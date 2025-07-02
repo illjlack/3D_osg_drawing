@@ -538,30 +538,31 @@ void MainWindow::onGeoParametersChanged()
 
 // ========================================= OSGWidget 实现 =========================================
 OSGWidget::OSGWidget(QWidget* parent)
-    : QWidget(parent)
-    , osgViewer::Viewer()
-    , m_graphicsWindow(nullptr)
+    : osgQOpenGLWidget(parent)
+    , m_rootNode(new osg::Group)
+    , m_sceneNode(new osg::Group)
+    , m_geoNode(new osg::Group)
+    , m_lightNode(new osg::Group)
+    , m_trackballManipulator(new osgGA::TrackballManipulator)
     , m_currentDrawingGeo(nullptr)
     , m_selectedGeo(nullptr)
     , m_isDrawing(false)
-    , m_updateTimer(nullptr)
+    , m_lastMouseWorldPos(0.0f)
+    , m_updateTimer(new QTimer(this))
 {
-    setAttribute(Qt::WA_PaintOnScreen);
-    setAttribute(Qt::WA_NoSystemBackground);
     setFocusPolicy(Qt::StrongFocus);
     setMouseTracking(true);
     
-    initializeScene();
-    setupCamera();
-    setupLighting();
-    setupEventHandlers();
-    
-    // 创建更新定时器
-    m_updateTimer = new QTimer(this);
-    connect(m_updateTimer, &QTimer::timeout, [this]() {
+    // 连接信号槽
+    connect(m_updateTimer, &QTimer::timeout, this, [this]() {
         update();
     });
-    m_updateTimer->start(16); // 60 FPS
+    
+    // 连接初始化完成信号
+    connect(this, &osgQOpenGLWidget::initialized, this, &OSGWidget::initializeScene);
+    
+    // 设置渲染循环
+    m_updateTimer->start(16); // 约60FPS
 }
 
 OSGWidget::~OSGWidget()
@@ -574,53 +575,33 @@ OSGWidget::~OSGWidget()
 
 void OSGWidget::initializeScene()
 {
-    // 创建图形窗口
-    osg::ref_ptr<osg::GraphicsContext::Traits> traits = new osg::GraphicsContext::Traits;
-    traits->x = x();
-    traits->y = y();
-    traits->width = width();
-    traits->height = height();
-    traits->windowDecoration = false;
-    traits->doubleBuffer = true;
-    traits->sharedContext = nullptr;
-    traits->inheritedWindowData = new osgQt::GraphicsWindowQt::WindowData(this);
+    osgViewer::Viewer* viewer = getOsgViewer();
+    if (!viewer) return;
     
-    m_graphicsWindow = new osgQt::GraphicsWindowQt(traits.get());
+    // 设置场景图
+    m_rootNode->addChild(m_sceneNode);
+    m_rootNode->addChild(m_lightNode);
+    m_sceneNode->addChild(m_geoNode);
     
-    // 设置相机
-    osg::Camera* camera = getCamera();
-    camera->setGraphicsContext(m_graphicsWindow);
-    camera->setClearColor(osg::Vec4(0.2f, 0.2f, 0.2f, 1.0f));
-    camera->setViewport(new osg::Viewport(0, 0, traits->width, traits->height));
-    camera->setProjectionMatrixAsPerspective(
-        45.0f, 
-        static_cast<double>(traits->width) / static_cast<double>(traits->height), 
-        0.1f, 
-        1000.0f
-    );
+    viewer->setSceneData(m_rootNode);
     
-    // 创建场景图
-    m_rootNode = new osg::Group();
-    m_sceneNode = new osg::Group();
-    m_geoNode = new osg::Group();
-    m_lightNode = new osg::Group();
+    // 设置线程模型
+    viewer->setThreadingModel(osgViewer::Viewer::SingleThreaded);
     
-    m_rootNode->addChild(m_lightNode.get());
-    m_rootNode->addChild(m_sceneNode.get());
-    m_sceneNode->addChild(m_geoNode.get());
+    // 设置相机操控器
+    viewer->setCameraManipulator(m_trackballManipulator);
     
-    setSceneData(m_rootNode.get());
-    
-    // 启用多线程
-    setThreadingModel(osgViewer::Viewer::SingleThreaded);
-    
-    // 初始化相机操作器
-    setCameraManipulator(new osgGA::TrackballManipulator());
+    setupCamera();
+    setupLighting();
+    setupEventHandlers();
 }
 
 void OSGWidget::setupCamera()
 {
-    osg::Camera* camera = getCamera();
+    osgViewer::Viewer* viewer = getOsgViewer();
+    if (!viewer) return;
+    
+    osg::Camera* camera = viewer->getCamera();
     
     // 设置渲染状态
     osg::StateSet* stateSet = camera->getOrCreateStateSet();
@@ -631,6 +612,9 @@ void OSGWidget::setupCamera()
     // 启用反走样
     stateSet->setMode(GL_LINE_SMOOTH, osg::StateAttribute::ON);
     stateSet->setMode(GL_POINT_SMOOTH, osg::StateAttribute::ON);
+    
+    // 设置背景色
+    camera->setClearColor(osg::Vec4(0.2f, 0.2f, 0.2f, 1.0f));
     
     // 设置初始视点
     resetCamera();
@@ -660,58 +644,70 @@ void OSGWidget::setupLighting()
 
 void OSGWidget::setupEventHandlers()
 {
+    osgViewer::Viewer* viewer = getOsgViewer();
+    if (!viewer) return;
+    
     // 添加事件处理器
-    addEventHandler(new osgViewer::StatsHandler());
-    addEventHandler(new osgViewer::WindowSizeHandler());
-    addEventHandler(new osgGA::StateSetManipulator(getCamera()->getOrCreateStateSet()));
+    viewer->addEventHandler(new osgViewer::StatsHandler());
+    viewer->addEventHandler(new osgViewer::WindowSizeHandler());
+    viewer->addEventHandler(new osgGA::StateSetManipulator(viewer->getCamera()->getOrCreateStateSet()));
 }
 
 void OSGWidget::resetCamera()
 {
-    if (getCameraManipulator())
+    osgViewer::Viewer* viewer = getOsgViewer();
+    if (!viewer) return;
+    
+    if (viewer->getCameraManipulator())
     {
-        getCameraManipulator()->setHomePosition(
+        viewer->getCameraManipulator()->setHomePosition(
             osg::Vec3d(10, 10, 10),  // eye
             osg::Vec3d(0, 0, 0),     // center
             osg::Vec3d(0, 0, 1)      // up
         );
-        getCameraManipulator()->home(0.0);
+        viewer->getCameraManipulator()->home(0.0);
     }
 }
 
 void OSGWidget::fitAll()
 {
-    if (getCameraManipulator() && m_geoNode.valid())
+    osgViewer::Viewer* viewer = getOsgViewer();
+    if (!viewer || !m_geoNode.valid()) return;
+    
+    if (viewer->getCameraManipulator())
     {
         osg::BoundingSphere bs = m_geoNode->getBound();
         if (bs.valid())
         {
-            getCameraManipulator()->setHomePosition(
+            viewer->getCameraManipulator()->setHomePosition(
                 bs.center() + osg::Vec3d(bs.radius() * 2, bs.radius() * 2, bs.radius() * 2),
                 bs.center(),
                 osg::Vec3d(0, 0, 1)
             );
-            getCameraManipulator()->home(0.0);
+            viewer->getCameraManipulator()->home(0.0);
         }
     }
 }
 
 void OSGWidget::setViewDirection(const glm::vec3& direction, const glm::vec3& up)
 {
-    if (getCameraManipulator())
+    osgViewer::Viewer* viewer = getOsgViewer();
+    if (!viewer) return;
+    
+    if (viewer->getCameraManipulator())
     {
         osg::BoundingSphere bs = m_geoNode->getBound();
-        osg::Vec3d center = bs.valid() ? bs.center() : osg::Vec3d(0, 0, 0);
+        osg::Vec3d center = bs.valid() ? osg::Vec3d(bs.center()) : osg::Vec3d(0, 0, 0);
         float distance = bs.valid() ? bs.radius() * 3.0f : 10.0f;
         
         osg::Vec3d eye = center - osg::Vec3d(direction.x, direction.y, direction.z) * distance;
         
-        getCameraManipulator()->setHomePosition(
+        viewer->getCameraManipulator()->setHomePosition(
             eye,
             center,
             osg::Vec3d(up.x, up.y, up.z)
         );
-        getCameraManipulator()->home(0.0);
+        viewer->getCameraManipulator()->home(0.0);
     }
 }
 
@@ -812,13 +808,18 @@ PickResult3D OSGWidget::pick(int x, int y)
 {
     PickResult3D result;
     
+    osgViewer::Viewer* viewer = getOsgViewer();
+    if (!viewer) return result;
+    
+    osg::Camera* camera = viewer->getCamera();
+    
     // 创建射线
     osg::Vec3f nearPoint, farPoint;
-    if (getCamera()->getViewport())
+    if (camera->getViewport())
     {
-        osg::Matrix VPW = getCamera()->getViewMatrix() * 
-                         getCamera()->getProjectionMatrix() * 
-                         getCamera()->getViewport()->computeWindowMatrix();
+        osg::Matrix VPW = camera->getViewMatrix() * 
+                         camera->getProjectionMatrix() * 
+                         camera->getViewport()->computeWindowMatrix();
         osg::Matrix invVPW;
         invVPW.invert(VPW);
         
@@ -851,11 +852,15 @@ glm::vec3 OSGWidget::screenToWorld(int x, int y, float depth)
 {
     osg::Vec3f worldPoint;
     
-    if (getCamera()->getViewport())
+    osgViewer::Viewer* viewer = getOsgViewer();
+    if (!viewer) return glm::vec3(0, 0, 0);
+    
+    osg::Camera* camera = viewer->getCamera();
+    if (camera->getViewport())
     {
-        osg::Matrix VPW = getCamera()->getViewMatrix() * 
-                         getCamera()->getProjectionMatrix() * 
-                         getCamera()->getViewport()->computeWindowMatrix();
+        osg::Matrix VPW = camera->getViewMatrix() * 
+                         camera->getProjectionMatrix() * 
+                         camera->getViewport()->computeWindowMatrix();
         osg::Matrix invVPW;
         invVPW.invert(VPW);
         
@@ -869,11 +874,15 @@ glm::vec2 OSGWidget::worldToScreen(const glm::vec3& worldPos)
 {
     osg::Vec2f screenPoint;
     
-    if (getCamera()->getViewport())
+    osgViewer::Viewer* viewer = getOsgViewer();
+    if (!viewer) return glm::vec2(0, 0);
+    
+    osg::Camera* camera = viewer->getCamera();
+    if (camera->getViewport())
     {
-        osg::Matrix VPW = getCamera()->getViewMatrix() * 
-                         getCamera()->getProjectionMatrix() * 
-                         getCamera()->getViewport()->computeWindowMatrix();
+        osg::Matrix VPW = camera->getViewMatrix() * 
+                         camera->getProjectionMatrix() * 
+                         camera->getViewport()->computeWindowMatrix();
         
         osg::Vec3f world(worldPos.x, worldPos.y, worldPos.z);
         osg::Vec3f screen = world * VPW;
@@ -886,18 +895,18 @@ glm::vec2 OSGWidget::worldToScreen(const glm::vec3& worldPos)
 // OSGWidget 事件处理
 void OSGWidget::paintEvent(QPaintEvent* event)
 {
-    frame();
+    // osgQOpenGLWidget已经处理了渲染，这里不需要手动调用frame()
+    QOpenGLWidget::paintEvent(event);
 }
 
 void OSGWidget::resizeEvent(QResizeEvent* event)
 {
-    if (m_graphicsWindow.valid())
-    {
-        m_graphicsWindow->getEventQueue()->windowResize(0, 0, width(), height());
-        m_graphicsWindow->resized(0, 0, width(), height());
-    }
+    osgQOpenGLWidget::resizeEvent(event);
     
-    osg::Camera* camera = getCamera();
+    osgViewer::Viewer* viewer = getOsgViewer();
+    if (!viewer) return;
+    
+    osg::Camera* camera = viewer->getCamera();
     if (camera)
     {
         camera->setViewport(0, 0, width(), height());
@@ -908,23 +917,13 @@ void OSGWidget::resizeEvent(QResizeEvent* event)
 
 void OSGWidget::mousePressEvent(QMouseEvent* event)
 {
-    if (m_graphicsWindow.valid())
-    {
-        m_graphicsWindow->getEventQueue()->mouseButtonPress(event->x(), event->y(), 
-            event->button() == Qt::LeftButton ? 1 : 
-            event->button() == Qt::RightButton ? 3 : 
-            event->button() == Qt::MiddleButton ? 2 : 0);
-    }
-    
+    osgQOpenGLWidget::mousePressEvent(event);
     handleDrawingInput(event);
 }
 
 void OSGWidget::mouseMoveEvent(QMouseEvent* event)
 {
-    if (m_graphicsWindow.valid())
-    {
-        m_graphicsWindow->getEventQueue()->mouseMotion(event->x(), event->y());
-    }
+    osgQOpenGLWidget::mouseMoveEvent(event);
     
     // 更新鼠标世界坐标
     glm::vec3 worldPos = screenToWorld(event->x(), event->y(), 0.5f);
@@ -940,31 +939,17 @@ void OSGWidget::mouseMoveEvent(QMouseEvent* event)
 
 void OSGWidget::mouseReleaseEvent(QMouseEvent* event)
 {
-    if (m_graphicsWindow.valid())
-    {
-        m_graphicsWindow->getEventQueue()->mouseButtonRelease(event->x(), event->y(), 
-            event->button() == Qt::LeftButton ? 1 : 
-            event->button() == Qt::RightButton ? 3 : 
-            event->button() == Qt::MiddleButton ? 2 : 0);
-    }
+    osgQOpenGLWidget::mouseReleaseEvent(event);
 }
 
 void OSGWidget::wheelEvent(QWheelEvent* event)
 {
-    if (m_graphicsWindow.valid())
-    {
-        m_graphicsWindow->getEventQueue()->mouseScroll(
-            event->delta() > 0 ? osgGA::GUIEventAdapter::SCROLL_UP : 
-                                osgGA::GUIEventAdapter::SCROLL_DOWN);
-    }
+    osgQOpenGLWidget::wheelEvent(event);
 }
 
 void OSGWidget::keyPressEvent(QKeyEvent* event)
 {
-    if (m_graphicsWindow.valid())
-    {
-        m_graphicsWindow->getEventQueue()->keyPress(static_cast<osgGA::GUIEventAdapter::KeySymbol>(event->key()));
-    }
+    osgQOpenGLWidget::keyPressEvent(event);
     
     // 处理绘制相关按键
     if (m_isDrawing && m_currentDrawingGeo)
@@ -996,10 +981,7 @@ void OSGWidget::keyPressEvent(QKeyEvent* event)
 
 void OSGWidget::keyReleaseEvent(QKeyEvent* event)
 {
-    if (m_graphicsWindow.valid())
-    {
-        m_graphicsWindow->getEventQueue()->keyRelease(static_cast<osgGA::GUIEventAdapter::KeySymbol>(event->key()));
-    }
+    osgQOpenGLWidget::keyReleaseEvent(event);
     
     if (m_isDrawing && m_currentDrawingGeo)
     {
@@ -2000,8 +1982,3 @@ void ToolPanel3D::onDrawModeButtonClicked()
     
     emit drawModeChanged(mode);
 }
-
-// 包含moc文件
-#include "MainWindow.moc"
-
-

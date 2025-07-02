@@ -94,27 +94,27 @@ void initializeGlobal3DSettings()
 QString drawMode3DToString(DrawMode3D mode)
 {
     switch (mode) {
-            case DrawSelect3D: return QObject::tr("选择");
-    case DrawPoint3D: return QObject::tr("点");
-    case DrawLine3D: return QObject::tr("线");
-    case DrawArc3D: return QObject::tr("圆弧");
-    case DrawThreePointArc3D: return QObject::tr("三点弧");
-    case DrawBezierCurve3D: return QObject::tr("贝塞尔曲线");
-    case DrawStreamline3D: return QObject::tr("流线");
-    case DrawTriangle3D: return QObject::tr("三角形");
-    case DrawQuad3D: return QObject::tr("四边形");
-    case DrawPolygon3D: return QObject::tr("多边形");
-    case DrawCircleSurface3D: return QObject::tr("圆面");
-    case DrawBox3D: return QObject::tr("长方体");
-    case DrawCube3D: return QObject::tr("正方体");
-    case DrawCone3D: return QObject::tr("圆锥");
-    case DrawCylinder3D: return QObject::tr("圆柱");
-    case DrawPrism3D: return QObject::tr("多棱柱");
-    case DrawTorus3D: return QObject::tr("圆环");
-    case DrawSphere3D: return QObject::tr("球");
-    case DrawHemisphere3D: return QObject::tr("半球");
-    case DrawEllipsoid3D: return QObject::tr("椭球");
-    default: return QObject::tr("未知");
+        case DrawSelect3D: return QObject::tr("选择");
+        case DrawPoint3D: return QObject::tr("点");
+        case DrawLine3D: return QObject::tr("线");
+        case DrawArc3D: return QObject::tr("圆弧");
+        case DrawThreePointArc3D: return QObject::tr("三点弧");
+        case DrawBezierCurve3D: return QObject::tr("贝塞尔曲线");
+        case DrawStreamline3D: return QObject::tr("流线");
+        case DrawTriangle3D: return QObject::tr("三角形");
+        case DrawQuad3D: return QObject::tr("四边形");
+        case DrawPolygon3D: return QObject::tr("多边形");
+        case DrawCircleSurface3D: return QObject::tr("圆面");
+        case DrawBox3D: return QObject::tr("长方体");
+        case DrawCube3D: return QObject::tr("正方体");
+        case DrawCone3D: return QObject::tr("圆锥");
+        case DrawCylinder3D: return QObject::tr("圆柱");
+        case DrawPrism3D: return QObject::tr("多棱柱");
+        case DrawTorus3D: return QObject::tr("圆环");
+        case DrawSphere3D: return QObject::tr("球");
+        case DrawHemisphere3D: return QObject::tr("半球");
+        case DrawEllipsoid3D: return QObject::tr("椭球");
+        default: return QObject::tr("未知");
     }
 }
 

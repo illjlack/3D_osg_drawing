@@ -45,8 +45,10 @@
 #include <osg/LightSource>
 #include <osg/Light>
 #include <osg/PositionAttitudeTransform>
-#include <osgQt/GraphicsWindowQt>
+// 使用osgQOpenGL代替osgQt
+#include <osgQOpenGL/osgQOpenGLWidget>
 #include <QTimer>
+#include <QOpenGLWidget>
 
 #include "Common3D.h"
 
@@ -137,7 +139,7 @@ private:
 };
 
 // OSG视图组件
-class OSGWidget : public QWidget, public osgViewer::Viewer
+class OSGWidget : public osgQOpenGLWidget
 {
     Q_OBJECT
 
@@ -196,11 +198,14 @@ private:
     void cancelCurrentDrawing();
 
 private:
-    osgQt::GraphicsWindowQt* m_graphicsWindow;
+    // OSG场景图相关成员
     osg::ref_ptr<osg::Group> m_rootNode;
     osg::ref_ptr<osg::Group> m_sceneNode;
     osg::ref_ptr<osg::Group> m_geoNode;
     osg::ref_ptr<osg::Group> m_lightNode;
+    
+    // 相机操控器
+    osg::ref_ptr<osgGA::TrackballManipulator> m_trackballManipulator;
     
     // 当前绘制状态
     Geo3D* m_currentDrawingGeo;
@@ -344,6 +349,10 @@ private:
     QPushButton* m_coneButton;
     QPushButton* m_sphereButton;
     QPushButton* m_torusButton;
+    
+    // 视图和实用工具组
+    QGroupBox* m_viewGroup;
+    QGroupBox* m_utilityGroup;
     
     std::vector<QPushButton*> m_drawButtons;
 };

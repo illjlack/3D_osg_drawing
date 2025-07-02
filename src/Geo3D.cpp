@@ -57,12 +57,12 @@ Geo3D::Geo3D()
     , m_initialized(false)
 {
     m_osgNode = new osg::Group();
-    m_geode = new osg::Geode();
+    m_drawableGroup = new osg::Group();  // 替代Geode
     m_transformNode = new osg::MatrixTransform();
     m_controlPointsNode = new osg::Group();
     
     m_osgNode->addChild(m_transformNode.get());
-    m_transformNode->addChild(m_geode.get());
+    m_transformNode->addChild(m_drawableGroup.get());
     m_transformNode->addChild(m_controlPointsNode.get());
 }
 
@@ -208,13 +208,16 @@ void Geo3D::updateOSGNode()
     if (isGeometryDirty())
     {
         // 清除旧的几何体
-        m_geode->removeDrawables(0, m_geode->getNumDrawables());
+        m_drawableGroup->removeChildren(0, m_drawableGroup->getNumChildren());
         
         // 创建新的几何体
         m_geometry = createGeometry();
         if (m_geometry.valid())
         {
-            m_geode->addDrawable(m_geometry.get());
+            // 创建Geode来包装Drawable，然后添加到Group中
+            osg::ref_ptr<osg::Geode> geode = new osg::Geode();
+            geode->addDrawable(m_geometry.get());
+            m_drawableGroup->addChild(geode.get());
             updateMaterial();
         }
         

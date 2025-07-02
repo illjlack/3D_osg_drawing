@@ -8,9 +8,12 @@
 #include <QDebug>
 #include <QString>
 #include <QStatusBar>
+#include <QObject>
 #include <vector>
 #include <filesystem>
 #include <sstream>
+#include <cfloat>
+#include <climits>
 
 // 全局变量声明
 extern DrawMode3D GlobalDrawMode3D;

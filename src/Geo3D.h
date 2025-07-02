@@ -4,6 +4,7 @@
 #include <osg/Node>
 #include <osg/Group>
 #include <osg/Geode>
+#include <osg/Drawable>
 #include <osg/Geometry>
 #include <osg/Vec3>
 #include <osg/Vec4>
@@ -149,9 +150,9 @@ protected:
     Transform3D m_transform;
     BoundingBox3D m_boundingBox;
     
-    // OSG相关
+    // OSG相关 - 使用现代OSG API (Group+Drawable而不是Geode)
     osg::ref_ptr<osg::Group> m_osgNode;
-    osg::ref_ptr<osg::Geode> m_geode;
+    osg::ref_ptr<osg::Group> m_drawableGroup;  // 替代Geode
     osg::ref_ptr<osg::Geometry> m_geometry;
     osg::ref_ptr<osg::MatrixTransform> m_transformNode;
     osg::ref_ptr<osg::Group> m_controlPointsNode;
@@ -168,6 +169,7 @@ public:
     
     void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
     void completeDrawing() override;
+    void updateGeometry() override;
 
 protected:
     osg::ref_ptr<osg::Geometry> createGeometry() override;
@@ -185,6 +187,7 @@ public:
     void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
     void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
     void keyPressEvent(QKeyEvent* event) override;
+    void updateGeometry() override;
 
 protected:
     osg::ref_ptr<osg::Geometry> createGeometry() override;
@@ -205,6 +208,7 @@ public:
     
     void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
     void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
+    void updateGeometry() override;
 
 protected:
     osg::ref_ptr<osg::Geometry> createGeometry() override;
@@ -230,6 +234,7 @@ public:
     void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
     void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
     void keyPressEvent(QKeyEvent* event) override;
+    void updateGeometry() override;
 
 protected:
     osg::ref_ptr<osg::Geometry> createGeometry() override;
@@ -249,6 +254,7 @@ public:
     
     void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
     void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
+    void updateGeometry() override;
 
 protected:
     osg::ref_ptr<osg::Geometry> createGeometry() override;
@@ -267,6 +273,7 @@ public:
     
     void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
     void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
+    void updateGeometry() override;
 
 protected:
     osg::ref_ptr<osg::Geometry> createGeometry() override;
@@ -286,6 +293,7 @@ public:
     void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
     void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
     void keyPressEvent(QKeyEvent* event) override;
+    void updateGeometry() override;
 
 protected:
     osg::ref_ptr<osg::Geometry> createGeometry() override;
@@ -306,6 +314,7 @@ public:
     
     void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
     void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
+    void updateGeometry() override;
 
 protected:
     osg::ref_ptr<osg::Geometry> createGeometry() override;
@@ -322,6 +331,7 @@ public:
     
     void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
     void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
+    void updateGeometry() override;
 
 protected:
     osg::ref_ptr<osg::Geometry> createGeometry() override;
@@ -338,6 +348,7 @@ public:
     
     void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
     void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
+    void updateGeometry() override;
 
 protected:
     osg::ref_ptr<osg::Geometry> createGeometry() override;
@@ -356,6 +367,7 @@ public:
     
     void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
     void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
+    void updateGeometry() override;
 
 protected:
     osg::ref_ptr<osg::Geometry> createGeometry() override;
@@ -374,6 +386,7 @@ public:
     
     void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
     void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
+    void updateGeometry() override;
 
 protected:
     osg::ref_ptr<osg::Geometry> createGeometry() override;
@@ -390,6 +403,7 @@ public:
     
     void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
     void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
+    void updateGeometry() override;
 
 protected:
     osg::ref_ptr<osg::Geometry> createGeometry() override;
