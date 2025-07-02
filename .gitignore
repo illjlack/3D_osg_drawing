@@ -1,0 +1,75 @@
+# Visual Studio 文件
+.vs/
+*.user
+*.aps
+*.pch
+*.vspscc
+*_i.c
+*_p.c
+*.ncb
+*.suo
+*.tlb
+*.tlh
+*.bak
+*.cache
+*.ilk
+*.log
+[Bb]in/
+[Dd]ebug*/
+[Rr]elease*/
+x64/
+x86/
+[Oo]bj/
+[Tt]mp/
+[Tt]emp/
+
+# Qt 文件
+*.pro.user
+*.pro.user.*
+.qmake.cache
+.qmake.stash
+*.moc
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+*.qm
+.qtc_clangd/
+
+# CMake 文件
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake
+!CMakeLists.txt
+
+# vcpkg
+vcpkg_installed/
+.vcpkg-root
+
+# 编译输出
+*.exe
+*.dll
+*.pdb
+*.lib
+*.obj
+*.exp
+*.idb
+*.ipdb
+*.iobj
+*.manifest
+
+# 系统文件
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# 备份文件
+*.bak
+*.swp
+*.tmp
+*~
+
+# 日志文件
+*.log 
