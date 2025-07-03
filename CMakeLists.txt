@@ -16,6 +16,12 @@ if (NOT DEFINED CMAKE_TOOLCHAIN_FILE)
   )
 endif()
 
+# 设置vcpkg使用全局缓存，避免重复安装
+if (DEFINED CMAKE_TOOLCHAIN_FILE)
+  set(VCPKG_INSTALLED_DIR "${CMAKE_BINARY_DIR}/../vcpkg_installed" CACHE PATH "vcpkg installed directory")
+  set(VCPKG_OVERLAY_PORTS "${CMAKE_SOURCE_DIR}/vcpkg_ports" CACHE PATH "vcpkg overlay ports")
+endif()
+
 # ——— 查找依赖 ———
 find_package(Qt5      REQUIRED COMPONENTS Core Widgets Gui)
 find_package(OpenSceneGraph CONFIG REQUIRED
@@ -116,3 +122,17 @@ message(STATUS "  OSG Version    : ${OpenSceneGraph_VERSION}")
 message(STATUS "  osgQt Target   : osgQt::osgQt")
 message(STATUS "  glm Target     : glm::glm")
 message(STATUS "———————————— End ——————————")
+
+# 设置输出目录
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+
+# 设置包含目录
+include_directories(${CMAKE_SOURCE_DIR}/src)
+
+# 添加子目录
+add_subdirectory(src)
+
+# 设置VS文件夹结构
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)

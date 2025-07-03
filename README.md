@@ -1,6 +1,104 @@
-# OSG 3D 绘图板
+# 3Drawing - 3D绘图项目
 
-基于Qt + OpenSceneGraph的三维绘图应用程序，支持点、线、面、体的三维绘制与编辑。
+这是一个基于Qt6和OpenSceneGraph的3D绘图应用程序。
+
+## 项目结构
+
+```
+src/
+├── main.cpp                 # 主程序入口
+├── ui/                      # 用户界面模块
+│   ├── MainWindow.h/cpp     # 主窗口
+│   └── OSGWidget.h/cpp      # OSG渲染窗口
+├── core/                    # 核心功能模块
+│   ├── Common3D.h/cpp       # 通用3D功能
+│   ├── GeometryBase.h/cpp   # 几何基类
+│   ├── Enums3D.h           # 枚举定义
+│   ├── geometry/           # 几何对象
+│   │   ├── Point3D.h/cpp
+│   │   ├── Line3D.h/cpp
+│   │   ├── Triangle3D.h/cpp
+│   │   ├── Quad3D.h/cpp
+│   │   ├── Polygon3D.h/cpp
+│   │   ├── Box3D.h/cpp
+│   │   ├── Cube3D.h/cpp
+│   │   ├── Sphere3D.h/cpp
+│   │   ├── Cylinder3D.h/cpp
+│   │   ├── Cone3D.h/cpp
+│   │   ├── Torus3D.h/cpp
+│   │   ├── Arc3D.h/cpp
+│   │   └── BezierCurve3D.h/cpp
+│   └── picking/            # 拾取系统
+│       ├── PickingSystem.h/cpp
+│       ├── PickingIntegration.h/cpp
+│       └── PickingIndicator.h/cpp
+└── util/                   # 工具模块
+    ├── OSGUtils.h/cpp      # OSG工具函数
+    ├── GeometryFactory.h/cpp # 几何工厂
+    ├── IndicatorFactory.h/cpp # 指示器工厂
+    └── MathUtils.h/cpp     # 数学工具
+```
+
+## 依赖项
+
+- **Qt6**: Core, Widgets, OpenGL, OpenGLWidgets
+- **OpenSceneGraph**: osg, osgDB, osgViewer, osgGA, osgUtil, osgText, osgManipulator
+- **osgQt**: Qt与OSG的集成
+- **glm**: 数学库
+
+## 构建说明
+
+### 使用CMake构建
+
+1. **确保已安装依赖项**:
+   - Qt6
+   - OpenSceneGraph
+   - osgQt
+   - glm
+   - Visual Studio 2022
+
+2. **构建项目**:
+   ```bash
+   # 方法1: 使用构建脚本
+   build.bat
+   
+   # 方法2: 手动构建
+   mkdir build
+   cd build
+   cmake .. -G "Visual Studio 17 2022" -A x64
+   cmake --build . --config Release
+   ```
+
+3. **在Visual Studio中打开**:
+   - 打开 `build/3Drawing.sln`
+   - 项目将按文件夹结构组织，便于导航
+
+### VS文件夹结构
+
+项目在Visual Studio中按以下结构组织：
+
+- **3Drawing** (根项目)
+  - **Main** - 主程序文件
+  - **UI** - 用户界面模块
+  - **Core** - 核心功能
+    - **Core\Geometry** - 几何对象
+    - **Core\Picking** - 拾取系统
+  - **Util** - 工具模块
+
+## 功能特性
+
+- 3D几何对象绘制
+- 实时拾取和选择
+- 多种视图模式（线框、实体、点）
+- 相机控制
+- 高级拾取系统
+
+## 开发说明
+
+- 使用C++17标准
+- 支持Windows平台
+- 自动Qt库部署
+- 调试和发布配置支持
 
 ## 功能特性
 

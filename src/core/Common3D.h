@@ -14,6 +14,10 @@
 #include <sstream>
 #include <cfloat>
 #include <climits>
+#include <osg/Geometry>
+#include <osg/Vec3>
+#include <osg/Vec4>
+#include <osg/ref_ptr>
 
 // 全局变量声明
 extern DrawMode3D GlobalDrawMode3D;
@@ -205,6 +209,39 @@ struct PickResult3D
     void* userData;  // 可以存储几何对象指针
     
     PickResult3D() : hit(false), distance(FLT_MAX), point(0.0f), normal(0.0f), userData(nullptr) {}
+};
+
+// 拾取Feature结构
+struct PickingFeature
+{
+    FeatureType type;
+    uint32_t index;                    // Feature在该类型中的索引
+    osg::ref_ptr<osg::Geometry> geometry;  // 该Feature的几何体
+    osg::Vec3 center;                  // Feature中心点(用于指示器定位)
+    float size;                        // Feature大小(用于指示器缩放)
+    
+    PickingFeature(FeatureType t, uint32_t idx) 
+        : type(t), index(idx), center(0,0,0), size(1.0f) {}
+};
+
+// 指示器配置
+struct IndicatorConfig
+{
+    float size;                 // 指示器大小
+    osg::Vec4 color;           // 颜色
+    float lineWidth;           // 线宽
+    float animationSpeed;      // 动画速度
+    bool enableAnimation;      // 是否启用动画
+    float fadeTime;            // 淡入淡出时间
+    
+    IndicatorConfig()
+        : size(0.1f)
+        , color(1.0f, 1.0f, 0.0f, 1.0f)  // 黄色
+        , lineWidth(3.0f)
+        , animationSpeed(2.0f)
+        , enableAnimation(true)
+        , fadeTime(0.3f)
+    {}
 };
 
 // 日志辅助类

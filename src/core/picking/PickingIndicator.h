@@ -18,34 +18,6 @@
 
 class Geo3D;
 
-// 指示器类型
-enum class IndicatorType
-{
-    VERTEX_INDICATOR,    // 顶点指示器(小方框)
-    EDGE_INDICATOR,      // 边指示器(小三角箭头)
-    FACE_INDICATOR       // 面指示器(圆环)
-};
-
-// 指示器配置
-struct IndicatorConfig
-{
-    float size;                 // 指示器大小
-    osg::Vec4 color;           // 颜色
-    float lineWidth;           // 线宽
-    float animationSpeed;      // 动画速度
-    bool enableAnimation;      // 是否启用动画
-    float fadeTime;            // 淡入淡出时间
-    
-    IndicatorConfig()
-        : size(0.1f)
-        , color(1.0f, 1.0f, 0.0f, 1.0f)  // 黄色
-        , lineWidth(3.0f)
-        , animationSpeed(2.0f)
-        , enableAnimation(true)
-        , fadeTime(0.3f)
-    {}
-};
-
 // 单个指示器
 class PickingIndicator : public osg::Referenced
 {

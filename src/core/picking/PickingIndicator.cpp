@@ -1,5 +1,5 @@
 #include "PickingIndicator.h"
-#include "Geo3D.h"
+#include "../GeometryBase.h"
 #include <osg/ShapeDrawable>
 #include <osg/PrimitiveSet>
 #include <osg/CullFace>

@@ -31,43 +31,11 @@
 
 // 前向声明
 class Geo3D;
-class Point3D_Geo;
-class Line3D_Geo;
-class Arc3D_Geo;
-class BezierCurve3D_Geo;
-class Triangle3D_Geo;
-class Quad3D_Geo;
-class Polygon3D_Geo;
-class Box3D_Geo;
-class Cube3D_Geo;
-class Cylinder3D_Geo;
-class Cone3D_Geo;
-class Sphere3D_Geo;
-class Torus3D_Geo;
 
 // 几何对象工厂
 Geo3D* createGeo3D(DrawMode3D mode);
 
-// 拾取Feature接口
-enum class FeatureType : uint8_t
-{
-    FACE = 0,
-    EDGE = 1, 
-    VERTEX = 2
-};
-
-struct PickingFeature
-{
-    FeatureType type;
-    uint32_t index;                    // Feature在该类型中的索引
-    osg::ref_ptr<osg::Geometry> geometry;  // 该Feature的几何体
-    osg::Vec3 center;                  // Feature中心点(用于指示器定位)
-    float size;                        // Feature大小(用于指示器缩放)
-    
-    PickingFeature(FeatureType t, uint32_t idx) 
-        : type(t), index(idx), center(0,0,0), size(1.0f) {}
-};
-
+// 拾取Provider接口
 class IPickingProvider
 {
 public:
@@ -225,259 +193,6 @@ protected:
     std::vector<PickingFeature> getCachedFeatures(FeatureType type) const;
 };
 
-// ========================================= 点类 =========================================
-class Point3D_Geo : public Geo3D
-{
-public:
-    Point3D_Geo();
-    
-    void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
-    void completeDrawing() override;
-    void updateGeometry() override;
-
-protected:
-    osg::ref_ptr<osg::Geometry> createGeometry() override;
-    
-private:
-    osg::ref_ptr<osg::Geometry> createPointGeometry(PointShape3D shape, float size);
-};
-
-// ========================================= 线类 =========================================
-class Line3D_Geo : public Geo3D
-{
-public:
-    Line3D_Geo();
-    
-    void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
-    void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
-    void keyPressEvent(QKeyEvent* event) override;
-    void updateGeometry() override;
-
-protected:
-    osg::ref_ptr<osg::Geometry> createGeometry() override;
-    
-private:
-    void generatePolyline();
-    void generateSpline();
-    void generateBezierCurve();
-    
-    std::vector<Point3D> m_generatedPoints;
-};
-
-// ========================================= 圆弧类 =========================================
-class Arc3D_Geo : public Geo3D
-{
-public:
-    Arc3D_Geo();
-    
-    void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
-    void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
-    void updateGeometry() override;
-
-protected:
-    osg::ref_ptr<osg::Geometry> createGeometry() override;
-    
-private:
-    void calculateArcFromThreePoints();
-    void generateArcPoints();
-    
-    glm::vec3 m_center;
-    float m_radius;
-    float m_startAngle;
-    float m_endAngle;
-    glm::vec3 m_normal;
-    std::vector<Point3D> m_arcPoints;
-};
-
-// ========================================= 贝塞尔曲线类 =========================================
-class BezierCurve3D_Geo : public Geo3D
-{
-public:
-    BezierCurve3D_Geo();
-    
-    void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
-    void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
-    void keyPressEvent(QKeyEvent* event) override;
-    void updateGeometry() override;
-
-protected:
-    osg::ref_ptr<osg::Geometry> createGeometry() override;
-    
-private:
-    void generateBezierPoints();
-    glm::vec3 calculateBezierPoint(float t) const;
-    
-    std::vector<Point3D> m_bezierPoints;
-};
-
-// ========================================= 三角形类 =========================================
-class Triangle3D_Geo : public Geo3D
-{
-public:
-    Triangle3D_Geo();
-    
-    void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
-    void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
-    void updateGeometry() override;
-
-protected:
-    osg::ref_ptr<osg::Geometry> createGeometry() override;
-    
-private:
-    void calculateNormal();
-    
-    glm::vec3 m_normal;
-};
-
-// ========================================= 四边形类 =========================================
-class Quad3D_Geo : public Geo3D
-{
-public:
-    Quad3D_Geo();
-    
-    void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
-    void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
-    void updateGeometry() override;
-
-protected:
-    osg::ref_ptr<osg::Geometry> createGeometry() override;
-    
-private:
-    void calculateNormal();
-    
-    glm::vec3 m_normal;
-};
-
-// ========================================= 多边形类 =========================================
-class Polygon3D_Geo : public Geo3D
-{
-public:
-    Polygon3D_Geo();
-    
-    void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
-    void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
-    void keyPressEvent(QKeyEvent* event) override;
-    void updateGeometry() override;
-
-protected:
-    osg::ref_ptr<osg::Geometry> createGeometry() override;
-    
-private:
-    void calculateNormal();
-    void triangulatePolygon();
-    
-    glm::vec3 m_normal;
-    std::vector<unsigned int> m_triangleIndices;
-};
-
-// ========================================= 长方体类 =========================================
-class Box3D_Geo : public Geo3D
-{
-public:
-    Box3D_Geo();
-    
-    void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
-    void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
-    void updateGeometry() override;
-
-protected:
-    osg::ref_ptr<osg::Geometry> createGeometry() override;
-    
-private:
-    glm::vec3 m_size;
-};
-
-// ========================================= 正方体类 =========================================
-class Cube3D_Geo : public Geo3D
-{
-public:
-    Cube3D_Geo();
-    
-    void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
-    void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
-    void updateGeometry() override;
-
-protected:
-    osg::ref_ptr<osg::Geometry> createGeometry() override;
-    
-private:
-    float m_size;
-};
-
-// ========================================= 圆柱类 =========================================
-class Cylinder3D_Geo : public Geo3D
-{
-public:
-    Cylinder3D_Geo();
-    
-    void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
-    void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
-    void updateGeometry() override;
-
-protected:
-    osg::ref_ptr<osg::Geometry> createGeometry() override;
-    
-private:
-    float m_radius;
-    float m_height;
-    glm::vec3 m_axis;
-};
-
-// ========================================= 圆锥类 =========================================
-class Cone3D_Geo : public Geo3D
-{
-public:
-    Cone3D_Geo();
-    
-    void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
-    void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
-    void updateGeometry() override;
-
-protected:
-    osg::ref_ptr<osg::Geometry> createGeometry() override;
-    
-private:
-    float m_radius;
-    float m_height;
-    glm::vec3 m_axis;
-};
-
-// ========================================= 球类 =========================================
-class Sphere3D_Geo : public Geo3D
-{
-public:
-    Sphere3D_Geo();
-    
-    void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
-    void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
-    void updateGeometry() override;
-
-protected:
-    osg::ref_ptr<osg::Geometry> createGeometry() override;
-    
-private:
-    float m_radius;
-};
-
-// ========================================= 圆环类 =========================================
-class Torus3D_Geo : public Geo3D
-{
-public:
-    Torus3D_Geo();
-    
-    void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
-    void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
-    void updateGeometry() override;
-
-protected:
-    osg::ref_ptr<osg::Geometry> createGeometry() override;
-    
-private:
-    float m_majorRadius;  // 主半径
-    float m_minorRadius;  // 次半径
-    glm::vec3 m_axis;
-};
-
 // 规则几何体基类
 class RegularGeo3D : public Geo3D
 {
@@ -498,7 +213,7 @@ protected:
     virtual std::vector<PickingFeature> extractVertexFeatures() const override;
 };
 
-// 三角网格几何体(导入的模型)
+// 网格几何体基类
 class MeshGeo3D : public Geo3D
 {
 public:
@@ -528,14 +243,23 @@ public:
     CompositeGeo3D();
     virtual ~CompositeGeo3D() = default;
     
-    // 添加子几何体
+    // 复合对象支持所有Feature类型
+    virtual std::vector<FeatureType> getSupportedFeatureTypes() const override
+    {
+        return {FeatureType::FACE, FeatureType::EDGE, FeatureType::VERTEX};
+    }
+    
+    // 组件管理
     void addComponent(osg::ref_ptr<Geo3D> component);
     void removeComponent(osg::ref_ptr<Geo3D> component);
     void clearComponents();
     
-    // 复合对象支持的Feature类型是所有子对象的并集
-    virtual std::vector<FeatureType> getSupportedFeatureTypes() const override;
+    // 从所有组件收集Feature
     virtual std::vector<PickingFeature> getFeatures(FeatureType type) const override;
+
+protected:
+    virtual osg::ref_ptr<osg::Geometry> createGeometry() override;
+    virtual void updateGeometry() override;
 
 private:
     std::vector<osg::ref_ptr<Geo3D>> m_components;

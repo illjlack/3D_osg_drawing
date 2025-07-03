@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Common3D.h"
-#include "Geo3D.h"  // 包含Geo3D.h以使用FeatureType
+#include "../Common3D.h"
+#include "../GeometryBase.h"
 #include <osg/Camera>
 #include <osg/FrameBufferObject>
 #include <osg/Texture2D>

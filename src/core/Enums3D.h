@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 // 三维绘图系统枚举定义
 
 enum DrawMode3D 
@@ -172,4 +174,21 @@ enum SubdivisionLevel3D
     Subdivision_Ultra3D = 64,    // 超高细分度
     
     EndSubdivisionLevel3D
-}; 
+};
+
+// 拾取Feature接口
+enum class FeatureType : uint8_t
+{
+    FACE = 0,
+    EDGE = 1, 
+    VERTEX = 2
+};
+
+// 指示器类型
+enum class IndicatorType
+{
+    VERTEX_INDICATOR,    // 顶点指示器(小方框)
+    EDGE_INDICATOR,      // 边指示器(小三角箭头)
+    FACE_INDICATOR,       // 面指示器(圆环)
+    VOLUME_INDICATOR
+};

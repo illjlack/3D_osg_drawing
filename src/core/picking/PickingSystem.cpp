@@ -1,5 +1,5 @@
 #include "PickingSystem.h"
-#include "Geo3D.h"
+#include "../GeometryBase.h"
 #include <osg/GL>
 #include <osgDB/ReadFile>
 #include <osgDB/WriteFile>

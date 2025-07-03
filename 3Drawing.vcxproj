@@ -39,12 +39,12 @@
   </ImportGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'" Label="QtSettings">
     <QtInstall>5.15.2_msvc2019_64</QtInstall>
-    <QtModules>core;gui;widgets</QtModules>
+    <QtModules>core;gui;widgets;opengl</QtModules>
     <QtBuildConfig>debug</QtBuildConfig>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'" Label="QtSettings">
     <QtInstall>5.15.2_msvc2019_64</QtInstall>
-    <QtModules>core;gui;widgets</QtModules>
+    <QtModules>core;gui;widgets;opengl</QtModules>
     <QtBuildConfig>release</QtBuildConfig>
   </PropertyGroup>
   <Target Name="QtMsBuildNotFound" BeforeTargets="CustomBuild;ClCompile" Condition="!Exists('$(QtMsBuild)\qt.targets') or !Exists('$(QtMsBuild)\qt.props')">
@@ -103,25 +103,180 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <QtRcc Include="Drawing.qrc" />
+    <ClCompile Include="src\main.cpp">
+      <Filter>Main</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\MainWindow.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\OSGWidget.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\Common3D.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\GeometryBase.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\geometry\Point3D.cpp">
+      <Filter>Core\Geometry</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\geometry\Line3D.cpp">
+      <Filter>Core\Geometry</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\geometry\Triangle3D.cpp">
+      <Filter>Core\Geometry</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\geometry\Quad3D.cpp">
+      <Filter>Core\Geometry</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\geometry\Polygon3D.cpp">
+      <Filter>Core\Geometry</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\geometry\Box3D.cpp">
+      <Filter>Core\Geometry</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\geometry\Cube3D.cpp">
+      <Filter>Core\Geometry</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\geometry\Sphere3D.cpp">
+      <Filter>Core\Geometry</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\geometry\Cylinder3D.cpp">
+      <Filter>Core\Geometry</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\geometry\Cone3D.cpp">
+      <Filter>Core\Geometry</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\geometry\Torus3D.cpp">
+      <Filter>Core\Geometry</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\geometry\Arc3D.cpp">
+      <Filter>Core\Geometry</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\geometry\BezierCurve3D.cpp">
+      <Filter>Core\Geometry</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\picking\PickingSystem.cpp">
+      <Filter>Core\Picking</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\picking\PickingIntegration.cpp">
+      <Filter>Core\Picking</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\picking\PickingIndicator.cpp">
+      <Filter>Core\Picking</Filter>
+    </ClCompile>
+    <ClCompile Include="src\util\OSGUtils.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="src\util\GeometryFactory.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="src\util\IndicatorFactory.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="src\util\MathUtils.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\Common3D.cpp" />
-    <ClCompile Include="src\Geo3D.cpp" />
-    <ClCompile Include="src\main.cpp" />
-    <ClCompile Include="src\MainWindow.cpp" />
-    <ClCompile Include="src\PickingIndicator.cpp" />
-    <ClCompile Include="src\PickingIntegration.cpp" />
-    <ClCompile Include="src\PickingSystem.cpp" />
+    <ClInclude Include="src\core\Common3D.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\GeometryBase.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\Enums3D.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\geometry\Point3D.h">
+      <Filter>Core\Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\geometry\Line3D.h">
+      <Filter>Core\Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\geometry\Triangle3D.h">
+      <Filter>Core\Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\geometry\Quad3D.h">
+      <Filter>Core\Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\geometry\Polygon3D.h">
+      <Filter>Core\Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\geometry\Box3D.h">
+      <Filter>Core\Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\geometry\Cube3D.h">
+      <Filter>Core\Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\geometry\Sphere3D.h">
+      <Filter>Core\Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\geometry\Cylinder3D.h">
+      <Filter>Core\Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\geometry\Cone3D.h">
+      <Filter>Core\Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\geometry\Torus3D.h">
+      <Filter>Core\Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\geometry\Arc3D.h">
+      <Filter>Core\Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\geometry\BezierCurve3D.h">
+      <Filter>Core\Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\picking\PickingSystem.h">
+      <Filter>Core\Picking</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\picking\PickingIntegration.h">
+      <Filter>Core\Picking</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\picking\PickingIndicator.h">
+      <Filter>Core\Picking</Filter>
+    </ClInclude>
+    <ClInclude Include="src\util\OSGUtils.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="src\util\GeometryFactory.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="src\util\IndicatorFactory.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="src\util\MathUtils.h">
+      <Filter>Util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\Common3D.h" />
-    <ClInclude Include="src\Enums3D.h" />
-    <ClInclude Include="src\Geo3D.h" />
-    <ClInclude Include="src\PickingIndicator.h" />
-    <ClInclude Include="src\PickingIntegration.h" />
-    <ClInclude Include="src\PickingSystem.h" />
-    <QtMoc Include="src\MainWindow.h" />
+    <QtMoc Include="src\ui\MainWindow.h">
+      <Filter>UI</Filter>
+    </QtMoc>
+    <QtMoc Include="src\ui\OSGWidget.h">
+      <Filter>UI</Filter>
+    </QtMoc>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Main">
+      <UniqueIdentifier>{main-filter-guid}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="UI">
+      <UniqueIdentifier>{ui-filter-guid}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core">
+      <UniqueIdentifier>{core-filter-guid}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core\Geometry">
+      <UniqueIdentifier>{core-geometry-filter-guid}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core\Picking">
+      <UniqueIdentifier>{core-picking-filter-guid}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Util">
+      <UniqueIdentifier>{util-filter-guid}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Condition="Exists('$(QtMsBuild)\qt.targets')">

@@ -8,8 +8,8 @@
 #include <QPixmap>
 #include <QTimer>
 
-#include "MainWindow.h"
-#include "Common3D.h"
+#include "ui/MainWindow.h"
+#include "core/Common3D.h"
 
 int main(int argc, char *argv[])
 {
