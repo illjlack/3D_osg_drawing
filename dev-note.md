@@ -274,5 +274,10 @@ OSG提供了拾取相关的库，可以给每个对象的点、线额外维护�
 
 
 
+花了很久才搞明白一点点点点这些库的关系
+osg与osgqt是独立模块，因为官方没给出osgConfig.cmake, 所以使用的是unofficial-osg-config.cmake
+osg-qt编出安装了osgQOpenGL.lib，但是没提供找的cmake,所以自己写一个cmake放那里，或者写道cmake里找，或者直接把源码编到项目里。
+
+
 
 

@@ -43,6 +43,7 @@ cmake_install.cmake
 Makefile
 *.cmake
 !CMakeLists.txt
+build/
 
 # vcpkg
 vcpkg_installed/

@@ -1,35 +1,28 @@
 @echo off
-REM 3Drawing Windows 构建脚本
+REM 3Drawing Windows 构建脚本 - 基于成功的test_cmake_global_qt.cmd配置
 
 setlocal enabledelayedexpansion
 
-REM 设置颜色
-set "RED=[91m"
-set "GREEN=[92m"
-set "YELLOW=[93m"
-set "BLUE=[94m"
-set "NC=[0m"
-
-REM 打印带颜色的消息
+REM 打印消息
 :print_message
-echo !BLUE![3Drawing]!NC! %~1
+echo [3Drawing] %~1
 goto :eof
 
 :print_success
-echo !GREEN![3Drawing]!NC! %~1
+echo [3Drawing] %~1
 goto :eof
 
 :print_warning
-echo !YELLOW![3Drawing]!NC! %~1
+echo [3Drawing] %~1
 goto :eof
 
 :print_error
-echo !RED![3Drawing]!NC! %~1
+echo [3Drawing] %~1
 goto :eof
 
 REM 显示帮助信息
 :show_help
-echo 3Drawing 构建脚本
+echo 3Drawing Windows 构建脚本
 echo.
 echo 用法: %~nx0 [选项]
 echo.
@@ -37,16 +30,14 @@ echo 选项:
 echo   /h, /help           显示此帮助信息
 echo   /d, /debug          构建Debug版本（默认为Release）
 echo   /c, /clean          清理构建目录
-echo   /i, /install        安装到系统
-echo   /p, /package        创建发布包
+echo   /qt, /local-qt      使用本地Qt5（默认通过vcpkg）
 echo   /j, /jobs N         并行编译任务数（默认为CPU核心数）
 echo.
 echo 示例:
 echo   %~nx0               # 构建Release版本
 echo   %~nx0 /d            # 构建Debug版本
 echo   %~nx0 /c /d         # 清理并构建Debug版本
-echo   %~nx0 /i            # 构建并安装
-echo   %~nx0 /p            # 构建并创建发布包
+echo   %~nx0 /qt /d        # 使用本地Qt5构建Debug版本
 goto :eof
 
 REM 检查依赖
@@ -58,15 +49,6 @@ cmake --version >nul 2>&1
 if errorlevel 1 (
     call :print_error "CMake 未安装，请先安装 CMake"
     exit /b 1
-)
-
-REM 检查ninja
-ninja --version >nul 2>&1
-if errorlevel 1 (
-    call :print_warning "Ninja 未安装，将使用 Visual Studio 生成器"
-    set "USE_NINJA=false"
-) else (
-    set "USE_NINJA=true"
 )
 
 REM 检查vcpkg
@@ -87,8 +69,8 @@ goto :eof
 REM 初始化变量
 set "BUILD_TYPE=Release"
 set "CLEAN_BUILD=false"
-set "INSTALL_AFTER_BUILD=false"
-set "CREATE_PACKAGE=false"
+set "USE_LOCAL_QT=false"
+set "LOCAL_QT_PATH=D:\Qt5.15\5.15.2\msvc2019_64"
 set "JOBS=%NUMBER_OF_PROCESSORS%"
 
 REM 入口点 - 开始解析命令行参数
@@ -119,23 +101,13 @@ if /i "%~1"=="/clean" (
     shift
     goto :parse_args
 )
-if /i "%~1"=="/i" (
-    set "INSTALL_AFTER_BUILD=true"
+if /i "%~1"=="/qt" (
+    set "USE_LOCAL_QT=true"
     shift
     goto :parse_args
 )
-if /i "%~1"=="/install" (
-    set "INSTALL_AFTER_BUILD=true"
-    shift
-    goto :parse_args
-)
-if /i "%~1"=="/p" (
-    set "CREATE_PACKAGE=true"
-    shift
-    goto :parse_args
-)
-if /i "%~1"=="/package" (
-    set "CREATE_PACKAGE=true"
+if /i "%~1"=="/local-qt" (
+    set "USE_LOCAL_QT=true"
     shift
     goto :parse_args
 )
@@ -166,9 +138,16 @@ REM 检查依赖
 call :check_dependencies
 if errorlevel 1 exit /b 1
 
-set "PLATFORM=windows"
-set "PRESET_NAME=windows-msvc"
-set "BUILD_DIR=build\%PRESET_NAME%-%BUILD_TYPE%"
+REM 检查本地Qt5（如果指定使用）
+if "%USE_LOCAL_QT%"=="true" (
+    if not exist "%LOCAL_QT_PATH%" (
+        call :print_error "本地Qt5未找到: %LOCAL_QT_PATH%"
+        exit /b 1
+    )
+    call :print_message "使用本地Qt5: %LOCAL_QT_PATH%"
+)
+
+set "BUILD_DIR=build\windows-%BUILD_TYPE%"
 
 REM 清理构建目录
 if "%CLEAN_BUILD%"=="true" (
@@ -177,19 +156,22 @@ if "%CLEAN_BUILD%"=="true" (
 )
 
 REM 创建构建目录
+if not exist build mkdir build
 if not exist "%BUILD_DIR%" mkdir "%BUILD_DIR%"
 
 REM 配置CMake
 call :print_message "配置 CMake..."
 set CMAKE_ARGS=-S . -B "%BUILD_DIR%" -DCMAKE_BUILD_TYPE=%BUILD_TYPE% -DCMAKE_TOOLCHAIN_FILE="%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake"
 
-if "%USE_NINJA%"=="true" (
-    set CMAKE_ARGS=%CMAKE_ARGS% -G Ninja
-) else (
-    set CMAKE_ARGS=%CMAKE_ARGS% -G "Visual Studio 16 2019" -A x64
+REM 添加本地Qt5路径（如果指定）
+if "%USE_LOCAL_QT%"=="true" (
+    set CMAKE_ARGS=!CMAKE_ARGS! -DQT5_PREFIX="%LOCAL_QT_PATH%" -DDISABLE_WINDEPLOYQT=TRUE
 )
 
-cmake %CMAKE_ARGS%
+REM 指定Visual Studio生成器
+set CMAKE_ARGS=!CMAKE_ARGS! -G "Visual Studio 17 2022" -A x64
+
+cmake !CMAKE_ARGS!
 if errorlevel 1 (
     call :print_error "CMake 配置失败"
     exit /b 1
@@ -203,34 +185,16 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call :print_success "构建完成"
+call :print_success "构建完成！"
 
-REM 安装
-if "%INSTALL_AFTER_BUILD%"=="true" (
-    call :print_message "安装项目..."
-    cmake --install "%BUILD_DIR%" --config %BUILD_TYPE%
-    if errorlevel 1 (
-        call :print_error "安装失败"
-        exit /b 1
-    )
-    call :print_success "安装完成"
+REM 查找生成的可执行文件
+if exist "%BUILD_DIR%\%BUILD_TYPE%\3Drawing.exe" (
+    call :print_message "可执行文件: %BUILD_DIR%\%BUILD_TYPE%\3Drawing.exe"
+) else if exist "%BUILD_DIR%\3Drawing.exe" (
+    call :print_message "可执行文件: %BUILD_DIR%\3Drawing.exe"
+) else (
+    call :print_warning "请在 %BUILD_DIR% 或其子目录中查找可执行文件"
 )
 
-REM 创建包
-if "%CREATE_PACKAGE%"=="true" (
-    call :print_message "创建发布包..."
-    cd "%BUILD_DIR%"
-    cpack
-    if errorlevel 1 (
-        call :print_error "创建发布包失败"
-        cd ..
-        exit /b 1
-    )
-    cd ..
-    call :print_success "发布包创建完成"
-)
-
-call :print_success "所有操作完成!"
-call :print_message "可执行文件位置: %BUILD_DIR%\3Drawing.exe"
-
+call :print_success "所有操作完成！"
 exit /b 0 

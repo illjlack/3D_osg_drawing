@@ -1,7 +1,6 @@
 #!/bin/bash
 
-# 3Drawing 跨平台构建脚本
-# 支持 Linux 和 macOS
+# 3Drawing Linux 构建脚本 - 支持Ninja构建系统
 
 set -e
 
@@ -31,7 +30,7 @@ print_error() {
 
 # 显示帮助信息
 show_help() {
-    echo "3Drawing 构建脚本"
+    echo "3Drawing Linux 构建脚本"
     echo ""
     echo "用法: $0 [选项]"
     echo ""
@@ -39,16 +38,13 @@ show_help() {
     echo "  -h, --help          显示此帮助信息"
     echo "  -d, --debug         构建Debug版本（默认为Release）"
     echo "  -c, --clean         清理构建目录"
-    echo "  -i, --install       安装到系统"
-    echo "  -p, --package       创建发布包"
     echo "  -j, --jobs N        并行编译任务数（默认为CPU核心数）"
     echo ""
     echo "示例:"
     echo "  $0                  # 构建Release版本"
     echo "  $0 -d               # 构建Debug版本"
     echo "  $0 -c -d            # 清理并构建Debug版本"
-    echo "  $0 -i               # 构建并安装"
-    echo "  $0 -p               # 构建并创建发布包"
+    echo "  $0 -j 8             # 使用8个并行任务构建"
 }
 
 # 检查依赖
@@ -67,6 +63,7 @@ check_dependencies() {
         USE_NINJA=false
     else
         USE_NINJA=true
+        print_message "找到 Ninja 构建系统"
     fi
     
     # 检查vcpkg
@@ -87,8 +84,6 @@ check_dependencies() {
 # 初始化变量
 BUILD_TYPE="Release"
 CLEAN_BUILD=false
-INSTALL_AFTER_BUILD=false
-CREATE_PACKAGE=false
 JOBS=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
 
 # 解析命令行参数
@@ -104,14 +99,6 @@ while [[ $# -gt 0 ]]; do
             ;;
         -c|--clean)
             CLEAN_BUILD=true
-            shift
-            ;;
-        -i|--install)
-            INSTALL_AFTER_BUILD=true
-            shift
-            ;;
-        -p|--package)
-            CREATE_PACKAGE=true
             shift
             ;;
         -j|--jobs)
@@ -145,7 +132,7 @@ main() {
         exit 1
     fi
     
-    BUILD_DIR="build/${PRESET_NAME}-$(echo $BUILD_TYPE | tr '[:upper:]' '[:lower:]')"
+    BUILD_DIR="build/${PLATFORM}-$(echo $BUILD_TYPE | tr '[:upper:]' '[:lower:]')"
     
     # 清理构建目录
     if [ "$CLEAN_BUILD" = true ]; then
@@ -165,36 +152,38 @@ main() {
         -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
     )
     
+    # 优先使用Ninja生成器
     if [ "$USE_NINJA" = true ]; then
         CMAKE_ARGS+=(-G Ninja)
+        print_message "使用 Ninja 生成器"
+    else
+        print_message "使用系统默认生成器"
     fi
     
     cmake "${CMAKE_ARGS[@]}"
     
     # 构建项目
     print_message "构建项目..."
-    cmake --build "$BUILD_DIR" --config "$BUILD_TYPE" -j "$JOBS"
-    
-    print_success "构建完成"
-    
-    # 安装
-    if [ "$INSTALL_AFTER_BUILD" = true ]; then
-        print_message "安装项目..."
-        cmake --install "$BUILD_DIR" --config "$BUILD_TYPE"
-        print_success "安装完成"
+    if [ "$USE_NINJA" = true ]; then
+        # Ninja构建
+        ninja -C "$BUILD_DIR" -j "$JOBS"
+    else
+        # 默认构建
+        cmake --build "$BUILD_DIR" --config "$BUILD_TYPE" -j "$JOBS"
     fi
     
-    # 创建包
-    if [ "$CREATE_PACKAGE" = true ]; then
-        print_message "创建发布包..."
-        cd "$BUILD_DIR"
-        cpack
-        cd ..
-        print_success "发布包创建完成"
+    print_success "构建完成！"
+    
+    # 查找生成的可执行文件
+    if [ -f "$BUILD_DIR/3Drawing" ]; then
+        print_message "可执行文件: $BUILD_DIR/3Drawing"
+    elif [ -f "$BUILD_DIR/3Drawing.exe" ]; then
+        print_message "可执行文件: $BUILD_DIR/3Drawing.exe"
+    else
+        print_warning "请在 $BUILD_DIR 目录中查找可执行文件"
     fi
     
-    print_success "所有操作完成!"
-    print_message "可执行文件位置: $BUILD_DIR/3Drawing"
+    print_success "所有操作完成！"
 }
 
 # 运行主函数
