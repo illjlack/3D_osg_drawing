@@ -2,7 +2,7 @@
 #include <sstream>
 #include <filesystem>
 
-// 全局变量定义
+// 全局变量定义(用于初始化新的对象，可以写个配置文件让重新启动时保存上次设置)
 DrawMode3D GlobalDrawMode3D = DrawSelect3D;
 PointShape3D GlobalPointShape3D = Point_Circle3D;
 float GlobalPointSize3D = 5.0f;

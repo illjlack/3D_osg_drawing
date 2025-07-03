@@ -46,6 +46,7 @@ Makefile
 
 # vcpkg
 vcpkg_installed/
+vcpkg_installed_backups/
 .vcpkg-root
 
 # 编译输出

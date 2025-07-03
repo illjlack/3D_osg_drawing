@@ -110,11 +110,17 @@
     <ClCompile Include="src\Geo3D.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\MainWindow.cpp" />
+    <ClCompile Include="src\PickingIndicator.cpp" />
+    <ClCompile Include="src\PickingIntegration.cpp" />
+    <ClCompile Include="src\PickingSystem.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Common3D.h" />
     <ClInclude Include="src\Enums3D.h" />
     <ClInclude Include="src\Geo3D.h" />
+    <ClInclude Include="src\PickingIndicator.h" />
+    <ClInclude Include="src\PickingIntegration.h" />
+    <ClInclude Include="src\PickingSystem.h" />
     <QtMoc Include="src\MainWindow.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

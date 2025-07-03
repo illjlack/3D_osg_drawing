@@ -25,6 +25,9 @@
 #include <QKeyEvent>
 #include <vector>
 #include <memory>
+#include <map>
+#include <set>
+#include <algorithm>
 
 // 前向声明
 class Geo3D;
@@ -45,8 +48,49 @@ class Torus3D_Geo;
 // 几何对象工厂
 Geo3D* createGeo3D(DrawMode3D mode);
 
+// 拾取Feature接口
+enum class FeatureType : uint8_t
+{
+    FACE = 0,
+    EDGE = 1, 
+    VERTEX = 2
+};
+
+struct PickingFeature
+{
+    FeatureType type;
+    uint32_t index;                    // Feature在该类型中的索引
+    osg::ref_ptr<osg::Geometry> geometry;  // 该Feature的几何体
+    osg::Vec3 center;                  // Feature中心点(用于指示器定位)
+    float size;                        // Feature大小(用于指示器缩放)
+    
+    PickingFeature(FeatureType t, uint32_t idx) 
+        : type(t), index(idx), center(0,0,0), size(1.0f) {}
+};
+
+class IPickingProvider
+{
+public:
+    virtual ~IPickingProvider() = default;
+    
+    // 获取支持的Feature类型
+    virtual std::vector<FeatureType> getSupportedFeatureTypes() const = 0;
+    
+    // 获取指定类型的所有Feature
+    virtual std::vector<PickingFeature> getFeatures(FeatureType type) const = 0;
+    
+    // 获取指定Feature的详细信息(可选实现)
+    virtual bool getFeatureInfo(FeatureType type, uint32_t index, PickingFeature& feature) const { return false; }
+    
+    // 判断是否需要重新抽取Feature(当几何体发生变化时)
+    virtual bool needsFeatureUpdate() const = 0;
+    
+    // 标记Feature已更新
+    virtual void markFeatureUpdated() = 0;
+};
+
 // 三维几何对象基类
-class Geo3D
+class Geo3D : public osg::Referenced, public IPickingProvider
 {
 public:
     Geo3D();
@@ -116,6 +160,12 @@ public:
     // 更新几何体
     virtual void updateGeometry() = 0;
 
+    // 实现IPickingProvider接口
+    virtual std::vector<FeatureType> getSupportedFeatureTypes() const override;
+    virtual std::vector<PickingFeature> getFeatures(FeatureType type) const override;
+    virtual bool needsFeatureUpdate() const override { return m_featuresDirty; }
+    virtual void markFeatureUpdated() override { m_featuresDirty = false; }
+
 protected:
     // 初始化（第一次调用时）
     virtual void initialize();
@@ -140,6 +190,14 @@ protected:
     bool isGeometryDirty() const { return m_geometryDirty; }
     void clearGeometryDirty() { m_geometryDirty = false; }
 
+    // 子类实现具体的Feature抽取逻辑
+    virtual std::vector<PickingFeature> extractFaceFeatures() const { return {}; }
+    virtual std::vector<PickingFeature> extractEdgeFeatures() const { return {}; }
+    virtual std::vector<PickingFeature> extractVertexFeatures() const { return {}; }
+    
+    // 标记Feature需要更新
+    void markFeaturesDirty() { m_featuresDirty = true; }
+
 protected:
     GeoType3D m_geoType;
     int m_geoState;
@@ -159,6 +217,12 @@ protected:
     
     bool m_geometryDirty;
     bool m_initialized;
+
+    mutable bool m_featuresDirty;
+    mutable std::map<FeatureType, std::vector<PickingFeature>> m_cachedFeatures;
+    
+    // 缓存Feature以提高性能
+    std::vector<PickingFeature> getCachedFeatures(FeatureType type) const;
 };
 
 // ========================================= 点类 =========================================
@@ -412,4 +476,67 @@ private:
     float m_majorRadius;  // 主半径
     float m_minorRadius;  // 次半径
     glm::vec3 m_axis;
+};
+
+// 规则几何体基类
+class RegularGeo3D : public Geo3D
+{
+public:
+    RegularGeo3D();
+    virtual ~RegularGeo3D() = default;
+    
+    // 规则几何体默认支持所有Feature类型
+    virtual std::vector<FeatureType> getSupportedFeatureTypes() const override
+    {
+        return {FeatureType::FACE, FeatureType::EDGE, FeatureType::VERTEX};
+    }
+
+protected:
+    // 规则几何体可以精确计算Feature
+    virtual std::vector<PickingFeature> extractFaceFeatures() const override;
+    virtual std::vector<PickingFeature> extractEdgeFeatures() const override; 
+    virtual std::vector<PickingFeature> extractVertexFeatures() const override;
+};
+
+// 三角网格几何体(导入的模型)
+class MeshGeo3D : public Geo3D
+{
+public:
+    MeshGeo3D();
+    virtual ~MeshGeo3D() = default;
+    
+    // 网格对象通常只提供面Feature
+    virtual std::vector<FeatureType> getSupportedFeatureTypes() const override
+    {
+        return {FeatureType::FACE};
+    }
+    
+    // 设置三角网格数据
+    void setMeshData(osg::ref_ptr<osg::Geometry> geometry);
+
+protected:
+    virtual std::vector<PickingFeature> extractFaceFeatures() const override;
+
+private:
+    osg::ref_ptr<osg::Geometry> m_meshGeometry;
+};
+
+// 复合几何体(由多个基本几何体组成)
+class CompositeGeo3D : public Geo3D
+{
+public:
+    CompositeGeo3D();
+    virtual ~CompositeGeo3D() = default;
+    
+    // 添加子几何体
+    void addComponent(osg::ref_ptr<Geo3D> component);
+    void removeComponent(osg::ref_ptr<Geo3D> component);
+    void clearComponents();
+    
+    // 复合对象支持的Feature类型是所有子对象的并集
+    virtual std::vector<FeatureType> getSupportedFeatureTypes() const override;
+    virtual std::vector<PickingFeature> getFeatures(FeatureType type) const override;
+
+private:
+    std::vector<osg::ref_ptr<Geo3D>> m_components;
 }; 

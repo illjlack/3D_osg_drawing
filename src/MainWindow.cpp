@@ -262,6 +262,7 @@ void MainWindow::connectSignals()
         connect(m_osgWidget, &OSGWidget::drawingProgress, [this](const QString& message) {
             updateStatusBar(message);
         });
+        connect(m_osgWidget, &OSGWidget::advancedPickingResult, this, &MainWindow::onAdvancedPickingResult);
     }
     
     // 工具面板信号连接
@@ -316,12 +317,22 @@ void MainWindow::onFileNew()
     if (m_osgWidget)
     {
         m_osgWidget->removeAllGeos();
+        
+        // 添加一个测试立方体来演示拾取功能
+        Geo3D* testCube = createGeo3D(DrawCube3D);
+        if (testCube)
+        {
+            testCube->addControlPoint(Point3D(-1, -1, -1));
+            testCube->addControlPoint(Point3D(1, 1, 1));
+            testCube->completeDrawing();
+            m_osgWidget->addGeo(testCube);
+        }
     }
     
     m_currentFilePath.clear();
     m_modified = false;
     setWindowTitle(tr("3D Drawing Board - 未命名"));
-    updateStatusBar(tr("新建文档"));
+    updateStatusBar(tr("新建文档 - 已添加测试立方体，试试64位ID拾取功能!"));
 }
 
 void MainWindow::onFileOpen()
@@ -536,6 +547,44 @@ void MainWindow::onGeoParametersChanged()
     updateStatusBar(tr("属性已修改"));
 }
 
+void MainWindow::onAdvancedPickingResult(const PickingResult& result)
+{
+    if (!result.hasResult)
+        return;
+    
+    // 更新状态栏信息
+    QString typeStr;
+    switch (result.id.typeCode)
+    {
+    case PickingID64::TYPE_VERTEX:
+        typeStr = tr("顶点");
+        break;
+    case PickingID64::TYPE_EDGE:
+        typeStr = tr("边");
+        break;
+    case PickingID64::TYPE_FACE:
+        typeStr = tr("面");
+        break;
+    default:
+        typeStr = tr("未知");
+        break;
+    }
+    
+    updateStatusBar(tr("拾取到 %1 - 对象ID: %2, 索引: %3")
+        .arg(typeStr)
+        .arg(result.id.objectID)
+        .arg(result.id.localIdx));
+    
+    // 更新坐标显示
+    if (m_positionLabel)
+    {
+        m_positionLabel->setText(tr("拾取点: (%1, %2, %3)")
+            .arg(result.worldPos.x, 0, 'f', 3)
+            .arg(result.worldPos.y, 0, 'f', 3)
+            .arg(result.worldPos.z, 0, 'f', 3));
+    }
+}
+
 // ========================================= OSGWidget 实现 =========================================
 OSGWidget::OSGWidget(QWidget* parent)
     : osgQOpenGLWidget(parent)
@@ -543,11 +592,13 @@ OSGWidget::OSGWidget(QWidget* parent)
     , m_sceneNode(new osg::Group)
     , m_geoNode(new osg::Group)
     , m_lightNode(new osg::Group)
+    , m_pickingIndicatorNode(new osg::Group)
     , m_trackballManipulator(new osgGA::TrackballManipulator)
     , m_currentDrawingGeo(nullptr)
     , m_selectedGeo(nullptr)
     , m_isDrawing(false)
     , m_lastMouseWorldPos(0.0f)
+    , m_advancedPickingEnabled(false)
     , m_updateTimer(new QTimer(this))
 {
     setFocusPolicy(Qt::StrongFocus);
@@ -581,6 +632,7 @@ void OSGWidget::initializeScene()
     // 设置场景图
     m_rootNode->addChild(m_sceneNode);
     m_rootNode->addChild(m_lightNode);
+    m_rootNode->addChild(m_pickingIndicatorNode);
     m_sceneNode->addChild(m_geoNode);
     
     viewer->setSceneData(m_rootNode);
@@ -594,6 +646,7 @@ void OSGWidget::initializeScene()
     setupCamera();
     setupLighting();
     setupEventHandlers();
+    setupPickingSystem();
 }
 
 void OSGWidget::setupCamera()
@@ -651,6 +704,42 @@ void OSGWidget::setupEventHandlers()
     viewer->addEventHandler(new osgViewer::StatsHandler());
     viewer->addEventHandler(new osgViewer::WindowSizeHandler());
     viewer->addEventHandler(new osgGA::StateSetManipulator(viewer->getCamera()->getOrCreateStateSet()));
+}
+
+void OSGWidget::setupPickingSystem()
+{
+    osgViewer::Viewer* viewer = getOsgViewer();
+    if (!viewer) return;
+    
+    // 初始化拾取系统
+    if (!PickingSystemIntegration::initializePickingSystem(width(), height()))
+    {
+        Log3D << "Failed to initialize picking system";
+        return;
+    }
+    
+    // 设置主相机
+    PickingSystemIntegration::setMainCamera(viewer->getCamera());
+    
+    // 创建指示器管理器
+    m_pickingIndicatorManager = PickingSystemIntegration::getIndicatorManager();
+    
+    if (m_pickingIndicatorManager)
+    {
+        // 添加指示器和高亮节点到场景图
+        m_pickingIndicatorNode->addChild(m_pickingIndicatorManager->getIndicatorRoot());
+        m_pickingIndicatorNode->addChild(m_pickingIndicatorManager->getHighlightRoot());
+    }
+    
+    // 添加拾取事件处理器
+    PickingSystemIntegration::addPickingEventHandler(viewer, 
+        [this](const PickingResult& result) {
+            onPickingResult(result);
+        });
+    
+    m_advancedPickingEnabled = true;
+    
+    Log3D << "Picking system initialized successfully";
 }
 
 void OSGWidget::resetCamera()
@@ -756,6 +845,12 @@ void OSGWidget::addGeo(Geo3D* geo)
     {
         m_geoList.push_back(geo);
         m_geoNode->addChild(geo->getOSGNode().get());
+        
+        // 添加到拾取系统
+        if (m_advancedPickingEnabled)
+        {
+            PickingSystemIntegration::addGeometry(geo);
+        }
     }
 }
 
@@ -768,6 +863,12 @@ void OSGWidget::removeGeo(Geo3D* geo)
         {
             m_geoList.erase(it);
             m_geoNode->removeChild(geo->getOSGNode().get());
+            
+            // 从拾取系统移除
+            if (m_advancedPickingEnabled)
+            {
+                PickingSystemIntegration::removeGeometry(geo);
+            }
         }
     }
 }
@@ -802,6 +903,44 @@ void OSGWidget::selectGeo(Geo3D* geo)
 void OSGWidget::deselectAll()
 {
     selectGeo(nullptr);
+}
+
+// 高级拾取系统接口
+void OSGWidget::enableAdvancedPicking(bool enabled)
+{
+    m_advancedPickingEnabled = enabled;
+}
+
+bool OSGWidget::isAdvancedPickingEnabled() const
+{
+    return m_advancedPickingEnabled;
+}
+
+void OSGWidget::setPickingRadius(int radius)
+{
+    if (m_pickingEventHandler)
+    {
+        m_pickingEventHandler->setPickingRadius(radius);
+    }
+}
+
+void OSGWidget::setPickingFrequency(double frequency)
+{
+    if (m_pickingEventHandler)
+    {
+        m_pickingEventHandler->setPickingFrequency(frequency);
+    }
+}
+
+void OSGWidget::onPickingResult(const PickingResult& result)
+{
+    if (m_pickingIndicatorManager)
+    {
+        m_pickingIndicatorManager->onPickingResult(result);
+    }
+    
+    // 发射高级拾取结果信号
+    emit advancedPickingResult(result);
 }
 
 PickResult3D OSGWidget::pick(int x, int y)

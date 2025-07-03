@@ -51,12 +51,14 @@
 #include <QOpenGLWidget>
 
 #include "Common3D.h"
+#include "PickingIntegration.h"
 
 // 前向声明
 class Geo3D;
 class OSGWidget;
 class PropertyEditor3D;
 class ToolPanel3D;
+class SimplePickingIndicatorManager;
 
 // 主窗口类
 class MainWindow : public QMainWindow
@@ -96,6 +98,7 @@ private slots:
     void onDrawModeChanged(DrawMode3D mode);
     void onGeoSelected(Geo3D* geo);
     void onGeoParametersChanged();
+    void onAdvancedPickingResult(const PickingResult& result);
 
 private:
     void setupUI();
@@ -168,6 +171,12 @@ public:
     // 拾取
     PickResult3D pick(int x, int y);
     
+    // 高级拾取系统
+    void enableAdvancedPicking(bool enabled);
+    bool isAdvancedPickingEnabled() const;
+    void setPickingRadius(int radius);
+    void setPickingFrequency(double frequency);
+    
     // 坐标转换
     glm::vec3 screenToWorld(int x, int y, float depth = 0.0f);
     glm::vec2 worldToScreen(const glm::vec3& worldPos);
@@ -176,6 +185,7 @@ signals:
     void geoSelected(Geo3D* geo);
     void mousePositionChanged(const glm::vec3& worldPos);
     void drawingProgress(const QString& message);
+    void advancedPickingResult(const PickingResult& result);
 
 protected:
     virtual void paintEvent(QPaintEvent* event) override;
@@ -191,11 +201,15 @@ private:
     void setupCamera();
     void setupLighting();
     void setupEventHandlers();
+    void setupPickingSystem();
     
     void handleDrawingInput(QMouseEvent* event);
     void updateCurrentDrawing(const glm::vec3& worldPos);
     void completeCurrentDrawing();
     void cancelCurrentDrawing();
+    
+    // 拾取系统回调
+    void onPickingResult(const PickingResult& result);
 
 private:
     // OSG场景图相关成员
@@ -203,6 +217,7 @@ private:
     osg::ref_ptr<osg::Group> m_sceneNode;
     osg::ref_ptr<osg::Group> m_geoNode;
     osg::ref_ptr<osg::Group> m_lightNode;
+    osg::ref_ptr<osg::Group> m_pickingIndicatorNode;  // 拾取指示器节点
     
     // 相机操控器
     osg::ref_ptr<osgGA::TrackballManipulator> m_trackballManipulator;
@@ -215,6 +230,11 @@ private:
     // 交互状态
     bool m_isDrawing;
     glm::vec3 m_lastMouseWorldPos;
+    
+    // 拾取系统
+    osg::ref_ptr<PickingEventHandler> m_pickingEventHandler;
+    osg::ref_ptr<SimplePickingIndicatorManager> m_pickingIndicatorManager;
+    bool m_advancedPickingEnabled;
     
     QTimer* m_updateTimer;
 };

@@ -55,6 +55,7 @@ Geo3D::Geo3D()
     , m_tempPoint(0, 0, 0)
     , m_geometryDirty(true)
     , m_initialized(false)
+    , m_featuresDirty(true)
 {
     m_osgNode = new osg::Group();
     m_drawableGroup = new osg::Group();  // 替代Geode
@@ -444,6 +445,232 @@ osg::ref_ptr<osg::Geometry> Point3D_Geo::createPointGeometry(PointShape3D shape,
     geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     
     return geometry;
+}
+
+// ============================================================================
+// IPickingProvider Implementation (Geo3D基类)
+// ============================================================================
+
+std::vector<FeatureType> Geo3D::getSupportedFeatureTypes() const
+{
+    // 默认不支持任何Feature类型，子类需要重写
+    return {};
+}
+
+std::vector<PickingFeature> Geo3D::getFeatures(FeatureType type) const
+{
+    return getCachedFeatures(type);
+}
+
+std::vector<PickingFeature> Geo3D::getCachedFeatures(FeatureType type) const
+{
+    // 检查缓存
+    auto it = m_cachedFeatures.find(type);
+    if (it != m_cachedFeatures.end() && !m_featuresDirty)
+    {
+        return it->second;
+    }
+    
+    // 重新抽取Feature
+    std::vector<PickingFeature> features;
+    switch (type)
+    {
+        case FeatureType::FACE:
+            features = extractFaceFeatures();
+            break;
+        case FeatureType::EDGE:
+            features = extractEdgeFeatures();
+            break;
+        case FeatureType::VERTEX:
+            features = extractVertexFeatures();
+            break;
+        default:
+            break;
+    }
+    
+    // 更新缓存
+    m_cachedFeatures[type] = features;
+    
+    return features;
+}
+
+// ============================================================================
+// RegularGeo3D Implementation (规则几何体基类)
+// ============================================================================
+
+RegularGeo3D::RegularGeo3D()
+{
+    markFeaturesDirty();
+}
+
+std::vector<PickingFeature> RegularGeo3D::extractFaceFeatures() const
+{
+    // 规则几何体的子类需要实现具体的Face抽取逻辑
+    return {};
+}
+
+std::vector<PickingFeature> RegularGeo3D::extractEdgeFeatures() const
+{
+    // 规则几何体的子类需要实现具体的Edge抽取逻辑
+    return {};
+}
+
+std::vector<PickingFeature> RegularGeo3D::extractVertexFeatures() const
+{
+    // 规则几何体的子类需要实现具体的Vertex抽取逻辑
+    return {};
+}
+
+// ============================================================================
+// MeshGeo3D Implementation (三角网格几何体)
+// ============================================================================
+
+MeshGeo3D::MeshGeo3D()
+{
+    markFeaturesDirty();
+}
+
+void MeshGeo3D::setMeshData(osg::ref_ptr<osg::Geometry> geometry)
+{
+    m_meshGeometry = geometry;
+    markFeaturesDirty();
+}
+
+std::vector<PickingFeature> MeshGeo3D::extractFaceFeatures() const
+{
+    std::vector<PickingFeature> features;
+    
+    if (!m_meshGeometry)
+        return features;
+    
+    // 获取基本几何数据
+    const osg::Vec3Array* vertices = dynamic_cast<const osg::Vec3Array*>(
+        m_meshGeometry->getVertexArray());
+    
+    if (!vertices || m_meshGeometry->getNumPrimitiveSets() == 0)
+        return features;
+    
+    // 处理三角形面
+    for (unsigned int i = 0; i < m_meshGeometry->getNumPrimitiveSets(); ++i)
+    {
+        const osg::PrimitiveSet* primitiveSet = m_meshGeometry->getPrimitiveSet(i);
+        const osg::DrawElementsUInt* drawElements = 
+            dynamic_cast<const osg::DrawElementsUInt*>(primitiveSet);
+        
+        if (drawElements && drawElements->getMode() == GL_TRIANGLES)
+        {
+            // 为每个三角形创建一个面Feature
+            for (size_t j = 0; j < drawElements->size(); j += 3)
+            {
+                PickingFeature feature(FeatureType::FACE, static_cast<uint32_t>(j / 3));
+                
+                // 创建单个三角形的几何体
+                osg::ref_ptr<osg::Geometry> faceGeometry = new osg::Geometry;
+                faceGeometry->setVertexArray(const_cast<osg::Vec3Array*>(vertices));
+                
+                osg::ref_ptr<osg::DrawElementsUInt> faceElements = new osg::DrawElementsUInt(GL_TRIANGLES);
+                faceElements->push_back((*drawElements)[j]);
+                faceElements->push_back((*drawElements)[j + 1]);
+                faceElements->push_back((*drawElements)[j + 2]);
+                
+                faceGeometry->addPrimitiveSet(faceElements);
+                feature.geometry = faceGeometry;
+                
+                // 计算面的中心点
+                const osg::Vec3& v0 = (*vertices)[(*drawElements)[j]];
+                const osg::Vec3& v1 = (*vertices)[(*drawElements)[j + 1]];
+                const osg::Vec3& v2 = (*vertices)[(*drawElements)[j + 2]];
+                feature.center = (v0 + v1 + v2) / 3.0f;
+                
+                // 计算面的大小(最大边长)
+                float d1 = (v1 - v0).length();
+                float d2 = (v2 - v1).length(); 
+                float d3 = (v0 - v2).length();
+                feature.size = std::max({d1, d2, d3});
+                
+                features.push_back(feature);
+            }
+        }
+    }
+    
+    return features;
+}
+
+// ============================================================================
+// CompositeGeo3D Implementation (复合几何体)
+// ============================================================================
+
+CompositeGeo3D::CompositeGeo3D()
+{
+    markFeaturesDirty();
+}
+
+void CompositeGeo3D::addComponent(osg::ref_ptr<Geo3D> component)
+{
+    if (component)
+    {
+        m_components.push_back(component);
+        markFeaturesDirty();
+    }
+}
+
+void CompositeGeo3D::removeComponent(osg::ref_ptr<Geo3D> component)
+{
+    auto it = std::find(m_components.begin(), m_components.end(), component);
+    if (it != m_components.end())
+    {
+        m_components.erase(it);
+        markFeaturesDirty();
+    }
+}
+
+void CompositeGeo3D::clearComponents()
+{
+    m_components.clear();
+    markFeaturesDirty();
+}
+
+std::vector<FeatureType> CompositeGeo3D::getSupportedFeatureTypes() const
+{
+    std::set<FeatureType> allTypes;
+    
+    // 收集所有子组件支持的Feature类型
+    for (const auto& component : m_components)
+    {
+        if (component)
+        {
+            std::vector<FeatureType> componentTypes = component->getSupportedFeatureTypes();
+            allTypes.insert(componentTypes.begin(), componentTypes.end());
+        }
+    }
+    
+    return std::vector<FeatureType>(allTypes.begin(), allTypes.end());
+}
+
+std::vector<PickingFeature> CompositeGeo3D::getFeatures(FeatureType type) const
+{
+    std::vector<PickingFeature> allFeatures;
+    uint32_t featureOffset = 0;
+    
+    // 收集所有子组件的Feature
+    for (const auto& component : m_components)
+    {
+        if (component)
+        {
+            std::vector<PickingFeature> componentFeatures = component->getFeatures(type);
+            
+            // 调整Feature索引，确保全局唯一
+            for (auto& feature : componentFeatures)
+            {
+                feature.index += featureOffset;
+                allFeatures.push_back(feature);
+            }
+            
+            featureOffset += static_cast<uint32_t>(componentFeatures.size());
+        }
+    }
+    
+    return allFeatures;
 }
 
 void Point3D_Geo::updateGeometry()
