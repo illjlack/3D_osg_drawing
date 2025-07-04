@@ -216,7 +216,7 @@ void Arc3D_Geo::generateArcPoints()
         glm::vec3 ref = glm::normalize(m_controlPoints[0].position - m_center);
         glm::vec3 perpRef = glm::normalize(glm::cross(m_normal, ref));
         
-        glm::vec3 point = m_center + m_radius * (cos(angle) * ref + sin(angle) * perpRef);
+        glm::vec3 point = m_center + m_radius * (static_cast<float>(cos(angle)) * ref + static_cast<float>(sin(angle)) * perpRef);
         m_arcPoints.push_back(Point3D(point));
     }
 } 

@@ -3,8 +3,11 @@
     "version-string": "1.0.0",
     "description": "An OpenSceneGraph-based 3D drawing application supporting customizable points, lines, surfaces and solids.",
     "dependencies": [
-      "osg",
-      "osg-qt",
-      "glm"
+        {
+            "name": "osg",
+            "features": ["tools", "plugins", "freetype"]
+        },
+        "osg-qt",
+        "glm"
     ]
 }

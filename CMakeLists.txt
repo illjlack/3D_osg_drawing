@@ -1,63 +1,105 @@
-cmake_minimum_required(VERSION 3.20)
+#
+#
+cmake_minimum_required(VERSION 3.16)
 
 project(3Drawing VERSION 1.0.0 LANGUAGES CXX)
 
 # ——— 基本配置 ———
-set(CMAKE_CXX_STANDARD            17)
-set(CMAKE_CXX_STANDARD_REQUIRED   ON)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
-
-# ——— Qt5 路径设置 ———
-# 优先使用全局安装的Qt5
-set(QT5_PREFIX "D:/Qt5.15/5.15.2/msvc2019_64" CACHE PATH "Qt5 installation prefix")
-if(EXISTS "${QT5_PREFIX}")
-    set(CMAKE_PREFIX_PATH "${QT5_PREFIX};${CMAKE_PREFIX_PATH}")
-    message(STATUS "使用全局Qt5: ${QT5_PREFIX}")
-else()
-    message(WARNING "未找到全局Qt5，将尝试使用vcpkg的Qt5")
-endif()
 
 # 禁用有问题的 windeployqt 自动部署
 set(DISABLE_WINDEPLOYQT TRUE CACHE BOOL "Disable automatic Qt deployment")
 
 # 如果你使用 vcpkg，请在调用 cmake 时传入：
 #   -DCMAKE_TOOLCHAIN_FILE=[vcpkg_root]/scripts/buildsystems/vcpkg.cmake
-if (NOT DEFINED CMAKE_TOOLCHAIN_FILE)
-  message(WARNING
-    "未指定 CMAKE_TOOLCHAIN_FILE；如果你使用 vcpkg，请添加：\n"
-    "  -DCMAKE_TOOLCHAIN_FILE=[vcpkg]/scripts/buildsystems/vcpkg.cmake"
-  )
+if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+    message(WARNING
+        "未指定 CMAKE_TOOLCHAIN_FILE；如果你使用 vcpkg，请添加：\n"
+        "  -DCMAKE_TOOLCHAIN_FILE=[vcpkg]/scripts/buildsystems/vcpkg.cmake"
+    )
 endif()
 
-# 设置vcpkg使用全局缓存，避免重复安装
+# 设置 vcpkg 安装目录
 if (DEFINED CMAKE_TOOLCHAIN_FILE)
-  set(VCPKG_INSTALLED_DIR "${CMAKE_BINARY_DIR}/../vcpkg_installed" CACHE PATH "vcpkg installed directory")
-  set(VCPKG_OVERLAY_PORTS "${CMAKE_SOURCE_DIR}/vcpkg_ports" CACHE PATH "vcpkg overlay ports")
+#
+#  set(VCPKG_INSTALLED_DIR "${CMAKE_BINARY_DIR}/../vcpkg_installed"
+#      CACHE PATH "vcpkg installed directory")
+#  set(VCPKG_OVERLAY_PORTS  "${CMAKE_SOURCE_DIR}/vcpkg_ports"
+#      CACHE PATH "vcpkg overlay ports")
+
+  # —— 打印调试信息 ——
+  message(STATUS "================ vcpkg ==============")
+  message(STATUS "vcpkg toolchain file: ${CMAKE_TOOLCHAIN_FILE}")
+  message(STATUS "vcpkg installed dir: ${VCPKG_INSTALLED_DIR}")
+  message(STATUS "vcpkg overlay ports: ${VCPKG_OVERLAY_PORTS}")
+  message(STATUS "vcpkg target triplet: ${VCPKG_TARGET_TRIPLET}")
+  message(STATUS "CMAKE_PREFIX_PATH: ${CMAKE_PREFIX_PATH}")
 endif()
 
 # ——— 查找依赖 ———
-find_package(Qt5      REQUIRED COMPONENTS Core Widgets Gui OpenGL)
-find_package(unofficial-osg CONFIG REQUIRED)
-find_package(glm      CONFIG REQUIRED)
+find_package(Qt5 REQUIRED COMPONENTS Core Widgets Gui OpenGL)
+message(STATUS "找到 Qt5 版本：${Qt5_VERSION}，安装目录：${Qt5_DIR}")
 
-# 创建 osgQOpenGL 的 IMPORTED target，支持 Debug 和 Release 自动切换
+find_package(unofficial-osg CONFIG REQUIRED)
+message(STATUS "找到 OpenSceneGraph 版本：${OpenSceneGraph_VERSION}")
+
+find_package(glm CONFIG REQUIRED)
+# 获取 glm::glm 的包含目录属性并打印
+get_target_property(_glm_inc glm::glm INTERFACE_INCLUDE_DIRECTORIES)
+message(STATUS "glm 的头文件目录：${_glm_inc}")
+
+# ——— 导入 osgQOpenGL 静态库 ———
 add_library(osgQOpenGL STATIC IMPORTED GLOBAL)
-set_target_properties(osgQOpenGL PROPERTIES
-  IMPORTED_CONFIGURATIONS "Debug;Release"
-  IMPORTED_LOCATION_DEBUG "${VCPKG_INSTALLED_DIR}/x64-windows/debug/lib/osgQOpenGLd.lib"
-  IMPORTED_LOCATION_RELEASE "${VCPKG_INSTALLED_DIR}/x64-windows/lib/osgQOpenGL.lib"
-  INTERFACE_INCLUDE_DIRECTORIES "${VCPKG_INSTALLED_DIR}/x64-windows/include/osgQOpenGL"
-)
+
+# ——— 检测 32/64 位 & 操作系统 ———
+if (CMAKE_SIZEOF_VOID_P EQUAL 8)
+  set(_arch "x64")
+else()
+  set(_arch "x86")
+endif()
+
+if (WIN32)
+  set(_os "windows")
+elseif (APPLE)
+  set(_os "osx")
+elseif (UNIX)
+  set(_os "linux")
+endif()
+
+# ——— 组合 vcpkg triplet ———
+set(_vcpkg_triplet "${_arch}-${_os}")
+message(STATUS "Using vcpkg triplet: ${_vcpkg_triplet}")
+
+if (WIN32)
+  # Windows 下带 d 后缀的 Debug lib
+  set_target_properties(osgQOpenGL PROPERTIES
+    IMPORTED_CONFIGURATIONS   "Debug;Release"
+    IMPORTED_LOCATION_DEBUG   "${VCPKG_INSTALLED_DIR}/${_vcpkg_triplet}/debug/lib/osgQOpenGLd${CMAKE_STATIC_LIBRARY_SUFFIX}"
+    IMPORTED_LOCATION_RELEASE "${VCPKG_INSTALLED_DIR}/${_vcpkg_triplet}/lib/osgQOpenGL${CMAKE_STATIC_LIBRARY_SUFFIX}"
+    INTERFACE_INCLUDE_DIRECTORIES "${VCPKG_INSTALLED_DIR}/${_vcpkg_triplet}/include/osgQOpenGL"
+  )
+else()
+  # Linux/macOS 下只有 libosgQOpenGL.a
+  set(_osgQLib "${VCPKG_INSTALLED_DIR}/${_vcpkg_triplet}/lib/libosgQOpenGL${CMAKE_STATIC_LIBRARY_SUFFIX}")
+  set_target_properties(osgQOpenGL PROPERTIES
+    IMPORTED_CONFIGURATIONS   "Debug;Release"
+    IMPORTED_LOCATION_DEBUG   "${_osgQLib}"
+    IMPORTED_LOCATION_RELEASE "${_osgQLib}"
+    INTERFACE_INCLUDE_DIRECTORIES "${VCPKG_INSTALLED_DIR}/${_vcpkg_triplet}/include/osgQOpenGL"
+  )
+endif()
 
 # ——— 源文件收集 ———
 # 按目录分组源文件
-set(MAIN_SOURCES 
+set(MAIN_SOURCES
     src/main.cpp
 )
-set(UI_SOURCES 
+set(UI_SOURCES
     src/ui/OSGWidget.cpp
     src/ui/MainWindow.cpp
 )
@@ -127,7 +169,7 @@ set(UTIL_HEADERS
     src/util/MathUtils.h
 )
 
-# 合并所有源文件
+# 合并所有源文件和头文件
 set(ALL_SOURCES
     ${MAIN_SOURCES}
     ${UI_SOURCES}
@@ -136,7 +178,6 @@ set(ALL_SOURCES
     ${PICKING_SOURCES}
     ${UTIL_SOURCES}
 )
-
 set(ALL_HEADERS
     ${UI_HEADERS}
     ${CORE_HEADERS}
@@ -147,31 +188,29 @@ set(ALL_HEADERS
 
 # ——— 可执行目标 ———
 add_executable(${PROJECT_NAME}
-  ${ALL_SOURCES}
-  ${ALL_HEADERS}
+    ${ALL_SOURCES}
+    ${ALL_HEADERS}
 )
 
-# ——— 链接 & 包含 ———
 target_link_libraries(${PROJECT_NAME} PRIVATE
-  Qt5::Core
-  Qt5::Widgets
-  Qt5::Gui
-  Qt5::OpenGL
+    Qt5::Core
+    Qt5::Widgets
+    Qt5::Gui
+    Qt5::OpenGL
 
-  unofficial::osg::osg
-  unofficial::osg::osgDB
-  unofficial::osg::osgViewer
-  unofficial::osg::osgManipulator
-  unofficial::osg::osgGA
-  unofficial::osg::osgUtil
-  unofficial::osg::osgText
+    unofficial::osg::osg
+    unofficial::osg::osgDB
+    unofficial::osg::osgViewer
+    unofficial::osg::osgManipulator
+    unofficial::osg::osgGA
+    unofficial::osg::osgUtil
+    unofficial::osg::osgText
 
-  osgQOpenGL
+    osgQOpenGL
 
-  glm::glm
+    glm::glm
 )
 
-# 设置包含目录
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/src/core
@@ -180,89 +219,76 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${VCPKG_INSTALLED_DIR}/x64-windows/include
 )
 
-# ——— 编译开关 ———
+# ——— 编译选项 ———
 target_compile_definitions(${PROJECT_NAME} PRIVATE
-  $<$<CONFIG:Debug>:DEBUG>
-  $<$<CONFIG:Release>:NDEBUG>
-  QT_NO_DEBUG_OUTPUT
+    $<$<CONFIG:Debug>:DEBUG>
+    $<$<CONFIG:Release>:NDEBUG>
+    QT_NO_DEBUG_OUTPUT
 )
 
-if (MSVC)
-  target_compile_options(${PROJECT_NAME} PRIVATE
-    /W3 /MP /utf-8
-    $<$<CONFIG:Release>:/Ox>
-  )
+if(MSVC)
+    target_compile_options(${PROJECT_NAME} PRIVATE
+        /W3 /MP /utf-8
+        $<$<CONFIG:Release>:/Ox>
+    )
 else()
-  target_compile_options(${PROJECT_NAME} PRIVATE
-    -Wall -Wextra -Wpedantic
-    $<$<CONFIG:Release>:-O3>
-    $<$<CONFIG:Debug>:-g>
-  )
+    target_compile_options(${PROJECT_NAME} PRIVATE
+        -Wall -Wextra -Wpedantic
+        $<$<CONFIG:Release>:-O3>
+        $<$<CONFIG:Debug>:-g>
+    )
 endif()
 
 # ——— 平台特定设置 ———
-if (WIN32)
-  set_target_properties(${PROJECT_NAME} PROPERTIES
-    WIN32_EXECUTABLE TRUE
-  )
+if(WIN32)
+    set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)
 
-  # 只有在明确启用时才执行 windeployqt
-  if(NOT DISABLE_WINDEPLOYQT)
-    if(EXISTS "${QT5_PREFIX}/bin/windeployqt.exe")
-      set(WINDEPLOYQT "${QT5_PREFIX}/bin/windeployqt.exe")
+    if(NOT DISABLE_WINDEPLOYQT)
+        find_program(WINDEPLOYQT NAMES windeployqt HINTS ${Qt5_DIR}/../../../bin)
+        if(WINDEPLOYQT)
+            add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+                COMMAND ${WINDEPLOYQT} --no-compiler-runtime --no-translations --no-system-d3d-compiler $<TARGET_FILE:${PROJECT_NAME}>
+                COMMENT "Deploying Qt with windeployqt…"
+            )
+        endif()
     else()
-      find_program(WINDEPLOYQT NAMES windeployqt HINTS ${Qt5_DIR}/../../../bin)
+        message(STATUS "已禁用 windeployqt 自动部署")
     endif()
-
-    if (WINDEPLOYQT)
-      add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-        COMMAND ${WINDEPLOYQT} --no-compiler-runtime --no-translations --no-system-d3d-compiler $<TARGET_FILE:${PROJECT_NAME}>
-        COMMENT "Deploying Qt with windeployqt…"
-      )
-    endif()
-  else()
-    message(STATUS "已禁用 windeployqt 自动部署")
-  endif()
 endif()
 
-if (APPLE)
-  set_target_properties(${PROJECT_NAME} PROPERTIES
-    MACOSX_BUNDLE TRUE
-    MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/Info.plist"
-  )
-
-  find_program(MACDEPLOYQT NAMES macdeployqt HINTS ${Qt5_DIR}/../../../bin)
-  if (MACDEPLOYQT)
-    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-      COMMAND ${MACDEPLOYQT} $<TARGET_FILE:${PROJECT_NAME}>
-      COMMENT "Deploying Qt with macdeployqt…"
+if(APPLE)
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+        MACOSX_BUNDLE TRUE
+        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/Info.plist"
     )
-  endif()
+    find_program(MACDEPLOYQT NAMES macdeployqt HINTS ${Qt5_DIR}/../../../bin)
+    if(MACDEPLOYQT)
+        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+            COMMAND ${MACDEPLOYQT} $<TARGET_FILE:${PROJECT_NAME}>
+            COMMENT "Deploying Qt with macdeployqt…"
+        )
+    endif()
 endif()
 
 # ——— 安装 & 打包 ———
 include(GNUInstallDirs)
-install(TARGETS ${PROJECT_NAME}
-  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-)
+install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 include(CPack)
-set(CPACK_PACKAGE_NAME               "${PROJECT_NAME}")
-set(CPACK_PACKAGE_VENDOR             "3Drawing Team")
-set(CPACK_PACKAGE_VERSION            "${PROJECT_VERSION}")
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
-    "OpenSceneGraph-based 3D Drawing Application"
-)
+set(CPACK_PACKAGE_NAME "${PROJECT_NAME}")
+set(CPACK_PACKAGE_VENDOR "3Drawing Team")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "OpenSceneGraph-based 3D Drawing Application")
 
-if (WIN32)
-  set(CPACK_GENERATOR "NSIS;ZIP")
+if(WIN32)
+    set(CPACK_GENERATOR "NSIS;ZIP")
 elseif(APPLE)
-  set(CPACK_GENERATOR "DragNDrop;TGZ")
+    set(CPACK_GENERATOR "DragNDrop;TGZ")
 else()
-  set(CPACK_GENERATOR "DEB;RPM;TGZ")
+    set(CPACK_GENERATOR "DEB;RPM;TGZ")
 endif()
 
-# ——— 构建信息 ———
+# 构建信息输出
 message(STATUS "—— 3Drawing Configuration ——")
 message(STATUS "  Build Type     : ${CMAKE_BUILD_TYPE}")
 message(STATUS "  C++ Standard   : ${CMAKE_CXX_STANDARD}")
@@ -278,7 +304,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
-# 设置VS文件夹结构
+# 设置 VS 文件夹结构
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set_target_properties(${PROJECT_NAME} PROPERTIES FOLDER "3Drawing")
 

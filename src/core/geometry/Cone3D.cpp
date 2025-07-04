@@ -106,8 +106,8 @@ osg::ref_ptr<osg::Geometry> Cone3D_Geo::createGeometry()
         float angle1 = 2.0f * M_PI * i / segments;
         float angle2 = 2.0f * M_PI * (i + 1) / segments;
         
-        glm::vec3 dir1 = cos(angle1) * u + sin(angle1) * v;
-        glm::vec3 dir2 = cos(angle2) * u + sin(angle2) * v;
+        glm::vec3 dir1 = static_cast<float>(cos(angle1)) * u + static_cast<float>(sin(angle1)) * v;
+        glm::vec3 dir2 = static_cast<float>(cos(angle2)) * u + static_cast<float>(sin(angle2)) * v;
         
         glm::vec3 p1 = base + radius * dir1;
         glm::vec3 p2 = base + radius * dir2;
@@ -134,8 +134,8 @@ osg::ref_ptr<osg::Geometry> Cone3D_Geo::createGeometry()
         float angle1 = 2.0f * M_PI * i / segments;
         float angle2 = 2.0f * M_PI * (i + 1) / segments;
         
-        glm::vec3 dir1 = cos(angle1) * u + sin(angle1) * v;
-        glm::vec3 dir2 = cos(angle2) * u + sin(angle2) * v;
+        glm::vec3 dir1 = static_cast<float>(cos(angle1)) * u + static_cast<float>(sin(angle1)) * v;
+        glm::vec3 dir2 = static_cast<float>(cos(angle2)) * u + static_cast<float>(sin(angle2)) * v;
         
         glm::vec3 p1 = base + radius * dir1;
         glm::vec3 p2 = base + radius * dir2;

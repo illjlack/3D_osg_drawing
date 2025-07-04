@@ -112,8 +112,8 @@ osg::ref_ptr<osg::Geometry> Cylinder3D_Geo::createGeometry()
         float angle1 = 2.0f * M_PI * i / segments;
         float angle2 = 2.0f * M_PI * (i + 1) / segments;
         
-        glm::vec3 dir1 = cos(angle1) * u + sin(angle1) * v;
-        glm::vec3 dir2 = cos(angle2) * u + sin(angle2) * v;
+        glm::vec3 dir1 = static_cast<float>(cos(angle1)) * u + static_cast<float>(sin(angle1)) * v;
+        glm::vec3 dir2 = static_cast<float>(cos(angle2)) * u + static_cast<float>(sin(angle2)) * v;
         
         glm::vec3 p1_bottom = bottom + radius * dir1;
         glm::vec3 p2_bottom = bottom + radius * dir2;
@@ -152,8 +152,8 @@ osg::ref_ptr<osg::Geometry> Cylinder3D_Geo::createGeometry()
         float angle1 = 2.0f * M_PI * i / segments;
         float angle2 = 2.0f * M_PI * (i + 1) / segments;
         
-        glm::vec3 dir1 = cos(angle1) * u + sin(angle1) * v;
-        glm::vec3 dir2 = cos(angle2) * u + sin(angle2) * v;
+        glm::vec3 dir1 = static_cast<float>(cos(angle1)) * u + static_cast<float>(sin(angle1)) * v;
+        glm::vec3 dir2 = static_cast<float>(cos(angle2)) * u + static_cast<float>(sin(angle2)) * v;
         
         glm::vec3 p1 = bottom + radius * dir1;
         glm::vec3 p2 = bottom + radius * dir2;
@@ -175,8 +175,8 @@ osg::ref_ptr<osg::Geometry> Cylinder3D_Geo::createGeometry()
         float angle1 = 2.0f * M_PI * i / segments;
         float angle2 = 2.0f * M_PI * (i + 1) / segments;
         
-        glm::vec3 dir1 = cos(angle1) * u + sin(angle1) * v;
-        glm::vec3 dir2 = cos(angle2) * u + sin(angle2) * v;
+        glm::vec3 dir1 = static_cast<float>(cos(angle1)) * u + static_cast<float>(sin(angle1)) * v;
+        glm::vec3 dir2 = static_cast<float>(cos(angle2)) * u + static_cast<float>(sin(angle2)) * v;
         
         glm::vec3 p1 = top + radius * dir1;
         glm::vec3 p2 = top + radius * dir2;

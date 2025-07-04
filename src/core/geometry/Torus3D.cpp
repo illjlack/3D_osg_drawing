@@ -100,16 +100,16 @@ osg::ref_ptr<osg::Geometry> Torus3D_Geo::createGeometry()
     for (int i = 0; i <= majorSegments; ++i)
     {
         float majorAngle = 2.0f * M_PI * i / majorSegments;
-        glm::vec3 majorCenter = center + majorRadius * (cos(majorAngle) * u + sin(majorAngle) * v);
-        glm::vec3 majorTangent = glm::normalize(-sin(majorAngle) * u + cos(majorAngle) * v);
+        glm::vec3 majorCenter = center + majorRadius * (static_cast<float>(cos(majorAngle)) * u + static_cast<float>(sin(majorAngle)) * v);
+        glm::vec3 majorTangent = glm::normalize(-static_cast<float>(sin(majorAngle)) * u + static_cast<float>(cos(majorAngle)) * v);
         
         for (int j = 0; j <= minorSegments; ++j)
         {
             float minorAngle = 2.0f * M_PI * j / minorSegments;
             
             // 在局部坐标系中计算次圆上的点
-            glm::vec3 localPoint = minorRadius * (cos(minorAngle) * glm::normalize(glm::cross(majorTangent, axis)) + 
-                                                 sin(minorAngle) * axis);
+            glm::vec3 localPoint = minorRadius * (static_cast<float>(cos(minorAngle)) * glm::normalize(glm::cross(majorTangent, axis)) + 
+                                                 static_cast<float>(sin(minorAngle)) * axis);
             glm::vec3 point = majorCenter + localPoint;
             
             // 计算法向量
