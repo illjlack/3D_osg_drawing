@@ -5,7 +5,7 @@
     "dependencies": [
         {
             "name": "osg",
-            "features": ["tools", "plugins", "freetype"]
+          "features": [ "tools", "plugins", "freetype" ]
         },
         "osg-qt",
         "glm"

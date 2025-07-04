@@ -103,6 +103,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\core\world\CoordinateSystem3D.cpp" />
+    <ClCompile Include="src\core\world\CoordinateSystemRenderer.cpp" />
+    <ClCompile Include="src\core\world\Skybox.cpp" />
     <ClCompile Include="src\main.cpp">
       <Filter>Main</Filter>
     </ClCompile>
@@ -110,6 +113,9 @@
       <Filter>UI</Filter>
     </ClCompile>
     <ClCompile Include="src\ui\OSGWidget.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\CoordinateSystemDialog.cpp">
       <Filter>UI</Filter>
     </ClCompile>
     <ClCompile Include="src\core\Common3D.cpp">
@@ -237,6 +243,9 @@
     <ClInclude Include="src\core\picking\PickingIndicator.h">
       <Filter>Core\Picking</Filter>
     </ClInclude>
+    <QtMoc Include="src\core\world\CoordinateSystem3D.h" />
+    <QtMoc Include="src\core\world\CoordinateSystemRenderer.h" />
+    <ClInclude Include="src\core\world\Skybox.h" />
     <ClInclude Include="src\util\OSGUtils.h">
       <Filter>Util</Filter>
     </ClInclude>
@@ -255,6 +264,9 @@
       <Filter>UI</Filter>
     </QtMoc>
     <QtMoc Include="src\ui\OSGWidget.h">
+      <Filter>UI</Filter>
+    </QtMoc>
+    <QtMoc Include="src\ui\CoordinateSystemDialog.h">
       <Filter>UI</Filter>
     </QtMoc>
   </ItemGroup>

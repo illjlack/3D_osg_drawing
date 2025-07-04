@@ -19,6 +19,9 @@
     <Filter Include="Util">
       <UniqueIdentifier>{util-filter-guid}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Core\World">
+      <UniqueIdentifier>{9429a5c3-2197-4b7a-a4c1-0ccdafd4b03b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">
@@ -96,6 +99,18 @@
     <ClCompile Include="src\util\MathUtils.cpp">
       <Filter>Util</Filter>
     </ClCompile>
+    <ClCompile Include="src\ui\CoordinateSystemDialog.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\world\CoordinateSystem3D.cpp">
+      <Filter>Core\World</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\world\CoordinateSystemRenderer.cpp">
+      <Filter>Core\World</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\world\Skybox.cpp">
+      <Filter>Core\World</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\core\Common3D.h">
@@ -167,6 +182,9 @@
     <ClInclude Include="src\util\MathUtils.h">
       <Filter>Util</Filter>
     </ClInclude>
+    <ClInclude Include="src\core\world\Skybox.h">
+      <Filter>Core\World</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="src\ui\MainWindow.h">
@@ -174,6 +192,15 @@
     </QtMoc>
     <QtMoc Include="src\ui\OSGWidget.h">
       <Filter>UI</Filter>
+    </QtMoc>
+    <QtMoc Include="src\ui\CoordinateSystemDialog.h">
+      <Filter>UI</Filter>
+    </QtMoc>
+    <QtMoc Include="src\core\world\CoordinateSystem3D.h">
+      <Filter>Core\World</Filter>
+    </QtMoc>
+    <QtMoc Include="src\core\world\CoordinateSystemRenderer.h">
+      <Filter>Core\World</Filter>
     </QtMoc>
   </ItemGroup>
 </Project>

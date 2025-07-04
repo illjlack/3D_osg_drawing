@@ -192,3 +192,69 @@ enum class IndicatorType
     FACE_INDICATOR,       // 面指示器(圆环)
     VOLUME_INDICATOR
 };
+
+// 坐标系类型
+enum CoordinateSystemType3D
+{
+    BeginCoordinateSystemType3D = EndSubdivisionLevel3D,
+    
+    CoordSystem_None3D,      // 无坐标系
+    CoordSystem_Axis3D,      // 光轴线坐标系
+    CoordSystem_Grid3D,      // 网格线坐标系
+    CoordSystem_Both3D,      // 光轴线+网格线
+    
+    EndCoordinateSystemType3D
+};
+
+// 坐标轴
+enum CoordinateAxis3D
+{
+    BeginCoordinateAxis3D = EndCoordinateSystemType3D,
+    
+    Axis_X3D,           // X轴
+    Axis_Y3D,           // Y轴
+    Axis_Z3D,           // Z轴
+    Axis_All3D,         // 所有轴
+    
+    EndCoordinateAxis3D
+};
+
+// 网格平面
+enum GridPlane3D
+{
+    BeginGridPlane3D = EndCoordinateAxis3D,
+    
+    GridPlane_XY3D,     // XY平面 (Z=0)
+    GridPlane_YZ3D,     // YZ平面 (X=0)
+    GridPlane_XZ3D,     // XZ平面 (Y=0)
+    GridPlane_All3D,    // 所有平面
+    
+    EndGridPlane3D
+};
+
+// 刻度单位类型
+enum ScaleUnit3D
+{
+    BeginScaleUnit3D = EndCoordinateAxis3D,
+    
+    Unit_Meter3D,       // 米
+    Unit_Kilometer3D,   // 千米
+    Unit_Centimeter3D,  // 厘米
+    Unit_Millimeter3D,  // 毫米
+    Unit_Custom3D,      // 自定义单位
+    
+    EndScaleUnit3D
+};
+
+// 字体大小类型
+enum FontSize3D
+{
+    BeginFontSize3D = EndScaleUnit3D,
+    
+    FontSize_Small3D,     // 小字体
+    FontSize_Medium3D,    // 中等字体
+    FontSize_Large3D,     // 大字体
+    FontSize_Custom3D,    // 自定义字体大小
+    
+    EndFontSize3D
+};

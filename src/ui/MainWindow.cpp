@@ -7,7 +7,7 @@
 #include <QGridLayout>
 #include <QButtonGroup>
 #include <QApplication>
-#include <QDesktopWidget>
+#include <QScreen>
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QColorDialog>
@@ -38,13 +38,52 @@ MainWindow::MainWindow(QWidget* parent)
     resize(1200, 800);
     
     // 居中显示
-    QRect screenGeometry = QApplication::desktop()->screenGeometry();
+    QScreen* screen = QApplication::primaryScreen();
+    QRect screenGeometry = screen->geometry();
     int x = (screenGeometry.width() - width()) / 2;
     int y = (screenGeometry.height() - height()) / 2;
     move(x, y);
     
     updateDrawModeUI();
     updateStatusBar("Ready");
+    
+    // 初始化坐标系统
+    CoordinateSystem3D* coordSystem = CoordinateSystem3D::getInstance();
+    
+    // 连接坐标系统信号
+    connect(coordSystem, &CoordinateSystem3D::coordinateRangeChanged,
+            this, [this](const CoordinateSystem3D::CoordinateRange& range) {
+                updateCoordinateRangeLabel();
+            });
+    
+    // 连接OSGWidget的鼠标位置变化信号（在OSGWidget创建后）
+    if (m_osgWidget)
+    {
+        connect(m_osgWidget, &OSGWidget::mousePositionChanged,
+                this, [this](const glm::vec3& pos) {
+                    m_positionLabel->setText(QString("位置: (%1, %2, %3)")
+                        .arg(pos.x, 0, 'f', 2)
+                        .arg(pos.y, 0, 'f', 2)
+                        .arg(pos.z, 0, 'f', 2));
+                });
+        
+        // 连接摄像机移动速度变化
+        connect(m_osgWidget, &OSGWidget::cameraMoveSpeedChanged,
+                this, [this](double speed) {
+                    // 更新状态栏中的摄像机速度显示
+                    QList<QLabel*> labels = findChildren<QLabel*>();
+                    for (QLabel* label : labels)
+                    {
+                        if (label->text().startsWith("摄像机速度:"))
+                        {
+                            label->setText(QString("摄像机速度: %1").arg(speed, 0, 'f', 0));
+                            break;
+                        }
+                    }
+                });
+    }
+    
+    updateCoordinateRangeLabel();
 }
 
 MainWindow::~MainWindow()
@@ -167,8 +206,53 @@ void MainWindow::createMenus()
     shadedWireframeAction->setCheckable(true);
     connect(shadedWireframeAction, &QAction::triggered, this, &MainWindow::onViewShadedWireframe);
     
+    m_viewMenu->addSeparator();
+    
+    // 天空盒菜单
+    QAction* skyboxAction = m_viewMenu->addAction(tr("天空盒(&K)"));
+    skyboxAction->setCheckable(true);
+    skyboxAction->setChecked(true);
+    connect(skyboxAction, &QAction::triggered, this, &MainWindow::onViewSkybox);
+    
+    QMenu* skyboxMenu = m_viewMenu->addMenu(tr("天空盒样式(&S)"));
+    
+    QAction* gradientSkyboxAction = skyboxMenu->addAction(tr("渐变天空盒(&G)"));
+    connect(gradientSkyboxAction, &QAction::triggered, this, &MainWindow::onSkyboxGradient);
+    
+    QAction* solidSkyboxAction = skyboxMenu->addAction(tr("纯色天空盒(&S)"));
+    connect(solidSkyboxAction, &QAction::triggered, this, &MainWindow::onSkyboxSolid);
+    
+    QAction* customSkyboxAction = skyboxMenu->addAction(tr("自定义立方体贴图(&C)"));
+    connect(customSkyboxAction, &QAction::triggered, this, &MainWindow::onSkyboxCustom);
+    
+    m_viewMenu->addSeparator();
+    
+    // 坐标系统设置
+    QAction* coordSystemAction = m_viewMenu->addAction(tr("坐标系统设置(&C)"));
+    coordSystemAction->setShortcut(Qt::CTRL + Qt::Key_C);
+    connect(coordSystemAction, &QAction::triggered, this, &MainWindow::onCoordinateSystemSettings);
+    
     // 帮助菜单
     m_helpMenu = menuBar()->addMenu(tr("帮助(&H)"));
+    
+    QAction* cameraControlAction = m_helpMenu->addAction(tr("摄像机控制说明"));
+    connect(cameraControlAction, &QAction::triggered, this, [this]() {
+        QMessageBox::information(this, tr("摄像机控制说明"), 
+            tr("摄像机控制快捷键：\n\n"
+               "W 或 ↑ - 摄像机上移\n"
+               "S 或 ↓ - 摄像机下移\n"
+               "A 或 ← - 摄像机左移\n"
+               "D 或 → - 摄像机右移\n"
+               "Q - 摄像机前进\n"
+               "E - 摄像机后退\n\n"
+               "鼠标操作：\n"
+               "左键拖拽 - 旋转视角\n"
+               "右键拖拽 - 缩放\n"
+               "中键拖拽 - 平移\n\n"
+               "您也可以使用工具栏按钮进行摄像机控制。"));
+    });
+    
+    m_helpMenu->addSeparator();
     
     QAction* aboutAction = m_helpMenu->addAction(tr("关于(&A)"));
     connect(aboutAction, &QAction::triggered, this, &MainWindow::onHelpAbout);
@@ -189,22 +273,80 @@ void MainWindow::createToolBars()
     m_mainToolBar->addAction(tr("重做"), this, &MainWindow::onEditRedo);
     
     // 视图工具栏
-    m_viewToolBar = addToolBar(tr("视图工具栏"));
+    m_viewToolBar = addToolBar(tr("视图"));
     m_viewToolBar->setObjectName("ViewToolBar");
     
-    m_viewToolBar->addAction(tr("重置相机"), this, &MainWindow::onViewResetCamera);
-    m_viewToolBar->addAction(tr("适应窗口"), this, &MainWindow::onViewFitAll);
+    // 摄像机控制按钮
+    QAction* cameraUpAction = m_viewToolBar->addAction(tr("上移"));
+    cameraUpAction->setIcon(QIcon(":/icons/up.png"));
+    cameraUpAction->setToolTip(tr("摄像机上移 (W/↑)"));
+    connect(cameraUpAction, &QAction::triggered, this, [this]() {
+        if (m_osgWidget) m_osgWidget->moveCameraUp();
+    });
+    
+    QAction* cameraDownAction = m_viewToolBar->addAction(tr("下移"));
+    cameraDownAction->setIcon(QIcon(":/icons/down.png"));
+    cameraDownAction->setToolTip(tr("摄像机下移 (S/↓)"));
+    connect(cameraDownAction, &QAction::triggered, this, [this]() {
+        if (m_osgWidget) m_osgWidget->moveCameraDown();
+    });
+    
+    QAction* cameraLeftAction = m_viewToolBar->addAction(tr("左移"));
+    cameraLeftAction->setIcon(QIcon(":/icons/left.png"));
+    cameraLeftAction->setToolTip(tr("摄像机左移 (A/←)"));
+    connect(cameraLeftAction, &QAction::triggered, this, [this]() {
+        if (m_osgWidget) m_osgWidget->moveCameraLeft();
+    });
+    
+    QAction* cameraRightAction = m_viewToolBar->addAction(tr("右移"));
+    cameraRightAction->setIcon(QIcon(":/icons/right.png"));
+    cameraRightAction->setToolTip(tr("摄像机右移 (D/→)"));
+    connect(cameraRightAction, &QAction::triggered, this, [this]() {
+        if (m_osgWidget) m_osgWidget->moveCameraRight();
+    });
+    
+    QAction* cameraForwardAction = m_viewToolBar->addAction(tr("前进"));
+    cameraForwardAction->setIcon(QIcon(":/icons/forward.png"));
+    cameraForwardAction->setToolTip(tr("摄像机前进 (Q)"));
+    connect(cameraForwardAction, &QAction::triggered, this, [this]() {
+        if (m_osgWidget) m_osgWidget->moveCameraForward();
+    });
+    
+    QAction* cameraBackwardAction = m_viewToolBar->addAction(tr("后退"));
+    cameraBackwardAction->setIcon(QIcon(":/icons/backward.png"));
+    cameraBackwardAction->setToolTip(tr("摄像机后退 (E)"));
+    connect(cameraBackwardAction, &QAction::triggered, this, [this]() {
+        if (m_osgWidget) m_osgWidget->moveCameraBackward();
+    });
+    
     m_viewToolBar->addSeparator();
+    
+    // 原有的视图控制按钮
+    QAction* resetCameraAction = m_viewToolBar->addAction(tr("重置相机"));
+    resetCameraAction->setIcon(QIcon(":/icons/reset.png"));
+    connect(resetCameraAction, &QAction::triggered, this, &MainWindow::onViewResetCamera);
+    
+    QAction* fitAllAction = m_viewToolBar->addAction(tr("适应窗口"));
+    fitAllAction->setIcon(QIcon(":/icons/fit.png"));
+    connect(fitAllAction, &QAction::triggered, this, &MainWindow::onViewFitAll);
+    
+    m_viewToolBar->addSeparator();
+    
     m_viewToolBar->addAction(tr("线框"), this, &MainWindow::onViewWireframe);
     m_viewToolBar->addAction(tr("着色"), this, &MainWindow::onViewShaded);
 }
 
 void MainWindow::createStatusBar()
 {
-    // 位置标签
-    m_positionLabel = new QLabel(tr("位置: (0, 0, 0)"));
-    m_positionLabel->setMinimumWidth(120);
+    // 创建状态栏标签
+    m_positionLabel = new QLabel("位置: (0, 0, 0)");
+    m_positionLabel->setMinimumWidth(200);
     statusBar()->addWidget(m_positionLabel);
+    
+    // 添加摄像机移动速度显示
+    QLabel* cameraSpeedLabel = new QLabel("摄像机速度: 100");
+    cameraSpeedLabel->setMinimumWidth(150);
+    statusBar()->addWidget(cameraSpeedLabel);
     
     // 模式标签
     m_modeLabel = new QLabel(tr("模式: 选择"));
@@ -215,6 +357,11 @@ void MainWindow::createStatusBar()
     m_objectCountLabel = new QLabel(tr("对象: 0"));
     m_objectCountLabel->setMinimumWidth(80);
     statusBar()->addWidget(m_objectCountLabel);
+    
+    // 坐标范围标签
+    m_coordinateRangeLabel = new QLabel(tr("范围: 地球"));
+    m_coordinateRangeLabel->setMinimumWidth(120);
+    statusBar()->addWidget(m_coordinateRangeLabel);
     
     statusBar()->addPermanentWidget(new QLabel(tr("就绪")));
 }
@@ -269,6 +416,10 @@ void MainWindow::connectSignals()
     if (m_toolPanel)
     {
         connect(m_toolPanel, &ToolPanel3D::drawModeChanged, this, &MainWindow::onDrawModeChanged);
+        connect(m_toolPanel, &ToolPanel3D::skyboxEnabled, this, &MainWindow::onToolPanelSkyboxEnabled);
+        connect(m_toolPanel, &ToolPanel3D::skyboxGradientRequested, this, &MainWindow::onSkyboxGradient);
+        connect(m_toolPanel, &ToolPanel3D::skyboxSolidRequested, this, &MainWindow::onSkyboxSolid);
+        connect(m_toolPanel, &ToolPanel3D::skyboxCustomRequested, this, &MainWindow::onSkyboxCustom);
     }
     
     // 属性编辑器信号连接
@@ -293,6 +444,30 @@ void MainWindow::updateDrawModeUI()
     if (m_modeLabel)
     {
         m_modeLabel->setText(tr("模式: %1").arg(drawMode3DToString(GlobalDrawMode3D)));
+    }
+}
+
+void MainWindow::updateCoordinateRangeLabel()
+{
+    if (m_coordinateRangeLabel)
+    {
+        CoordinateSystem3D* coordSystem = CoordinateSystem3D::getInstance();
+        const CoordinateSystem3D::CoordinateRange& range = coordSystem->getCoordinateRange();
+        
+        // 根据范围大小确定显示名称
+        double maxRange = range.maxRange();
+        QString rangeName;
+        
+        if (maxRange <= 1000) rangeName = "小范围";
+        else if (maxRange <= 100000) rangeName = "中等范围";
+        else if (maxRange <= 1000000) rangeName = "大范围";
+        else if (maxRange <= 50000) rangeName = "城市范围";
+        else if (maxRange <= 5000000) rangeName = "国家范围";
+        else if (maxRange <= 10000000) rangeName = "大陆范围";
+        else if (maxRange <= 12742000) rangeName = "地球范围";
+        else rangeName = "自定义范围";
+        
+        m_coordinateRangeLabel->setText(tr("范围: %1").arg(rangeName));
     }
 }
 
@@ -513,7 +688,16 @@ void MainWindow::onHelpAbout()
 // 绘制相关槽函数
 void MainWindow::onDrawModeChanged(DrawMode3D mode)
 {
-    GlobalDrawMode3D = mode;
+    // 通过OSGWidget设置绘制模式，确保状态正确重置
+    if (m_osgWidget)
+    {
+        m_osgWidget->setDrawMode(mode);
+    }
+    else
+    {
+        GlobalDrawMode3D = mode;
+    }
+    
     updateDrawModeUI();
     updateStatusBar(tr("切换到: %1").arg(drawMode3DToString(mode)));
 }
@@ -1304,10 +1488,12 @@ void ToolPanel3D::setupUI()
     createDrawingGroup();
     createViewGroup();
     createUtilityGroup();
+    createSkyboxGroup();
     
     mainLayout->addWidget(m_drawingGroup);
     mainLayout->addWidget(m_viewGroup);
     mainLayout->addWidget(m_utilityGroup);
+    mainLayout->addWidget(m_skyboxGroup);
     mainLayout->addStretch();
 }
 
@@ -1464,6 +1650,37 @@ void ToolPanel3D::createUtilityGroup()
     layout->addWidget(exportButton);
 }
 
+void ToolPanel3D::createSkyboxGroup()
+{
+    m_skyboxGroup = new QGroupBox("天空盒设置", this);
+    QVBoxLayout* layout = new QVBoxLayout(m_skyboxGroup);
+    
+    // 天空盒启用开关
+    m_skyboxEnabledCheck = new QCheckBox("启用天空盒");
+    m_skyboxEnabledCheck->setChecked(true);
+    m_skyboxEnabledCheck->setToolTip("启用或禁用天空盒");
+    layout->addWidget(m_skyboxEnabledCheck);
+    
+    // 天空盒样式按钮
+    m_skyboxGradientButton = new QPushButton("渐变天空盒");
+    m_skyboxGradientButton->setToolTip("设置渐变天空盒");
+    layout->addWidget(m_skyboxGradientButton);
+    
+    m_skyboxSolidButton = new QPushButton("纯色天空盒");
+    m_skyboxSolidButton->setToolTip("设置纯色天空盒");
+    layout->addWidget(m_skyboxSolidButton);
+    
+    m_skyboxCustomButton = new QPushButton("自定义立方体贴图");
+    m_skyboxCustomButton->setToolTip("设置自定义立方体贴图天空盒");
+    layout->addWidget(m_skyboxCustomButton);
+    
+    // 连接信号
+    connect(m_skyboxEnabledCheck, &QCheckBox::toggled, this, &ToolPanel3D::onSkyboxEnabledChanged);
+    connect(m_skyboxGradientButton, &QPushButton::clicked, this, &ToolPanel3D::onSkyboxGradientClicked);
+    connect(m_skyboxSolidButton, &QPushButton::clicked, this, &ToolPanel3D::onSkyboxSolidClicked);
+    connect(m_skyboxCustomButton, &QPushButton::clicked, this, &ToolPanel3D::onSkyboxCustomClicked);
+}
+
 void ToolPanel3D::updateDrawMode(DrawMode3D mode)
 {
     m_currentMode = mode;
@@ -1496,4 +1713,160 @@ void ToolPanel3D::onDrawModeButtonClicked()
     m_currentMode = mode;
     
     emit drawModeChanged(mode);
+}
+
+// ToolPanel3D 天空盒相关槽函数
+void ToolPanel3D::onSkyboxEnabledChanged(bool enabled)
+{
+    emit skyboxEnabled(enabled);
+}
+
+void ToolPanel3D::onSkyboxGradientClicked()
+{
+    emit skyboxGradientRequested();
+}
+
+void ToolPanel3D::onSkyboxSolidClicked()
+{
+    emit skyboxSolidRequested();
+}
+
+void ToolPanel3D::onSkyboxCustomClicked()
+{
+    emit skyboxCustomRequested();
+}
+
+// ========================================= 天空盒相关方法 =========================================
+
+void MainWindow::onViewSkybox()
+{
+    QAction* action = qobject_cast<QAction*>(sender());
+    if (!action || !m_osgWidget) return;
+    
+    bool enabled = action->isChecked();
+    m_osgWidget->enableSkybox(enabled);
+    
+    updateStatusBar(enabled ? "天空盒已启用" : "天空盒已禁用");
+}
+
+void MainWindow::onToolPanelSkyboxEnabled(bool enabled)
+{
+    if (!m_osgWidget) return;
+    
+    m_osgWidget->enableSkybox(enabled);
+    
+    updateStatusBar(enabled ? "天空盒已启用" : "天空盒已禁用");
+}
+
+void MainWindow::onSkyboxGradient()
+{
+    if (!m_osgWidget) return;
+    
+    // 创建颜色选择对话框
+    QColorDialog dialog(this);
+    dialog.setWindowTitle("选择天空盒顶部颜色");
+    dialog.setCurrentColor(QColor(128, 179, 255)); // 默认天蓝色
+    
+    if (dialog.exec() == QDialog::Accepted)
+    {
+        QColor topColor = dialog.selectedColor();
+        
+        dialog.setWindowTitle("选择天空盒底部颜色");
+        dialog.setCurrentColor(QColor(204, 230, 255)); // 默认浅蓝色
+        
+        if (dialog.exec() == QDialog::Accepted)
+        {
+            QColor bottomColor = dialog.selectedColor();
+            
+            // 转换为OSG颜色格式
+            osg::Vec4 osgTopColor(topColor.redF(), topColor.greenF(), topColor.blueF(), topColor.alphaF());
+            osg::Vec4 osgBottomColor(bottomColor.redF(), bottomColor.greenF(), bottomColor.blueF(), bottomColor.alphaF());
+            
+            m_osgWidget->setSkyboxGradient(osgTopColor, osgBottomColor);
+            updateStatusBar("已设置渐变天空盒");
+        }
+    }
+}
+
+void MainWindow::onSkyboxSolid()
+{
+    if (!m_osgWidget) return;
+    
+    QColorDialog dialog(this);
+    dialog.setWindowTitle("选择天空盒颜色");
+    dialog.setCurrentColor(QColor(51, 51, 51)); // 默认深灰色
+    
+    if (dialog.exec() == QDialog::Accepted)
+    {
+        QColor color = dialog.selectedColor();
+        
+        // 转换为OSG颜色格式
+        osg::Vec4 osgColor(color.redF(), color.greenF(), color.blueF(), color.alphaF());
+        
+        m_osgWidget->setSkyboxSolidColor(osgColor);
+        updateStatusBar("已设置纯色天空盒");
+    }
+}
+
+void MainWindow::onSkyboxCustom()
+{
+    if (!m_osgWidget) return;
+    
+    QMessageBox::information(this, "自定义立方体贴图", 
+        "请选择六个面的纹理文件：\n"
+        "1. 正面 (+X)\n"
+        "2. 背面 (-X)\n"
+        "3. 顶面 (+Y)\n"
+        "4. 底面 (-Y)\n"
+        "5. 右面 (+Z)\n"
+        "6. 左面 (-Z)\n\n"
+        "注意：所有纹理文件应该具有相同的尺寸。");
+    
+    QStringList fileNames = QFileDialog::getOpenFileNames(
+        this,
+        "选择立方体贴图纹理文件",
+        "",
+        "图像文件 (*.png *.jpg *.jpeg *.bmp *.tga *.dds)"
+    );
+    
+    if (fileNames.size() >= 6)
+    {
+        std::string positiveX = fileNames[0].toStdString();
+        std::string negativeX = fileNames[1].toStdString();
+        std::string positiveY = fileNames[2].toStdString();
+        std::string negativeY = fileNames[3].toStdString();
+        std::string positiveZ = fileNames[4].toStdString();
+        std::string negativeZ = fileNames[5].toStdString();
+        
+        m_osgWidget->setSkyboxCubeMap(positiveX, negativeX, positiveY, negativeY, positiveZ, negativeZ);
+        updateStatusBar("已设置自定义立方体贴图天空盒");
+    }
+    else if (fileNames.size() > 0)
+    {
+        QMessageBox::warning(this, "文件数量不足", 
+            "需要选择6个纹理文件来创建立方体贴图天空盒。");
+    }
+}
+
+void MainWindow::onCoordinateSystemSettings()
+{
+    CoordinateSystemDialog dialog(this);
+    if (dialog.exec() == QDialog::Accepted)
+    {
+        // 如果天空盒已启用，重新设置天空盒以应用新的范围
+        if (m_osgWidget && m_osgWidget->isSkyboxEnabled())
+        {
+            m_osgWidget->refreshSkybox();
+        }
+        
+        // 刷新坐标系显示
+        if (m_osgWidget)
+        {
+            m_osgWidget->refreshCoordinateSystem();
+        }
+        
+        // 更新状态栏显示
+        updateCoordinateRangeLabel();
+        updateStatusBar("坐标系统设置已更新");
+    }
 }

@@ -32,6 +32,7 @@
 #include <QPainter>
 #include <QResizeEvent>
 #include <QWheelEvent>
+#include <QApplication>
 #include <algorithm>
 
 // ========================================= OSGWidget 实现 =========================================
@@ -42,20 +43,34 @@ OSGWidget::OSGWidget(QWidget* parent)
     , m_geoNode(new osg::Group)
     , m_lightNode(new osg::Group)
     , m_pickingIndicatorNode(new osg::Group)
+    , m_skyboxNode(new osg::Group)
     , m_trackballManipulator(new osgGA::TrackballManipulator)
+    , m_cameraMoveSpeed(100.0) // 默认移动速度
     , m_currentDrawingGeo(nullptr)
     , m_selectedGeo(nullptr)
     , m_isDrawing(false)
     , m_lastMouseWorldPos(0.0f)
     , m_advancedPickingEnabled(false)
+    , m_skybox(std::make_unique<Skybox>())
+    , m_skyboxEnabled(true)
+    , m_coordinateSystemRenderer(std::make_unique<CoordinateSystemRenderer>())
+    , m_coordinateSystemEnabled(true)
     , m_updateTimer(new QTimer(this))
 {
     setFocusPolicy(Qt::StrongFocus);
     setMouseTracking(true);
     
+    // 初始化摄像机移动键状态
+    for (int i = 0; i < 6; ++i)
+    {
+        m_cameraMoveKeys[i] = false;
+    }
+    
     // 连接信号槽
     connect(m_updateTimer, &QTimer::timeout, this, [this]() {
         update();
+        // 处理摄像机移动
+        updateCameraPosition();
     });
     
     // 连接初始化完成信号
@@ -82,6 +97,7 @@ void OSGWidget::initializeScene()
     m_rootNode->addChild(m_sceneNode);
     m_rootNode->addChild(m_lightNode);
     m_rootNode->addChild(m_pickingIndicatorNode);
+    m_rootNode->addChild(m_skyboxNode);
     m_sceneNode->addChild(m_geoNode);
     
     viewer->setSceneData(m_rootNode);
@@ -97,6 +113,8 @@ void OSGWidget::initializeScene()
     setupLighting();
     setupEventHandlers();
     setupPickingSystem();
+    setupSkybox();
+    setupCoordinateSystem();
 }
 
 void OSGWidget::setupCamera()
@@ -199,10 +217,25 @@ void OSGWidget::resetCamera()
     
     if (viewer->getCameraManipulator())
     {
+        // 获取坐标系统范围
+        CoordinateSystem3D* coordSystem = CoordinateSystem3D::getInstance();
+        const CoordinateSystem3D::CoordinateRange& range = coordSystem->getCoordinateRange();
+        
+        // 修改：将摄像机位置设置为(1,0,0)附近
+        glm::vec3 center = range.center();
+        double maxRange = range.maxRange();
+        
+        // 计算摄像机位置：在(1,0,0)方向，距离为范围的较小比例
+        double distance = maxRange * 0.3; // 减小距离，使缩放更小
+        
+        // 设置摄像机位置在(1,0,0)附近，稍微偏移以避免完全在轴上
+        osg::Vec3d eye(center.x + distance, center.y + distance * 0.1, center.z + distance * 0.1);
+        osg::Vec3d centerOsg(center.x, center.y, center.z);
+        
         viewer->getCameraManipulator()->setHomePosition(
-            osg::Vec3d(10, 10, 10),  // eye
-            osg::Vec3d(0, 0, 0),     // center
-            osg::Vec3d(0, 0, 1)      // up
+            eye,        // eye
+            centerOsg,  // center
+            osg::Vec3d(0, 0, 1)  // up
         );
         viewer->getCameraManipulator()->home(0.0);
     }
@@ -215,14 +248,53 @@ void OSGWidget::fitAll()
     
     if (viewer->getCameraManipulator())
     {
+        // 获取坐标系统范围
+        CoordinateSystem3D* coordSystem = CoordinateSystem3D::getInstance();
+        const CoordinateSystem3D::CoordinateRange& range = coordSystem->getCoordinateRange();
+        
+        // 计算场景包围盒
         osg::BoundingSphere bs = m_geoNode->getBound();
         if (bs.valid())
         {
-            viewer->getCameraManipulator()->setHomePosition(
-                bs.center() + osg::Vec3d(bs.radius() * 2, bs.radius() * 2, bs.radius() * 2),
-                bs.center(),
-                osg::Vec3d(0, 0, 1)
-            );
+            // 结合坐标系统范围和场景包围盒
+            glm::vec3 coordCenter = range.center();
+            double coordRadius = range.maxRange() * 0.5;
+            
+            // 如果场景有对象，使用场景和坐标系统的并集
+            if (bs.radius() > 0)
+            {
+                osg::Vec3d sceneCenter = bs.center();
+                double sceneRadius = bs.radius();
+                
+                // 计算并集中心
+                osg::Vec3d combinedCenter(
+                    (sceneCenter.x() + coordCenter.x) * 0.5,
+                    (sceneCenter.y() + coordCenter.y) * 0.5,
+                    (sceneCenter.z() + coordCenter.z) * 0.5
+                );
+                
+                // 计算并集半径
+                double combinedRadius = std::max(sceneRadius, coordRadius) * 1.2; // 20%边距
+                
+                viewer->getCameraManipulator()->setHomePosition(
+                    combinedCenter + osg::Vec3d(combinedRadius * 2, combinedRadius * 2, combinedRadius * 2),
+                    combinedCenter,
+                    osg::Vec3d(0, 0, 1)
+                );
+            }
+            else
+            {
+                // 如果场景为空，使用坐标系统范围
+                osg::Vec3d center(coordCenter.x, coordCenter.y, coordCenter.z);
+                double distance = coordRadius * 2.0;
+                
+                viewer->getCameraManipulator()->setHomePosition(
+                    center + osg::Vec3d(distance, distance, distance),
+                    center,
+                    osg::Vec3d(0, 0, 1)
+                );
+            }
+            
             viewer->getCameraManipulator()->home(0.0);
         }
     }
@@ -293,7 +365,8 @@ void OSGWidget::addGeo(Geo3D* geo)
 {
     if (geo && m_geoNode.valid())
     {
-        m_geoList.push_back(geo);
+        osg::ref_ptr<Geo3D> geoRef(geo);
+        m_geoList.push_back(geoRef);
         m_geoNode->addChild(geo->getOSGNode().get());
         
         // 添加到拾取系统
@@ -308,11 +381,12 @@ void OSGWidget::removeGeo(Geo3D* geo)
 {
     if (geo && m_geoNode.valid())
     {
-        auto it = std::find(m_geoList.begin(), m_geoList.end(), geo);
+        auto it = std::find_if(m_geoList.begin(), m_geoList.end(), 
+            [geo](const osg::ref_ptr<Geo3D>& ref) { return ref.get() == geo; });
         if (it != m_geoList.end())
         {
-            m_geoList.erase(it);
             m_geoNode->removeChild(geo->getOSGNode().get());
+            m_geoList.erase(it);
             
             // 从拾取系统移除
             if (m_advancedPickingEnabled)
@@ -421,7 +495,7 @@ PickResult3D OSGWidget::pick(int x, int y)
     
     // 测试所有几何对象
     float minDistance = FLT_MAX;
-    for (Geo3D* geo : m_geoList)
+    for (const osg::ref_ptr<Geo3D>& geo : m_geoList)
     {
         PickResult3D geoResult;
         if (geo->hitTest(ray, geoResult))
@@ -500,14 +574,28 @@ void OSGWidget::resizeEvent(QResizeEvent* event)
     {
         camera->setViewport(0, 0, width(), height());
         double aspectRatio = static_cast<double>(width()) / static_cast<double>(height());
+        // todo: 应该可以设置：视场角、近平面、远平面参数
         camera->setProjectionMatrixAsPerspective(45.0f, aspectRatio, 0.1f, 1000.0f);
     }
 }
 
 void OSGWidget::mousePressEvent(QMouseEvent* event)
 {
-    osgQOpenGLWidget::mousePressEvent(event);
-    handleDrawingInput(event);
+    // 获取当前键盘状态
+    Qt::KeyboardModifiers currentModifiers = QApplication::keyboardModifiers();
+    
+    // 非绘制状态：根据模式决定处理方式
+    if (GlobalDrawMode3D == DrawSelect3D || (currentModifiers & Qt::ControlModifier))
+    {
+        // 选择模式：正常传递给OSG窗口
+        osgQOpenGLWidget::mousePressEvent(event);
+    }
+    else
+    {
+        // 绘制模式：处理绘制输入
+        handleDrawingInput(event);
+        event->accept();
+    }
 }
 
 void OSGWidget::mouseMoveEvent(QMouseEvent* event)
@@ -516,13 +604,18 @@ void OSGWidget::mouseMoveEvent(QMouseEvent* event)
     
     // 更新鼠标世界坐标
     glm::vec3 worldPos = screenToWorld(event->x(), event->y(), 0.5f);
-    m_lastMouseWorldPos = worldPos;
-    emit mousePositionChanged(worldPos);
+    
+    // 应用坐标范围限制
+    CoordinateSystem3D* coordSystem = CoordinateSystem3D::getInstance();
+    glm::vec3 clampedPos = coordSystem->clampPointToSkybox(worldPos);
+    
+    m_lastMouseWorldPos = clampedPos;
+    emit mousePositionChanged(clampedPos);
     
     // 处理绘制预览
     if (m_isDrawing && m_currentDrawingGeo)
     {
-        updateCurrentDrawing(worldPos);
+        updateCurrentDrawing(clampedPos);
     }
 }
 
@@ -536,54 +629,20 @@ void OSGWidget::wheelEvent(QWheelEvent* event)
     osgQOpenGLWidget::wheelEvent(event);
 }
 
-void OSGWidget::keyPressEvent(QKeyEvent* event)
-{
-    osgQOpenGLWidget::keyPressEvent(event);
-    
-    // 处理绘制相关按键
-    if (m_isDrawing && m_currentDrawingGeo)
-    {
-        m_currentDrawingGeo->keyPressEvent(event);
-        
-        if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter)
-        {
-            completeCurrentDrawing();
-        }
-        else if (event->key() == Qt::Key_Escape)
-        {
-            cancelCurrentDrawing();
-        }
-    }
-    
-    // 处理选择模式
-    if (GlobalDrawMode3D == DrawSelect3D && event->key() == Qt::Key_Delete)
-    {
-        if (m_selectedGeo)
-        {
-            removeGeo(m_selectedGeo);
-            delete m_selectedGeo;
-            m_selectedGeo = nullptr;
-            emit geoSelected(nullptr);
-        }
-    }
-}
-
-void OSGWidget::keyReleaseEvent(QKeyEvent* event)
-{
-    osgQOpenGLWidget::keyReleaseEvent(event);
-    
-    if (m_isDrawing && m_currentDrawingGeo)
-    {
-        m_currentDrawingGeo->keyReleaseEvent(event);
-    }
-}
-
 void OSGWidget::handleDrawingInput(QMouseEvent* event)
 {
+    glm::vec3 worldPos = screenToWorld(event->x(), event->y(), 0.5f);
+    
+    // 右键取消绘制
+    if (event->button() == Qt::RightButton && m_isDrawing)
+    {
+        cancelCurrentDrawing();
+        return;
+    }
+    
+    // 只处理左键事件
     if (event->button() != Qt::LeftButton)
         return;
-    
-    glm::vec3 worldPos = screenToWorld(event->x(), event->y(), 0.5f);
     
     if (GlobalDrawMode3D == DrawSelect3D)
     {
@@ -604,18 +663,23 @@ void OSGWidget::handleDrawingInput(QMouseEvent* event)
         if (!m_isDrawing)
         {
             // 开始新的绘制
-            m_currentDrawingGeo = createGeo3D(GlobalDrawMode3D);
-            if (m_currentDrawingGeo)
+            Geo3D* newGeo = createGeo3D(GlobalDrawMode3D);
+            if (newGeo)
             {
+                m_currentDrawingGeo = newGeo;
                 m_isDrawing = true;
-                addGeo(m_currentDrawingGeo);
+                addGeo(newGeo);
                 emit drawingProgress("开始绘制...");
             }
         }
         
         if (m_currentDrawingGeo)
         {
-            m_currentDrawingGeo->mousePressEvent(event, worldPos);
+            // 应用天空盒范围限制，确保不会超出天空盒
+            CoordinateSystem3D* coordSystem = CoordinateSystem3D::getInstance();
+            glm::vec3 clampedPos = coordSystem->clampPointToSkybox(worldPos);
+            
+            m_currentDrawingGeo->mousePressEvent(event, clampedPos);
             
             // 检查是否完成绘制
             if (m_currentDrawingGeo->isStateComplete())
@@ -630,8 +694,12 @@ void OSGWidget::updateCurrentDrawing(const glm::vec3& worldPos)
 {
     if (m_currentDrawingGeo)
     {
+        // 应用天空盒范围限制，确保不会超出天空盒
+        CoordinateSystem3D* coordSystem = CoordinateSystem3D::getInstance();
+        glm::vec3 clampedPos = coordSystem->clampPointToSkybox(worldPos);
+        
         QMouseEvent moveEvent(QEvent::MouseMove, QPoint(0, 0), Qt::NoButton, Qt::NoButton, Qt::NoModifier);
-        m_currentDrawingGeo->mouseMoveEvent(&moveEvent, worldPos);
+        m_currentDrawingGeo->mouseMoveEvent(&moveEvent, clampedPos);
     }
 }
 
@@ -639,10 +707,17 @@ void OSGWidget::completeCurrentDrawing()
 {
     if (m_currentDrawingGeo)
     {
+        // 完成绘制
         m_currentDrawingGeo->completeDrawing();
-        emit drawingProgress("绘制完成");
+        
+        // 绘制完成后，对象保留在场景中，不需要删除
         m_currentDrawingGeo = nullptr;
         m_isDrawing = false;
+        
+        emit drawingProgress("绘制完成");
+        
+        // 重新启用OSG窗口的事件处理
+        setFocus();
     }
 }
 
@@ -650,10 +725,402 @@ void OSGWidget::cancelCurrentDrawing()
 {
     if (m_currentDrawingGeo)
     {
-        removeGeo(m_currentDrawingGeo);
-        delete m_currentDrawingGeo;
+        // 从场景中移除（这会减少引用计数）
+        removeGeo(m_currentDrawingGeo.get());
+        
+        // 重置绘制状态
         m_currentDrawingGeo = nullptr;
         m_isDrawing = false;
+        
         emit drawingProgress("取消绘制");
+        
+        // 重新启用OSG窗口的事件处理
+        setFocus();
     }
+}
+
+void OSGWidget::setDrawMode(DrawMode3D mode)
+{
+    // 如果当前正在绘制，取消绘制
+    if (m_isDrawing)
+    {
+        cancelCurrentDrawing();
+    }
+    
+    // 如果切换到选择模式，取消选择
+    if (mode == DrawSelect3D)
+    {
+        deselectAll();
+    }
+    
+    // 更新全局绘制模式
+    GlobalDrawMode3D = mode;
+    
+    // 发送状态更新信号
+    if (mode == DrawSelect3D)
+    {
+        emit drawingProgress("切换到选择模式");
+    }
+    else
+    {
+        emit drawingProgress(tr("切换到绘制模式: %1").arg(drawMode3DToString(mode)));
+    }
+}
+
+// ========================================= 天空盒相关方法 =========================================
+
+void OSGWidget::setupSkybox()
+{
+    if (m_skybox && m_skyboxEnabled)
+    {
+        // 获取坐标系统范围并设置天空盒大小
+        CoordinateSystem3D* coordSystem = CoordinateSystem3D::getInstance();
+        const CoordinateSystem3D::CoordinateRange& range = coordSystem->getSkyboxRange();
+        
+        // 根据坐标范围设置天空盒大小
+        m_skybox->setSizeFromRange(range.minX, range.maxX, range.minY, range.maxY, range.minZ, range.maxZ);
+        
+        // 设置天空盒中心为坐标原点
+        m_skybox->setCenter(osg::Vec3(0.0f, 0.0f, 0.0f));
+        
+        // 清除现有的天空盒
+        m_skyboxNode->removeChildren(0, m_skyboxNode->getNumChildren());
+        
+        // 添加新的天空盒
+        osg::ref_ptr<osg::Node> skyboxNode = m_skybox->getSkyboxNode();
+        if (skyboxNode)
+        {
+            m_skyboxNode->addChild(skyboxNode);
+        }
+    }
+}
+
+void OSGWidget::enableSkybox(bool enabled)
+{
+    m_skyboxEnabled = enabled;
+    
+    if (enabled)
+    {
+        setupSkybox();
+    }
+    else
+    {
+        // 移除天空盒
+        m_skyboxNode->removeChildren(0, m_skyboxNode->getNumChildren());
+    }
+}
+
+bool OSGWidget::isSkyboxEnabled() const
+{
+    return m_skyboxEnabled;
+}
+
+void OSGWidget::setSkyboxGradient(const osg::Vec4& topColor, const osg::Vec4& bottomColor)
+{
+    if (m_skybox)
+    {
+        m_skybox->setGradientSkybox(topColor, bottomColor);
+        if (m_skyboxEnabled)
+        {
+            setupSkybox();
+        }
+    }
+}
+
+void OSGWidget::setSkyboxSolidColor(const osg::Vec4& color)
+{
+    if (m_skybox)
+    {
+        m_skybox->setSolidColorSkybox(color);
+        if (m_skyboxEnabled)
+        {
+            setupSkybox();
+        }
+    }
+}
+
+void OSGWidget::setSkyboxCubeMap(const std::string& positiveX, const std::string& negativeX,
+                                const std::string& positiveY, const std::string& negativeY,
+                                const std::string& positiveZ, const std::string& negativeZ)
+{
+    if (m_skybox)
+    {
+        m_skybox->setCubeMapTexture(positiveX, negativeX, positiveY, negativeY, positiveZ, negativeZ);
+        if (m_skyboxEnabled)
+        {
+            setupSkybox();
+        }
+    }
+}
+
+void OSGWidget::refreshSkybox()
+{
+    if (m_skyboxEnabled)
+    {
+        setupSkybox();
+    }
+}
+
+// ========================================= 坐标系相关方法 =========================================
+
+void OSGWidget::setupCoordinateSystem()
+{
+    if (!m_coordinateSystemRenderer)
+    {
+        // 创建坐标系渲染器
+        m_coordinateSystemRenderer = std::make_unique<CoordinateSystemRenderer>();
+    }
+    
+    if (m_coordinateSystemEnabled)
+    {
+        // 清除现有的坐标系
+        m_sceneNode->removeChild(m_coordinateSystemRenderer->getCoordinateSystemNode());
+        
+        // 添加坐标系到场景
+        osg::ref_ptr<osg::Node> coordSystemNode = m_coordinateSystemRenderer->getCoordinateSystemNode();
+        if (coordSystemNode)
+        {
+            m_sceneNode->addChild(coordSystemNode);
+        }
+    }
+}
+
+void OSGWidget::enableCoordinateSystem(bool enabled)
+{
+    m_coordinateSystemEnabled = enabled;
+    
+    if (enabled)
+    {
+        setupCoordinateSystem();
+    }
+    else
+    {
+        // 移除坐标系
+        if (m_coordinateSystemRenderer)
+        {
+            m_sceneNode->removeChild(m_coordinateSystemRenderer->getCoordinateSystemNode());
+        }
+    }
+}
+
+bool OSGWidget::isCoordinateSystemEnabled() const
+{
+    return m_coordinateSystemEnabled;
+}
+
+void OSGWidget::refreshCoordinateSystem()
+{
+    if (m_coordinateSystemEnabled && m_coordinateSystemRenderer)
+    {
+        m_coordinateSystemRenderer->updateCoordinateSystem();
+    }
+}
+
+// ========================================= 摄像机移动控制 =========================================
+
+void OSGWidget::moveCameraUp()
+{
+    m_cameraMoveKeys[0] = true;
+}
+
+void OSGWidget::moveCameraDown()
+{
+    m_cameraMoveKeys[1] = true;
+}
+
+void OSGWidget::moveCameraLeft()
+{
+    m_cameraMoveKeys[2] = true;
+}
+
+void OSGWidget::moveCameraRight()
+{
+    m_cameraMoveKeys[3] = true;
+}
+
+void OSGWidget::moveCameraForward()
+{
+    m_cameraMoveKeys[4] = true;
+}
+
+void OSGWidget::moveCameraBackward()
+{
+    m_cameraMoveKeys[5] = true;
+}
+
+void OSGWidget::setCameraMoveSpeed(double speed)
+{
+    m_cameraMoveSpeed = speed;
+    emit cameraMoveSpeedChanged(speed);
+}
+
+void OSGWidget::performCameraMove(const osg::Vec3d& direction)
+{
+    osgViewer::Viewer* viewer = getOsgViewer();
+    if (!viewer || !viewer->getCameraManipulator()) return;
+    
+    // 获取当前相机位置和朝向
+    osg::Vec3d eye, center, up;
+    viewer->getCameraManipulator()->getInverseMatrix().getLookAt(eye, center, up);
+    
+    // 计算移动距离
+    double moveDistance = m_cameraMoveSpeed * 0.016; // 基于16ms帧时间
+    
+    // 更新相机位置
+    osg::Vec3d newEye = eye + direction * moveDistance;
+    osg::Vec3d newCenter = center + direction * moveDistance;
+    
+    // 设置新的相机位置
+    viewer->getCameraManipulator()->setHomePosition(newEye, newCenter, up);
+    viewer->getCameraManipulator()->home(0.0);
+}
+
+void OSGWidget::updateCameraPosition()
+{
+    osgViewer::Viewer* viewer = getOsgViewer();
+    if (!viewer || !viewer->getCameraManipulator()) return;
+    
+    // 获取当前相机矩阵
+    osg::Matrix viewMatrix = viewer->getCameraManipulator()->getInverseMatrix();
+    osg::Vec3d right, up, forward;
+    
+    // 从视图矩阵中提取方向向量
+    right = osg::Vec3d(viewMatrix(0,0), viewMatrix(0,1), viewMatrix(0,2));
+    up = osg::Vec3d(viewMatrix(1,0), viewMatrix(1,1), viewMatrix(1,2));
+    forward = osg::Vec3d(viewMatrix(2,0), viewMatrix(2,1), viewMatrix(2,2));
+    
+    // 标准化方向向量
+    right.normalize();
+    up.normalize();
+    forward.normalize();
+    
+    // 计算移动方向
+    osg::Vec3d moveDirection(0, 0, 0);
+    
+    if (m_cameraMoveKeys[0]) // Up
+        moveDirection += up;
+    if (m_cameraMoveKeys[1]) // Down
+        moveDirection -= up;
+    if (m_cameraMoveKeys[2]) // Left
+        moveDirection -= right;
+    if (m_cameraMoveKeys[3]) // Right
+        moveDirection += right;
+    if (m_cameraMoveKeys[4]) // Forward
+        moveDirection -= forward;
+    if (m_cameraMoveKeys[5]) // Backward
+        moveDirection += forward;
+    
+    // 如果有移动，执行移动
+    if (moveDirection.length2() > 0)
+    {
+        moveDirection.normalize();
+        performCameraMove(moveDirection);
+    }
+}
+
+void OSGWidget::keyPressEvent(QKeyEvent* event)
+{
+    // 处理摄像机移动键
+    switch (event->key())
+    {
+        case Qt::Key_W:
+        case Qt::Key_Up:
+            moveCameraUp();
+            break;
+        case Qt::Key_S:
+        case Qt::Key_Down:
+            moveCameraDown();
+            break;
+        case Qt::Key_A:
+        case Qt::Key_Left:
+            moveCameraLeft();
+            break;
+        case Qt::Key_D:
+        case Qt::Key_Right:
+            moveCameraRight();
+            break;
+        case Qt::Key_Q:
+            moveCameraForward();
+            break;
+        case Qt::Key_E:
+            moveCameraBackward();
+            break;
+        default:
+            // 其他按键传递给基类
+            osgQOpenGLWidget::keyPressEvent(event);
+            
+            // 处理绘制相关按键
+            if (m_isDrawing && m_currentDrawingGeo)
+            {
+                m_currentDrawingGeo->keyPressEvent(event);
+                
+                if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter)
+                {
+                    completeCurrentDrawing();
+                }
+                else if (event->key() == Qt::Key_Escape)
+                {
+                    cancelCurrentDrawing();
+                }
+            }
+            
+            // 处理选择模式
+            if (GlobalDrawMode3D == DrawSelect3D && event->key() == Qt::Key_Delete)
+            {
+                if (m_selectedGeo)
+                {
+                    // 从场景中移除（这会减少引用计数）
+                    removeGeo(m_selectedGeo.get());
+                    
+                    // 重置选择状态
+                    m_selectedGeo = nullptr;
+                    
+                    emit geoSelected(nullptr);
+                }
+            }
+            return;
+    }
+    
+    event->accept();
+}
+
+void OSGWidget::keyReleaseEvent(QKeyEvent* event)
+{
+    // 处理摄像机移动键释放
+    switch (event->key())
+    {
+        case Qt::Key_W:
+        case Qt::Key_Up:
+            m_cameraMoveKeys[0] = false;
+            break;
+        case Qt::Key_S:
+        case Qt::Key_Down:
+            m_cameraMoveKeys[1] = false;
+            break;
+        case Qt::Key_A:
+        case Qt::Key_Left:
+            m_cameraMoveKeys[2] = false;
+            break;
+        case Qt::Key_D:
+        case Qt::Key_Right:
+            m_cameraMoveKeys[3] = false;
+            break;
+        case Qt::Key_Q:
+            m_cameraMoveKeys[4] = false;
+            break;
+        case Qt::Key_E:
+            m_cameraMoveKeys[5] = false;
+            break;
+        default:
+            // 其他按键传递给基类
+            osgQOpenGLWidget::keyReleaseEvent(event);
+            
+            if (m_isDrawing && m_currentDrawingGeo)
+            {
+                m_currentDrawingGeo->keyReleaseEvent(event);
+            }
+            return;
+    }
+    
+    event->accept();
 }

@@ -53,6 +53,7 @@
 #include "../core/Common3D.h"
 #include "../core/picking/PickingIntegration.h"
 #include "OSGWidget.h"
+#include "CoordinateSystemDialog.h"
 
 // 前向声明
 class Geo3D;
@@ -93,6 +94,16 @@ private slots:
     void onViewShaded();
     void onViewShadedWireframe();
     
+    // 天空盒相关
+    void onViewSkybox();
+    void onToolPanelSkyboxEnabled(bool enabled);
+    void onSkyboxGradient();
+    void onSkyboxSolid();
+    void onSkyboxCustom();
+    
+    // 坐标系统相关
+    void onCoordinateSystemSettings();
+    
     void onHelpAbout();
     
     void onDrawModeChanged(DrawMode3D mode);
@@ -110,6 +121,7 @@ private:
     
     void updateStatusBar(const QString& message);
     void updateDrawModeUI();
+    void updateCoordinateRangeLabel();
 
 private:
     // UI组件
@@ -136,6 +148,7 @@ private:
     QLabel* m_positionLabel;
     QLabel* m_modeLabel;
     QLabel* m_objectCountLabel;
+    QLabel* m_coordinateRangeLabel;
     
     QString m_currentFilePath;
     bool m_modified;
@@ -242,15 +255,24 @@ public:
 
 signals:
     void drawModeChanged(DrawMode3D mode);
+    void skyboxEnabled(bool enabled);
+    void skyboxGradientRequested();
+    void skyboxSolidRequested();
+    void skyboxCustomRequested();
 
 private slots:
     void onDrawModeButtonClicked();
+    void onSkyboxEnabledChanged(bool enabled);
+    void onSkyboxGradientClicked();
+    void onSkyboxSolidClicked();
+    void onSkyboxCustomClicked();
 
 private:
     void setupUI();
     void createDrawingGroup();
     void createViewGroup();
     void createUtilityGroup();
+    void createSkyboxGroup();
 
 private:
     DrawMode3D m_currentMode;
@@ -275,6 +297,13 @@ private:
     // 视图和实用工具组
     QGroupBox* m_viewGroup;
     QGroupBox* m_utilityGroup;
+    QGroupBox* m_skyboxGroup;
+    
+    // 天空盒控件
+    QCheckBox* m_skyboxEnabledCheck;
+    QPushButton* m_skyboxGradientButton;
+    QPushButton* m_skyboxSolidButton;
+    QPushButton* m_skyboxCustomButton;
     
     std::vector<QPushButton*> m_drawButtons;
 };

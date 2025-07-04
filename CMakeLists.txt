@@ -4,6 +4,11 @@ cmake_minimum_required(VERSION 3.16)
 
 project(3Drawing VERSION 1.0.0 LANGUAGES CXX)
 
+# ——— 构建选项 ———
+option(BUILD_TESTS "Build test suite" OFF)
+option(ENABLE_DEBUG_OUTPUT "Enable debug output" ON)
+option(USE_VCPKG "Use vcpkg for dependency management" ON)
+
 # ——— 基本配置 ———
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -17,15 +22,16 @@ set(DISABLE_WINDEPLOYQT TRUE CACHE BOOL "Disable automatic Qt deployment")
 
 # 如果你使用 vcpkg，请在调用 cmake 时传入：
 #   -DCMAKE_TOOLCHAIN_FILE=[vcpkg_root]/scripts/buildsystems/vcpkg.cmake
-if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+if(USE_VCPKG AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
     message(WARNING
         "未指定 CMAKE_TOOLCHAIN_FILE；如果你使用 vcpkg，请添加：\n"
-        "  -DCMAKE_TOOLCHAIN_FILE=[vcpkg]/scripts/buildsystems/vcpkg.cmake"
+        "  -DCMAKE_TOOLCHAIN_FILE=[vcpkg]/scripts/buildsystems/vcpkg.cmake\n"
+        "或者设置 USE_VCPKG=OFF 来禁用 vcpkg"
     )
 endif()
 
 # 设置 vcpkg 安装目录
-if (DEFINED CMAKE_TOOLCHAIN_FILE)
+if (USE_VCPKG AND DEFINED CMAKE_TOOLCHAIN_FILE)
 #
 #  set(VCPKG_INSTALLED_DIR "${CMAKE_BINARY_DIR}/../vcpkg_installed"
 #      CACHE PATH "vcpkg installed directory")
@@ -102,19 +108,27 @@ set(MAIN_SOURCES
 set(UI_SOURCES
     src/ui/OSGWidget.cpp
     src/ui/MainWindow.cpp
+    src/ui/CoordinateSystemDialog.cpp
 )
 set(UI_HEADERS
     src/ui/OSGWidget.h
     src/ui/MainWindow.h
+    src/ui/CoordinateSystemDialog.h
 )
 set(CORE_SOURCES
     src/core/Common3D.cpp
     src/core/GeometryBase.cpp
+    src/core/world/CoordinateSystem3D.cpp
+    src/core/world/CoordinateSystemRenderer.cpp
+    src/core/world/Skybox.cpp
 )
 set(CORE_HEADERS
     src/core/Common3D.h
     src/core/GeometryBase.h
     src/core/Enums3D.h
+    src/core/world/CoordinateSystem3D.h
+    src/core/world/CoordinateSystemRenderer.h
+    src/core/world/Skybox.h
 )
 set(GEOMETRY_SOURCES
     src/core/geometry/Point3D.cpp
@@ -214,6 +228,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/src/core
+    ${CMAKE_SOURCE_DIR}/src/core/world
     ${CMAKE_SOURCE_DIR}/src/ui
     ${CMAKE_SOURCE_DIR}/src/util
     ${VCPKG_INSTALLED_DIR}/x64-windows/include
@@ -223,19 +238,26 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 target_compile_definitions(${PROJECT_NAME} PRIVATE
     $<$<CONFIG:Debug>:DEBUG>
     $<$<CONFIG:Release>:NDEBUG>
+    $<$<BOOL:${ENABLE_DEBUG_OUTPUT}>:ENABLE_DEBUG_OUTPUT>
     QT_NO_DEBUG_OUTPUT
+    _CRT_SECURE_NO_WARNINGS  # 禁用MSVC安全警告
 )
 
 if(MSVC)
     target_compile_options(${PROJECT_NAME} PRIVATE
-        /W3 /MP /utf-8
-        $<$<CONFIG:Release>:/Ox>
+        /W3 /MP /utf-8 /permissive-
+        $<$<CONFIG:Release>:/Ox /GL>
+        $<$<CONFIG:Debug>:/Zi /Od>
+    )
+    # 链接时优化
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+        $<$<CONFIG:Release>:LINK_FLAGS "/LTCG">
     )
 else()
     target_compile_options(${PROJECT_NAME} PRIVATE
-        -Wall -Wextra -Wpedantic
-        $<$<CONFIG:Release>:-O3>
-        $<$<CONFIG:Debug>:-g>
+        -Wall -Wextra -Wpedantic -Wno-unused-parameter
+        $<$<CONFIG:Release>:-O3 -DNDEBUG>
+        $<$<CONFIG:Debug>:-g -O0>
     )
 endif()
 
@@ -292,6 +314,9 @@ endif()
 message(STATUS "—— 3Drawing Configuration ——")
 message(STATUS "  Build Type     : ${CMAKE_BUILD_TYPE}")
 message(STATUS "  C++ Standard   : ${CMAKE_CXX_STANDARD}")
+message(STATUS "  Build Tests    : ${BUILD_TESTS}")
+message(STATUS "  Debug Output   : ${ENABLE_DEBUG_OUTPUT}")
+message(STATUS "  Use vcpkg      : ${USE_VCPKG}")
 message(STATUS "  Qt Version     : ${Qt5_VERSION}")
 message(STATUS "  Qt Prefix      : ${QT5_PREFIX}")
 message(STATUS "  OSG Version    : ${OpenSceneGraph_VERSION}")
@@ -312,6 +337,14 @@ set_target_properties(${PROJECT_NAME} PROPERTIES FOLDER "3Drawing")
 source_group("Main" FILES ${MAIN_SOURCES})
 source_group("UI" FILES ${UI_SOURCES} ${UI_HEADERS})
 source_group("Core" FILES ${CORE_SOURCES} ${CORE_HEADERS})
+source_group("Core\\World" FILES 
+    src/core/world/CoordinateSystem3D.cpp
+    src/core/world/CoordinateSystem3D.h
+    src/core/world/CoordinateSystemRenderer.cpp
+    src/core/world/CoordinateSystemRenderer.h
+    src/core/world/Skybox.cpp
+    src/core/world/Skybox.h
+)
 source_group("Core\\Geometry" FILES ${GEOMETRY_SOURCES} ${GEOMETRY_HEADERS})
 source_group("Core\\Picking" FILES ${PICKING_SOURCES} ${PICKING_HEADERS})
 source_group("Util" FILES ${UTIL_SOURCES} ${UTIL_HEADERS})
