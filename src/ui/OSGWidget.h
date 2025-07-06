@@ -5,6 +5,7 @@
 #include "../core/world/Skybox.h"
 #include "../core/world/CoordinateSystem3D.h"
 #include "../core/world/CoordinateSystemRenderer.h"
+#include "../core/camera/CameraController.h"
 #include <osgViewer/Viewer>
 #include <osgViewer/CompositeViewer>
 #include <osgViewer/ViewerEventHandlers>
@@ -109,13 +110,37 @@ public:
     void moveCameraBackward();
     void setCameraMoveSpeed(double speed);
     double getCameraMoveSpeed() const { return m_cameraMoveSpeed; }
+    void setWheelMoveSensitivity(double sensitivity);
+    double getWheelMoveSensitivity() const { return m_wheelMoveSensitivity; }
+    
+    // 加速度移动控制
+    void setAccelerationRate(double rate);
+    double getAccelerationRate() const { return m_accelerationRate; }
+    void setMaxAccelerationSpeed(double speed);
+    double getMaxAccelerationSpeed() const { return m_maxAccelerationSpeed; }
+    void resetAllAcceleration();
+    
+    // 投影模式控制
+    void setProjectionMode(ProjectionMode mode);
+    ProjectionMode getProjectionMode() const;
+    void setPerspectiveFOV(double fov);
+    void setOrthographicSize(double left, double right, double bottom, double top);
+    void setOrthographicNearFar(double near, double far);
+    
+    // 比例尺相关
+    void enableScaleBar(bool enabled);
+    bool isScaleBarEnabled() const { return m_scaleBarEnabled; }
+    void setScaleBarPosition(const QPoint& position);
+    void setScaleBarSize(int width, int height);
 
 signals:
     void geoSelected(Geo3D* geo);
     void mousePositionChanged(const glm::vec3& worldPos);
-    void drawingProgress(const QString& message);
     void advancedPickingResult(const PickingResult& result);
     void cameraMoveSpeedChanged(double speed);
+    void wheelMoveSensitivityChanged(double sensitivity);
+    void accelerationRateChanged(double rate);
+    void maxAccelerationSpeedChanged(double speed);
 
 protected:
     virtual void paintEvent(QPaintEvent* event) override;
@@ -141,8 +166,12 @@ private:
     void cancelCurrentDrawing();
     
     // 摄像机移动相关
-    void performCameraMove(const osg::Vec3d& direction);
     void updateCameraPosition();
+    
+    // 比例尺相关
+    void drawScaleBar();
+    double calculateScaleValue();
+    QString formatScaleText(double worldUnits);
     
     // 拾取系统回调
     void onPickingResult(const PickingResult& result);
@@ -159,9 +188,18 @@ private:
     // 相机操控器
     osg::ref_ptr<osgGA::TrackballManipulator> m_trackballManipulator;
     
+    // 摄像机控制器
+    std::unique_ptr<CameraController> m_cameraController;
+    
     // 摄像机移动控制
     double m_cameraMoveSpeed;
+    double m_wheelMoveSensitivity; // 滚轮移动灵敏度
     bool m_cameraMoveKeys[6]; // up, down, left, right, forward, backward
+    
+    // 加速度移动相关
+    double m_accelerationRate;
+    double m_maxAccelerationSpeed;
+    double m_accelerationSpeeds[6]; // 各方向的当前加速度
     
     // 当前绘制状态
     osg::ref_ptr<Geo3D> m_currentDrawingGeo;
@@ -184,6 +222,11 @@ private:
     // 坐标系
     std::unique_ptr<CoordinateSystemRenderer> m_coordinateSystemRenderer;
     bool m_coordinateSystemEnabled;
+    
+    // 比例尺相关
+    bool m_scaleBarEnabled;
+    QPoint m_scaleBarPosition;
+    QSize m_scaleBarSize;
     
     QTimer* m_updateTimer;
 }; 

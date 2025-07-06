@@ -1,5 +1,6 @@
 #include "PickingSystem.h"
 #include "../GeometryBase.h"
+#include "../../util/LogManager.h"
 #include <osg/GL>
 #include <osgDB/ReadFile>
 #include <osgDB/WriteFile>
@@ -87,19 +88,19 @@ bool PickingSystem::initialize(int width, int height)
     
     if (!createPickingCamera())
     {
-        Log3D << "Failed to create picking camera";
+        LOG_ERROR("Failed to create picking camera", "拾取");
         return false;
     }
     
     if (!createFrameBuffer())
     {
-        Log3D << "Failed to create frame buffer";
+        LOG_ERROR("Failed to create frame buffer", "拾取");
         return false;
     }
     
     if (!createShaders())
     {
-        Log3D << "Failed to create shaders";
+        LOG_ERROR("Failed to create shaders", "拾取");
         return false;
     }
     
@@ -125,7 +126,7 @@ bool PickingSystem::initialize(int width, int height)
     
     m_initialized = true;
     
-    Log3D << "Picking system initialized successfully (" << width << "x" << height << ")";
+    LOG_SUCCESS(QString("Picking system initialized successfully (%1x%2)").arg(width).arg(height), "拾取");
     return true;
 }
 
@@ -147,7 +148,7 @@ void PickingSystem::resize(int width, int height)
     
     // PBO大小调整 - OSG 3.6.5中BufferObject会自动管理大小
     
-    Log3D << "Picking system resized to " << width << "x" << height;
+    LOG_INFO(QString("Picking system resized to %1x%2").arg(width).arg(height), "拾取");
 }
 
 void PickingSystem::syncWithMainCamera(osg::Camera* mainCamera)
@@ -297,7 +298,7 @@ uint64_t PickingSystem::addObject(Geo3D* geo)
     // 抽取Feature
     extractFeatures(objectID);
     
-    Log3D << "Added object " << objectID << " to picking system";
+    LOG_INFO(QString("Added object %1 to picking system").arg(objectID), "拾取");
     return objectID;
 }
 
@@ -340,7 +341,7 @@ void PickingSystem::removeObject(uint64_t objectID)
         m_objectMap.erase(it);
     }
     
-    Log3D << "Removed object " << objectID << " from picking system";
+    LOG_INFO(QString("Removed object %1 from picking system").arg(objectID), "拾取");
 }
 
 void PickingSystem::removeObject(Geo3D* geo)
@@ -398,7 +399,7 @@ void PickingSystem::clearAllObjects()
     
     m_idArray.clear();
     
-    Log3D << "Cleared all objects from picking system";
+    LOG_INFO("Cleared all objects from picking system", "拾取");
 }
 
 void PickingSystem::extractFeatures(uint64_t objectID)
@@ -475,10 +476,9 @@ void PickingSystem::buildFeatureGeometry(uint64_t objectID, FeatureType type)
         }
     }
     
-    Log3D << "Built " << features.size() << " " 
-          << (type == FeatureType::FACE ? "face" : 
-              type == FeatureType::EDGE ? "edge" : "vertex") 
-          << " features for object " << objectID;
+    QString featureTypeStr = (type == FeatureType::FACE ? "face" : 
+                             type == FeatureType::EDGE ? "edge" : "vertex");
+    LOG_DEBUG(QString("Built %1 %2 features for object %3").arg(features.size()).arg(featureTypeStr).arg(objectID), "拾取");
 }
 
 void PickingSystem::rebuildFeatureGeometry(uint64_t objectID)
@@ -577,7 +577,7 @@ PickingResult PickingSystem::pick(int mouseX, int mouseY, int sampleRadius)
     
     if (m_debugMode)
     {
-        Log3D << "Pick completed in " << pickTime * 1000.0 << "ms, avg: " << m_avgPickTime * 1000.0 << "ms";
+        LOG_DEBUG(QString("Pick completed in %1ms, avg: %2ms").arg(pickTime * 1000.0, 0, 'f', 2).arg(m_avgPickTime * 1000.0, 0, 'f', 2), "拾取");
     }
     
     return result;

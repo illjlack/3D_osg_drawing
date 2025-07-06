@@ -19,6 +19,7 @@ MainWindow::MainWindow(QWidget* parent)
     , m_osgWidget(nullptr)
     , m_propertyEditor(nullptr)
     , m_toolPanel(nullptr)
+    , m_logOutputWidget(nullptr)
     , m_modified(false)
 {
     setWindowTitle("3D Drawing Board");
@@ -47,6 +48,14 @@ MainWindow::MainWindow(QWidget* parent)
     updateDrawModeUI();
     updateStatusBar("Ready");
     
+    // 初始化投影模式控件状态
+    if (m_projectionModeCombo && m_perspectiveFOVSpinBox && m_orthographicSizeSpinBox)
+    {
+        // 默认启用透视FOV控件，禁用正交大小控件
+        m_perspectiveFOVSpinBox->setEnabled(true);
+        m_orthographicSizeSpinBox->setEnabled(false);
+    }
+    
     // 初始化坐标系统
     CoordinateSystem3D* coordSystem = CoordinateSystem3D::getInstance();
     
@@ -54,6 +63,13 @@ MainWindow::MainWindow(QWidget* parent)
     connect(coordSystem, &CoordinateSystem3D::coordinateRangeChanged,
             this, [this](const CoordinateSystem3D::CoordinateRange& range) {
                 updateCoordinateRangeLabel();
+                LOG_INFO(tr("坐标系统范围已更新: X[%1,%2] Y[%3,%4] Z[%5,%6]")
+                    .arg(range.minX, 0, 'f', 0)
+                    .arg(range.maxX, 0, 'f', 0)
+                    .arg(range.minY, 0, 'f', 0)
+                    .arg(range.maxY, 0, 'f', 0)
+                    .arg(range.minZ, 0, 'f', 0)
+                    .arg(range.maxZ, 0, 'f', 0), "坐标系统");
             });
     
     // 连接OSGWidget的鼠标位置变化信号（在OSGWidget创建后）
@@ -80,6 +96,7 @@ MainWindow::MainWindow(QWidget* parent)
                             break;
                         }
                     }
+                    LOG_DEBUG(tr("摄像机移动速度已更改为: %1").arg(speed, 0, 'f', 0), "摄像机");
                 });
     }
     
@@ -101,6 +118,14 @@ void MainWindow::setupUI()
     
     // 创建工具面板
     m_toolPanel = new ToolPanel3D(this);
+    
+    // 创建日志输出栏
+    m_logOutputWidget = new LogOutputWidget(this);
+    
+    // 添加初始日志信息（在UI创建完成后）
+    LOG_INFO("3D绘图板启动完成", "系统");
+    LOG_INFO("日志系统已初始化", "系统");
+    LOG_DEBUG("调试模式已启用", "系统");
 }
 
 void MainWindow::createMenus()
@@ -321,6 +346,41 @@ void MainWindow::createToolBars()
     
     m_viewToolBar->addSeparator();
     
+    // 投影模式控制
+    m_viewToolBar->addWidget(new QLabel(tr("投影:")));
+    m_projectionModeCombo = new QComboBox();
+    m_projectionModeCombo->addItem(tr("透视"), static_cast<int>(ProjectionMode::Perspective));
+    m_projectionModeCombo->addItem(tr("正交"), static_cast<int>(ProjectionMode::Orthographic));
+    m_projectionModeCombo->setCurrentIndex(0);
+    m_projectionModeCombo->setToolTip(tr("切换投影模式"));
+    connect(m_projectionModeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &MainWindow::onProjectionModeChanged);
+    m_viewToolBar->addWidget(m_projectionModeCombo);
+    
+    // 透视FOV控制
+    m_viewToolBar->addWidget(new QLabel(tr("FOV:")));
+    m_perspectiveFOVSpinBox = new QDoubleSpinBox();
+    m_perspectiveFOVSpinBox->setRange(1.0, 179.0);
+    m_perspectiveFOVSpinBox->setValue(45.0);
+    m_perspectiveFOVSpinBox->setSuffix("°");
+    m_perspectiveFOVSpinBox->setToolTip(tr("透视投影视场角"));
+    connect(m_perspectiveFOVSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this, &MainWindow::onPerspectiveFOVChanged);
+    m_viewToolBar->addWidget(m_perspectiveFOVSpinBox);
+    
+    // 正交大小控制
+    m_viewToolBar->addWidget(new QLabel(tr("正交大小:")));
+    m_orthographicSizeSpinBox = new QDoubleSpinBox();
+    m_orthographicSizeSpinBox->setRange(0.1, 1000.0);
+    m_orthographicSizeSpinBox->setValue(10.0);
+    m_orthographicSizeSpinBox->setSuffix("m");
+    m_orthographicSizeSpinBox->setToolTip(tr("正交投影大小"));
+    connect(m_orthographicSizeSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this, &MainWindow::onOrthographicSizeChanged);
+    m_viewToolBar->addWidget(m_orthographicSizeSpinBox);
+    
+    m_viewToolBar->addSeparator();
+    
     // 原有的视图控制按钮
     QAction* resetCameraAction = m_viewToolBar->addAction(tr("重置相机"));
     resetCameraAction->setIcon(QIcon(":/icons/reset.png"));
@@ -382,12 +442,23 @@ void MainWindow::createDockWidgets()
     m_toolDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
     addDockWidget(Qt::LeftDockWidgetArea, m_toolDock);
     
+    // 日志输出栏停靠窗口
+    m_logDock = new QDockWidget(tr("日志输出"), this);
+    m_logDock->setObjectName("LogDock");
+    m_logDock->setWidget(m_logOutputWidget);
+    m_logDock->setAllowedAreas(Qt::BottomDockWidgetArea);
+    addDockWidget(Qt::BottomDockWidgetArea, m_logDock);
+    
+    // 设置日志输出栏的初始大小
+    m_logDock->resize(800, 200);
+    
     // 添加停靠窗口到视图菜单
     if (m_viewMenu)
     {
         m_viewMenu->addSeparator();
         m_viewMenu->addAction(m_propertyDock->toggleViewAction());
         m_viewMenu->addAction(m_toolDock->toggleViewAction());
+        m_viewMenu->addAction(m_logDock->toggleViewAction());
     }
 }
 
@@ -405,9 +476,7 @@ void MainWindow::connectSignals()
                     .arg(pos.y, 0, 'f', 2)
                     .arg(pos.z, 0, 'f', 2));
             }
-        });
-        connect(m_osgWidget, &OSGWidget::drawingProgress, [this](const QString& message) {
-            updateStatusBar(message);
+            // 注意：鼠标位置变化太频繁，不输出到日志，避免日志过多
         });
         connect(m_osgWidget, &OSGWidget::advancedPickingResult, this, &MainWindow::onAdvancedPickingResult);
     }
@@ -432,6 +501,8 @@ void MainWindow::connectSignals()
 void MainWindow::updateStatusBar(const QString& message)
 {
     statusBar()->showMessage(message, 3000);
+    // 同时输出到日志系统
+    LOG_INFO(message, "状态");
 }
 
 void MainWindow::updateDrawModeUI()
@@ -508,6 +579,7 @@ void MainWindow::onFileNew()
     m_modified = false;
     setWindowTitle(tr("3D Drawing Board - 未命名"));
     updateStatusBar(tr("新建文档 - 已添加测试立方体，试试64位ID拾取功能!"));
+    LOG_SUCCESS("新建文档成功", "文件");
 }
 
 void MainWindow::onFileOpen()
@@ -522,6 +594,7 @@ void MainWindow::onFileOpen()
         m_modified = false;
         setWindowTitle(tr("3D Drawing Board - %1").arg(QFileInfo(fileName).baseName()));
         updateStatusBar(tr("打开文档: %1").arg(fileName));
+        LOG_SUCCESS(tr("打开文档: %1").arg(fileName), "文件");
     }
 }
 
@@ -536,6 +609,7 @@ void MainWindow::onFileSave()
     // TODO: 实现文件保存逻辑
     m_modified = false;
     updateStatusBar(tr("保存文档: %1").arg(m_currentFilePath));
+    LOG_SUCCESS(tr("保存文档: %1").arg(m_currentFilePath), "文件");
 }
 
 void MainWindow::onFileSaveAs()
@@ -548,11 +622,13 @@ void MainWindow::onFileSaveAs()
         m_currentFilePath = fileName;
         onFileSave();
         setWindowTitle(tr("3D Drawing Board - %1").arg(QFileInfo(fileName).baseName()));
+        LOG_SUCCESS(tr("另存为: %1").arg(fileName), "文件");
     }
 }
 
 void MainWindow::onFileExit()
 {
+    LOG_INFO("用户请求退出应用程序", "系统");
     close();
 }
 // 编辑菜单槽函数
@@ -560,36 +636,42 @@ void MainWindow::onEditUndo()
 {
     // TODO: 实现撤销功能
     updateStatusBar(tr("撤销"));
+    LOG_INFO("执行撤销操作", "编辑");
 }
 
 void MainWindow::onEditRedo()
 {
     // TODO: 实现重做功能
     updateStatusBar(tr("重做"));
+    LOG_INFO("执行重做操作", "编辑");
 }
 
 void MainWindow::onEditCopy()
 {
     // TODO: 实现复制功能
     updateStatusBar(tr("复制"));
+    LOG_INFO("执行复制操作", "编辑");
 }
 
 void MainWindow::onEditPaste()
 {
     // TODO: 实现粘贴功能
     updateStatusBar(tr("粘贴"));
+    LOG_INFO("执行粘贴操作", "编辑");
 }
 
 void MainWindow::onEditDelete()
 {
     // TODO: 实现删除功能
     updateStatusBar(tr("删除"));
+    LOG_INFO("执行删除操作", "编辑");
 }
 
 void MainWindow::onEditSelectAll()
 {
     // TODO: 实现全选功能
     updateStatusBar(tr("全选"));
+    LOG_INFO("执行全选操作", "编辑");
 }
 
 // 视图菜单槽函数
@@ -599,6 +681,7 @@ void MainWindow::onViewResetCamera()
     {
         m_osgWidget->resetCamera();
         updateStatusBar(tr("重置相机"));
+        LOG_INFO("重置相机视角", "视图");
     }
 }
 
@@ -608,6 +691,7 @@ void MainWindow::onViewFitAll()
     {
         m_osgWidget->fitAll();
         updateStatusBar(tr("适应窗口"));
+        LOG_INFO("适应窗口显示", "视图");
     }
 }
 
@@ -617,6 +701,7 @@ void MainWindow::onViewTop()
     {
         m_osgWidget->setViewDirection(glm::vec3(0, 0, -1), glm::vec3(0, 1, 0));
         updateStatusBar(tr("俯视图"));
+        LOG_INFO("切换到俯视图", "视图");
     }
 }
 
@@ -626,6 +711,7 @@ void MainWindow::onViewFront()
     {
         m_osgWidget->setViewDirection(glm::vec3(0, -1, 0), glm::vec3(0, 0, 1));
         updateStatusBar(tr("前视图"));
+        LOG_INFO("切换到前视图", "视图");
     }
 }
 
@@ -635,6 +721,7 @@ void MainWindow::onViewRight()
     {
         m_osgWidget->setViewDirection(glm::vec3(-1, 0, 0), glm::vec3(0, 0, 1));
         updateStatusBar(tr("右视图"));
+        LOG_INFO("切换到右视图", "视图");
     }
 }
 
@@ -644,6 +731,7 @@ void MainWindow::onViewIsometric()
     {
         m_osgWidget->setViewDirection(glm::vec3(-1, -1, -1), glm::vec3(0, 0, 1));
         updateStatusBar(tr("等轴测图"));
+        LOG_INFO("切换到等轴测图", "视图");
     }
 }
 
@@ -653,6 +741,7 @@ void MainWindow::onViewWireframe()
     {
         m_osgWidget->setWireframeMode(true);
         updateStatusBar(tr("线框模式"));
+        LOG_INFO("切换到线框模式", "显示");
     }
 }
 
@@ -662,6 +751,7 @@ void MainWindow::onViewShaded()
     {
         m_osgWidget->setShadedMode(true);
         updateStatusBar(tr("着色模式"));
+        LOG_INFO("切换到着色模式", "显示");
     }
 }
 
@@ -672,11 +762,13 @@ void MainWindow::onViewShadedWireframe()
         m_osgWidget->setWireframeMode(true);
         m_osgWidget->setShadedMode(true);
         updateStatusBar(tr("着色+线框模式"));
+        LOG_INFO("切换到着色+线框模式", "显示");
     }
 }
 
 void MainWindow::onHelpAbout()
 {
+    LOG_INFO("用户查看关于信息", "帮助");
     QMessageBox::about(this, tr("关于"), 
         tr("3D Drawing Board v1.0\n\n"
         "基于Qt + OSG的三维绘图板\n"
@@ -700,6 +792,7 @@ void MainWindow::onDrawModeChanged(DrawMode3D mode)
     
     updateDrawModeUI();
     updateStatusBar(tr("切换到: %1").arg(drawMode3DToString(mode)));
+    LOG_INFO(tr("切换到绘制模式: %1").arg(drawMode3DToString(mode)), "模式");
 }
 
 void MainWindow::onGeoSelected(Geo3D* geo)
@@ -712,10 +805,12 @@ void MainWindow::onGeoSelected(Geo3D* geo)
     if (geo)
     {
         updateStatusBar(tr("选中几何对象"));
+        LOG_INFO("选中几何对象", "选择");
     }
     else
     {
         updateStatusBar(tr("取消选择"));
+        LOG_INFO("取消选择", "选择");
     }
 }
 
@@ -728,6 +823,7 @@ void MainWindow::onGeoParametersChanged()
         setWindowTitle(title + " *");
     }
     updateStatusBar(tr("属性已修改"));
+    LOG_INFO("几何对象属性已修改", "属性");
 }
 
 void MainWindow::onAdvancedPickingResult(const PickingResult& result)
@@ -757,6 +853,14 @@ void MainWindow::onAdvancedPickingResult(const PickingResult& result)
         .arg(typeStr)
         .arg(result.id.objectID)
         .arg(result.id.localIdx));
+    
+    LOG_DEBUG(tr("拾取到 %1 - 对象ID: %2, 索引: %3, 位置: (%4, %5, %6)")
+        .arg(typeStr)
+        .arg(result.id.objectID)
+        .arg(result.id.localIdx)
+        .arg(result.worldPos.x, 0, 'f', 3)
+        .arg(result.worldPos.y, 0, 'f', 3)
+        .arg(result.worldPos.z, 0, 'f', 3), "拾取");
     
     // 更新坐标显示
     if (m_positionLabel)
@@ -1756,6 +1860,7 @@ void MainWindow::onToolPanelSkyboxEnabled(bool enabled)
     m_osgWidget->enableSkybox(enabled);
     
     updateStatusBar(enabled ? "天空盒已启用" : "天空盒已禁用");
+    LOG_INFO(enabled ? "天空盒已启用" : "天空盒已禁用", "天空盒");
 }
 
 void MainWindow::onSkyboxGradient()
@@ -1784,6 +1889,7 @@ void MainWindow::onSkyboxGradient()
             
             m_osgWidget->setSkyboxGradient(osgTopColor, osgBottomColor);
             updateStatusBar("已设置渐变天空盒");
+            LOG_SUCCESS("已设置渐变天空盒", "天空盒");
         }
     }
 }
@@ -1805,6 +1911,7 @@ void MainWindow::onSkyboxSolid()
         
         m_osgWidget->setSkyboxSolidColor(osgColor);
         updateStatusBar("已设置纯色天空盒");
+        LOG_SUCCESS("已设置纯色天空盒", "天空盒");
     }
 }
 
@@ -1840,6 +1947,7 @@ void MainWindow::onSkyboxCustom()
         
         m_osgWidget->setSkyboxCubeMap(positiveX, negativeX, positiveY, negativeY, positiveZ, negativeZ);
         updateStatusBar("已设置自定义立方体贴图天空盒");
+        LOG_SUCCESS("已设置自定义立方体贴图天空盒", "天空盒");
     }
     else if (fileNames.size() > 0)
     {
@@ -1868,5 +1976,49 @@ void MainWindow::onCoordinateSystemSettings()
         // 更新状态栏显示
         updateCoordinateRangeLabel();
         updateStatusBar("坐标系统设置已更新");
+        LOG_SUCCESS("坐标系统设置已更新", "坐标系统");
     }
+}
+
+// ========================================= 投影模式相关槽函数 =========================================
+
+void MainWindow::onProjectionModeChanged()
+{
+    if (!m_osgWidget) return;
+    
+    int index = m_projectionModeCombo->currentIndex();
+    ProjectionMode mode = static_cast<ProjectionMode>(m_projectionModeCombo->itemData(index).toInt());
+    
+    m_osgWidget->setProjectionMode(mode);
+    
+    // 根据投影模式启用/禁用相关控件
+    bool isPerspective = (mode == ProjectionMode::Perspective);
+    m_perspectiveFOVSpinBox->setEnabled(isPerspective);
+    m_orthographicSizeSpinBox->setEnabled(!isPerspective);
+    
+    QString modeName = isPerspective ? tr("透视") : tr("正交");
+    updateStatusBar(tr("投影模式切换为: %1").arg(modeName));
+    LOG_INFO(tr("投影模式切换为: %1").arg(modeName), "投影");
+}
+
+void MainWindow::onPerspectiveFOVChanged()
+{
+    if (!m_osgWidget) return;
+    
+    double fov = m_perspectiveFOVSpinBox->value();
+    m_osgWidget->setPerspectiveFOV(fov);
+    
+    updateStatusBar(tr("透视FOV设置为: %1°").arg(fov));
+    LOG_DEBUG(tr("透视FOV设置为: %1°").arg(fov), "投影");
+}
+
+void MainWindow::onOrthographicSizeChanged()
+{
+    if (!m_osgWidget) return;
+    
+    double size = m_orthographicSizeSpinBox->value();
+    m_osgWidget->setOrthographicSize(-size, size, -size, size);
+    
+    updateStatusBar(tr("正交投影大小设置为: ±%1m").arg(size));
+    LOG_DEBUG(tr("正交投影大小设置为: ±%1m").arg(size), "投影");
 }

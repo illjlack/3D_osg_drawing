@@ -10,6 +10,7 @@
 
 #include "ui/MainWindow.h"
 #include "core/Common3D.h"
+#include "util/LogManager.h"
 
 int main(int argc, char *argv[])
 {
@@ -28,6 +29,11 @@ int main(int argc, char *argv[])
     
     // 设置应用程序样式
     app.setStyle(QStyleFactory::create("Fusion"));
+    
+    // 初始化日志系统
+    LogManager* logManager = LogManager::getInstance();
+    LOG_INFO("应用程序启动", "系统");
+    LOG_INFO("日志系统初始化完成", "系统");
     
     //// 设置深色主题样式表
     //QString darkStyleSheet = R"(

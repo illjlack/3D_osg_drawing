@@ -27,6 +27,7 @@ void BezierCurve3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worl
     if (!isStateComplete() && !m_controlPoints.empty())
     {
         setTempPoint(Point3D(worldPos));
+        markGeometryDirty();
         updateGeometry();
     }
 }

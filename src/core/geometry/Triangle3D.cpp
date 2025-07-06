@@ -30,6 +30,7 @@ void Triangle3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPo
     if (!isStateComplete())
     {
         setTempPoint(Point3D(worldPos));
+        markGeometryDirty();
         updateGeometry();
     }
 }
@@ -222,4 +223,4 @@ void Triangle3D_Geo::calculateNormal()
         glm::vec3 v2 = m_controlPoints[2].position - m_controlPoints[0].position;
         m_normal = glm::normalize(glm::cross(v1, v2));
     }
-} 
+}

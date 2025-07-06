@@ -1,4 +1,5 @@
 #include "Skybox.h"
+#include "../../util/LogManager.h"
 #include <osg/Geometry>
 #include <osg/Geode>
 #include <osg/StateSet>
@@ -124,7 +125,7 @@ osg::ref_ptr<osg::Node> Skybox::createCubeMapSkybox(float size)
     m_cubeMapTexture = createCubeMapTexture();
     if (!m_cubeMapTexture)
     {
-        Log3D << "Failed to create cube map texture, falling back to gradient skybox";
+        LOG_WARNING("Failed to create cube map texture, falling back to gradient skybox", "天空盒");
         return createGradientSkybox(size);
     }
     
@@ -477,7 +478,7 @@ osg::ref_ptr<osg::TextureCubeMap> Skybox::createCubeMapTexture()
             }
             else
             {
-                Log3D << "Failed to load texture: " << m_textureFiles[i];
+                LOG_ERROR(QString("Failed to load texture: %1").arg(QString::fromStdString(m_textureFiles[i])), "天空盒");
                 return nullptr;
             }
         }

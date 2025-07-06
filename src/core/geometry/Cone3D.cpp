@@ -41,6 +41,7 @@ void Cone3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
     if (!isStateComplete() && m_controlPoints.size() == 1)
     {
         setTempPoint(Point3D(worldPos));
+        markGeometryDirty();
         updateGeometry();
     }
 }

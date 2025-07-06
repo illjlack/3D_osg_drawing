@@ -185,6 +185,7 @@ protected:
     
     bool m_geometryDirty;
     bool m_initialized;
+    bool m_parametersChanged;  // 新增：跟踪参数是否发生变化
 
     mutable bool m_featuresDirty;
     mutable std::map<FeatureType, std::vector<PickingFeature>> m_cachedFeatures;

@@ -17,6 +17,7 @@ void Point3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
     if (!isStateComplete())
     {
         addControlPoint(Point3D(worldPos));
+        markGeometryDirty();
         completeDrawing();
     }
 }

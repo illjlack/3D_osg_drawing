@@ -36,7 +36,7 @@ void Arc3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
     if (!isStateComplete())
     {
         setTempPoint(Point3D(worldPos));
-        
+        markGeometryDirty();
         if (m_controlPoints.size() == 2)
         {
             // 临时计算圆弧预览

@@ -22,6 +22,9 @@
     <Filter Include="Core\World">
       <UniqueIdentifier>{9429a5c3-2197-4b7a-a4c1-0ccdafd4b03b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Core\Camera">
+      <UniqueIdentifier>{ebe8fdc1-9f0a-4443-83ec-c66ddecf9a8f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">
@@ -110,6 +113,9 @@
     </ClCompile>
     <ClCompile Include="src\core\world\Skybox.cpp">
       <Filter>Core\World</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\camera\CameraController.cpp">
+      <Filter>Core\Camera</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -201,6 +207,9 @@
     </QtMoc>
     <QtMoc Include="src\core\world\CoordinateSystemRenderer.h">
       <Filter>Core\World</Filter>
+    </QtMoc>
+    <QtMoc Include="src\core\camera\CameraController.h">
+      <Filter>Core\Camera</Filter>
     </QtMoc>
   </ItemGroup>
 </Project>

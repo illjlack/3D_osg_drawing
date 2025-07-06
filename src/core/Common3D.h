@@ -244,6 +244,8 @@ struct IndicatorConfig
     {}
 };
 
+
+/*
 // 日志辅助类
 class LogHelper3D
 {
@@ -277,6 +279,7 @@ private:
 };
 
 #define Log3D LogHelper3D(__FILE__, __LINE__)
+*/
 
 // 初始化全局设置
 void initializeGlobal3DSettings();

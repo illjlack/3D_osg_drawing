@@ -54,6 +54,7 @@
 #include "../core/picking/PickingIntegration.h"
 #include "OSGWidget.h"
 #include "CoordinateSystemDialog.h"
+#include "LogOutputWidget.h"
 
 // 前向声明
 class Geo3D;
@@ -93,6 +94,11 @@ private slots:
     void onViewWireframe();
     void onViewShaded();
     void onViewShadedWireframe();
+    
+    // 投影模式相关
+    void onProjectionModeChanged();
+    void onPerspectiveFOVChanged();
+    void onOrthographicSizeChanged();
     
     // 天空盒相关
     void onViewSkybox();
@@ -143,12 +149,21 @@ private:
     // 停靠窗口
     QDockWidget* m_propertyDock;
     QDockWidget* m_toolDock;
+    QDockWidget* m_logDock;
     
     // 状态栏标签
     QLabel* m_positionLabel;
     QLabel* m_modeLabel;
     QLabel* m_objectCountLabel;
     QLabel* m_coordinateRangeLabel;
+    
+    // 日志输出栏
+    LogOutputWidget* m_logOutputWidget;
+    
+    // 投影模式相关UI控件
+    QComboBox* m_projectionModeCombo;
+    QDoubleSpinBox* m_perspectiveFOVSpinBox;
+    QDoubleSpinBox* m_orthographicSizeSpinBox;
     
     QString m_currentFilePath;
     bool m_modified;

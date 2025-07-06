@@ -106,6 +106,9 @@
     <ClCompile Include="src\core\world\CoordinateSystem3D.cpp" />
     <ClCompile Include="src\core\world\CoordinateSystemRenderer.cpp" />
     <ClCompile Include="src\core\world\Skybox.cpp" />
+    <ClCompile Include="src\core\camera\CameraController.cpp">
+      <Filter>Core\Camera</Filter>
+    </ClCompile>
     <ClCompile Include="src\main.cpp">
       <Filter>Main</Filter>
     </ClCompile>
@@ -116,6 +119,9 @@
       <Filter>UI</Filter>
     </ClCompile>
     <ClCompile Include="src\ui\CoordinateSystemDialog.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\LogOutputWidget.cpp">
       <Filter>UI</Filter>
     </ClCompile>
     <ClCompile Include="src\core\Common3D.cpp">
@@ -184,6 +190,9 @@
     <ClCompile Include="src\util\MathUtils.cpp">
       <Filter>Util</Filter>
     </ClCompile>
+    <ClCompile Include="src\util\LogManager.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\core\Common3D.h">
@@ -246,6 +255,9 @@
     <QtMoc Include="src\core\world\CoordinateSystem3D.h" />
     <QtMoc Include="src\core\world\CoordinateSystemRenderer.h" />
     <ClInclude Include="src\core\world\Skybox.h" />
+    <QtMoc Include="src\core\camera\CameraController.h">
+      <Filter>Core\Camera</Filter>
+    </QtMoc>
     <ClInclude Include="src\util\OSGUtils.h">
       <Filter>Util</Filter>
     </ClInclude>
@@ -258,6 +270,9 @@
     <ClInclude Include="src\util\MathUtils.h">
       <Filter>Util</Filter>
     </ClInclude>
+    <QtMoc Include="src\util\LogManager.h">
+      <Filter>Util</Filter>
+    </QtMoc>
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="src\ui\MainWindow.h">
@@ -267,6 +282,9 @@
       <Filter>UI</Filter>
     </QtMoc>
     <QtMoc Include="src\ui\CoordinateSystemDialog.h">
+      <Filter>UI</Filter>
+    </QtMoc>
+    <QtMoc Include="src\ui\LogOutputWidget.h">
       <Filter>UI</Filter>
     </QtMoc>
   </ItemGroup>
@@ -282,6 +300,9 @@
     </Filter>
     <Filter Include="Core\Geometry">
       <UniqueIdentifier>{core-geometry-filter-guid}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core\Camera">
+      <UniqueIdentifier>{core-camera-filter-guid}</UniqueIdentifier>
     </Filter>
     <Filter Include="Core\Picking">
       <UniqueIdentifier>{core-picking-filter-guid}</UniqueIdentifier>

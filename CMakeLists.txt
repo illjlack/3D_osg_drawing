@@ -109,11 +109,13 @@ set(UI_SOURCES
     src/ui/OSGWidget.cpp
     src/ui/MainWindow.cpp
     src/ui/CoordinateSystemDialog.cpp
+    src/ui/LogOutputWidget.cpp
 )
 set(UI_HEADERS
     src/ui/OSGWidget.h
     src/ui/MainWindow.h
     src/ui/CoordinateSystemDialog.h
+    src/ui/LogOutputWidget.h
 )
 set(CORE_SOURCES
     src/core/Common3D.cpp
@@ -121,6 +123,7 @@ set(CORE_SOURCES
     src/core/world/CoordinateSystem3D.cpp
     src/core/world/CoordinateSystemRenderer.cpp
     src/core/world/Skybox.cpp
+    src/core/camera/CameraController.cpp
 )
 set(CORE_HEADERS
     src/core/Common3D.h
@@ -129,6 +132,7 @@ set(CORE_HEADERS
     src/core/world/CoordinateSystem3D.h
     src/core/world/CoordinateSystemRenderer.h
     src/core/world/Skybox.h
+    src/core/camera/CameraController.h
 )
 set(GEOMETRY_SOURCES
     src/core/geometry/Point3D.cpp
@@ -175,12 +179,14 @@ set(UTIL_SOURCES
     src/util/GeometryFactory.cpp
     src/util/IndicatorFactory.cpp
     src/util/MathUtils.cpp
+    src/util/LogManager.cpp
 )
 set(UTIL_HEADERS
     src/util/OSGUtils.h
     src/util/GeometryFactory.h
     src/util/IndicatorFactory.h
     src/util/MathUtils.h
+    src/util/LogManager.h
 )
 
 # 合并所有源文件和头文件

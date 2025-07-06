@@ -3,6 +3,7 @@
 #include "../core/GeometryBase.h"
 #include "../core/picking/PickingSystem.h"
 #include "../core/picking/PickingIntegration.h"
+#include "../util/LogManager.h"
 #include <osgViewer/Viewer>
 #include <osgViewer/CompositeViewer>
 #include <osgViewer/ViewerEventHandlers>
@@ -24,6 +25,7 @@
 #include <osg/LightSource>
 #include <osg/Light>
 #include <osg/PositionAttitudeTransform>
+#include <osg/Math>
 #include <osgQOpenGL/osgQOpenGLWidget>
 #include <QTimer>
 #include <QOpenGLWidget>
@@ -33,7 +35,11 @@
 #include <QResizeEvent>
 #include <QWheelEvent>
 #include <QApplication>
+#include <QDebug>
 #include <algorithm>
+#include <QFont>
+#include <QColor>
+#include <cmath>
 
 // ========================================= OSGWidget 实现 =========================================
 OSGWidget::OSGWidget(QWidget* parent)
@@ -45,7 +51,11 @@ OSGWidget::OSGWidget(QWidget* parent)
     , m_pickingIndicatorNode(new osg::Group)
     , m_skyboxNode(new osg::Group)
     , m_trackballManipulator(new osgGA::TrackballManipulator)
+    , m_cameraController(std::make_unique<CameraController>())
     , m_cameraMoveSpeed(100.0) // 默认移动速度
+    , m_wheelMoveSensitivity(0.1) // 默认滚轮移动灵敏度
+    , m_accelerationRate(2.0) // 默认加速度倍率
+    , m_maxAccelerationSpeed(1000.0) // 默认最大加速度速度
     , m_currentDrawingGeo(nullptr)
     , m_selectedGeo(nullptr)
     , m_isDrawing(false)
@@ -55,6 +65,9 @@ OSGWidget::OSGWidget(QWidget* parent)
     , m_skyboxEnabled(true)
     , m_coordinateSystemRenderer(std::make_unique<CoordinateSystemRenderer>())
     , m_coordinateSystemEnabled(true)
+    , m_scaleBarEnabled(true)
+    , m_scaleBarPosition(20, 20)
+    , m_scaleBarSize(150, 30)
     , m_updateTimer(new QTimer(this))
 {
     setFocusPolicy(Qt::StrongFocus);
@@ -64,20 +77,25 @@ OSGWidget::OSGWidget(QWidget* parent)
     for (int i = 0; i < 6; ++i)
     {
         m_cameraMoveKeys[i] = false;
+        m_accelerationSpeeds[i] = 0.0;
     }
     
     // 连接信号槽
     connect(m_updateTimer, &QTimer::timeout, this, [this]() {
         update();
-        // 处理摄像机移动
         updateCameraPosition();
     });
+    
+
     
     // 连接初始化完成信号
     connect(this, &osgQOpenGLWidget::initialized, this, &OSGWidget::initializeScene);
     
     // 设置渲染循环
-    m_updateTimer->start(16); // 约60FPS
+    m_updateTimer->start(16);
+    
+    LOG_INFO("OSGWidget初始化完成", "系统");
+    LOG_DEBUG("渲染循环已启动，帧率: 60fps", "系统");
 }
 
 OSGWidget::~OSGWidget()
@@ -103,11 +121,13 @@ void OSGWidget::initializeScene()
     viewer->setSceneData(m_rootNode);
     
     // 设置线程模型
-    viewer->setThreadingModel(osgViewer::Viewer::SingleThreaded); //调试
-    //viewer->setThreadingModel(osgViewer::Viewer::AutomaticSelection);
+    viewer->setThreadingModel(osgViewer::Viewer::SingleThreaded);
     
     // 设置相机操控器
     viewer->setCameraManipulator(m_trackballManipulator);
+    
+    // 设置摄像机控制器
+    m_cameraController->setViewer(viewer);
     
     setupCamera();
     setupLighting();
@@ -182,7 +202,7 @@ void OSGWidget::setupPickingSystem()
     // 初始化拾取系统
     if (!PickingSystemIntegration::initializePickingSystem(width(), height()))
     {
-        Log3D << "Failed to initialize picking system";
+        LOG_ERROR("Failed to initialize picking system", "拾取");
         return;
     }
     
@@ -207,119 +227,89 @@ void OSGWidget::setupPickingSystem()
     
     m_advancedPickingEnabled = true;
     
-    Log3D << "Picking system initialized successfully";
+    LOG_SUCCESS("Picking system initialized successfully", "拾取");
 }
 
 void OSGWidget::resetCamera()
 {
-    osgViewer::Viewer* viewer = getOsgViewer();
-    if (!viewer) return;
+    if (!m_cameraController) return;
     
-    if (viewer->getCameraManipulator())
-    {
-        // 获取坐标系统范围
-        CoordinateSystem3D* coordSystem = CoordinateSystem3D::getInstance();
-        const CoordinateSystem3D::CoordinateRange& range = coordSystem->getCoordinateRange();
-        
-        // 修改：将摄像机位置设置为(1,0,0)附近
-        glm::vec3 center = range.center();
-        double maxRange = range.maxRange();
-        
-        // 计算摄像机位置：在(1,0,0)方向，距离为范围的较小比例
-        double distance = maxRange * 0.3; // 减小距离，使缩放更小
-        
-        // 设置摄像机位置在(1,0,0)附近，稍微偏移以避免完全在轴上
-        osg::Vec3d eye(center.x + distance, center.y + distance * 0.1, center.z + distance * 0.1);
-        osg::Vec3d centerOsg(center.x, center.y, center.z);
-        
-        viewer->getCameraManipulator()->setHomePosition(
-            eye,        // eye
-            centerOsg,  // center
-            osg::Vec3d(0, 0, 1)  // up
-        );
-        viewer->getCameraManipulator()->home(0.0);
-    }
+    // 获取坐标系统范围
+    CoordinateSystem3D* coordSystem = CoordinateSystem3D::getInstance();
+    const CoordinateSystem3D::CoordinateRange& range = coordSystem->getCoordinateRange();
+    
+    // 修改：将摄像机位置设置为(1,0,0)附近
+    glm::vec3 center = range.center();
+    double maxRange = range.maxRange();
+    
+    // 计算摄像机位置：在(1,0,0)方向，距离为范围的较小比例
+    double distance = maxRange * 0.3; // 减小距离，使缩放更小
+    
+    // 设置摄像机位置在(1,0,0)附近，稍微偏移以避免完全在轴上
+    osg::Vec3d eye(center.x + distance, center.y + distance * 0.1, center.z + distance * 0.1);
+    osg::Vec3d centerOsg(center.x, center.y, center.z);
+    
+    m_cameraController->setPosition(eye, centerOsg, osg::Vec3d(0, 0, 1));
 }
 
 void OSGWidget::fitAll()
 {
-    osgViewer::Viewer* viewer = getOsgViewer();
-    if (!viewer || !m_geoNode.valid()) return;
+    if (!m_cameraController || !m_geoNode.valid()) return;
     
-    if (viewer->getCameraManipulator())
+    // 获取坐标系统范围
+    CoordinateSystem3D* coordSystem = CoordinateSystem3D::getInstance();
+    const CoordinateSystem3D::CoordinateRange& range = coordSystem->getCoordinateRange();
+    
+    // 计算场景包围盒
+    osg::BoundingSphere bs = m_geoNode->getBound();
+    if (bs.valid())
     {
-        // 获取坐标系统范围
-        CoordinateSystem3D* coordSystem = CoordinateSystem3D::getInstance();
-        const CoordinateSystem3D::CoordinateRange& range = coordSystem->getCoordinateRange();
+        // 结合坐标系统范围和场景包围盒
+        glm::vec3 coordCenter = range.center();
+        double coordRadius = range.maxRange() * 0.5;
         
-        // 计算场景包围盒
-        osg::BoundingSphere bs = m_geoNode->getBound();
-        if (bs.valid())
+        // 如果场景有对象，使用场景和坐标系统的并集
+        if (bs.radius() > 0)
         {
-            // 结合坐标系统范围和场景包围盒
-            glm::vec3 coordCenter = range.center();
-            double coordRadius = range.maxRange() * 0.5;
+            osg::Vec3d sceneCenter = bs.center();
+            double sceneRadius = bs.radius();
             
-            // 如果场景有对象，使用场景和坐标系统的并集
-            if (bs.radius() > 0)
-            {
-                osg::Vec3d sceneCenter = bs.center();
-                double sceneRadius = bs.radius();
-                
-                // 计算并集中心
-                osg::Vec3d combinedCenter(
-                    (sceneCenter.x() + coordCenter.x) * 0.5,
-                    (sceneCenter.y() + coordCenter.y) * 0.5,
-                    (sceneCenter.z() + coordCenter.z) * 0.5
-                );
-                
-                // 计算并集半径
-                double combinedRadius = std::max(sceneRadius, coordRadius) * 1.2; // 20%边距
-                
-                viewer->getCameraManipulator()->setHomePosition(
-                    combinedCenter + osg::Vec3d(combinedRadius * 2, combinedRadius * 2, combinedRadius * 2),
-                    combinedCenter,
-                    osg::Vec3d(0, 0, 1)
-                );
-            }
-            else
-            {
-                // 如果场景为空，使用坐标系统范围
-                osg::Vec3d center(coordCenter.x, coordCenter.y, coordCenter.z);
-                double distance = coordRadius * 2.0;
-                
-                viewer->getCameraManipulator()->setHomePosition(
-                    center + osg::Vec3d(distance, distance, distance),
-                    center,
-                    osg::Vec3d(0, 0, 1)
-                );
-            }
+            // 计算并集中心
+            osg::Vec3d combinedCenter(
+                (sceneCenter.x() + coordCenter.x) * 0.5,
+                (sceneCenter.y() + coordCenter.y) * 0.5,
+                (sceneCenter.z() + coordCenter.z) * 0.5
+            );
             
-            viewer->getCameraManipulator()->home(0.0);
+            // 计算并集半径
+            double combinedRadius = std::max(sceneRadius, coordRadius) * 1.2; // 20%边距
+            
+            osg::Vec3d eye = combinedCenter + osg::Vec3d(combinedRadius * 2, combinedRadius * 2, combinedRadius * 2);
+            m_cameraController->setPosition(eye, combinedCenter, osg::Vec3d(0, 0, 1));
+        }
+        else
+        {
+            // 如果场景为空，使用坐标系统范围
+            osg::Vec3d center(coordCenter.x, coordCenter.y, coordCenter.z);
+            double distance = coordRadius * 2.0;
+            
+            osg::Vec3d eye = center + osg::Vec3d(distance, distance, distance);
+            m_cameraController->setPosition(eye, center, osg::Vec3d(0, 0, 1));
         }
     }
 }
 
 void OSGWidget::setViewDirection(const glm::vec3& direction, const glm::vec3& up)
 {
-    osgViewer::Viewer* viewer = getOsgViewer();
-    if (!viewer) return;
+    if (!m_cameraController) return;
     
-    if (viewer->getCameraManipulator())
-    {
-        osg::BoundingSphere bs = m_geoNode->getBound();
-        osg::Vec3d center = bs.valid() ? osg::Vec3d(bs.center()) : osg::Vec3d(0, 0, 0);
-        float distance = bs.valid() ? bs.radius() * 3.0f : 10.0f;
-        
-        osg::Vec3d eye = center - osg::Vec3d(direction.x, direction.y, direction.z) * distance;
-        
-        viewer->getCameraManipulator()->setHomePosition(
-            eye,
-            center,
-            osg::Vec3d(up.x, up.y, up.z)
-        );
-        viewer->getCameraManipulator()->home(0.0);
-    }
+    osg::BoundingSphere bs = m_geoNode->getBound();
+    osg::Vec3d center = bs.valid() ? osg::Vec3d(bs.center()) : osg::Vec3d(0, 0, 0);
+    float distance = bs.valid() ? bs.radius() * 3.0f : 10.0f;
+    
+    osg::Vec3d eye = center - osg::Vec3d(direction.x, direction.y, direction.z) * distance;
+    
+    m_cameraController->setPosition(eye, center, osg::Vec3d(up.x, up.y, up.z));
 }
 
 void OSGWidget::setWireframeMode(bool wireframe)
@@ -513,45 +503,17 @@ PickResult3D OSGWidget::pick(int x, int y)
 
 glm::vec3 OSGWidget::screenToWorld(int x, int y, float depth)
 {
-    osg::Vec3f worldPoint;
+    if (!m_cameraController) return glm::vec3(0, 0, 0);
     
-    osgViewer::Viewer* viewer = getOsgViewer();
-    if (!viewer) return glm::vec3(0, 0, 0);
-    
-    osg::Camera* camera = viewer->getCamera();
-    if (camera->getViewport())
-    {
-        osg::Matrix VPW = camera->getViewMatrix() * 
-                         camera->getProjectionMatrix() * 
-                         camera->getViewport()->computeWindowMatrix();
-        osg::Matrix invVPW;
-        invVPW.invert(VPW);
-        
-        worldPoint = osg::Vec3f(x, height() - y, depth) * invVPW;
-    }
-    
+    osg::Vec3d worldPoint = m_cameraController->screenToWorld(x, y, depth, width(), height());
     return glm::vec3(worldPoint.x(), worldPoint.y(), worldPoint.z());
 }
 
 glm::vec2 OSGWidget::worldToScreen(const glm::vec3& worldPos)
 {
-    osg::Vec2f screenPoint;
+    if (!m_cameraController) return glm::vec2(0, 0);
     
-    osgViewer::Viewer* viewer = getOsgViewer();
-    if (!viewer) return glm::vec2(0, 0);
-    
-    osg::Camera* camera = viewer->getCamera();
-    if (camera->getViewport())
-    {
-        osg::Matrix VPW = camera->getViewMatrix() * 
-                         camera->getProjectionMatrix() * 
-                         camera->getViewport()->computeWindowMatrix();
-        
-        osg::Vec3f world(worldPos.x, worldPos.y, worldPos.z);
-        osg::Vec3f screen = world * VPW;
-        screenPoint = osg::Vec2f(screen.x(), height() - screen.y());
-    }
-    
+    osg::Vec2d screenPoint = m_cameraController->worldToScreen(osg::Vec3d(worldPos.x, worldPos.y, worldPos.z), width(), height());
     return glm::vec2(screenPoint.x(), screenPoint.y());
 }
 
@@ -560,22 +522,22 @@ void OSGWidget::paintEvent(QPaintEvent* event)
 {
     // osgQOpenGLWidget已经处理了渲染，这里不需要手动调用frame()
     QOpenGLWidget::paintEvent(event);
+    
+    // 绘制比例尺
+    if (m_scaleBarEnabled)
+    {
+        drawScaleBar();
+    }
 }
 
 void OSGWidget::resizeEvent(QResizeEvent* event)
 {
     osgQOpenGLWidget::resizeEvent(event);
     
-    osgViewer::Viewer* viewer = getOsgViewer();
-    if (!viewer) return;
-    
-    osg::Camera* camera = viewer->getCamera();
-    if (camera)
+    // 更新摄像机控制器的投影矩阵
+    if (m_cameraController)
     {
-        camera->setViewport(0, 0, width(), height());
-        double aspectRatio = static_cast<double>(width()) / static_cast<double>(height());
-        // todo: 应该可以设置：视场角、近平面、远平面参数
-        camera->setProjectionMatrixAsPerspective(45.0f, aspectRatio, 0.1f, 1000.0f);
+        m_cameraController->updateProjectionMatrix(width(), height());
     }
 }
 
@@ -626,7 +588,25 @@ void OSGWidget::mouseReleaseEvent(QMouseEvent* event)
 
 void OSGWidget::wheelEvent(QWheelEvent* event)
 {
-    osgQOpenGLWidget::wheelEvent(event);
+    // 检查是否按住Ctrl键进行快速移动
+    if (event->modifiers() & Qt::ControlModifier)
+    {
+        // Ctrl + 滚轮 = 快速前后移动
+        int delta = event->angleDelta().y();
+        double moveDistance = delta > 0 ? m_cameraMoveSpeed * m_wheelMoveSensitivity : -m_cameraMoveSpeed * m_wheelMoveSensitivity;
+        
+        if (m_cameraController)
+        {
+            m_cameraController->moveForward(moveDistance);
+        }
+        
+        event->accept();
+    }
+    else
+    {
+        // 正常的滚轮缩放（OSG默认行为）
+        osgQOpenGLWidget::wheelEvent(event);
+    }
 }
 
 void OSGWidget::handleDrawingInput(QMouseEvent* event)
@@ -664,13 +644,13 @@ void OSGWidget::handleDrawingInput(QMouseEvent* event)
         {
             // 开始新的绘制
             Geo3D* newGeo = createGeo3D(GlobalDrawMode3D);
-            if (newGeo)
-            {
-                m_currentDrawingGeo = newGeo;
-                m_isDrawing = true;
-                addGeo(newGeo);
-                emit drawingProgress("开始绘制...");
-            }
+                    if (newGeo)
+        {
+            m_currentDrawingGeo = newGeo;
+            m_isDrawing = true;
+            addGeo(newGeo);
+            LOG_INFO("开始绘制...", "绘制");
+        }
         }
         
         if (m_currentDrawingGeo)
@@ -714,7 +694,7 @@ void OSGWidget::completeCurrentDrawing()
         m_currentDrawingGeo = nullptr;
         m_isDrawing = false;
         
-        emit drawingProgress("绘制完成");
+        LOG_SUCCESS("绘制完成", "绘制");
         
         // 重新启用OSG窗口的事件处理
         setFocus();
@@ -732,7 +712,7 @@ void OSGWidget::cancelCurrentDrawing()
         m_currentDrawingGeo = nullptr;
         m_isDrawing = false;
         
-        emit drawingProgress("取消绘制");
+        LOG_WARNING("取消绘制", "绘制");
         
         // 重新启用OSG窗口的事件处理
         setFocus();
@@ -759,11 +739,11 @@ void OSGWidget::setDrawMode(DrawMode3D mode)
     // 发送状态更新信号
     if (mode == DrawSelect3D)
     {
-        emit drawingProgress("切换到选择模式");
+        LOG_INFO("切换到选择模式", "模式");
     }
     else
     {
-        emit drawingProgress(tr("切换到绘制模式: %1").arg(drawMode3DToString(mode)));
+        LOG_INFO(tr("切换到绘制模式: %1").arg(drawMode3DToString(mode)), "模式");
     }
 }
 
@@ -954,96 +934,153 @@ void OSGWidget::setCameraMoveSpeed(double speed)
     emit cameraMoveSpeedChanged(speed);
 }
 
-void OSGWidget::performCameraMove(const osg::Vec3d& direction)
+void OSGWidget::setWheelMoveSensitivity(double sensitivity)
 {
-    osgViewer::Viewer* viewer = getOsgViewer();
-    if (!viewer || !viewer->getCameraManipulator()) return;
-    
-    // 获取当前相机位置和朝向
-    osg::Vec3d eye, center, up;
-    viewer->getCameraManipulator()->getInverseMatrix().getLookAt(eye, center, up);
-    
-    // 计算移动距离
-    double moveDistance = m_cameraMoveSpeed * 0.016; // 基于16ms帧时间
-    
-    // 更新相机位置
-    osg::Vec3d newEye = eye + direction * moveDistance;
-    osg::Vec3d newCenter = center + direction * moveDistance;
-    
-    // 设置新的相机位置
-    viewer->getCameraManipulator()->setHomePosition(newEye, newCenter, up);
-    viewer->getCameraManipulator()->home(0.0);
+    m_wheelMoveSensitivity = sensitivity;
+    emit wheelMoveSensitivityChanged(sensitivity);
+}
+
+
+
+void OSGWidget::setAccelerationRate(double rate)
+{
+    m_accelerationRate = rate;
+    emit accelerationRateChanged(rate);
+}
+
+void OSGWidget::setMaxAccelerationSpeed(double speed)
+{
+    m_maxAccelerationSpeed = speed;
+    emit maxAccelerationSpeedChanged(speed);
+}
+
+void OSGWidget::resetAllAcceleration()
+{
+    for (int i = 0; i < 6; ++i)
+    {
+        m_accelerationSpeeds[i] = 0.0;
+    }
 }
 
 void OSGWidget::updateCameraPosition()
 {
-    osgViewer::Viewer* viewer = getOsgViewer();
-    if (!viewer || !viewer->getCameraManipulator()) return;
+    if (!m_cameraController) return;
     
-    // 获取当前相机矩阵
-    osg::Matrix viewMatrix = viewer->getCameraManipulator()->getInverseMatrix();
-    osg::Vec3d right, up, forward;
+    // 计算自适应移动速度
+    double adaptiveSpeed = m_cameraController->calculateAdaptiveMoveSpeed(m_cameraMoveSpeed);
+    double baseMoveDistance = adaptiveSpeed * 0.016; // 基于16ms帧时间
     
-    // 从视图矩阵中提取方向向量
-    right = osg::Vec3d(viewMatrix(0,0), viewMatrix(0,1), viewMatrix(0,2));
-    up = osg::Vec3d(viewMatrix(1,0), viewMatrix(1,1), viewMatrix(1,2));
-    forward = osg::Vec3d(viewMatrix(2,0), viewMatrix(2,1), viewMatrix(2,2));
-    
-    // 标准化方向向量
-    right.normalize();
-    up.normalize();
-    forward.normalize();
-    
-    // 计算移动方向
-    osg::Vec3d moveDirection(0, 0, 0);
-    
-    if (m_cameraMoveKeys[0]) // Up
-        moveDirection += up;
-    if (m_cameraMoveKeys[1]) // Down
-        moveDirection -= up;
-    if (m_cameraMoveKeys[2]) // Left
-        moveDirection -= right;
-    if (m_cameraMoveKeys[3]) // Right
-        moveDirection += right;
-    if (m_cameraMoveKeys[4]) // Forward
-        moveDirection -= forward;
-    if (m_cameraMoveKeys[5]) // Backward
-        moveDirection += forward;
-    
-    // 如果有移动，执行移动
-    if (moveDirection.length2() > 0)
+    // 根据按键状态移动摄像机
+    for (int i = 0; i < 6; ++i)
     {
-        moveDirection.normalize();
-        performCameraMove(moveDirection);
+        if (m_cameraMoveKeys[i])
+        {
+            double moveDistance = baseMoveDistance;
+            
+            // 如果该方向有加速度
+            if (m_accelerationSpeeds[i] > 0.0)
+            {
+                // 使用加速度速度
+                moveDistance = m_accelerationSpeeds[i] * 0.016;
+                
+                // 增加加速度
+                m_accelerationSpeeds[i] *= m_accelerationRate;
+                
+                // 限制最大速度
+                if (m_accelerationSpeeds[i] > m_maxAccelerationSpeed)
+                {
+                    m_accelerationSpeeds[i] = m_maxAccelerationSpeed;
+                }
+                
+
+            }
+            else
+            {
+                // 正常移动：逐渐加速到基础速度
+                if (m_accelerationSpeeds[i] < adaptiveSpeed)
+                {
+                    m_accelerationSpeeds[i] += adaptiveSpeed * 0.5 * 0.016;
+                    if (m_accelerationSpeeds[i] > adaptiveSpeed)
+                    {
+                        m_accelerationSpeeds[i] = adaptiveSpeed;
+                    }
+                }
+                moveDistance = m_accelerationSpeeds[i] * 0.016;
+            }
+            
+            // 执行移动
+            switch (i)
+            {
+                case 0: // Up
+                    m_cameraController->moveUp(moveDistance);
+                    break;
+                case 1: // Down
+                    m_cameraController->moveDown(moveDistance);
+                    break;
+                case 2: // Left
+                    m_cameraController->moveLeft(moveDistance);
+                    break;
+                case 3: // Right
+                    m_cameraController->moveRight(moveDistance);
+                    break;
+                case 4: // Forward
+                    m_cameraController->moveForward(moveDistance);
+                    break;
+                case 5: // Backward
+                    m_cameraController->moveBackward(moveDistance);
+                    break;
+            }
+        }
+        else
+        {
+            // 按键释放时：逐渐减速到停止
+            if (m_accelerationSpeeds[i] > 0.0)
+            {
+                m_accelerationSpeeds[i] -= adaptiveSpeed * 2.0 * 0.016;
+                if (m_accelerationSpeeds[i] < 0.0)
+                {
+                    m_accelerationSpeeds[i] = 0.0;
+                }
+            }
+        }
     }
 }
 
 void OSGWidget::keyPressEvent(QKeyEvent* event)
 {
     // 处理摄像机移动键
+    int keyIndex = -1;
     switch (event->key())
     {
         case Qt::Key_W:
         case Qt::Key_Up:
-            moveCameraUp();
+            keyIndex = 4; // Forward
+            moveCameraForward();
             break;
         case Qt::Key_S:
         case Qt::Key_Down:
-            moveCameraDown();
+            keyIndex = 5; // Backward
+            moveCameraBackward();
             break;
         case Qt::Key_A:
         case Qt::Key_Left:
+            keyIndex = 2; // Left
             moveCameraLeft();
             break;
         case Qt::Key_D:
         case Qt::Key_Right:
+            keyIndex = 3; // Right
             moveCameraRight();
             break;
         case Qt::Key_Q:
-            moveCameraForward();
+        case Qt::Key_PageUp:
+            keyIndex = 0; // Up
+            moveCameraUp();
             break;
         case Qt::Key_E:
-            moveCameraBackward();
+        case Qt::Key_PageDown:
+            keyIndex = 1; // Down
+            moveCameraDown();
             break;
         default:
             // 其他按键传递给基类
@@ -1081,35 +1118,51 @@ void OSGWidget::keyPressEvent(QKeyEvent* event)
             return;
     }
     
+    // 启动加速度模式
+    if (keyIndex >= 0)
+    {
+        double adaptiveSpeed = m_cameraController->calculateAdaptiveMoveSpeed(m_cameraMoveSpeed);
+        m_accelerationSpeeds[keyIndex] = adaptiveSpeed * 1.5; // 从1.5倍基础速度开始加速
+    }
+    
     event->accept();
 }
 
 void OSGWidget::keyReleaseEvent(QKeyEvent* event)
 {
     // 处理摄像机移动键释放
+    int keyIndex = -1;
     switch (event->key())
     {
         case Qt::Key_W:
         case Qt::Key_Up:
-            m_cameraMoveKeys[0] = false;
+            keyIndex = 4; // Forward
+            m_cameraMoveKeys[4] = false;
             break;
         case Qt::Key_S:
         case Qt::Key_Down:
-            m_cameraMoveKeys[1] = false;
+            keyIndex = 5; // Backward
+            m_cameraMoveKeys[5] = false;
             break;
         case Qt::Key_A:
         case Qt::Key_Left:
+            keyIndex = 2; // Left
             m_cameraMoveKeys[2] = false;
             break;
         case Qt::Key_D:
         case Qt::Key_Right:
+            keyIndex = 3; // Right
             m_cameraMoveKeys[3] = false;
             break;
         case Qt::Key_Q:
-            m_cameraMoveKeys[4] = false;
+        case Qt::Key_PageUp:
+            keyIndex = 0; // Up
+            m_cameraMoveKeys[0] = false;
             break;
         case Qt::Key_E:
-            m_cameraMoveKeys[5] = false;
+        case Qt::Key_PageDown:
+            keyIndex = 1; // Down
+            m_cameraMoveKeys[1] = false;
             break;
         default:
             // 其他按键传递给基类
@@ -1122,5 +1175,221 @@ void OSGWidget::keyReleaseEvent(QKeyEvent* event)
             return;
     }
     
+    // 不在这里重置加速度，让减速在updateCameraPosition中处理
+    
     event->accept();
+}
+
+// ========================================= 比例尺相关方法 =========================================
+
+void OSGWidget::drawScaleBar()
+{
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
+    
+    // 获取当前相机信息
+    osgViewer::Viewer* viewer = getOsgViewer();
+    if (!viewer) return;
+    
+    osg::Camera* camera = viewer->getCamera();
+    if (!camera) return;
+    
+    // 计算比例尺
+    double scaleValue = calculateScaleValue();
+    QString scaleText = formatScaleText(scaleValue);
+    
+    // 设置绘制区域
+    QRect scaleRect(m_scaleBarPosition.x(), m_scaleBarPosition.y(), 
+                   m_scaleBarSize.width(), m_scaleBarSize.height());
+    
+    // 绘制背景
+    painter.fillRect(scaleRect, QColor(0, 0, 0, 100));
+    painter.setPen(QPen(QColor(255, 255, 255), 1));
+    painter.drawRect(scaleRect);
+    
+    // 绘制比例尺线条
+    int barWidth = m_scaleBarSize.width() - 20;
+    int barHeight = 4;
+    int barY = scaleRect.center().y() - barHeight / 2;
+    
+    // 绘制主线条
+    painter.setPen(QPen(QColor(255, 255, 255), 2));
+    painter.drawLine(scaleRect.left() + 10, barY, scaleRect.left() + 10 + barWidth, barY);
+    
+    // 绘制刻度线
+    painter.setPen(QPen(QColor(255, 255, 255), 1));
+    for (int i = 0; i <= 10; ++i)
+    {
+        int x = scaleRect.left() + 10 + (barWidth * i) / 10;
+        int tickHeight = (i % 5 == 0) ? 8 : 4;
+        painter.drawLine(x, barY - tickHeight, x, barY + tickHeight);
+    }
+    
+    // 绘制文本
+    painter.setPen(QColor(255, 255, 255));
+    painter.setFont(QFont("Arial", 8));
+    
+    // 绘制比例尺值
+    QRect textRect = scaleRect.adjusted(5, barY + 10, -5, -5);
+    painter.drawText(textRect, Qt::AlignCenter, scaleText);
+}
+
+double OSGWidget::calculateScaleValue()
+{
+    if (!m_cameraController) return 1.0;
+    
+    ProjectionMode mode = m_cameraController->getProjectionMode();
+    
+    if (mode == ProjectionMode::Orthographic)
+    {
+        // 正交投影模式：直接使用正交投影的大小计算比例尺
+        double orthoWidth = m_cameraController->getOrthographicRight() - m_cameraController->getOrthographicLeft();
+        double scaleBarPixels = m_scaleBarSize.width() - 20; // 减去边距
+        double scaleBarWorldUnits = (orthoWidth * scaleBarPixels) / width();
+        
+        return scaleBarWorldUnits;
+    }
+    else
+    {
+        // 透视投影模式：使用原来的计算方法
+        // 获取相机位置
+        osg::Vec3d eye = m_cameraController->getEyePosition();
+        osg::Vec3d center = m_cameraController->getCenterPosition();
+        
+        // 计算相机到中心的距离
+        double distance = (eye - center).length();
+        
+        // 获取视口信息
+        osgViewer::Viewer* viewer = getOsgViewer();
+        if (!viewer || !viewer->getCamera()) return 1.0;
+        
+        osg::Viewport* viewport = viewer->getCamera()->getViewport();
+        if (!viewport) return 1.0;
+        
+        // 计算屏幕像素对应的世界单位
+        double screenHeight = viewport->height();
+        double fov = m_cameraController->getPerspectiveFOV(); // 使用当前设置的FOV
+        double worldHeight = 2.0 * distance * tan(osg::DegreesToRadians(fov / 2.0));
+        double pixelsPerUnit = screenHeight / worldHeight;
+        
+        // 计算比例尺对应的世界单位
+        double scaleBarPixels = m_scaleBarSize.width() - 20; // 减去边距
+        double scaleBarWorldUnits = scaleBarPixels / pixelsPerUnit;
+        
+        return scaleBarWorldUnits;
+    }
+}
+
+QString OSGWidget::formatScaleText(double worldUnits)
+{
+    QString unit = "m";
+    double value = worldUnits;
+    
+    // 根据数值大小选择合适的单位
+    if (value >= 1000.0)
+    {
+        value /= 1000.0;
+        unit = "km";
+    }
+    else if (value < 1.0 && value >= 0.01)
+    {
+        value *= 100.0;
+        unit = "cm";
+    }
+    else if (value < 0.01)
+    {
+        value *= 1000.0;
+        unit = "mm";
+    }
+    
+    // 格式化数值
+    if (value >= 100.0)
+    {
+        return QString("%1 %2").arg(static_cast<int>(value)).arg(unit);
+    }
+    else if (value >= 10.0)
+    {
+        return QString("%1 %2").arg(value, 0, 'f', 1).arg(unit);
+    }
+    else
+    {
+        return QString("%1 %2").arg(value, 0, 'f', 2).arg(unit);
+    }
+}
+
+void OSGWidget::enableScaleBar(bool enabled)
+{
+    m_scaleBarEnabled = enabled;
+    update(); // 触发重绘
+}
+
+void OSGWidget::setScaleBarPosition(const QPoint& position)
+{
+    m_scaleBarPosition = position;
+    update(); // 触发重绘
+}
+
+void OSGWidget::setScaleBarSize(int width, int height)
+{
+    m_scaleBarSize = QSize(width, height);
+    update(); // 触发重绘
+}
+
+// ========================================= 投影模式相关方法 =========================================
+
+void OSGWidget::setProjectionMode(ProjectionMode mode)
+{
+    if (m_cameraController)
+    {
+        m_cameraController->setProjectionMode(mode);
+        
+        // 如果切换到正交模式，自动调整正交投影的大小
+        if (mode == ProjectionMode::Orthographic)
+        {
+            // 获取当前场景的包围盒来设置正交投影的大小
+            CoordinateSystem3D* coordSystem = CoordinateSystem3D::getInstance();
+            const CoordinateSystem3D::CoordinateRange& range = coordSystem->getCoordinateRange();
+            
+            double maxRange = range.maxRange();
+            double orthoSize = maxRange * 0.6; // 使用坐标范围的60%作为正交投影大小
+            
+            m_cameraController->setOrthographicSize(-orthoSize, orthoSize, -orthoSize, orthoSize);
+            m_cameraController->setOrthographicNearFar(-maxRange, maxRange);
+        }
+        
+        update(); // 触发重绘
+    }
+}
+
+ProjectionMode OSGWidget::getProjectionMode() const
+{
+    if (m_cameraController)
+    {
+        return m_cameraController->getProjectionMode();
+    }
+    return ProjectionMode::Perspective;
+}
+
+void OSGWidget::setPerspectiveFOV(double fov)
+{
+    if (m_cameraController)
+    {
+        m_cameraController->setPerspectiveFOV(fov);
+    }
+}
+
+void OSGWidget::setOrthographicSize(double left, double right, double bottom, double top)
+{
+    if (m_cameraController)
+    {
+        m_cameraController->setOrthographicSize(left, right, bottom, top);
+    }
+}
+
+void OSGWidget::setOrthographicNearFar(double near_, double far_)
+{
+    if (m_cameraController)
+    {
+        m_cameraController->setOrthographicNearFar(near_, far_);
+    }
 }

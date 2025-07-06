@@ -29,6 +29,7 @@ void Quad3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
     if (!isStateComplete())
     {
         setTempPoint(Point3D(worldPos));
+        markGeometryDirty();
         updateGeometry();
     }
 }
