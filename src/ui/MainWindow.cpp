@@ -1,4 +1,4 @@
-#include "MainWindow.h"
+﻿#include "MainWindow.h"
 #include "../core/GeometryBase.h"
 #include <QTimer>
 #include <QSplitter>

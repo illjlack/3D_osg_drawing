@@ -1,4 +1,4 @@
-#include "CoordinateSystem3D.h"
+﻿#include "CoordinateSystem3D.h"
 #include <QDebug>
 #include <algorithm>
 #include <cmath>

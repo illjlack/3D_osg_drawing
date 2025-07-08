@@ -1,4 +1,4 @@
-#include "CoordinateSystemRenderer.h"
+﻿#include "CoordinateSystemRenderer.h"
 #include <osg/StateSet>
 #include <osg/BlendFunc>
 #include <osg/Depth>

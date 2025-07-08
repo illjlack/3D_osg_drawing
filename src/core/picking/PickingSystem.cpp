@@ -1,4 +1,4 @@
-#include "PickingSystem.h"
+﻿#include "PickingSystem.h"
 #include "../GeometryBase.h"
 #include "../../util/LogManager.h"
 #include <osg/GL>

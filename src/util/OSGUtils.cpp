@@ -1,4 +1,4 @@
-#include "OSGUtils.h"
+﻿#include "OSGUtils.h"
 #include <osg/Array>
 #include <osg/BoundingBox>
 #include <osg/BoundingSphere>

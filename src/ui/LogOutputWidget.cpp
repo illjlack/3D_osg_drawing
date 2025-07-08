@@ -1,4 +1,4 @@
-#include "LogOutputWidget.h"
+﻿#include "LogOutputWidget.h"
 #include <QTextStream>
 #include <QScrollBar>
 #include <QApplication>

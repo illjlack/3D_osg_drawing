@@ -1,4 +1,4 @@
-#include "Skybox.h"
+﻿#include "Skybox.h"
 #include "../../util/LogManager.h"
 #include <osg/Geometry>
 #include <osg/Geode>

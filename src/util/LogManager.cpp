@@ -1,4 +1,4 @@
-#include "LogManager.h"
+﻿#include "LogManager.h"
 #include <QDebug>
 #include <QApplication>
 #include <QFile>

@@ -1,4 +1,4 @@
-#include "Polygon3D.h"
+﻿#include "Polygon3D.h"
 #include <osg/Array>
 #include <osg/PrimitiveSet>
 #include <QKeyEvent>

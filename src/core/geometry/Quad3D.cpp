@@ -1,4 +1,4 @@
-#include "Quad3D.h"
+﻿#include "Quad3D.h"
 #include <osg/Array>
 #include <osg/PrimitiveSet>
 

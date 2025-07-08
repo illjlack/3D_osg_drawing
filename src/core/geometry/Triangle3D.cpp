@@ -1,4 +1,4 @@
-#include "Triangle3D.h"
+﻿#include "Triangle3D.h"
 #include <osg/Array>
 #include <osg/PrimitiveSet>
 #include <cmath>

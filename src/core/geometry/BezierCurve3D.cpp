@@ -1,4 +1,4 @@
-#include "BezierCurve3D.h"
+﻿#include "BezierCurve3D.h"
 #include <osg/Array>
 #include <osg/PrimitiveSet>
 #include <QKeyEvent>

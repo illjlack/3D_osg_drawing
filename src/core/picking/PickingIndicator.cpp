@@ -1,4 +1,4 @@
-#include "PickingIndicator.h"
+﻿#include "PickingIndicator.h"
 #include "../GeometryBase.h"
 #include <osg/ShapeDrawable>
 #include <osg/PrimitiveSet>

@@ -1,4 +1,4 @@
-#include "OSGWidget.h"
+﻿#include "OSGWidget.h"
 #include "../core/Common3D.h"
 #include "../core/GeometryBase.h"
 #include "../core/picking/PickingSystem.h"

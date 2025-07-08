@@ -1,4 +1,4 @@
-#include "CameraController.h"
+﻿#include "CameraController.h"
 #include <osg/Matrix>
 #include <osg/Math>
 #include <osg/Camera>

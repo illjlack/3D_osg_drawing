@@ -1,4 +1,5 @@
-#pragma once
+﻿#pragma once
+#pragma execution_character_set("utf-8")
 
 #include "Enums3D.h"
 #include <glm/glm.hpp>

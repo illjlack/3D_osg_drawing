@@ -1,4 +1,5 @@
-#pragma once
+﻿#pragma once
+#pragma execution_character_set("utf-8")
 
 #include "../core/Common3D.h"
 

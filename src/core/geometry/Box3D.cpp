@@ -1,4 +1,4 @@
-#include "Box3D.h"
+﻿#include "Box3D.h"
 #include <osg/Array>
 #include <osg/PrimitiveSet>
 #include <cmath>

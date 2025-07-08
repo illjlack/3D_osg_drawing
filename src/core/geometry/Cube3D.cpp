@@ -1,4 +1,4 @@
-#include "Cube3D.h"
+﻿#include "Cube3D.h"
 #include <osg/Array>
 #include <osg/PrimitiveSet>
 #include <algorithm>

@@ -1,4 +1,4 @@
-#include "GeometryBase.h"
+﻿#include "GeometryBase.h"
 #include <osg/Array>
 #include <osg/Shape>
 #include <osg/PositionAttitudeTransform>

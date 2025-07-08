@@ -1,4 +1,4 @@
-#include "PickingIntegration.h"
+﻿#include "PickingIntegration.h"
 #include "../GeometryBase.h"
 #include <osg/ShapeDrawable>
 #include <osg/PrimitiveSet>

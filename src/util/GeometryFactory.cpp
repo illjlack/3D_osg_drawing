@@ -1,4 +1,4 @@
-#include "GeometryFactory.h"
+﻿#include "GeometryFactory.h"
 #include "../core/GeometryBase.h"
 #include "../core/geometry/Point3D.h"
 #include "../core/geometry/Line3D.h"

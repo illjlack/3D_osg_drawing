@@ -1,4 +1,4 @@
-#include "IndicatorFactory.h"
+﻿#include "IndicatorFactory.h"
 #include "../core/Enums3D.h"
 #include <osg/Array>
 #include <osg/PrimitiveSet>

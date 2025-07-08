@@ -1,4 +1,4 @@
-#include "MathUtils.h"
+﻿#include "MathUtils.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/geometric.hpp>
 #include <cmath>
@@ -143,7 +143,7 @@ bool MathUtils::rayIntersectsTriangle(const glm::vec3& rayOrigin, const glm::vec
                                      const glm::vec3& v0, const glm::vec3& v1, const glm::vec3& v2,
                                      float& t, glm::vec3& intersectionPoint)
 {
-    // Möller-Trumbore相交算法
+    // Mller-Trumbore相交算法
     glm::vec3 edge1 = v1 - v0;
     glm::vec3 edge2 = v2 - v0;
     glm::vec3 h = glm::cross(rayDir, edge2);

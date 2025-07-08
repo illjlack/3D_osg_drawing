@@ -1,4 +1,4 @@
-#include "CoordinateSystemDialog.h"
+﻿#include "CoordinateSystemDialog.h"
 #include <QMessageBox>
 #include <QApplication>
 #include <QScreen>

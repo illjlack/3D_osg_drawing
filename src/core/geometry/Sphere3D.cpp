@@ -1,4 +1,4 @@
-#include "Sphere3D.h"
+﻿#include "Sphere3D.h"
 #include <osg/Array>
 #include <osg/PrimitiveSet>
 #include <cmath>
