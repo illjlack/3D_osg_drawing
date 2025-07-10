@@ -13,6 +13,7 @@
 #include "../core/geometry/Cone3D.h"
 #include "../core/geometry/Sphere3D.h"
 #include "../core/geometry/Torus3D.h"
+#include "../core/geometry/UndefinedGeo3D.h"
 
 Geo3D* GeometryFactory::createGeometry(DrawMode3D mode)
 {
@@ -46,7 +47,7 @@ Geo3D* GeometryFactory::createGeometry(DrawMode3D mode)
     case DrawTorus3D:
         return createTorus();
     default:
-        return nullptr;
+        return createUndefinedGeo();
     }
 }
 
@@ -120,6 +121,11 @@ Torus3D_Geo* GeometryFactory::createTorus()
     return new Torus3D_Geo();
 }
 
+UndefinedGeo3D* GeometryFactory::createUndefinedGeo()
+{
+    return new UndefinedGeo3D();
+}
+
 DrawMode3D GeometryFactory::geoTypeToDrawMode(GeoType3D type)
 {
     switch (type)
@@ -137,6 +143,7 @@ DrawMode3D GeometryFactory::geoTypeToDrawMode(GeoType3D type)
     case Geo_Cone3D: return DrawCone3D;
     case Geo_Sphere3D: return DrawSphere3D;
     case Geo_Torus3D: return DrawTorus3D;
+    case Geo_UndefinedGeo3D: return DrawSelect3D;
     default: return DrawSelect3D;
     }
 }
@@ -159,6 +166,6 @@ GeoType3D GeometryFactory::drawModeToGeoType(DrawMode3D mode)
     case DrawCone3D: return Geo_Cone3D;
     case DrawSphere3D: return Geo_Sphere3D;
     case DrawTorus3D: return Geo_Torus3D;
-    default: return Geo_Undefined3D;
+    default: return Geo_UndefinedGeo3D;
     }
 } 

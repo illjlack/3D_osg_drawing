@@ -1,0 +1,23 @@
+14:07:06.485 [INFO] [相机] (CameraController.cpp:31) __cdecl CameraController::CameraController(void) 创建相机控制器
+14:07:06.485 [INFO] [相机] (CameraController.cpp:62) void __cdecl CameraController::initializeManipulators(void) 初始化相机操控器
+14:07:06.485 [DEBUG] [相机] (CameraController.cpp:81) void __cdecl CameraController::initializeManipulators(void) 相机操控器初始化完成，默认使用轨道球操控器
+14:07:06.485 [DEBUG] [相机] (CameraController.cpp:1147) class QString __cdecl CameraController::getManipulatorTypeString(enum ManipulatorType) const 获取操控器类型字符串: 0 -> 轨道球
+14:07:06.485 [DEBUG] [相机] (CameraController.cpp:49) __cdecl CameraController::CameraController(void) 相机控制器初始化完成: 默认操控器=轨道球, 投影模式=透视, FOV=45.0°
+14:07:06.517 [INFO] [系统] (OSGWidget.cpp:97) __cdecl OSGWidget::OSGWidget(class QWidget *) OSGWidget初始化完成
+14:07:06.517 [DEBUG] [系统] (OSGWidget.cpp:98) __cdecl OSGWidget::OSGWidget(class QWidget *) 渲染循环已启动，帧率: 60fps
+14:07:06.558 [INFO] [系统] (MainWindow.cpp:126) void __cdecl MainWindow::setupUI(void) 3D绘图板启动完成
+14:07:06.558 [INFO] [系统] (MainWindow.cpp:127) void __cdecl MainWindow::setupUI(void) 日志系统已初始化
+14:07:06.558 [DEBUG] [系统] (MainWindow.cpp:128) void __cdecl MainWindow::setupUI(void) 调试模式已启用
+14:07:06.603 [INFO] [状态] (MainWindow.cpp:534) void __cdecl MainWindow::updateStatusBar(const class QString &) Ready
+14:07:11.014 [INFO] [系统] (OSGWidget.cpp:115) void __cdecl OSGWidget::initializeScene(void) 正在初始化OSG插件系统...
+14:07:11.014 [INFO] [系统] (OSGWidget.cpp:119) void __cdecl OSGWidget::initializeScene(void) OSG插件系统初始化完成
+14:07:11.025 [WARN] [系统] (OSGWidget.cpp:126) void __cdecl OSGWidget::initializeScene(void) 未找到OSGB文件读取插件
+14:07:11.109 [INFO] [系统] (OSGWidget.cpp:137) void __cdecl OSGWidget::initializeScene(void) 支持的常用格式: 
+14:07:11.109 [INFO] [相机] (CameraController.cpp:90) void __cdecl CameraController::setViewer(class osgViewer::Viewer *) 相机操控器已设置到OSG查看器
+14:07:11.109 [INFO] [相机] (CameraController.cpp:513) void __cdecl CameraController::setPosition(const class osg::Vec3d &,const class osg::Vec3d &,const class osg::Vec3d &) 设置相机位置: 眼睛(15000.00,1500.00,1500.00) 中心(0.00,0.00,0.00) 上方向(0.00,0.00,1.00)
+14:07:11.111 [SUCCESS] [拾取] (PickingSystem.cpp:129) bool __cdecl PickingSystem::initialize(int,int) Picking system initialized successfully (799x668)
+14:07:11.112 [SUCCESS] [拾取] (OSGWidget.cpp:255) void __cdecl OSGWidget::setupPickingSystem(void) Picking system initialized successfully
+14:07:39.767 [INFO] [文件IO] (GeoOsgbIO.cpp:49) class Geo3D *__cdecl GeoOsgbIO::loadFromOsgb(const class QString &) 尝试加载文件: D:/Program Files/feiq/Recv Files/moxing04/aaa.osgb
+14:07:39.767 [INFO] [文件IO] (GeoOsgbIO.cpp:60) class Geo3D *__cdecl GeoOsgbIO::loadFromOsgb(const class QString &) 文件扩展名: osgb
+14:07:39.783 [ERROR] [文件IO] (GeoOsgbIO.cpp:65) class Geo3D *__cdecl GeoOsgbIO::loadFromOsgb(const class QString &) 没有找到处理扩展名 'osgb' 的OSG插件
+14:07:41.170 [ERROR] [文件] (MainWindow.cpp:639) void __cdecl MainWindow::onFileOpen(void) 打开文档失败: D:/Program Files/feiq/Recv Files/moxing04/aaa.osgb

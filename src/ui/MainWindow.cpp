@@ -614,16 +614,31 @@ void MainWindow::onFileNew()
 void MainWindow::onFileOpen()
 {
     QString fileName = QFileDialog::getOpenFileName(this,
-        tr("打开3D文档"), "", tr("3D Drawing Files (*.3dd);;All Files (*)"));
+        tr("打开3D文档"), "", tr("OSGB Files (*.osgb);;3D Drawing Files (*.3dd);;All Files (*)"));
     
     if (!fileName.isEmpty())
     {
-        // TODO: 实现文件打开逻辑
-        m_currentFilePath = fileName;
-        m_modified = false;
-        setWindowTitle(tr("3D Drawing Board - %1").arg(QFileInfo(fileName).baseName()));
-        updateStatusBar(tr("打开文档: %1").arg(fileName));
-        LOG_SUCCESS(tr("打开文档: %1").arg(fileName), "文件");
+        if (m_osgWidget)
+        {
+            m_osgWidget->removeAllGeos();
+            
+            // 使用GeoOsgbIO加载文件
+            Geo3D* loadedGeo = GeoOsgbIO::loadFromOsgb(fileName);
+            if (loadedGeo)
+            {
+                m_osgWidget->addGeo(loadedGeo);
+                m_currentFilePath = fileName;
+                m_modified = false;
+                setWindowTitle(tr("3D Drawing Board - %1").arg(QFileInfo(fileName).baseName()));
+                updateStatusBar(tr("打开文档: %1").arg(fileName));
+                LOG_SUCCESS(tr("打开文档: %1").arg(fileName), "文件");
+            }
+            else
+            {
+                QMessageBox::warning(this, tr("打开失败"), tr("无法打开文件: %1").arg(fileName));
+                LOG_ERROR(tr("打开文档失败: %1").arg(fileName), "文件");
+            }
+        }
     }
 }
 
@@ -635,16 +650,47 @@ void MainWindow::onFileSave()
         return;
     }
     
-    // TODO: 实现文件保存逻辑
-    m_modified = false;
-    updateStatusBar(tr("保存文档: %1").arg(m_currentFilePath));
-    LOG_SUCCESS(tr("保存文档: %1").arg(m_currentFilePath), "文件");
+    if (m_osgWidget)
+    {
+        // 获取当前选中的几何体或所有几何体
+        Geo3D* geoToSave = m_osgWidget->getSelectedGeo();
+        if (!geoToSave)
+        {
+            // 如果没有选中的几何体，获取第一个几何体
+            const auto& allGeos = m_osgWidget->getAllGeos();
+            if (!allGeos.empty())
+            {
+                geoToSave = allGeos[0];
+            }
+        }
+        
+        if (geoToSave)
+        {
+            // 使用GeoOsgbIO保存文件
+            if (GeoOsgbIO::saveToOsgb(m_currentFilePath, geoToSave))
+            {
+                m_modified = false;
+                updateStatusBar(tr("保存文档: %1").arg(m_currentFilePath));
+                LOG_SUCCESS(tr("保存文档: %1").arg(m_currentFilePath), "文件");
+            }
+            else
+            {
+                QMessageBox::warning(this, tr("保存失败"), tr("无法保存文件: %1").arg(m_currentFilePath));
+                LOG_ERROR(tr("保存文档失败: %1").arg(m_currentFilePath), "文件");
+            }
+        }
+        else
+        {
+            QMessageBox::information(this, tr("保存提示"), tr("没有可保存的几何体"));
+            LOG_WARNING("没有可保存的几何体", "文件");
+        }
+    }
 }
 
 void MainWindow::onFileSaveAs()
 {
     QString fileName = QFileDialog::getSaveFileName(this,
-        tr("保存3D文档"), "", tr("3D Drawing Files (*.3dd);;All Files (*)"));
+        tr("保存3D文档"), "", tr("OSGB Files (*.osgb);;3D Drawing Files (*.3dd);;All Files (*)"));
     
     if (!fileName.isEmpty())
     {

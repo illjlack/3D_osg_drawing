@@ -123,6 +123,12 @@
     <ClCompile Include="src\ui\LogOutputWidget.cpp">
       <Filter>UI</Filter>
     </ClCompile>
+    <ClCompile Include="src\util\GeoOsgbIO.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\geometry\UndefinedGeo3D.cpp">
+      <Filter>Core\Geometry</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\core\Common3D.h">
@@ -196,6 +202,12 @@
     </ClInclude>
     <ClInclude Include="src\core\world\Skybox.h">
       <Filter>Core\World</Filter>
+    </ClInclude>
+    <ClInclude Include="src\util\GeoOsgbIO.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\geometry\UndefinedGeo3D.h">
+      <Filter>Core\Geometry</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

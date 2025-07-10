@@ -18,6 +18,7 @@ class Cylinder3D_Geo;
 class Cone3D_Geo;
 class Sphere3D_Geo;
 class Torus3D_Geo;
+class UndefinedGeo3D;
 
 // 几何体工厂类
 class GeometryFactory
@@ -43,6 +44,7 @@ public:
     static Cone3D_Geo* createCone();
     static Sphere3D_Geo* createSphere();
     static Torus3D_Geo* createTorus();
+    static UndefinedGeo3D* createUndefinedGeo();
     
     // 辅助函数
     static DrawMode3D geoTypeToDrawMode(GeoType3D type);

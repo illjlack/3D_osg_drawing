@@ -54,6 +54,7 @@
 #include "OSGWidget.h"
 #include "CoordinateSystemDialog.h"
 #include "LogOutputWidget.h"
+#include "../util/GeoOsgbIO.h"
 
 // 前向声明
 class Geo3D;

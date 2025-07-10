@@ -26,6 +26,7 @@
 #include <osg/Light>
 #include <osg/PositionAttitudeTransform>
 #include <osg/Math>
+#include <osgDB/Registry>
 #include <osgQOpenGL/osgQOpenGLWidget>
 #include <QTimer>
 #include <QOpenGLWidget>
@@ -41,6 +42,7 @@
 #include <QColor>
 #include <cmath>
 #include <QDateTime> // Added for cache
+#include <QProcessEnvironment>
 
 // ========================================= OSGWidget 实现 =========================================
 OSGWidget::OSGWidget(QWidget* parent)
@@ -109,6 +111,53 @@ void OSGWidget::initializeScene()
 {
     osgViewer::Viewer* viewer = getOsgViewer();
     if (!viewer) return;
+    
+    // 初始化OSG插件系统
+    LOG_INFO("正在初始化OSG插件系统...", "系统");
+    
+    // 设置OSG插件路径
+#ifdef OSG_PLUGIN_PATH
+    QString pluginPath = QString::fromLocal8Bit(OSG_PLUGIN_PATH);
+    LOG_INFO(QString("设置OSG插件路径: %1").arg(pluginPath), "系统");
+    
+    // 设置环境变量
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    env.insert("OSG_PLUGIN_PATH", pluginPath);
+    QProcessEnvironment::setSystemEnvironment(env);
+    
+    // 设置OSG插件路径
+    osgDB::Registry* registry = osgDB::Registry::instance();
+    if (registry) {
+        registry->setLibraryFilePathList(pluginPath.toStdString());
+        LOG_INFO("OSG插件路径已设置", "系统");
+    }
+#endif
+    
+    osgDB::Registry* registry = osgDB::Registry::instance();
+    if (registry) {
+        // 获取可用的插件信息
+        LOG_INFO(QString("OSG插件系统初始化完成"), "系统");
+        
+        // 检查是否有osgb插件
+        osgDB::ReaderWriter* osgbReader = registry->getReaderWriterForExtension("osgb");
+        if (osgbReader) {
+            LOG_INFO("找到OSGB文件读取插件", "系统");
+        } else {
+            LOG_WARNING("未找到OSGB文件读取插件", "系统");
+        }
+        
+        // 检查其他常用格式
+        QStringList commonFormats = {"osg", "osgb", "osgt", "ive", "obj", "3ds", "dae"};
+        QStringList supportedFormats;
+        for (const QString& format : commonFormats) {
+            if (registry->getReaderWriterForExtension(format.toStdString())) {
+                supportedFormats << format;
+            }
+        }
+        LOG_INFO(QString("支持的常用格式: %1").arg(supportedFormats.join(", ")), "系统");
+    } else {
+        LOG_ERROR("OSG插件系统初始化失败", "系统");
+    }
     
     // 设置场景图
     m_rootNode->addChild(m_sceneNode);
@@ -1395,6 +1444,18 @@ void OSGWidget::setViewSize(double left, double right, double bottom, double top
     {
         m_cameraController->setViewSize(left, right, bottom, top);
     }
+}
+
+// ========================================= 几何对象查询方法 =========================================
+
+Geo3D* OSGWidget::getSelectedGeo() const
+{
+    return m_selectedGeo.get();
+}
+
+const std::vector<osg::ref_ptr<Geo3D>>& OSGWidget::getAllGeos() const
+{
+    return m_geoList;
 }
 
 

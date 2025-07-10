@@ -45,6 +45,18 @@ if (USE_VCPKG AND DEFINED CMAKE_TOOLCHAIN_FILE)
   message(STATUS "vcpkg overlay ports: ${VCPKG_OVERLAY_PORTS}")
   message(STATUS "vcpkg target triplet: ${VCPKG_TARGET_TRIPLET}")
   message(STATUS "CMAKE_PREFIX_PATH: ${CMAKE_PREFIX_PATH}")
+  
+  # 设置OSG插件路径
+  if (WIN32)
+    set(OSG_PLUGIN_PATH "${VCPKG_INSTALLED_DIR}/${_vcpkg_triplet}/plugins/osgPlugins-${OpenSceneGraph_VERSION}")
+    set(OSG_LIBRARY_PATH "${VCPKG_INSTALLED_DIR}/${_vcpkg_triplet}/bin")
+  else()
+    set(OSG_PLUGIN_PATH "${VCPKG_INSTALLED_DIR}/${_vcpkg_triplet}/lib/osgPlugins-${OpenSceneGraph_VERSION}")
+    set(OSG_LIBRARY_PATH "${VCPKG_INSTALLED_DIR}/${_vcpkg_triplet}/lib")
+  endif()
+  
+  message(STATUS "OSG Plugin Path: ${OSG_PLUGIN_PATH}")
+  message(STATUS "OSG Library Path: ${OSG_LIBRARY_PATH}")
 endif()
 
 # ——— 查找依赖 ———
@@ -148,6 +160,7 @@ set(GEOMETRY_SOURCES
     src/core/geometry/Torus3D.cpp
     src/core/geometry/Arc3D.cpp
     src/core/geometry/BezierCurve3D.cpp
+    src/core/geometry/UndefinedGeo3D.cpp
 )
 set(GEOMETRY_HEADERS
     src/core/geometry/Point3D.h
@@ -163,6 +176,7 @@ set(GEOMETRY_HEADERS
     src/core/geometry/Torus3D.h
     src/core/geometry/Arc3D.h
     src/core/geometry/BezierCurve3D.h
+    src/core/geometry/UndefinedGeo3D.h
 )
 set(PICKING_SOURCES
     src/core/picking/PickingSystem.cpp
@@ -180,6 +194,7 @@ set(UTIL_SOURCES
     src/util/IndicatorFactory.cpp
     src/util/MathUtils.cpp
     src/util/LogManager.cpp
+    src/util/GeoOsgbIO.cpp
 )
 set(UTIL_HEADERS
     src/util/OSGUtils.h
@@ -187,6 +202,7 @@ set(UTIL_HEADERS
     src/util/IndicatorFactory.h
     src/util/MathUtils.h
     src/util/LogManager.h
+    src/util/GeoOsgbIO.h
 )
 
 # 合并所有源文件和头文件
@@ -239,6 +255,25 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}/src/util
     ${VCPKG_INSTALLED_DIR}/x64-windows/include
 )
+
+# 设置OSG插件路径环境变量
+if (USE_VCPKG AND DEFINED CMAKE_TOOLCHAIN_FILE)
+    # 设置OSG插件路径环境变量
+    target_compile_definitions(${PROJECT_NAME} PRIVATE
+        OSG_PLUGIN_PATH="${OSG_PLUGIN_PATH}"
+        OSG_LIBRARY_PATH="${OSG_LIBRARY_PATH}"
+    )
+    
+    # 在运行时设置环境变量
+    if (WIN32)
+        set_target_properties(${PROJECT_NAME} PROPERTIES
+            VS_DEBUGGER_ENVIRONMENT "OSG_PLUGIN_PATH=${OSG_PLUGIN_PATH};OSG_LIBRARY_PATH=${OSG_LIBRARY_PATH}"
+        )
+    endif()
+    
+    message(STATUS "设置OSG插件路径: ${OSG_PLUGIN_PATH}")
+    message(STATUS "设置OSG库路径: ${OSG_LIBRARY_PATH}")
+endif()
 
 # ——— 编译选项 ———
 target_compile_definitions(${PROJECT_NAME} PRIVATE

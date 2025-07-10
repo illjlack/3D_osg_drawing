@@ -62,6 +62,8 @@ public:
     void removeAllGeos();
     void selectGeo(Geo3D* geo);
     void deselectAll();
+    Geo3D* getSelectedGeo() const;
+    const std::vector<osg::ref_ptr<Geo3D>>& getAllGeos() const;
     
     // 拾取
     PickResult3D pick(int x, int y);

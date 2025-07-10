@@ -169,6 +169,9 @@
     <ClCompile Include="src\core\geometry\BezierCurve3D.cpp">
       <Filter>Core\Geometry</Filter>
     </ClCompile>
+    <ClCompile Include="src\core\geometry\UndefinedGeo3D.cpp">
+      <Filter>Core\Geometry</Filter>
+    </ClCompile>
     <ClCompile Include="src\core\picking\PickingSystem.cpp">
       <Filter>Core\Picking</Filter>
     </ClCompile>
@@ -191,6 +194,9 @@
       <Filter>Util</Filter>
     </ClCompile>
     <ClCompile Include="src\util\LogManager.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="src\util\GeoOsgbIO.cpp">
       <Filter>Util</Filter>
     </ClCompile>
   </ItemGroup>
@@ -243,6 +249,9 @@
     <ClInclude Include="src\core\geometry\BezierCurve3D.h">
       <Filter>Core\Geometry</Filter>
     </ClInclude>
+    <ClInclude Include="src\core\geometry\UndefinedGeo3D.h">
+      <Filter>Core\Geometry</Filter>
+    </ClInclude>
     <ClInclude Include="src\core\picking\PickingSystem.h">
       <Filter>Core\Picking</Filter>
     </ClInclude>
@@ -273,6 +282,9 @@
     <QtMoc Include="src\util\LogManager.h">
       <Filter>Util</Filter>
     </QtMoc>
+    <ClInclude Include="src\util\GeoOsgbIO.h">
+      <Filter>Util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="src\ui\MainWindow.h">

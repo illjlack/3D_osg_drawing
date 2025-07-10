@@ -119,6 +119,9 @@ enum GeoType3D
     Geo_Hemisphere3D,
     Geo_Ellipsoid3D,
     
+    // 未定义几何体类型
+    Geo_UndefinedGeo3D,
+    
     EndGeoType3D
 };
 
