@@ -306,42 +306,48 @@ void MainWindow::createToolBars()
     cameraUpAction->setIcon(QIcon(":/icons/up.png"));
     cameraUpAction->setToolTip(tr("摄像机上移 (W/↑)"));
     connect(cameraUpAction, &QAction::triggered, this, [this]() {
-        if (m_osgWidget) m_osgWidget->moveCameraUp();
+        if (m_osgWidget && m_osgWidget->getCameraController()) 
+            m_osgWidget->getCameraController()->moveUp(1.0);
     });
     
     QAction* cameraDownAction = m_viewToolBar->addAction(tr("下移"));
     cameraDownAction->setIcon(QIcon(":/icons/down.png"));
     cameraDownAction->setToolTip(tr("摄像机下移 (S/↓)"));
     connect(cameraDownAction, &QAction::triggered, this, [this]() {
-        if (m_osgWidget) m_osgWidget->moveCameraDown();
+        if (m_osgWidget && m_osgWidget->getCameraController()) 
+            m_osgWidget->getCameraController()->moveDown(1.0);
     });
     
     QAction* cameraLeftAction = m_viewToolBar->addAction(tr("左移"));
     cameraLeftAction->setIcon(QIcon(":/icons/left.png"));
     cameraLeftAction->setToolTip(tr("摄像机左移 (A/←)"));
     connect(cameraLeftAction, &QAction::triggered, this, [this]() {
-        if (m_osgWidget) m_osgWidget->moveCameraLeft();
+        if (m_osgWidget && m_osgWidget->getCameraController()) 
+            m_osgWidget->getCameraController()->moveLeft(1.0);
     });
     
     QAction* cameraRightAction = m_viewToolBar->addAction(tr("右移"));
     cameraRightAction->setIcon(QIcon(":/icons/right.png"));
     cameraRightAction->setToolTip(tr("摄像机右移 (D/→)"));
     connect(cameraRightAction, &QAction::triggered, this, [this]() {
-        if (m_osgWidget) m_osgWidget->moveCameraRight();
+        if (m_osgWidget && m_osgWidget->getCameraController()) 
+            m_osgWidget->getCameraController()->moveRight(1.0);
     });
     
     QAction* cameraForwardAction = m_viewToolBar->addAction(tr("前进"));
     cameraForwardAction->setIcon(QIcon(":/icons/forward.png"));
     cameraForwardAction->setToolTip(tr("摄像机前进 (Q)"));
     connect(cameraForwardAction, &QAction::triggered, this, [this]() {
-        if (m_osgWidget) m_osgWidget->moveCameraForward();
+        if (m_osgWidget && m_osgWidget->getCameraController()) 
+            m_osgWidget->getCameraController()->moveForward(1.0);
     });
     
     QAction* cameraBackwardAction = m_viewToolBar->addAction(tr("后退"));
     cameraBackwardAction->setIcon(QIcon(":/icons/backward.png"));
     cameraBackwardAction->setToolTip(tr("摄像机后退 (E)"));
     connect(cameraBackwardAction, &QAction::triggered, this, [this]() {
-        if (m_osgWidget) m_osgWidget->moveCameraBackward();
+        if (m_osgWidget && m_osgWidget->getCameraController()) 
+            m_osgWidget->getCameraController()->moveBackward(1.0);
     });
     
     m_viewToolBar->addSeparator();
@@ -378,6 +384,21 @@ void MainWindow::createToolBars()
     connect(m_orthographicSizeSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
             this, &MainWindow::onOrthographicSizeChanged);
     m_viewToolBar->addWidget(m_orthographicSizeSpinBox);
+    
+    m_viewToolBar->addSeparator();
+    
+    // 相机操控器切换
+    m_viewToolBar->addWidget(new QLabel(tr("相机:")));
+    m_manipulatorCombo = new QComboBox();
+    m_manipulatorCombo->addItem(tr("轨道球"), static_cast<int>(ManipulatorType::Trackball));
+    m_manipulatorCombo->addItem(tr("第一人称"), static_cast<int>(ManipulatorType::FirstPerson));
+    m_manipulatorCombo->addItem(tr("飞行"), static_cast<int>(ManipulatorType::Flight));
+    m_manipulatorCombo->addItem(tr("驾驶"), static_cast<int>(ManipulatorType::Drive));
+    m_manipulatorCombo->setCurrentIndex(0);
+    m_manipulatorCombo->setToolTip(tr("切换相机操控器"));
+    connect(m_manipulatorCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &MainWindow::onManipulatorTypeChanged);
+    m_viewToolBar->addWidget(m_manipulatorCombo);
     
     m_viewToolBar->addSeparator();
     
@@ -479,6 +500,14 @@ void MainWindow::connectSignals()
             // 注意：鼠标位置变化太频繁，不输出到日志，避免日志过多
         });
         connect(m_osgWidget, &OSGWidget::advancedPickingResult, this, &MainWindow::onAdvancedPickingResult);
+        connect(m_osgWidget, &OSGWidget::manipulatorTypeChanged, this, [this](ManipulatorType type) {
+            if (m_manipulatorCombo) {
+                int index = static_cast<int>(type);
+                if (index >= 0 && index < m_manipulatorCombo->count()) {
+                    m_manipulatorCombo->setCurrentIndex(index);
+                }
+            }
+        });
     }
     
     // 工具面板信号连接
@@ -2006,10 +2035,10 @@ void MainWindow::onPerspectiveFOVChanged()
     if (!m_osgWidget) return;
     
     double fov = m_perspectiveFOVSpinBox->value();
-    m_osgWidget->setPerspectiveFOV(fov);
+    m_osgWidget->setFOV(fov);
     
-    updateStatusBar(tr("透视FOV设置为: %1°").arg(fov));
-    LOG_DEBUG(tr("透视FOV设置为: %1°").arg(fov), "投影");
+    updateStatusBar(tr("FOV设置为: %1°").arg(fov));
+    LOG_DEBUG(tr("FOV设置为: %1°").arg(fov), "投影");
 }
 
 void MainWindow::onOrthographicSizeChanged()
@@ -2017,8 +2046,39 @@ void MainWindow::onOrthographicSizeChanged()
     if (!m_osgWidget) return;
     
     double size = m_orthographicSizeSpinBox->value();
-    m_osgWidget->setOrthographicSize(-size, size, -size, size);
+    m_osgWidget->setViewSize(-size, size, -size, size);
     
-    updateStatusBar(tr("正交投影大小设置为: ±%1m").arg(size));
-    LOG_DEBUG(tr("正交投影大小设置为: ±%1m").arg(size), "投影");
+    updateStatusBar(tr("视图大小设置为: ±%1m").arg(size));
+    LOG_DEBUG(tr("视图大小设置为: ±%1m").arg(size), "投影");
+}
+
+// ========================================= 相机操控器相关槽函数 =========================================
+
+void MainWindow::onManipulatorTypeChanged()
+{
+    if (!m_osgWidget) return;
+    
+    int index = m_manipulatorCombo->currentIndex();
+    ManipulatorType type = static_cast<ManipulatorType>(m_manipulatorCombo->itemData(index).toInt());
+    
+    m_osgWidget->setManipulatorType(type);
+    
+    QString typeName;
+    switch (type) {
+        case ManipulatorType::Trackball:
+            typeName = tr("轨道球");
+            break;
+        case ManipulatorType::FirstPerson:
+            typeName = tr("第一人称");
+            break;
+        case ManipulatorType::Flight:
+            typeName = tr("飞行");
+            break;
+        case ManipulatorType::Drive:
+            typeName = tr("驾驶");
+            break;
+    }
+    
+    updateStatusBar(tr("相机操控器切换为: %1").arg(typeName));
+    LOG_INFO(tr("相机操控器切换为: %1").arg(typeName), "相机");
 }

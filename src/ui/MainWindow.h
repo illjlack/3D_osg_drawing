@@ -50,8 +50,6 @@
 #include <osgQOpenGL/osgQOpenGLWidget>
 #include <QTimer>
 #include <QOpenGLWidget>
-
-#include "../core/Common3D.h"
 #include "../core/picking/PickingIntegration.h"
 #include "OSGWidget.h"
 #include "CoordinateSystemDialog.h"
@@ -100,6 +98,9 @@ private slots:
     void onProjectionModeChanged();
     void onPerspectiveFOVChanged();
     void onOrthographicSizeChanged();
+    
+    // 相机操控器相关
+    void onManipulatorTypeChanged();
     
     // 天空盒相关
     void onViewSkybox();
@@ -165,6 +166,9 @@ private:
     QComboBox* m_projectionModeCombo;
     QDoubleSpinBox* m_perspectiveFOVSpinBox;
     QDoubleSpinBox* m_orthographicSizeSpinBox;
+    
+    // 相机操控器相关UI控件
+    QComboBox* m_manipulatorCombo;
     
     QString m_currentFilePath;
     bool m_modified;

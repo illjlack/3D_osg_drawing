@@ -40,6 +40,7 @@
 #include <QFont>
 #include <QColor>
 #include <cmath>
+#include <QDateTime> // Added for cache
 
 // ========================================= OSGWidget 实现 =========================================
 OSGWidget::OSGWidget(QWidget* parent)
@@ -50,12 +51,7 @@ OSGWidget::OSGWidget(QWidget* parent)
     , m_lightNode(new osg::Group)
     , m_pickingIndicatorNode(new osg::Group)
     , m_skyboxNode(new osg::Group)
-    , m_trackballManipulator(new osgGA::TrackballManipulator)
     , m_cameraController(std::make_unique<CameraController>())
-    , m_cameraMoveSpeed(100.0) // 默认移动速度
-    , m_wheelMoveSensitivity(0.1) // 默认滚轮移动灵敏度
-    , m_accelerationRate(2.0) // 默认加速度倍率
-    , m_maxAccelerationSpeed(1000.0) // 默认最大加速度速度
     , m_currentDrawingGeo(nullptr)
     , m_selectedGeo(nullptr)
     , m_isDrawing(false)
@@ -72,21 +68,24 @@ OSGWidget::OSGWidget(QWidget* parent)
 {
     setFocusPolicy(Qt::StrongFocus);
     setMouseTracking(true);
-    
-    // 初始化摄像机移动键状态
-    for (int i = 0; i < 6; ++i)
-    {
-        m_cameraMoveKeys[i] = false;
-        m_accelerationSpeeds[i] = 0.0;
-    }
+    setFocus(); // 确保获得焦点
     
     // 连接信号槽
     connect(m_updateTimer, &QTimer::timeout, this, [this]() {
         update();
-        updateCameraPosition();
     });
     
-
+    // 连接CameraController的信号
+    connect(m_cameraController.get(), &CameraController::cameraMoveSpeedChanged, 
+            this, &OSGWidget::cameraMoveSpeedChanged);
+    connect(m_cameraController.get(), &CameraController::wheelMoveSensitivityChanged, 
+            this, &OSGWidget::wheelMoveSensitivityChanged);
+    connect(m_cameraController.get(), &CameraController::accelerationRateChanged, 
+            this, &OSGWidget::accelerationRateChanged);
+    connect(m_cameraController.get(), &CameraController::maxAccelerationSpeedChanged, 
+            this, &OSGWidget::maxAccelerationSpeedChanged);
+    connect(m_cameraController.get(), &CameraController::manipulatorTypeChanged, 
+            this, &OSGWidget::manipulatorTypeChanged);
     
     // 连接初始化完成信号
     connect(this, &osgQOpenGLWidget::initialized, this, &OSGWidget::initializeScene);
@@ -122,9 +121,6 @@ void OSGWidget::initializeScene()
     
     // 设置线程模型
     viewer->setThreadingModel(osgViewer::Viewer::SingleThreaded);
-    
-    // 设置相机操控器
-    viewer->setCameraManipulator(m_trackballManipulator);
     
     // 设置摄像机控制器
     m_cameraController->setViewer(viewer);
@@ -505,8 +501,26 @@ glm::vec3 OSGWidget::screenToWorld(int x, int y, float depth)
 {
     if (!m_cameraController) return glm::vec3(0, 0, 0);
     
+    // 检查鼠标位置缓存
+    QPoint currentPos(x, y);
+    if (m_mousePosCacheValid && 
+        m_lastMouseScreenPos == currentPos &&
+        m_lastMouseCalculation.isValid() &&
+        m_lastMouseCalculation.msecsTo(QDateTime::currentDateTime()) < MOUSE_CACHE_DURATION)
+    {
+        return m_cachedMouseWorldPos;
+    }
+    
     osg::Vec3d worldPoint = m_cameraController->screenToWorld(x, y, depth, width(), height());
-    return glm::vec3(worldPoint.x(), worldPoint.y(), worldPoint.z());
+    glm::vec3 result(worldPoint.x(), worldPoint.y(), worldPoint.z());
+    
+    // 更新缓存
+    m_lastMouseScreenPos = currentPos;
+    m_cachedMouseWorldPos = result;
+    m_mousePosCacheValid = true;
+    m_lastMouseCalculation = QDateTime::currentDateTime();
+    
+    return result;
 }
 
 glm::vec2 OSGWidget::worldToScreen(const glm::vec3& worldPos)
@@ -523,7 +537,12 @@ void OSGWidget::paintEvent(QPaintEvent* event)
     // osgQOpenGLWidget已经处理了渲染，这里不需要手动调用frame()
     QOpenGLWidget::paintEvent(event);
     
-    // 绘制比例尺
+    // 更新相机位置（基于时间的移动）- 只在有移动键按下时更新
+    if (m_cameraController && m_cameraController->isMoving()) {
+        m_cameraController->updateCameraPosition();
+    }
+    
+    // 绘制比例尺 - 只在启用时绘制
     if (m_scaleBarEnabled)
     {
         drawScaleBar();
@@ -550,6 +569,16 @@ void OSGWidget::mousePressEvent(QMouseEvent* event)
     if (GlobalDrawMode3D == DrawSelect3D || (currentModifiers & Qt::ControlModifier))
     {
         // 选择模式：正常传递给OSG窗口
+        QString buttonName;
+        switch (event->button()) {
+            case Qt::LeftButton: buttonName = "左键"; break;
+            case Qt::RightButton: buttonName = "右键"; break;
+            case Qt::MiddleButton: buttonName = "中键"; break;
+            default: buttonName = "未知"; break;
+        }
+        
+        LOG_DEBUG(QString("鼠标按下: %1 位置(%2,%3)").arg(buttonName).arg(event->x()).arg(event->y()), "相机");
+        
         osgQOpenGLWidget::mousePressEvent(event);
     }
     else
@@ -562,27 +591,69 @@ void OSGWidget::mousePressEvent(QMouseEvent* event)
 
 void OSGWidget::mouseMoveEvent(QMouseEvent* event)
 {
+    // 如果是相机控制模式，添加日志
+    if (GlobalDrawMode3D == DrawSelect3D || (QApplication::keyboardModifiers() & Qt::ControlModifier))
+    {
+        // 只在鼠标按下时输出移动日志，避免日志过多
+        if (event->buttons() != Qt::NoButton)
+        {
+            static int logCounter = 0;
+            if (++logCounter % 10 == 0) // 每10次移动输出一次日志
+            {
+                QString buttonName;
+                if (event->buttons() & Qt::LeftButton) buttonName = "左键拖拽";
+                else if (event->buttons() & Qt::RightButton) buttonName = "右键拖拽";
+                else if (event->buttons() & Qt::MiddleButton) buttonName = "中键拖拽";
+                else buttonName = "拖拽";
+                
+                LOG_DEBUG(QString("鼠标移动: %1 位置(%2,%3)").arg(buttonName).arg(event->x()).arg(event->y()), "相机");
+            }
+        }
+    }
+    
     osgQOpenGLWidget::mouseMoveEvent(event);
     
-    // 更新鼠标世界坐标
-    glm::vec3 worldPos = screenToWorld(event->x(), event->y(), 0.5f);
+    // 节流机制：每16ms（约60FPS）更新一次鼠标世界坐标
+    static QDateTime lastMouseUpdate;
+    QDateTime currentTime = QDateTime::currentDateTime();
+    if (!lastMouseUpdate.isValid() || lastMouseUpdate.msecsTo(currentTime) >= MOUSE_CACHE_DURATION)
+    {
+        // 更新鼠标世界坐标
+        glm::vec3 worldPos = screenToWorld(event->x(), event->y(), 0.5f);
+        
+        // 应用坐标范围限制
+        CoordinateSystem3D* coordSystem = CoordinateSystem3D::getInstance();
+        glm::vec3 clampedPos = coordSystem->clampPointToSkybox(worldPos);
+        
+        m_lastMouseWorldPos = clampedPos;
+        emit mousePositionChanged(clampedPos);
+        
+        lastMouseUpdate = currentTime;
+    }
     
-    // 应用坐标范围限制
-    CoordinateSystem3D* coordSystem = CoordinateSystem3D::getInstance();
-    glm::vec3 clampedPos = coordSystem->clampPointToSkybox(worldPos);
-    
-    m_lastMouseWorldPos = clampedPos;
-    emit mousePositionChanged(clampedPos);
-    
-    // 处理绘制预览
+    // 处理绘制预览 - 使用缓存的位置
     if (m_isDrawing && m_currentDrawingGeo)
     {
-        updateCurrentDrawing(clampedPos);
+        updateCurrentDrawing(m_lastMouseWorldPos);
     }
 }
 
 void OSGWidget::mouseReleaseEvent(QMouseEvent* event)
 {
+    // 如果是相机控制模式，添加日志
+    if (GlobalDrawMode3D == DrawSelect3D || (QApplication::keyboardModifiers() & Qt::ControlModifier))
+    {
+        QString buttonName;
+        switch (event->button()) {
+            case Qt::LeftButton: buttonName = "左键"; break;
+            case Qt::RightButton: buttonName = "右键"; break;
+            case Qt::MiddleButton: buttonName = "中键"; break;
+            default: buttonName = "未知"; break;
+        }
+        
+        LOG_DEBUG(QString("鼠标释放: %1 位置(%2,%3)").arg(buttonName).arg(event->x()).arg(event->y()), "相机");
+    }
+    
     osgQOpenGLWidget::mouseReleaseEvent(event);
 }
 
@@ -593,11 +664,12 @@ void OSGWidget::wheelEvent(QWheelEvent* event)
     {
         // Ctrl + 滚轮 = 快速前后移动
         int delta = event->angleDelta().y();
-        double moveDistance = delta > 0 ? m_cameraMoveSpeed * m_wheelMoveSensitivity : -m_cameraMoveSpeed * m_wheelMoveSensitivity;
+        
+        LOG_DEBUG(QString("Ctrl+滚轮缩放: delta=%1 位置(%2,%3)").arg(delta).arg(event->x()).arg(event->y()), "相机");
         
         if (m_cameraController)
         {
-            m_cameraController->moveForward(moveDistance);
+            m_cameraController->handleWheelZoom(delta);
         }
         
         event->accept();
@@ -605,6 +677,9 @@ void OSGWidget::wheelEvent(QWheelEvent* event)
     else
     {
         // 正常的滚轮缩放（OSG默认行为）
+        int delta = event->angleDelta().y();
+        LOG_DEBUG(QString("滚轮缩放: delta=%1 位置(%2,%3)").arg(delta).arg(event->x()).arg(event->y()), "相机");
+        
         osgQOpenGLWidget::wheelEvent(event);
     }
 }
@@ -896,191 +971,131 @@ void OSGWidget::refreshCoordinateSystem()
     }
 }
 
-// ========================================= 摄像机移动控制 =========================================
 
-void OSGWidget::moveCameraUp()
+
+// ========================================= 摄像机控制器委托方法 =========================================
+
+void OSGWidget::setManipulatorType(ManipulatorType type)
 {
-    m_cameraMoveKeys[0] = true;
+    if (m_cameraController)
+    {
+        m_cameraController->setManipulatorType(type);
+        
+        // 清除比例尺缓存，因为相机操控器改变了
+        m_lastScaleCalculation = QDateTime();
+        
+        // 清除鼠标位置缓存，因为相机改变了
+        m_mousePosCacheValid = false;
+        
+        LOG_INFO(QString("切换相机操控器: %1").arg(static_cast<int>(type)), "相机");
+    }
 }
 
-void OSGWidget::moveCameraDown()
+ManipulatorType OSGWidget::getManipulatorType() const
 {
-    m_cameraMoveKeys[1] = true;
+    if (m_cameraController)
+    {
+        return m_cameraController->getManipulatorType();
+    }
+    return ManipulatorType::Trackball;
 }
 
-void OSGWidget::moveCameraLeft()
+void OSGWidget::switchToNextManipulator()
 {
-    m_cameraMoveKeys[2] = true;
+    m_cameraController->switchToNextManipulator();
 }
 
-void OSGWidget::moveCameraRight()
+void OSGWidget::switchToPreviousManipulator()
 {
-    m_cameraMoveKeys[3] = true;
-}
-
-void OSGWidget::moveCameraForward()
-{
-    m_cameraMoveKeys[4] = true;
-}
-
-void OSGWidget::moveCameraBackward()
-{
-    m_cameraMoveKeys[5] = true;
+    m_cameraController->switchToPreviousManipulator();
 }
 
 void OSGWidget::setCameraMoveSpeed(double speed)
 {
-    m_cameraMoveSpeed = speed;
-    emit cameraMoveSpeedChanged(speed);
+    m_cameraController->setCameraMoveSpeed(speed);
+}
+
+double OSGWidget::getCameraMoveSpeed() const
+{
+    if (m_cameraController)
+    {
+        return m_cameraController->getCameraMoveSpeed();
+    }
+    return 1.0;
 }
 
 void OSGWidget::setWheelMoveSensitivity(double sensitivity)
 {
-    m_wheelMoveSensitivity = sensitivity;
-    emit wheelMoveSensitivityChanged(sensitivity);
+    m_cameraController->setWheelMoveSensitivity(sensitivity);
 }
 
-
+double OSGWidget::getWheelMoveSensitivity() const
+{
+    if (m_cameraController)
+    {
+        return m_cameraController->getWheelMoveSensitivity();
+    }
+    return 1.0;
+}
 
 void OSGWidget::setAccelerationRate(double rate)
 {
-    m_accelerationRate = rate;
-    emit accelerationRateChanged(rate);
+    m_cameraController->setAccelerationRate(rate);
+}
+
+double OSGWidget::getAccelerationRate() const
+{
+    if (m_cameraController)
+    {
+        return m_cameraController->getAccelerationRate();
+    }
+    return 1.5;
 }
 
 void OSGWidget::setMaxAccelerationSpeed(double speed)
 {
-    m_maxAccelerationSpeed = speed;
-    emit maxAccelerationSpeedChanged(speed);
+    m_cameraController->setMaxAccelerationSpeed(speed);
+}
+
+double OSGWidget::getMaxAccelerationSpeed() const
+{
+    if (m_cameraController)
+    {
+        return m_cameraController->getMaxAccelerationSpeed();
+    }
+    return 10.0;
 }
 
 void OSGWidget::resetAllAcceleration()
 {
-    for (int i = 0; i < 6; ++i)
-    {
-        m_accelerationSpeeds[i] = 0.0;
-    }
+    m_cameraController->resetAllAcceleration();
 }
 
-void OSGWidget::updateCameraPosition()
-{
-    if (!m_cameraController) return;
-    
-    // 计算自适应移动速度
-    double adaptiveSpeed = m_cameraController->calculateAdaptiveMoveSpeed(m_cameraMoveSpeed);
-    double baseMoveDistance = adaptiveSpeed * 0.016; // 基于16ms帧时间
-    
-    // 根据按键状态移动摄像机
-    for (int i = 0; i < 6; ++i)
-    {
-        if (m_cameraMoveKeys[i])
-        {
-            double moveDistance = baseMoveDistance;
-            
-            // 如果该方向有加速度
-            if (m_accelerationSpeeds[i] > 0.0)
-            {
-                // 使用加速度速度
-                moveDistance = m_accelerationSpeeds[i] * 0.016;
-                
-                // 增加加速度
-                m_accelerationSpeeds[i] *= m_accelerationRate;
-                
-                // 限制最大速度
-                if (m_accelerationSpeeds[i] > m_maxAccelerationSpeed)
-                {
-                    m_accelerationSpeeds[i] = m_maxAccelerationSpeed;
-                }
-                
 
-            }
-            else
-            {
-                // 正常移动：逐渐加速到基础速度
-                if (m_accelerationSpeeds[i] < adaptiveSpeed)
-                {
-                    m_accelerationSpeeds[i] += adaptiveSpeed * 0.5 * 0.016;
-                    if (m_accelerationSpeeds[i] > adaptiveSpeed)
-                    {
-                        m_accelerationSpeeds[i] = adaptiveSpeed;
-                    }
-                }
-                moveDistance = m_accelerationSpeeds[i] * 0.016;
-            }
-            
-            // 执行移动
-            switch (i)
-            {
-                case 0: // Up
-                    m_cameraController->moveUp(moveDistance);
-                    break;
-                case 1: // Down
-                    m_cameraController->moveDown(moveDistance);
-                    break;
-                case 2: // Left
-                    m_cameraController->moveLeft(moveDistance);
-                    break;
-                case 3: // Right
-                    m_cameraController->moveRight(moveDistance);
-                    break;
-                case 4: // Forward
-                    m_cameraController->moveForward(moveDistance);
-                    break;
-                case 5: // Backward
-                    m_cameraController->moveBackward(moveDistance);
-                    break;
-            }
-        }
-        else
-        {
-            // 按键释放时：逐渐减速到停止
-            if (m_accelerationSpeeds[i] > 0.0)
-            {
-                m_accelerationSpeeds[i] -= adaptiveSpeed * 2.0 * 0.016;
-                if (m_accelerationSpeeds[i] < 0.0)
-                {
-                    m_accelerationSpeeds[i] = 0.0;
-                }
-            }
-        }
-    }
-}
 
 void OSGWidget::keyPressEvent(QKeyEvent* event)
 {
+    // 添加测试日志，确认事件到达
+    LOG_DEBUG(QString("OSGWidget keyPressEvent: key=%1, text='%2'").arg(event->key()).arg(event->text()), "相机");
+    
     // 处理摄像机移动键
-    int keyIndex = -1;
     switch (event->key())
     {
         case Qt::Key_W:
-        case Qt::Key_Up:
-            keyIndex = 4; // Forward
-            moveCameraForward();
-            break;
         case Qt::Key_S:
-        case Qt::Key_Down:
-            keyIndex = 5; // Backward
-            moveCameraBackward();
-            break;
         case Qt::Key_A:
-        case Qt::Key_Left:
-            keyIndex = 2; // Left
-            moveCameraLeft();
-            break;
         case Qt::Key_D:
-        case Qt::Key_Right:
-            keyIndex = 3; // Right
-            moveCameraRight();
-            break;
         case Qt::Key_Q:
-        case Qt::Key_PageUp:
-            keyIndex = 0; // Up
-            moveCameraUp();
-            break;
         case Qt::Key_E:
+        case Qt::Key_Up:
+        case Qt::Key_Down:
+        case Qt::Key_Left:
+        case Qt::Key_Right:
+        case Qt::Key_PageUp:
         case Qt::Key_PageDown:
-            keyIndex = 1; // Down
-            moveCameraDown();
+            // 委托给CameraController处理
+            LOG_DEBUG(QString("OSGWidget收到键盘按下事件: key=%1").arg(event->key()), "相机");
+            m_cameraController->setKeyPressed(event->key(), true);
             break;
         default:
             // 其他按键传递给基类
@@ -1115,14 +1130,7 @@ void OSGWidget::keyPressEvent(QKeyEvent* event)
                     emit geoSelected(nullptr);
                 }
             }
-            return;
-    }
-    
-    // 启动加速度模式
-    if (keyIndex >= 0)
-    {
-        double adaptiveSpeed = m_cameraController->calculateAdaptiveMoveSpeed(m_cameraMoveSpeed);
-        m_accelerationSpeeds[keyIndex] = adaptiveSpeed * 1.5; // 从1.5倍基础速度开始加速
+            break;
     }
     
     event->accept();
@@ -1131,38 +1139,23 @@ void OSGWidget::keyPressEvent(QKeyEvent* event)
 void OSGWidget::keyReleaseEvent(QKeyEvent* event)
 {
     // 处理摄像机移动键释放
-    int keyIndex = -1;
     switch (event->key())
     {
         case Qt::Key_W:
-        case Qt::Key_Up:
-            keyIndex = 4; // Forward
-            m_cameraMoveKeys[4] = false;
-            break;
         case Qt::Key_S:
-        case Qt::Key_Down:
-            keyIndex = 5; // Backward
-            m_cameraMoveKeys[5] = false;
-            break;
         case Qt::Key_A:
-        case Qt::Key_Left:
-            keyIndex = 2; // Left
-            m_cameraMoveKeys[2] = false;
-            break;
         case Qt::Key_D:
-        case Qt::Key_Right:
-            keyIndex = 3; // Right
-            m_cameraMoveKeys[3] = false;
-            break;
         case Qt::Key_Q:
-        case Qt::Key_PageUp:
-            keyIndex = 0; // Up
-            m_cameraMoveKeys[0] = false;
-            break;
         case Qt::Key_E:
+        case Qt::Key_Up:
+        case Qt::Key_Down:
+        case Qt::Key_Left:
+        case Qt::Key_Right:
+        case Qt::Key_PageUp:
         case Qt::Key_PageDown:
-            keyIndex = 1; // Down
-            m_cameraMoveKeys[1] = false;
+            // 委托给CameraController处理
+            LOG_DEBUG(QString("OSGWidget收到键盘释放事件: key=%1").arg(event->key()), "相机");
+            m_cameraController->setKeyPressed(event->key(), false);
             break;
         default:
             // 其他按键传递给基类
@@ -1172,10 +1165,8 @@ void OSGWidget::keyReleaseEvent(QKeyEvent* event)
             {
                 m_currentDrawingGeo->keyReleaseEvent(event);
             }
-            return;
+            break;
     }
-    
-    // 不在这里重置加速度，让减速在updateCameraPosition中处理
     
     event->accept();
 }
@@ -1238,15 +1229,25 @@ double OSGWidget::calculateScaleValue()
 {
     if (!m_cameraController) return 1.0;
     
+    // 检查缓存是否有效
+    QDateTime currentTime = QDateTime::currentDateTime();
+    if (m_lastScaleCalculation.isValid() && 
+        m_lastScaleCalculation.msecsTo(currentTime) < SCALE_CACHE_DURATION)
+    {
+        return m_cachedScaleValue;
+    }
+    
     ProjectionMode mode = m_cameraController->getProjectionMode();
     
     if (mode == ProjectionMode::Orthographic)
     {
         // 正交投影模式：直接使用正交投影的大小计算比例尺
-        double orthoWidth = m_cameraController->getOrthographicRight() - m_cameraController->getOrthographicLeft();
+        double orthoWidth = m_cameraController->getRight() - m_cameraController->getLeft();
         double scaleBarPixels = m_scaleBarSize.width() - 20; // 减去边距
         double scaleBarWorldUnits = (orthoWidth * scaleBarPixels) / width();
         
+        m_cachedScaleValue = scaleBarWorldUnits;
+        m_lastScaleCalculation = currentTime;
         return scaleBarWorldUnits;
     }
     else
@@ -1268,7 +1269,7 @@ double OSGWidget::calculateScaleValue()
         
         // 计算屏幕像素对应的世界单位
         double screenHeight = viewport->height();
-        double fov = m_cameraController->getPerspectiveFOV(); // 使用当前设置的FOV
+        double fov = m_cameraController->getFOV(); // 使用当前设置的FOV
         double worldHeight = 2.0 * distance * tan(osg::DegreesToRadians(fov / 2.0));
         double pixelsPerUnit = screenHeight / worldHeight;
         
@@ -1276,6 +1277,8 @@ double OSGWidget::calculateScaleValue()
         double scaleBarPixels = m_scaleBarSize.width() - 20; // 减去边距
         double scaleBarWorldUnits = scaleBarPixels / pixelsPerUnit;
         
+        m_cachedScaleValue = scaleBarWorldUnits;
+        m_lastScaleCalculation = currentTime;
         return scaleBarWorldUnits;
     }
 }
@@ -1353,8 +1356,8 @@ void OSGWidget::setProjectionMode(ProjectionMode mode)
             double maxRange = range.maxRange();
             double orthoSize = maxRange * 0.6; // 使用坐标范围的60%作为正交投影大小
             
-            m_cameraController->setOrthographicSize(-orthoSize, orthoSize, -orthoSize, orthoSize);
-            m_cameraController->setOrthographicNearFar(-maxRange, maxRange);
+            m_cameraController->setViewSize(-orthoSize, orthoSize, -orthoSize, orthoSize);
+            m_cameraController->setNearFar(-maxRange, maxRange);
         }
         
         update(); // 触发重绘
@@ -1370,26 +1373,29 @@ ProjectionMode OSGWidget::getProjectionMode() const
     return ProjectionMode::Perspective;
 }
 
-void OSGWidget::setPerspectiveFOV(double fov)
+void OSGWidget::setFOV(double fov)
 {
     if (m_cameraController)
     {
-        m_cameraController->setPerspectiveFOV(fov);
+        m_cameraController->setFOV(fov);
     }
 }
 
-void OSGWidget::setOrthographicSize(double left, double right, double bottom, double top)
+void OSGWidget::setNearFar(double near_, double far_)
 {
     if (m_cameraController)
     {
-        m_cameraController->setOrthographicSize(left, right, bottom, top);
+        m_cameraController->setNearFar(near_, far_);
     }
 }
 
-void OSGWidget::setOrthographicNearFar(double near_, double far_)
+void OSGWidget::setViewSize(double left, double right, double bottom, double top)
 {
     if (m_cameraController)
     {
-        m_cameraController->setOrthographicNearFar(near_, far_);
+        m_cameraController->setViewSize(left, right, bottom, top);
     }
 }
+
+
+

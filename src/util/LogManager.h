@@ -8,6 +8,8 @@
 #include <QMutex>
 #include <QTimer>
 #include <QThread>
+#include <QQueue>
+#include <QWaitCondition>
 #include <memory>
 #include <sstream>
 #include <filesystem>
@@ -48,7 +50,72 @@ struct LogEntry
     {}
 };
 
-// 日志管理器类
+// 日志工作线程类
+class LogWorkerThread : public QThread
+{
+    Q_OBJECT
+
+public:
+    explicit LogWorkerThread(QObject* parent = nullptr);
+    ~LogWorkerThread();
+
+    // 添加日志到队列
+    void addLog(const LogEntry& entry);
+    
+    // 设置输出选项
+    void setConsoleOutput(bool enabled);
+    void setFileOutput(bool enabled);
+    void setLogFilePath(const QString& path);
+    void setMaxLogCount(int count);
+    void setAutoCleanup(bool enabled, int interval = 60);
+
+    // 获取日志（线程安全）
+    QList<LogEntry> getLogs() const;
+    QList<LogEntry> getLogsByLevel(LogLevel level) const;
+    QList<LogEntry> getLogsByCategory(const QString& category) const;
+    
+    // 清理日志
+    void clearLogs();
+
+signals:
+    void logAdded(const LogEntry& entry);
+    void logsCleared();
+    void logLevelChanged(LogLevel level);
+
+protected:
+    void run() override;
+
+private slots:
+    void cleanupOldLogs();
+
+private:
+    void writeToFile(const LogEntry& entry);
+    QString formatLogMessage(const LogEntry& entry) const;
+    void emitLogAdded(const LogEntry& entry);
+
+    // 日志队列
+    QQueue<LogEntry> m_logQueue;
+    mutable QMutex m_queueMutex;
+    QWaitCondition m_queueCondition;
+    
+    // 日志存储
+    QList<LogEntry> m_logs;
+    mutable QMutex m_logsMutex;
+    
+    // 配置
+    int m_maxLogCount;
+    bool m_autoCleanup;
+    int m_autoCleanupInterval;
+    bool m_consoleOutput;
+    bool m_fileOutput;
+    QString m_logFilePath;
+    
+    // 控制标志
+    bool m_running;
+    QTimer* m_cleanupTimer;
+};
+
+// 日志管理器类（主线程接口）
 class LogManager : public QObject
 {
     Q_OBJECT
@@ -70,10 +137,10 @@ public:
     void success(const QString& message, const QString& category = "",
                  const QString& fileName = "", int lineNumber = 0, const QString& functionName = "");
     
-    // 获取日志
-    QList<LogEntry> getLogs() const;
-    QList<LogEntry> getLogsByLevel(LogLevel level) const;
-    QList<LogEntry> getLogsByCategory(const QString& category) const;
+    // 获取日志（异步，通过信号返回）
+    void requestLogs();
+    void requestLogsByLevel(LogLevel level);
+    void requestLogsByCategory(const QString& category);
     
     // 日志管理
     void clearLogs();
@@ -98,26 +165,21 @@ signals:
     void logAdded(const LogEntry& entry);
     void logsCleared();
     void logLevelChanged(LogLevel level);
+    void logsReceived(const QList<LogEntry>& logs);
+    void logsByLevelReceived(LogLevel level, const QList<LogEntry>& logs);
+    void logsByCategoryReceived(const QString& category, const QList<LogEntry>& logs);
 
 private:
     LogManager();
     ~LogManager();
     
-    void addLog(const LogEntry& entry);
-    void cleanupOldLogs();
-    void writeToFile(const LogEntry& entry);
-    QString formatLogMessage(const LogEntry& entry) const;
-    
     static LogManager* s_instance;
+    LogWorkerThread* m_workerThread;
     
-    QList<LogEntry> m_logs;
-    mutable QMutex m_mutex;
+    // 配置缓存（避免频繁跨线程访问）
     int m_maxLogCount;
     bool m_autoCleanup;
     int m_autoCleanupInterval;
-    QTimer* m_cleanupTimer;
-    
-    // 输出设置
     bool m_consoleOutput;
     bool m_fileOutput;
     QString m_logFilePath;
@@ -165,18 +227,18 @@ private:
 };
 
 // 便捷宏定义
-#define LOG_DEBUG(msg, cat) LogManager::getInstance()->debug(msg, cat, __FILE__, __LINE__, __FUNCTION__)
-#define LOG_INFO(msg, cat) LogManager::getInstance()->info(msg, cat, __FILE__, __LINE__, __FUNCTION__)
-#define LOG_WARNING(msg, cat) LogManager::getInstance()->warning(msg, cat, __FILE__, __LINE__, __FUNCTION__)
-#define LOG_ERROR(msg, cat) LogManager::getInstance()->error(msg, cat, __FILE__, __LINE__, __FUNCTION__)
-#define LOG_SUCCESS(msg, cat) LogManager::getInstance()->success(msg, cat, __FILE__, __LINE__, __FUNCTION__)
+#define LOG_DEBUG(msg, cat) LogManager::getInstance()->debug(msg, cat, __FILE__, __LINE__, Q_FUNC_INFO)
+#define LOG_INFO(msg, cat) LogManager::getInstance()->info(msg, cat, __FILE__, __LINE__, Q_FUNC_INFO)
+#define LOG_WARNING(msg, cat) LogManager::getInstance()->warning(msg, cat, __FILE__, __LINE__, Q_FUNC_INFO)
+#define LOG_ERROR(msg, cat) LogManager::getInstance()->error(msg, cat, __FILE__, __LINE__, Q_FUNC_INFO)
+#define LOG_SUCCESS(msg, cat) LogManager::getInstance()->success(msg, cat, __FILE__, __LINE__, Q_FUNC_INFO)
 
 // 流式日志宏
-#define LOG_DEBUG_STREAM(cat) LogStream(LogLevel::Debug, cat, __FILE__, __LINE__, __FUNCTION__)
-#define LOG_INFO_STREAM(cat) LogStream(LogLevel::Info, cat, __FILE__, __LINE__, __FUNCTION__)
-#define LOG_WARNING_STREAM(cat) LogStream(LogLevel::Warning, cat, __FILE__, __LINE__, __FUNCTION__)
-#define LOG_ERROR_STREAM(cat) LogStream(LogLevel::Error, cat, __FILE__, __LINE__, __FUNCTION__)
-#define LOG_SUCCESS_STREAM(cat) LogStream(LogLevel::Success, cat, __FILE__, __LINE__, __FUNCTION__)
+#define LOG_DEBUG_STREAM(cat) LogStream(LogLevel::Debug, cat, __FILE__, __LINE__, Q_FUNC_INFO)
+#define LOG_INFO_STREAM(cat) LogStream(LogLevel::Info, cat, __FILE__, __LINE__, Q_FUNC_INFO)
+#define LOG_WARNING_STREAM(cat) LogStream(LogLevel::Warning, cat, __FILE__, __LINE__, Q_FUNC_INFO)
+#define LOG_ERROR_STREAM(cat) LogStream(LogLevel::Error, cat, __FILE__, __LINE__, Q_FUNC_INFO)
+#define LOG_SUCCESS_STREAM(cat) LogStream(LogLevel::Success, cat, __FILE__, __LINE__, Q_FUNC_INFO)
 
 // 简化的流式日志宏（无分类）
 #define LOG_DEBUG_S LOG_DEBUG_STREAM("")

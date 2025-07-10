@@ -168,16 +168,21 @@ protected:
     void markFeaturesDirty() { m_featuresDirty = true; }
 
 protected:
+    // 数据类型，反射用
     GeoType3D m_geoType;
+
+    // 对象状态，生命周期
     int m_geoState;
+
+    // 绘制参数，点线面的各种属性
     GeoParameters3D m_parameters;
     
+    // 控制点，
     std::vector<Point3D> m_controlPoints;
     Point3D m_tempPoint;
     Transform3D m_transform;
     BoundingBox3D m_boundingBox;
     
-    // OSG相关 - 使用现代OSG API (Group+Drawable而不是Geode)
     osg::ref_ptr<osg::Group> m_osgNode;
     osg::ref_ptr<osg::Group> m_drawableGroup;  // 替代Geode
     osg::ref_ptr<osg::Geometry> m_geometry;

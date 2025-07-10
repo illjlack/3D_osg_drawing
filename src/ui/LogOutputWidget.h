@@ -2,8 +2,7 @@
 #pragma execution_character_set("utf-8")
 
 #include <QWidget>
-#include <QTabWidget>
-#include <QTextEdit>
+#include <QPlainTextEdit>
 #include <QToolBar>
 #include <QAction>
 #include <QComboBox>
@@ -14,7 +13,6 @@
 #include <QPushButton>
 #include <QSpinBox>
 #include <QMenu>
-#include <QTimer>
 #include <QScrollBar>
 #include <QTextCursor>
 #include <QTextCharFormat>
@@ -26,9 +24,20 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QMutex>
-#include <QQueue>
 #include <QSet>
+#include <QListWidget>
+#include <QThread>
+#include <QQueue>
+#include <QTimer>
+#include <QWaitCondition>
+#include <QAtomicInt>
 #include "../util/LogManager.h"
+
+// 为LogLevel提供qHash函数
+inline uint qHash(LogLevel level, uint seed = 0)
+{
+    return qHash(static_cast<int>(level), seed);
+}
 
 // 日志输出栏组件
 class LogOutputWidget : public QWidget
@@ -64,25 +73,19 @@ public:
     // 复制选中内容
     void copySelectedText();
 
+    // 全选文本
+    void selectAllText();
+
 public slots:
     // 添加日志条目
     void addLogEntry(const LogEntry& entry);
     
     // 刷新显示
     void refreshDisplay();
-    
-    // 清空当前标签页
-    void clearCurrentTab();
-    
-    // 导出当前标签页
-    void exportCurrentTab();
 
 private slots:
-    // 标签页切换
-    void onTabChanged(int index);
-    
     // 过滤级别改变
-    void onFilterLevelChanged(int index);
+    void onFilterLevelChanged();
     
     // 过滤分类改变
     void onFilterCategoryChanged(const QString& category);
@@ -99,8 +102,11 @@ private slots:
     // 右键菜单
     void showContextMenu(const QPoint& pos);
     
-    // 定时刷新
-    void onRefreshTimer();
+    // 导出日志（无参数版本）
+    void exportLogs();
+    
+    // 批量更新UI
+    void processUIUpdate();
 
 private:
     // 初始化UI
@@ -109,14 +115,14 @@ private:
     // 初始化工具栏
     void setupToolbar();
     
-    // 初始化标签页
-    void setupTabs();
-    
     // 设置文本格式
     void setupTextFormats();
     
-    // 添加日志到指定文本编辑器
-    void addLogToTextEdit(QTextEdit* textEdit, const LogEntry& entry);
+    // 添加日志到文本编辑器
+    void addLogToTextEdit(const LogEntry& entry);
+    
+    // 批量添加日志到文本编辑器
+    void addLogsToTextEdit(const QList<LogEntry>& logs);
     
     // 格式化日志文本
     QString formatLogText(const LogEntry& entry);
@@ -127,26 +133,27 @@ private:
     // 获取日志级别文本
     QString getLogLevelText(LogLevel level);
     
-    // 应用过滤
-    void applyFilters();
-    
     // 更新过滤选项
     void updateFilterOptions();
     
     // 限制显示行数
     void limitDisplayLines();
     
+    // 调度UI更新
+    void scheduleUIUpdate();
+    
+    // 应用过滤条件
+    void applyFilters();
+    
     // 检查是否应该显示日志
-    bool shouldDisplayLog(const LogEntry& entry);
+    bool shouldDisplayLog(const LogEntry& entry) const;
 
 private:
     // UI组件
-    QTabWidget* m_tabWidget;
-    QTextEdit* m_normalTextEdit;    // 普通输出
-    QTextEdit* m_debugTextEdit;     // 调试输出
+    QPlainTextEdit* m_textEdit;      // 使用QPlainTextEdit提升性能
     
     QToolBar* m_toolBar;
-    QComboBox* m_filterLevelCombo;
+    QComboBox* m_filterLevelCombo;   // 级别过滤下拉框
     QComboBox* m_filterCategoryCombo;
     QCheckBox* m_autoScrollCheck;
     QCheckBox* m_showTimestampCheck;
@@ -155,13 +162,21 @@ private:
     QPushButton* m_exportButton;
     QPushButton* m_copyButton;
     
-    // 设置
+    // 日志数据
+    QList<LogEntry> m_allLogs;
+    QList<LogEntry> m_filteredLogs;
+    QSet<QString> m_categories;
+    QQueue<LogEntry> m_pendingLogs;
+    
+    // 过滤条件
+    QSet<LogLevel> m_selectedFilterLevels;
+    QString m_currentFilterCategory;
+    
+    // 显示设置
     int m_maxDisplayLines;
     bool m_autoScroll;
     bool m_showTimestamp;
     bool m_showCategory;
-    LogLevel m_currentFilterLevel;
-    QString m_currentFilterCategory;
     
     // 文本格式
     QTextCharFormat m_debugFormat;
@@ -172,18 +187,15 @@ private:
     QTextCharFormat m_timestampFormat;
     QTextCharFormat m_categoryFormat;
     
-    // 数据
-    QList<LogEntry> m_allLogs;
-    QList<LogEntry> m_normalLogs;
-    QList<LogEntry> m_debugLogs;
-    QSet<QString> m_categories;
+    // UI更新控制 - 简化版本
+    QTimer* m_uiUpdateTimer;
+    QList<LogEntry> m_pendingUILogs;
+    bool m_needsFullRefresh;
     
-    // 定时器
-    QTimer* m_refreshTimer;
+    // 线程安全
+    mutable QMutex m_logsMutex;
     
-    // 互斥锁
-    mutable QMutex m_mutex;
-    
-    // 待处理日志队列
-    QQueue<LogEntry> m_pendingLogs;
+    // 更新频率控制 - 简化参数
+    static const int UI_UPDATE_INTERVAL = 100; // 100ms UI更新间隔
+    static const int MAX_UI_BATCH_SIZE = 50;   // UI线程最多处理50条日志
 }; 

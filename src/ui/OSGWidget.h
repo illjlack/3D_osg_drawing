@@ -10,12 +10,6 @@
 #include <osgViewer/Viewer>
 #include <osgViewer/CompositeViewer>
 #include <osgViewer/ViewerEventHandlers>
-#include <osgGA/TrackballManipulator>
-#include <osgGA/FlightManipulator>
-#include <osgGA/DriveManipulator>
-#include <osgGA/KeySwitchMatrixManipulator>
-#include <osgGA/StateSetManipulator>
-#include <osgGA/TerrainManipulator>
 #include <osg/Node>
 #include <osg/Group>
 #include <osg/Geode>
@@ -36,6 +30,7 @@
 #include <QOpenGLWidget>
 #include <QMouseEvent>
 #include <QKeyEvent>
+#include <QDateTime>
 
 // 前向声明
 class Geo3D;
@@ -102,31 +97,34 @@ public:
     bool isCoordinateSystemEnabled() const;
     void refreshCoordinateSystem();
     
-    // 摄像机移动控制
-    void moveCameraUp();
-    void moveCameraDown();
-    void moveCameraLeft();
-    void moveCameraRight();
-    void moveCameraForward();
-    void moveCameraBackward();
-    void setCameraMoveSpeed(double speed);
-    double getCameraMoveSpeed() const { return m_cameraMoveSpeed; }
-    void setWheelMoveSensitivity(double sensitivity);
-    double getWheelMoveSensitivity() const { return m_wheelMoveSensitivity; }
+    // 摄像机控制器接口（委托给CameraController）
+    CameraController* getCameraController() const { return m_cameraController.get(); }
     
-    // 加速度移动控制
+    // 相机操控器管理
+    void setManipulatorType(ManipulatorType type);
+    ManipulatorType getManipulatorType() const;
+    void switchToNextManipulator();
+    void switchToPreviousManipulator();
+    
+    // 摄像机移动控制（委托给CameraController）
+    void setCameraMoveSpeed(double speed);
+    double getCameraMoveSpeed() const;
+    void setWheelMoveSensitivity(double sensitivity);
+    double getWheelMoveSensitivity() const;
+    
+    // 加速度移动控制（委托给CameraController）
     void setAccelerationRate(double rate);
-    double getAccelerationRate() const { return m_accelerationRate; }
+    double getAccelerationRate() const;
     void setMaxAccelerationSpeed(double speed);
-    double getMaxAccelerationSpeed() const { return m_maxAccelerationSpeed; }
+    double getMaxAccelerationSpeed() const;
     void resetAllAcceleration();
     
-    // 投影模式控制
+    // 投影模式控制（委托给CameraController）
     void setProjectionMode(ProjectionMode mode);
     ProjectionMode getProjectionMode() const;
-    void setPerspectiveFOV(double fov);
-    void setOrthographicSize(double left, double right, double bottom, double top);
-    void setOrthographicNearFar(double near, double far);
+    void setFOV(double fov);
+    void setNearFar(double near, double far);
+    void setViewSize(double left, double right, double bottom, double top);
     
     // 比例尺相关
     void enableScaleBar(bool enabled);
@@ -142,6 +140,7 @@ signals:
     void wheelMoveSensitivityChanged(double sensitivity);
     void accelerationRateChanged(double rate);
     void maxAccelerationSpeedChanged(double speed);
+    void manipulatorTypeChanged(ManipulatorType type);
 
 protected:
     virtual void paintEvent(QPaintEvent* event) override;
@@ -166,9 +165,6 @@ private:
     void completeCurrentDrawing();
     void cancelCurrentDrawing();
     
-    // 摄像机移动相关
-    void updateCameraPosition();
-    
     // 比例尺相关
     void drawScaleBar();
     double calculateScaleValue();
@@ -186,21 +182,8 @@ private:
     osg::ref_ptr<osg::Group> m_pickingIndicatorNode;  // 拾取指示器节点
     osg::ref_ptr<osg::Group> m_skyboxNode;            // 天空盒节点
     
-    // 相机操控器
-    osg::ref_ptr<osgGA::TrackballManipulator> m_trackballManipulator;
-    
     // 摄像机控制器
     std::unique_ptr<CameraController> m_cameraController;
-    
-    // 摄像机移动控制
-    double m_cameraMoveSpeed;
-    double m_wheelMoveSensitivity; // 滚轮移动灵敏度
-    bool m_cameraMoveKeys[6]; // up, down, left, right, forward, backward
-    
-    // 加速度移动相关
-    double m_accelerationRate;
-    double m_maxAccelerationSpeed;
-    double m_accelerationSpeeds[6]; // 各方向的当前加速度
     
     // 当前绘制状态
     osg::ref_ptr<Geo3D> m_currentDrawingGeo;
@@ -228,6 +211,18 @@ private:
     bool m_scaleBarEnabled;
     QPoint m_scaleBarPosition;
     QSize m_scaleBarSize;
+    
+    // 比例尺缓存 - 避免每帧重新计算
+    double m_cachedScaleValue;
+    QDateTime m_lastScaleCalculation;
+    static const int SCALE_CACHE_DURATION = 100; // 100ms缓存时间
+    
+    // 鼠标位置缓存 - 避免频繁的坐标转换
+    QPoint m_lastMouseScreenPos;
+    glm::vec3 m_cachedMouseWorldPos;
+    bool m_mousePosCacheValid;
+    QDateTime m_lastMouseCalculation;
+    static const int MOUSE_CACHE_DURATION = 16; // 16ms缓存时间（约60FPS）
     
     QTimer* m_updateTimer;
 }; 

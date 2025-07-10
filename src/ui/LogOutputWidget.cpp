@@ -6,6 +6,17 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QDebug>
+#include <QRegularExpression>
+#include <QTextCodec>
+#include <QMenu>
+#include <QAction>
+#include <QFileInfo>
+#include <QTimer>
+#include <QThread>
+#include <QWaitCondition>
+#include <QMutexLocker>
+
+// ==================== LogOutputWidget 实现 ====================
 
 LogOutputWidget::LogOutputWidget(QWidget* parent)
     : QWidget(parent)
@@ -13,30 +24,36 @@ LogOutputWidget::LogOutputWidget(QWidget* parent)
     , m_autoScroll(true)
     , m_showTimestamp(true)
     , m_showCategory(true)
-    , m_currentFilterLevel(LogLevel::Debug)
-    , m_refreshTimer(new QTimer(this))
+    , m_needsFullRefresh(false)
+    , m_uiUpdateTimer(nullptr)
 {
+    // 初始化过滤级别为全部
+    m_selectedFilterLevels.insert(LogLevel::Debug);
+    m_selectedFilterLevels.insert(LogLevel::Info);
+    m_selectedFilterLevels.insert(LogLevel::Warning);
+    m_selectedFilterLevels.insert(LogLevel::Error);
+    m_selectedFilterLevels.insert(LogLevel::Success);
+    
     setupUI();
     setupTextFormats();
+    
+    // 初始化UI更新定时器
+    m_uiUpdateTimer = new QTimer(this);
+    m_uiUpdateTimer->setSingleShot(true);
+    connect(m_uiUpdateTimer, &QTimer::timeout, this, &LogOutputWidget::processUIUpdate);
     
     // 连接日志管理器信号
     LogManager* logManager = LogManager::getInstance();
     connect(logManager, &LogManager::logAdded, this, &LogOutputWidget::addLogEntry);
     connect(logManager, &LogManager::logsCleared, this, &LogOutputWidget::clearLogs);
-    
-    // 设置定时刷新
-    connect(m_refreshTimer, &QTimer::timeout, this, &LogOutputWidget::onRefreshTimer);
-    m_refreshTimer->start(100); // 100ms刷新一次
-    
-    // 加载现有日志
-    refreshDisplay();
 }
 
 LogOutputWidget::~LogOutputWidget()
 {
-    if (m_refreshTimer)
+    if (m_uiUpdateTimer)
     {
-        m_refreshTimer->stop();
+        m_uiUpdateTimer->stop();
+        delete m_uiUpdateTimer;
     }
 }
 
@@ -50,9 +67,16 @@ void LogOutputWidget::setupUI()
     setupToolbar();
     mainLayout->addWidget(m_toolBar);
     
-    // 创建标签页
-    setupTabs();
-    mainLayout->addWidget(m_tabWidget);
+    // 创建文本编辑器 - 使用QPlainTextEdit提升性能
+    m_textEdit = new QPlainTextEdit(this);
+    m_textEdit->setReadOnly(true);
+    m_textEdit->setLineWrapMode(QPlainTextEdit::NoWrap);
+    m_textEdit->setFont(QFont("Consolas", 9));
+    m_textEdit->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(m_textEdit, &QPlainTextEdit::customContextMenuRequested,
+            this, &LogOutputWidget::showContextMenu);
+    
+    mainLayout->addWidget(m_textEdit);
     
     setLayout(mainLayout);
 }
@@ -63,15 +87,20 @@ void LogOutputWidget::setupToolbar()
     m_toolBar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
     m_toolBar->setIconSize(QSize(16, 16));
     
-    // 过滤级别
+    // 过滤级别（下拉多选）
     m_toolBar->addWidget(new QLabel("级别:"));
     m_filterLevelCombo = new QComboBox(this);
-    m_filterLevelCombo->addItem("全部", static_cast<int>(LogLevel::Debug));
+    m_filterLevelCombo->setEditable(false);
+    m_filterLevelCombo->setMaxVisibleItems(10);
+    
+    // 添加级别选项
+    m_filterLevelCombo->addItem("全部", -1);
     m_filterLevelCombo->addItem("调试", static_cast<int>(LogLevel::Debug));
     m_filterLevelCombo->addItem("信息", static_cast<int>(LogLevel::Info));
     m_filterLevelCombo->addItem("警告", static_cast<int>(LogLevel::Warning));
     m_filterLevelCombo->addItem("错误", static_cast<int>(LogLevel::Error));
     m_filterLevelCombo->addItem("成功", static_cast<int>(LogLevel::Success));
+    
     m_toolBar->addWidget(m_filterLevelCombo);
     
     // 过滤分类
@@ -79,6 +108,7 @@ void LogOutputWidget::setupToolbar()
     m_filterCategoryCombo = new QComboBox(this);
     m_filterCategoryCombo->addItem("全部", "");
     m_filterCategoryCombo->setEditable(true);
+    m_filterCategoryCombo->setToolTip("支持多关键词搜索，用空格分隔");
     m_toolBar->addWidget(m_filterCategoryCombo);
     
     m_toolBar->addSeparator();
@@ -113,51 +143,25 @@ void LogOutputWidget::setupToolbar()
     m_toolBar->addWidget(m_copyButton);
     
     // 连接信号
-    connect(m_filterLevelCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
-            this, &LogOutputWidget::onFilterLevelChanged);
-    connect(m_filterCategoryCombo, &QComboBox::currentTextChanged,
-            this, &LogOutputWidget::onFilterCategoryChanged);
-    connect(m_autoScrollCheck, &QCheckBox::toggled,
-            this, &LogOutputWidget::onAutoScrollToggled);
-    connect(m_showTimestampCheck, &QCheckBox::toggled,
-            this, &LogOutputWidget::onShowTimestampToggled);
-    connect(m_showCategoryCheck, &QCheckBox::toggled,
-            this, &LogOutputWidget::onShowCategoryToggled);
-    connect(m_clearButton, &QPushButton::clicked,
-            this, &LogOutputWidget::clearCurrentTab);
-    connect(m_exportButton, &QPushButton::clicked,
-            this, &LogOutputWidget::exportCurrentTab);
-    connect(m_copyButton, &QPushButton::clicked,
-            this, &LogOutputWidget::copySelectedText);
-}
-
-void LogOutputWidget::setupTabs()
-{
-    m_tabWidget = new QTabWidget(this);
+    connect(m_filterLevelCombo, SIGNAL(currentIndexChanged(int)),
+            this, SLOT(onFilterLevelChanged()));
+    connect(m_filterCategoryCombo, SIGNAL(currentTextChanged(QString)),
+            this, SLOT(onFilterCategoryChanged(QString)));
+    connect(m_autoScrollCheck, SIGNAL(toggled(bool)),
+            this, SLOT(onAutoScrollToggled(bool)));
+    connect(m_showTimestampCheck, SIGNAL(toggled(bool)),
+            this, SLOT(onShowTimestampToggled(bool)));
+    connect(m_showCategoryCheck, SIGNAL(toggled(bool)),
+            this, SLOT(onShowCategoryToggled(bool)));
+    connect(m_clearButton, SIGNAL(clicked()),
+            this, SLOT(clearLogs()));
+    connect(m_exportButton, SIGNAL(clicked()),
+            this, SLOT(exportLogs()));
+    connect(m_copyButton, SIGNAL(clicked()),
+            this, SLOT(copySelectedText()));
     
-    // 普通输出标签页
-    m_normalTextEdit = new QTextEdit(this);
-    m_normalTextEdit->setReadOnly(true);
-    m_normalTextEdit->setLineWrapMode(QTextEdit::NoWrap);
-    m_normalTextEdit->setFont(QFont("Consolas", 9));
-    m_normalTextEdit->setContextMenuPolicy(Qt::CustomContextMenu);
-    connect(m_normalTextEdit, &QTextEdit::customContextMenuRequested,
-            this, &LogOutputWidget::showContextMenu);
-    
-    // 调试输出标签页
-    m_debugTextEdit = new QTextEdit(this);
-    m_debugTextEdit->setReadOnly(true);
-    m_debugTextEdit->setLineWrapMode(QTextEdit::NoWrap);
-    m_debugTextEdit->setFont(QFont("Consolas", 9));
-    m_debugTextEdit->setContextMenuPolicy(Qt::CustomContextMenu);
-    connect(m_debugTextEdit, &QTextEdit::customContextMenuRequested,
-            this, &LogOutputWidget::showContextMenu);
-    
-    m_tabWidget->addTab(m_normalTextEdit, "普通输出");
-    m_tabWidget->addTab(m_debugTextEdit, "调试输出");
-    
-    connect(m_tabWidget, &QTabWidget::currentChanged,
-            this, &LogOutputWidget::onTabChanged);
+    // 设置默认选中"全部"
+    m_filterLevelCombo->setCurrentIndex(0);
 }
 
 void LogOutputWidget::setupTextFormats()
@@ -219,23 +223,11 @@ bool LogOutputWidget::isShowCategoryEnabled() const
 
 void LogOutputWidget::addLogEntry(const LogEntry& entry)
 {
-    QMutexLocker locker(&m_mutex);
-    m_pendingLogs.enqueue(entry);
-}
-
-void LogOutputWidget::onRefreshTimer()
-{
-    QMutexLocker locker(&m_mutex);
+    qDebug() << "LogOutputWidget::addLogEntry - 接收到日志:" << entry.message;
     
-    if (m_pendingLogs.isEmpty())
-        return;
-    
-    // 处理待处理的日志
-    while (!m_pendingLogs.isEmpty())
+    // 线程安全地添加日志
     {
-        LogEntry entry = m_pendingLogs.dequeue();
-        
-        // 添加到总日志列表
+        QMutexLocker locker(&m_logsMutex);
         m_allLogs.append(entry);
         
         // 更新分类集合
@@ -244,50 +236,178 @@ void LogOutputWidget::onRefreshTimer()
             m_categories.insert(entry.category);
         }
         
-        // 根据级别分类
-        if (entry.level == LogLevel::Debug)
-        {
-            m_debugLogs.append(entry);
-        }
-        else
-        {
-            m_normalLogs.append(entry);
-        }
-        
         // 检查是否应该显示
         if (shouldDisplayLog(entry))
         {
-            // 添加到对应的文本编辑器
-            if (entry.level == LogLevel::Debug)
-            {
-                addLogToTextEdit(m_debugTextEdit, entry);
-            }
-            else
-            {
-                addLogToTextEdit(m_normalTextEdit, entry);
-            }
+            m_filteredLogs.append(entry);
         }
     }
     
-    // 更新过滤选项
-    updateFilterOptions();
+    // 将日志添加到UI更新队列
+    m_pendingUILogs.append(entry);
+    
+    // 调度UI更新
+    scheduleUIUpdate();
+}
+
+void LogOutputWidget::scheduleUIUpdate()
+{
+    // 如果没有待处理的日志，不调度更新
+    if (m_pendingUILogs.isEmpty())
+    {
+        return;
+    }
+    
+    // 如果定时器已经在运行，不重复启动
+    if (m_uiUpdateTimer->isActive())
+    {
+        return;
+    }
+    
+    // 根据待处理日志数量调整更新间隔
+    int totalLogs = m_pendingUILogs.size();
+    
+    // 如果日志数量很多，立即更新；否则使用标准间隔
+    int updateInterval = (totalLogs > MAX_UI_BATCH_SIZE) ? 0 : UI_UPDATE_INTERVAL;
+    m_uiUpdateTimer->start(updateInterval);
+}
+
+bool LogOutputWidget::shouldDisplayLog(const LogEntry& entry) const
+{
+    // 级别过滤
+    if (!m_selectedFilterLevels.isEmpty() && !m_selectedFilterLevels.contains(entry.level))
+    {
+        return false;
+    }
+    
+    // 分类过滤
+    if (!m_currentFilterCategory.isEmpty())
+    {
+        if (entry.category.isEmpty())
+        {
+            return false;
+        }
+        
+        QStringList keywords = m_currentFilterCategory.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
+        bool matchesAnyKeyword = false;
+        
+        for (const QString& keyword : keywords)
+        {
+            if (entry.category.contains(keyword, Qt::CaseInsensitive))
+            {
+                matchesAnyKeyword = true;
+                break;
+            }
+        }
+        
+        if (!matchesAnyKeyword)
+        {
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+void LogOutputWidget::applyFilters()
+{
+    QMutexLocker locker(&m_logsMutex);
+    m_filteredLogs.clear();
+    
+    for (const LogEntry& entry : m_allLogs)
+    {
+        if (shouldDisplayLog(entry))
+        {
+            m_filteredLogs.append(entry);
+        }
+    }
+}
+
+void LogOutputWidget::processUIUpdate()
+{
+    if (m_pendingUILogs.isEmpty())
+    {
+        return;
+    }
+    
+    qDebug() << "LogOutputWidget::processUIUpdate - 处理UI更新，待处理日志数量:" << m_pendingUILogs.size();
+    
+    // 批量处理UI更新 - 简化版本
+    QList<LogEntry> logsToAdd;
+    int processedCount = 0;
+    
+    // 处理所有待处理的日志
+    while (!m_pendingUILogs.isEmpty() && processedCount < MAX_UI_BATCH_SIZE)
+    {
+        LogEntry entry = m_pendingUILogs.takeFirst();
+        logsToAdd.append(entry);
+        processedCount++;
+    }
+    
+    qDebug() << "LogOutputWidget::processUIUpdate - 准备添加到UI的日志数量:" << logsToAdd.size();
+    
+    // 暂停文本编辑器的重绘以提高性能
+    m_textEdit->setUpdatesEnabled(false);
+    
+    // 批量添加到文本编辑器
+    addLogsToTextEdit(logsToAdd);
     
     // 限制显示行数
     limitDisplayLines();
+    
+    // 恢复文本编辑器的重绘
+    m_textEdit->setUpdatesEnabled(true);
+    
+    // 如果还有待处理的日志，继续调度
+    if (!m_pendingUILogs.isEmpty())
+    {
+        scheduleUIUpdate();
+    }
 }
 
-void LogOutputWidget::addLogToTextEdit(QTextEdit* textEdit, const LogEntry& entry)
+void LogOutputWidget::addLogsToTextEdit(const QList<LogEntry>& logs)
 {
-    if (!textEdit) return;
+    if (!m_textEdit || logs.isEmpty()) return;
     
-    QTextCursor cursor = textEdit->textCursor();
+    qDebug() << "LogOutputWidget::addLogsToTextEdit - 开始添加日志到UI，数量:" << logs.size();
+    
+    // 准备批量文本插入 - 优化版本
+    QStringList textLines;
+    textLines.reserve(logs.size()); // 预分配内存
+    
+    for (const LogEntry& entry : logs)
+    {
+        QString logText = formatLogText(entry);
+        textLines.append(logText);
+    }
+    
+    // 使用QTextDocument的批量操作提高性能
+    QTextDocument* document = m_textEdit->document();
+    QTextCursor cursor = m_textEdit->textCursor();
     cursor.movePosition(QTextCursor::End);
     
-    // 格式化日志文本
-    QString logText = formatLogText(entry);
+    // 批量插入文本 - 使用单个insertText操作
+    QString allText = textLines.join("\n") + "\n";
+    cursor.insertText(allText);
     
-    // 插入文本
-    cursor.insertText(logText + "\n");
+    // 自动滚动 - 只在需要时执行
+    if (m_autoScroll)
+    {
+        QScrollBar* scrollBar = m_textEdit->verticalScrollBar();
+        if (scrollBar && scrollBar->maximum() > scrollBar->value())
+        {
+            scrollBar->setValue(scrollBar->maximum());
+        }
+    }
+    
+    qDebug() << "LogOutputWidget::addLogsToTextEdit - 完成添加日志到UI";
+}
+
+void LogOutputWidget::addLogToTextEdit(const LogEntry& entry)
+{
+    if (!m_textEdit) return;
+    
+    QString logText = formatLogText(entry);
     
     // 设置颜色格式
     QTextCharFormat format;
@@ -300,14 +420,15 @@ void LogOutputWidget::addLogToTextEdit(QTextEdit* textEdit, const LogEntry& entr
         case LogLevel::Success: format = m_successFormat; break;
     }
     
-    // 应用格式到新插入的文本
-    cursor.movePosition(QTextCursor::StartOfLine, QTextCursor::KeepAnchor);
-    cursor.setCharFormat(format);
+    // 插入文本
+    QTextCursor cursor = m_textEdit->textCursor();
+    cursor.movePosition(QTextCursor::End);
+    cursor.insertText(logText + "\n", format);
     
     // 自动滚动
     if (m_autoScroll)
     {
-        textEdit->verticalScrollBar()->setValue(textEdit->verticalScrollBar()->maximum());
+        m_textEdit->verticalScrollBar()->setValue(m_textEdit->verticalScrollBar()->maximum());
     }
 }
 
@@ -330,7 +451,7 @@ QString LogOutputWidget::formatLogText(const LogEntry& entry)
         text += "[" + entry.category + "] ";
     }
     
-    // 位置信息（文件名:行号）
+    // 位置信息
     if (!entry.fileName.isEmpty() && entry.lineNumber > 0)
     {
         QString fileName = QFileInfo(entry.fileName).fileName();
@@ -377,139 +498,51 @@ QString LogOutputWidget::getLogLevelText(LogLevel level)
 
 void LogOutputWidget::refreshDisplay()
 {
-    // 清空现有显示
-    m_normalTextEdit->clear();
-    m_debugTextEdit->clear();
+    m_needsFullRefresh = true;
+    m_textEdit->clear();
+    m_pendingUILogs.clear();
     
-    // 重新加载所有日志
-    LogManager* logManager = LogManager::getInstance();
-    QList<LogEntry> allLogs = logManager->getLogs();
-    
-    QMutexLocker locker(&m_mutex);
-    m_allLogs = allLogs;
-    m_normalLogs.clear();
-    m_debugLogs.clear();
-    m_categories.clear();
-    
-    // 重新分类
-    for (const LogEntry& entry : allLogs)
-    {
-        if (!entry.category.isEmpty())
-        {
-            m_categories.insert(entry.category);
-        }
-        
-        if (entry.level == LogLevel::Debug)
-        {
-            m_debugLogs.append(entry);
-        }
-        else
-        {
-            m_normalLogs.append(entry);
-        }
-    }
-    
-    // 重新显示
+    // 应用过滤器并显示过滤后的日志
     applyFilters();
-    updateFilterOptions();
-}
-
-void LogOutputWidget::applyFilters()
-{
-    // 清空显示
-    m_normalTextEdit->clear();
-    m_debugTextEdit->clear();
     
-    // 重新显示过滤后的日志
-    for (const LogEntry& entry : m_allLogs)
+    // 批量添加到UI
+    QMutexLocker locker(&m_logsMutex);
+    if (!m_filteredLogs.isEmpty())
     {
-        if (shouldDisplayLog(entry))
-        {
-            if (entry.level == LogLevel::Debug)
-            {
-                addLogToTextEdit(m_debugTextEdit, entry);
-            }
-            else
-            {
-                addLogToTextEdit(m_normalTextEdit, entry);
-            }
-        }
-    }
-}
-
-bool LogOutputWidget::shouldDisplayLog(const LogEntry& entry)
-{
-    // 级别过滤
-    if (m_currentFilterLevel != LogLevel::Debug && entry.level != m_currentFilterLevel)
-    {
-        return false;
-    }
-    
-    // 分类过滤
-    if (!m_currentFilterCategory.isEmpty() && entry.category != m_currentFilterCategory)
-    {
-        return false;
-    }
-    
-    return true;
-}
-
-void LogOutputWidget::updateFilterOptions()
-{
-    // 更新分类过滤选项
-    QString currentCategory = m_filterCategoryCombo->currentText();
-    m_filterCategoryCombo->clear();
-    m_filterCategoryCombo->addItem("全部", "");
-    
-    for (const QString& category : m_categories)
-    {
-        m_filterCategoryCombo->addItem(category, category);
-    }
-    
-    // 恢复之前的选择
-    int index = m_filterCategoryCombo->findText(currentCategory);
-    if (index >= 0)
-    {
-        m_filterCategoryCombo->setCurrentIndex(index);
+        addLogsToTextEdit(m_filteredLogs);
     }
 }
 
 void LogOutputWidget::limitDisplayLines()
 {
-    // 限制普通输出行数
-    QTextDocument* normalDoc = m_normalTextEdit->document();
-    if (normalDoc->lineCount() > m_maxDisplayLines)
+    QTextDocument* doc = m_textEdit->document();
+    if (doc->lineCount() > m_maxDisplayLines)
     {
-        QTextCursor cursor = m_normalTextEdit->textCursor();
+        QTextCursor cursor = m_textEdit->textCursor();
         cursor.movePosition(QTextCursor::Start);
         cursor.movePosition(QTextCursor::Down, QTextCursor::KeepAnchor, 
-                          normalDoc->lineCount() - m_maxDisplayLines);
-        cursor.removeSelectedText();
-    }
-    
-    // 限制调试输出行数
-    QTextDocument* debugDoc = m_debugTextEdit->document();
-    if (debugDoc->lineCount() > m_maxDisplayLines)
-    {
-        QTextCursor cursor = m_debugTextEdit->textCursor();
-        cursor.movePosition(QTextCursor::Start);
-        cursor.movePosition(QTextCursor::Down, QTextCursor::KeepAnchor, 
-                          debugDoc->lineCount() - m_maxDisplayLines);
+                          doc->lineCount() - m_maxDisplayLines);
         cursor.removeSelectedText();
     }
 }
 
 void LogOutputWidget::clearLogs()
 {
-    QMutexLocker locker(&m_mutex);
-    m_allLogs.clear();
-    m_normalLogs.clear();
-    m_debugLogs.clear();
-    m_categories.clear();
-    m_pendingLogs.clear();
+    m_textEdit->clear();
+    m_pendingUILogs.clear();
+    m_needsFullRefresh = false;
     
-    m_normalTextEdit->clear();
-    m_debugTextEdit->clear();
+    // 清空所有日志数据
+    {
+        QMutexLocker locker(&m_logsMutex);
+        m_allLogs.clear();
+        m_filteredLogs.clear();
+        m_categories.clear();
+    }
+    
+    // 重置过滤选项
+    m_filterCategoryCombo->clear();
+    m_filterCategoryCombo->addItem("全部", "");
 }
 
 void LogOutputWidget::exportLogs(const QString& filename)
@@ -524,7 +557,8 @@ void LogOutputWidget::exportLogs(const QString& filename)
     QTextStream stream(&file);
     stream.setCodec("UTF-8");
     
-    QMutexLocker locker(&m_mutex);
+    // 导出所有日志
+    QMutexLocker locker(&m_logsMutex);
     for (const LogEntry& entry : m_allLogs)
     {
         stream << formatLogText(entry) << "\n";
@@ -536,10 +570,9 @@ void LogOutputWidget::exportLogs(const QString& filename)
 
 void LogOutputWidget::copySelectedText()
 {
-    QTextEdit* currentEdit = qobject_cast<QTextEdit*>(m_tabWidget->currentWidget());
-    if (currentEdit)
+    if (m_textEdit)
     {
-        QString selectedText = currentEdit->textCursor().selectedText();
+        QString selectedText = m_textEdit->textCursor().selectedText();
         if (!selectedText.isEmpty())
         {
             QApplication::clipboard()->setText(selectedText);
@@ -547,23 +580,72 @@ void LogOutputWidget::copySelectedText()
     }
 }
 
-// 槽函数实现
-void LogOutputWidget::onTabChanged(int index)
+void LogOutputWidget::selectAllText()
 {
-    // 标签页切换时的处理
-    Q_UNUSED(index)
+    if (m_textEdit)
+    {
+        m_textEdit->selectAll();
+    }
 }
 
-void LogOutputWidget::onFilterLevelChanged(int index)
+// 槽函数实现
+void LogOutputWidget::onFilterLevelChanged()
 {
-    m_currentFilterLevel = static_cast<LogLevel>(m_filterLevelCombo->itemData(index).toInt());
+    QSet<LogLevel> selectedLevels;
+    
+    int currentIndex = m_filterLevelCombo->currentIndex();
+    if (currentIndex == 0) // "全部"选项
+    {
+        selectedLevels.insert(LogLevel::Debug);
+        selectedLevels.insert(LogLevel::Info);
+        selectedLevels.insert(LogLevel::Warning);
+        selectedLevels.insert(LogLevel::Error);
+        selectedLevels.insert(LogLevel::Success);
+    }
+    else
+    {
+        int levelValue = m_filterLevelCombo->itemData(currentIndex).toInt();
+        if (levelValue == -1) // "全部"选项
+        {
+            selectedLevels.insert(LogLevel::Debug);
+            selectedLevels.insert(LogLevel::Info);
+            selectedLevels.insert(LogLevel::Warning);
+            selectedLevels.insert(LogLevel::Error);
+            selectedLevels.insert(LogLevel::Success);
+        }
+        else
+        {
+            selectedLevels.insert(static_cast<LogLevel>(levelValue));
+        }
+    }
+    
+    // 更新过滤器
+    m_selectedFilterLevels = selectedLevels;
+    m_currentFilterCategory = m_filterCategoryCombo->currentText();
+    
+    // 应用过滤器
     applyFilters();
+    
+    // 刷新显示
+    refreshDisplay();
 }
 
 void LogOutputWidget::onFilterCategoryChanged(const QString& category)
 {
-    m_currentFilterCategory = category;
+    QString filterCategory;
+    if (category != "全部" && !category.isEmpty())
+    {
+        filterCategory = category;
+    }
+    
+    // 更新过滤器
+    m_currentFilterCategory = filterCategory;
+    
+    // 应用过滤器
     applyFilters();
+    
+    // 刷新显示
+    refreshDisplay();
 }
 
 void LogOutputWidget::onAutoScrollToggled(bool checked)
@@ -583,40 +665,14 @@ void LogOutputWidget::onShowCategoryToggled(bool checked)
     refreshDisplay();
 }
 
-void LogOutputWidget::clearCurrentTab()
-{
-    QTextEdit* currentEdit = qobject_cast<QTextEdit*>(m_tabWidget->currentWidget());
-    if (currentEdit)
-    {
-        currentEdit->clear();
-    }
-}
-
-void LogOutputWidget::exportCurrentTab()
+void LogOutputWidget::exportLogs()
 {
     QString filename = QFileDialog::getSaveFileName(this, "导出日志", 
                                                    "log_export.txt", "文本文件 (*.txt)");
-    if (filename.isEmpty())
-        return;
-    
-    QFile file(filename);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
+    if (!filename.isEmpty())
     {
-        QMessageBox::warning(this, "导出失败", "无法创建文件: " + filename);
-        return;
+        exportLogs(filename);
     }
-    
-    QTextStream stream(&file);
-    stream.setCodec("UTF-8");
-    
-    QTextEdit* currentEdit = qobject_cast<QTextEdit*>(m_tabWidget->currentWidget());
-    if (currentEdit)
-    {
-        stream << currentEdit->toPlainText();
-    }
-    
-    file.close();
-    QMessageBox::information(this, "导出成功", "日志已导出到: " + filename);
 }
 
 void LogOutputWidget::showContextMenu(const QPoint& pos)
@@ -629,16 +685,10 @@ void LogOutputWidget::showContextMenu(const QPoint& pos)
     QAction* clearAction = menu.addAction("清空");
     QAction* exportAction = menu.addAction("导出");
     
-    connect(copyAction, &QAction::triggered, this, &LogOutputWidget::copySelectedText);
-    connect(selectAllAction, &QAction::triggered, [this]() {
-        QTextEdit* currentEdit = qobject_cast<QTextEdit*>(m_tabWidget->currentWidget());
-        if (currentEdit)
-        {
-            currentEdit->selectAll();
-        }
-    });
-    connect(clearAction, &QAction::triggered, this, &LogOutputWidget::clearCurrentTab);
-    connect(exportAction, &QAction::triggered, this, &LogOutputWidget::exportCurrentTab);
+    connect(copyAction, SIGNAL(triggered()), this, SLOT(copySelectedText()));
+    connect(selectAllAction, SIGNAL(triggered()), this, SLOT(selectAllText()));
+    connect(clearAction, SIGNAL(triggered()), this, SLOT(clearLogs()));
+    connect(exportAction, SIGNAL(triggered()), this, SLOT(exportLogs()));
     
     menu.exec(mapToGlobal(pos));
 } 
