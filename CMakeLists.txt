@@ -1,5 +1,3 @@
-#
-#
 cmake_minimum_required(VERSION 3.16)
 
 project(3Drawing VERSION 1.0.0 LANGUAGES CXX)
@@ -259,6 +257,9 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 # 设置OSG插件路径环境变量
 if (USE_VCPKG AND DEFINED CMAKE_TOOLCHAIN_FILE)
     # 设置OSG插件路径环境变量
+    set(OSG_PLUGIN_PATH "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib/osgPlugins-3.6.5")
+    set(OSG_LIBRARY_PATH "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib")
+    
     target_compile_definitions(${PROJECT_NAME} PRIVATE
         OSG_PLUGIN_PATH="${OSG_PLUGIN_PATH}"
         OSG_LIBRARY_PATH="${OSG_LIBRARY_PATH}"
@@ -282,6 +283,7 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
     $<$<BOOL:${ENABLE_DEBUG_OUTPUT}>:ENABLE_DEBUG_OUTPUT>
     QT_NO_DEBUG_OUTPUT
     _CRT_SECURE_NO_WARNINGS  # 禁用MSVC安全警告
+    GLM_FORCE_CTOR_INIT  # 强制GLM构造函数初始化
 )
 
 if(MSVC)
@@ -296,7 +298,7 @@ if(MSVC)
     )
 else()
     target_compile_options(${PROJECT_NAME} PRIVATE
-        -Wall -Wextra -Wpedantic -Wno-unused-parameter
+        -Wall -Wextra -Wpedantic -Wno-unused-parameter -Wno-unknown-pragmas
         $<$<CONFIG:Release>:-O3 -DNDEBUG>
         $<$<CONFIG:Debug>:-g -O0>
     )

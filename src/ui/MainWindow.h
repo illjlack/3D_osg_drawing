@@ -55,6 +55,7 @@
 #include "CoordinateSystemDialog.h"
 #include "LogOutputWidget.h"
 #include "../util/GeoOsgbIO.h"
+#include <QDateTime>
 
 // 前向声明
 class Geo3D;
@@ -113,6 +114,11 @@ private slots:
     // 坐标系统相关
     void onCoordinateSystemSettings();
     
+    // 实用工具相关
+    void onClearScene();
+    void onExportImage();
+    void onDisplaySettings();
+    
     void onHelpAbout();
     
     void onDrawModeChanged(DrawMode3D mode);
@@ -131,6 +137,7 @@ private:
     void updateStatusBar(const QString& message);
     void updateDrawModeUI();
     void updateCoordinateRangeLabel();
+    void updateObjectCount();
 
 private:
     // UI组件
@@ -276,17 +283,49 @@ public:
 
 signals:
     void drawModeChanged(DrawMode3D mode);
+    
+    // 天空盒相关信号
     void skyboxEnabled(bool enabled);
     void skyboxGradientRequested();
     void skyboxSolidRequested();
     void skyboxCustomRequested();
+    
+    // 视图工具相关信号
+    void resetViewRequested();
+    void fitViewRequested();
+    void topViewRequested();
+    void frontViewRequested();
+    void rightViewRequested();
+    void isometricViewRequested();
+    
+    // 实用工具相关信号
+    void clearSceneRequested();
+    void exportImageRequested();
+    void coordinateSystemRequested();
+    void displaySettingsRequested();
 
 private slots:
     void onDrawModeButtonClicked();
+    
+    // 天空盒相关槽函数
     void onSkyboxEnabledChanged(bool enabled);
     void onSkyboxGradientClicked();
     void onSkyboxSolidClicked();
     void onSkyboxCustomClicked();
+    
+    // 视图工具相关槽函数
+    void onResetViewClicked();
+    void onFitViewClicked();
+    void onTopViewClicked();
+    void onFrontViewClicked();
+    void onRightViewClicked();
+    void onIsometricViewClicked();
+    
+    // 实用工具相关槽函数
+    void onClearSceneClicked();
+    void onExportImageClicked();
+    void onCoordinateSystemClicked();
+    void onDisplaySettingsClicked();
 
 private:
     void setupUI();
@@ -315,12 +354,24 @@ private:
     QPushButton* m_sphereButton;
     QPushButton* m_torusButton;
     
-    // 视图和实用工具组
+    // 视图工具按钮
     QGroupBox* m_viewGroup;
+    QPushButton* m_resetViewButton;
+    QPushButton* m_fitViewButton;
+    QPushButton* m_topViewButton;
+    QPushButton* m_frontViewButton;
+    QPushButton* m_rightViewButton;
+    QPushButton* m_isometricViewButton;
+    
+    // 实用工具按钮
     QGroupBox* m_utilityGroup;
-    QGroupBox* m_skyboxGroup;
+    QPushButton* m_clearSceneButton;
+    QPushButton* m_exportImageButton;
+    QPushButton* m_coordinateSystemButton;
+    QPushButton* m_displaySettingsButton;
     
     // 天空盒控件
+    QGroupBox* m_skyboxGroup;
     QCheckBox* m_skyboxEnabledCheck;
     QPushButton* m_skyboxGradientButton;
     QPushButton* m_skyboxSolidButton;

@@ -12,6 +12,10 @@
 #include <QMessageBox>
 #include <QColorDialog>
 #include <QDebug>
+#include <QPixmap>
+#include <QGroupBox>
+#include <QCheckBox>
+#include <QSlider>
 
 // ========================================= MainWindow 实现 =========================================
 MainWindow::MainWindow(QWidget* parent)
@@ -47,6 +51,7 @@ MainWindow::MainWindow(QWidget* parent)
     
     updateDrawModeUI();
     updateStatusBar("Ready");
+    updateObjectCount(); // 初始化对象数量显示
     
     // 初始化投影模式控件状态
     if (m_projectionModeCombo && m_perspectiveFOVSpinBox && m_orthographicSizeSpinBox)
@@ -518,6 +523,20 @@ void MainWindow::connectSignals()
         connect(m_toolPanel, &ToolPanel3D::skyboxGradientRequested, this, &MainWindow::onSkyboxGradient);
         connect(m_toolPanel, &ToolPanel3D::skyboxSolidRequested, this, &MainWindow::onSkyboxSolid);
         connect(m_toolPanel, &ToolPanel3D::skyboxCustomRequested, this, &MainWindow::onSkyboxCustom);
+        
+        // 视图工具信号连接
+        connect(m_toolPanel, &ToolPanel3D::resetViewRequested, this, &MainWindow::onViewResetCamera);
+        connect(m_toolPanel, &ToolPanel3D::fitViewRequested, this, &MainWindow::onViewFitAll);
+        connect(m_toolPanel, &ToolPanel3D::topViewRequested, this, &MainWindow::onViewTop);
+        connect(m_toolPanel, &ToolPanel3D::frontViewRequested, this, &MainWindow::onViewFront);
+        connect(m_toolPanel, &ToolPanel3D::rightViewRequested, this, &MainWindow::onViewRight);
+        connect(m_toolPanel, &ToolPanel3D::isometricViewRequested, this, &MainWindow::onViewIsometric);
+        
+        // 实用工具信号连接
+        connect(m_toolPanel, &ToolPanel3D::clearSceneRequested, this, &MainWindow::onClearScene);
+        connect(m_toolPanel, &ToolPanel3D::exportImageRequested, this, &MainWindow::onExportImage);
+        connect(m_toolPanel, &ToolPanel3D::coordinateSystemRequested, this, &MainWindow::onCoordinateSystemSettings);
+        connect(m_toolPanel, &ToolPanel3D::displaySettingsRequested, this, &MainWindow::onDisplaySettings);
     }
     
     // 属性编辑器信号连接
@@ -571,6 +590,16 @@ void MainWindow::updateCoordinateRangeLabel()
     }
 }
 
+void MainWindow::updateObjectCount()
+{
+    if (m_objectCountLabel && m_osgWidget)
+    {
+        const auto& allGeos = m_osgWidget->getAllGeos();
+        int count = static_cast<int>(allGeos.size());
+        m_objectCountLabel->setText(tr("对象: %1").arg(count));
+    }
+}
+
 // 文件菜单槽函数
 void MainWindow::onFileNew()
 {
@@ -608,6 +637,7 @@ void MainWindow::onFileNew()
     m_modified = false;
     setWindowTitle(tr("3D Drawing Board - 未命名"));
     updateStatusBar(tr("新建文档 - 已添加测试立方体，试试64位ID拾取功能!"));
+    updateObjectCount(); // 更新对象数量显示
     LOG_SUCCESS("新建文档成功", "文件");
 }
 
@@ -622,21 +652,47 @@ void MainWindow::onFileOpen()
         {
             m_osgWidget->removeAllGeos();
             
-            // 使用GeoOsgbIO加载文件
-            Geo3D* loadedGeo = GeoOsgbIO::loadFromOsgb(fileName);
-            if (loadedGeo)
+            // 尝试加载场景数据（多个对象）
+            SceneData sceneData = GeoOsgbIO::loadSceneFromOsgb(fileName);
+            if (!sceneData.objects.empty())
             {
-                m_osgWidget->addGeo(loadedGeo);
+                // 成功加载场景数据
+                for (Geo3D* geo : sceneData.objects)
+                {
+                    if (geo)
+                    {
+                        m_osgWidget->addGeo(geo);
+                    }
+                }
+                
                 m_currentFilePath = fileName;
                 m_modified = false;
                 setWindowTitle(tr("3D Drawing Board - %1").arg(QFileInfo(fileName).baseName()));
-                updateStatusBar(tr("打开文档: %1").arg(fileName));
-                LOG_SUCCESS(tr("打开文档: %1").arg(fileName), "文件");
+                updateStatusBar(tr("打开场景文档: %1，包含 %2 个对象").arg(fileName).arg(sceneData.objects.size()));
+                LOG_SUCCESS(tr("打开场景文档: %1，包含 %2 个对象").arg(fileName).arg(sceneData.objects.size()), "文件");
+                
+                // 更新对象数量显示
+                updateObjectCount();
             }
             else
             {
-                QMessageBox::warning(this, tr("打开失败"), tr("无法打开文件: %1").arg(fileName));
-                LOG_ERROR(tr("打开文档失败: %1").arg(fileName), "文件");
+                // 尝试加载单个对象（向后兼容）
+                Geo3D* loadedGeo = GeoOsgbIO::loadFromOsgb(fileName);
+                if (loadedGeo)
+                {
+                    m_osgWidget->addGeo(loadedGeo);
+                    m_currentFilePath = fileName;
+                    m_modified = false;
+                    setWindowTitle(tr("3D Drawing Board - %1").arg(QFileInfo(fileName).baseName()));
+                    updateStatusBar(tr("打开文档: %1").arg(fileName));
+                    LOG_SUCCESS(tr("打开文档: %1").arg(fileName), "文件");
+                    updateObjectCount();
+                }
+                else
+                {
+                    QMessageBox::warning(this, tr("打开失败"), tr("无法打开文件: %1").arg(fileName));
+                    LOG_ERROR(tr("打开文档失败: %1").arg(fileName), "文件");
+                }
             }
         }
     }
@@ -644,60 +700,198 @@ void MainWindow::onFileOpen()
 
 void MainWindow::onFileSave()
 {
-    if (m_currentFilePath.isEmpty())
-    {
-        onFileSaveAs();
-        return;
-    }
+    LOG_INFO("开始执行保存操作", "文件");
     
     if (m_osgWidget)
     {
-        // 获取当前选中的几何体或所有几何体
-        Geo3D* geoToSave = m_osgWidget->getSelectedGeo();
-        if (!geoToSave)
+        LOG_INFO("OSGWidget存在，准备显示保存对话框", "文件");
+        
+        // 总是显示保存对话框让用户选择路径
+        QString savePath = QFileDialog::getSaveFileName(this,
+            tr("保存3D场景"), "", tr("OSGB Files (*.osgb);;3D Drawing Files (*.3dd);;All Files (*)"));
+        
+        if (savePath.isEmpty())
         {
-            // 如果没有选中的几何体，获取第一个几何体
-            const auto& allGeos = m_osgWidget->getAllGeos();
-            if (!allGeos.empty())
-            {
-                geoToSave = allGeos[0];
-            }
+            LOG_INFO("用户取消了保存操作", "文件");
+            return; // 用户取消了保存
         }
         
-        if (geoToSave)
+        LOG_INFO(QString("用户选择了保存路径: %1").arg(savePath), "文件");
+        
+        m_currentFilePath = savePath;
+        setWindowTitle(tr("3D Drawing Board - %1").arg(QFileInfo(savePath).baseName()));
+        
+        // 获取所有几何对象
+        const auto& allGeos = m_osgWidget->getAllGeos();
+        
+        if (!allGeos.empty())
         {
-            // 使用GeoOsgbIO保存文件
-            if (GeoOsgbIO::saveToOsgb(m_currentFilePath, geoToSave))
+            // 创建场景数据
+            SceneData sceneData;
+            sceneData.sceneName = QFileInfo(savePath).baseName();
+            sceneData.description = tr("3D绘图板场景");
+            sceneData.author = tr("用户");
+            sceneData.version = "1.0";
+            sceneData.createTime = QDateTime::currentDateTime();
+            sceneData.modifyTime = QDateTime::currentDateTime();
+            
+            // 添加所有几何对象到场景数据
+            for (const auto& geoRef : allGeos)
+            {
+                if (geoRef)
+                {
+                    sceneData.objects.push_back(geoRef.get());
+                    
+                    // 为每个对象创建标签
+                    SceneObjectTag tag;
+                    tag.name = tr("对象_%1").arg(sceneData.objects.size());
+                    tag.description = tr("几何对象");
+                    tag.category = tr("几何体");
+                    tag.visible = true;
+                    tag.selectable = true;
+                    tag.opacity = 1.0f;
+                    tag.layer = 0;
+                    tag.createTime = QDateTime::currentDateTime();
+                    tag.modifyTime = QDateTime::currentDateTime();
+                    
+                    sceneData.objectTags[geoRef.get()] = tag;
+                }
+            }
+            
+            // 使用GeoOsgbIO保存场景数据
+            if (GeoOsgbIO::saveSceneToOsgb(savePath, sceneData))
             {
                 m_modified = false;
-                updateStatusBar(tr("保存文档: %1").arg(m_currentFilePath));
-                LOG_SUCCESS(tr("保存文档: %1").arg(m_currentFilePath), "文件");
+                updateStatusBar(tr("保存场景文档: %1，包含 %2 个对象").arg(savePath).arg(sceneData.objects.size()));
+                LOG_SUCCESS(tr("保存场景文档: %1，包含 %2 个对象").arg(savePath).arg(sceneData.objects.size()), "文件");
             }
             else
             {
-                QMessageBox::warning(this, tr("保存失败"), tr("无法保存文件: %1").arg(m_currentFilePath));
-                LOG_ERROR(tr("保存文档失败: %1").arg(m_currentFilePath), "文件");
+                QMessageBox::warning(this, tr("保存失败"), tr("无法保存文件: %1").arg(savePath));
+                LOG_ERROR(tr("保存文档失败: %1").arg(savePath), "文件");
             }
         }
         else
         {
-            QMessageBox::information(this, tr("保存提示"), tr("没有可保存的几何体"));
-            LOG_WARNING("没有可保存的几何体", "文件");
+            // 即使没有几何对象，也创建一个空的场景文件
+            SceneData sceneData;
+            sceneData.sceneName = QFileInfo(savePath).baseName();
+            sceneData.description = tr("3D绘图板场景");
+            sceneData.author = tr("用户");
+            sceneData.version = "1.0";
+            sceneData.createTime = QDateTime::currentDateTime();
+            sceneData.modifyTime = QDateTime::currentDateTime();
+            
+            // 使用GeoOsgbIO保存空场景数据
+            if (GeoOsgbIO::saveSceneToOsgb(savePath, sceneData))
+            {
+                m_modified = false;
+                updateStatusBar(tr("保存空场景文档: %1").arg(savePath));
+                LOG_SUCCESS(tr("保存空场景文档: %1").arg(savePath), "文件");
+            }
+            else
+            {
+                QMessageBox::warning(this, tr("保存失败"), tr("无法保存文件: %1").arg(savePath));
+                LOG_ERROR(tr("保存文档失败: %1").arg(savePath), "文件");
+            }
         }
     }
 }
 
 void MainWindow::onFileSaveAs()
 {
-    QString fileName = QFileDialog::getSaveFileName(this,
-        tr("保存3D文档"), "", tr("OSGB Files (*.osgb);;3D Drawing Files (*.3dd);;All Files (*)"));
+    LOG_INFO("开始执行另存为操作", "文件");
     
-    if (!fileName.isEmpty())
+    if (m_osgWidget)
     {
-        m_currentFilePath = fileName;
-        onFileSave();
-        setWindowTitle(tr("3D Drawing Board - %1").arg(QFileInfo(fileName).baseName()));
-        LOG_SUCCESS(tr("另存为: %1").arg(fileName), "文件");
+        LOG_INFO("OSGWidget存在，准备显示另存为对话框", "文件");
+        
+        QString fileName = QFileDialog::getSaveFileName(this,
+            tr("另存为3D场景"), "", tr("OSGB Files (*.osgb);;3D Drawing Files (*.3dd);;All Files (*)"));
+        
+        if (!fileName.isEmpty())
+        {
+            LOG_INFO(QString("用户选择了另存为路径: %1").arg(fileName), "文件");
+            
+            // 获取所有几何对象
+            const auto& allGeos = m_osgWidget->getAllGeos();
+            
+            if (!allGeos.empty())
+            {
+                // 创建场景数据
+                SceneData sceneData;
+                sceneData.sceneName = QFileInfo(fileName).baseName();
+                sceneData.description = tr("3D绘图板场景");
+                sceneData.author = tr("用户");
+                sceneData.version = "1.0";
+                sceneData.createTime = QDateTime::currentDateTime();
+                sceneData.modifyTime = QDateTime::currentDateTime();
+                
+                // 添加所有几何对象到场景数据
+                for (const auto& geoRef : allGeos)
+                {
+                    if (geoRef)
+                    {
+                        sceneData.objects.push_back(geoRef.get());
+                        
+                        // 为每个对象创建标签
+                        SceneObjectTag tag;
+                        tag.name = tr("对象_%1").arg(sceneData.objects.size());
+                        tag.description = tr("几何对象");
+                        tag.category = tr("几何体");
+                        tag.visible = true;
+                        tag.selectable = true;
+                        tag.opacity = 1.0f;
+                        tag.layer = 0;
+                        tag.createTime = QDateTime::currentDateTime();
+                        tag.modifyTime = QDateTime::currentDateTime();
+                        
+                        sceneData.objectTags[geoRef.get()] = tag;
+                    }
+                }
+                
+                // 使用GeoOsgbIO保存场景数据
+                if (GeoOsgbIO::saveSceneToOsgb(fileName, sceneData))
+                {
+                    m_currentFilePath = fileName;
+                    m_modified = false;
+                    setWindowTitle(tr("3D Drawing Board - %1").arg(QFileInfo(fileName).baseName()));
+                    updateStatusBar(tr("另存为场景文档: %1，包含 %2 个对象").arg(fileName).arg(sceneData.objects.size()));
+                    LOG_SUCCESS(tr("另存为场景文档: %1，包含 %2 个对象").arg(fileName).arg(sceneData.objects.size()), "文件");
+                }
+                else
+                {
+                    QMessageBox::warning(this, tr("保存失败"), tr("无法保存文件: %1").arg(fileName));
+                    LOG_ERROR(tr("另存为失败: %1").arg(fileName), "文件");
+                }
+            }
+            else
+            {
+                // 即使没有几何对象，也创建一个空的场景文件
+                SceneData sceneData;
+                sceneData.sceneName = QFileInfo(fileName).baseName();
+                sceneData.description = tr("3D绘图板场景");
+                sceneData.author = tr("用户");
+                sceneData.version = "1.0";
+                sceneData.createTime = QDateTime::currentDateTime();
+                sceneData.modifyTime = QDateTime::currentDateTime();
+                
+                // 使用GeoOsgbIO保存空场景数据
+                if (GeoOsgbIO::saveSceneToOsgb(fileName, sceneData))
+                {
+                    m_currentFilePath = fileName;
+                    m_modified = false;
+                    setWindowTitle(tr("3D Drawing Board - %1").arg(QFileInfo(fileName).baseName()));
+                    updateStatusBar(tr("另存为空场景文档: %1").arg(fileName));
+                    LOG_SUCCESS(tr("另存为空场景文档: %1").arg(fileName), "文件");
+                }
+                else
+                {
+                    QMessageBox::warning(this, tr("保存失败"), tr("无法保存文件: %1").arg(fileName));
+                    LOG_ERROR(tr("另存为失败: %1").arg(fileName), "文件");
+                }
+            }
+        }
     }
 }
 
@@ -1790,29 +1984,49 @@ void ToolPanel3D::createViewGroup()
     m_viewGroup = new QGroupBox("视图工具", this);
     QVBoxLayout* layout = new QVBoxLayout(m_viewGroup);
     
-    QPushButton* resetButton = new QPushButton("重置视图");
-    resetButton->setToolTip("重置相机到默认位置");
-    layout->addWidget(resetButton);
+    // 重置视图按钮
+    m_resetViewButton = new QPushButton("重置视图");
+    m_resetViewButton->setToolTip("重置相机到默认位置");
+    m_resetViewButton->setIcon(QIcon(":/icons/reset.png"));
+    layout->addWidget(m_resetViewButton);
     
-    QPushButton* fitButton = new QPushButton("适应窗口");
-    fitButton->setToolTip("适应所有对象到窗口");
-    layout->addWidget(fitButton);
+    // 适应窗口按钮
+    m_fitViewButton = new QPushButton("适应窗口");
+    m_fitViewButton->setToolTip("适应所有对象到窗口");
+    m_fitViewButton->setIcon(QIcon(":/icons/fit.png"));
+    layout->addWidget(m_fitViewButton);
     
-    QPushButton* topButton = new QPushButton("俯视图");
-    topButton->setToolTip("切换到俯视图");
-    layout->addWidget(topButton);
+    // 俯视图按钮
+    m_topViewButton = new QPushButton("俯视图");
+    m_topViewButton->setToolTip("切换到俯视图 (T)");
+    m_topViewButton->setIcon(QIcon(":/icons/top.png"));
+    layout->addWidget(m_topViewButton);
     
-    QPushButton* frontButton = new QPushButton("前视图");
-    frontButton->setToolTip("切换到前视图");
-    layout->addWidget(frontButton);
+    // 前视图按钮
+    m_frontViewButton = new QPushButton("前视图");
+    m_frontViewButton->setToolTip("切换到前视图 (1)");
+    m_frontViewButton->setIcon(QIcon(":/icons/front.png"));
+    layout->addWidget(m_frontViewButton);
     
-    QPushButton* rightButton = new QPushButton("右视图");
-    rightButton->setToolTip("切换到右视图");
-    layout->addWidget(rightButton);
+    // 右视图按钮
+    m_rightViewButton = new QPushButton("右视图");
+    m_rightViewButton->setToolTip("切换到右视图 (3)");
+    m_rightViewButton->setIcon(QIcon(":/icons/right.png"));
+    layout->addWidget(m_rightViewButton);
     
-    QPushButton* isoButton = new QPushButton("等轴测图");
-    isoButton->setToolTip("切换到等轴测图");
-    layout->addWidget(isoButton);
+    // 等轴测图按钮
+    m_isometricViewButton = new QPushButton("等轴测图");
+    m_isometricViewButton->setToolTip("切换到等轴测图 (7)");
+    m_isometricViewButton->setIcon(QIcon(":/icons/isometric.png"));
+    layout->addWidget(m_isometricViewButton);
+    
+    // 连接信号
+    connect(m_resetViewButton, &QPushButton::clicked, this, &ToolPanel3D::onResetViewClicked);
+    connect(m_fitViewButton, &QPushButton::clicked, this, &ToolPanel3D::onFitViewClicked);
+    connect(m_topViewButton, &QPushButton::clicked, this, &ToolPanel3D::onTopViewClicked);
+    connect(m_frontViewButton, &QPushButton::clicked, this, &ToolPanel3D::onFrontViewClicked);
+    connect(m_rightViewButton, &QPushButton::clicked, this, &ToolPanel3D::onRightViewClicked);
+    connect(m_isometricViewButton, &QPushButton::clicked, this, &ToolPanel3D::onIsometricViewClicked);
 }
 
 void ToolPanel3D::createUtilityGroup()
@@ -1820,13 +2034,35 @@ void ToolPanel3D::createUtilityGroup()
     m_utilityGroup = new QGroupBox("实用工具", this);
     QVBoxLayout* layout = new QVBoxLayout(m_utilityGroup);
     
-    QPushButton* clearButton = new QPushButton("清空场景");
-    clearButton->setToolTip("删除所有对象");
-    layout->addWidget(clearButton);
+    // 清空场景按钮
+    m_clearSceneButton = new QPushButton("清空场景");
+    m_clearSceneButton->setToolTip("删除所有对象");
+    m_clearSceneButton->setIcon(QIcon(":/icons/clear.png"));
+    layout->addWidget(m_clearSceneButton);
     
-    QPushButton* exportButton = new QPushButton("导出图像");
-    exportButton->setToolTip("导出当前视图为图像");
-    layout->addWidget(exportButton);
+    // 导出图像按钮
+    m_exportImageButton = new QPushButton("导出图像");
+    m_exportImageButton->setToolTip("导出当前视图为图像");
+    m_exportImageButton->setIcon(QIcon(":/icons/export.png"));
+    layout->addWidget(m_exportImageButton);
+    
+    // 坐标系统设置按钮
+    m_coordinateSystemButton = new QPushButton("坐标系统设置");
+    m_coordinateSystemButton->setToolTip("设置坐标系统参数");
+    m_coordinateSystemButton->setIcon(QIcon(":/icons/coordinate.png"));
+    layout->addWidget(m_coordinateSystemButton);
+    
+    // 显示设置按钮
+    m_displaySettingsButton = new QPushButton("显示设置");
+    m_displaySettingsButton->setToolTip("设置显示参数");
+    m_displaySettingsButton->setIcon(QIcon(":/icons/display.png"));
+    layout->addWidget(m_displaySettingsButton);
+    
+    // 连接信号
+    connect(m_clearSceneButton, &QPushButton::clicked, this, &ToolPanel3D::onClearSceneClicked);
+    connect(m_exportImageButton, &QPushButton::clicked, this, &ToolPanel3D::onExportImageClicked);
+    connect(m_coordinateSystemButton, &QPushButton::clicked, this, &ToolPanel3D::onCoordinateSystemClicked);
+    connect(m_displaySettingsButton, &QPushButton::clicked, this, &ToolPanel3D::onDisplaySettingsClicked);
 }
 
 void ToolPanel3D::createSkyboxGroup()
@@ -1913,6 +2149,58 @@ void ToolPanel3D::onSkyboxSolidClicked()
 void ToolPanel3D::onSkyboxCustomClicked()
 {
     emit skyboxCustomRequested();
+}
+
+// ToolPanel3D 视图工具相关槽函数
+void ToolPanel3D::onResetViewClicked()
+{
+    emit resetViewRequested();
+}
+
+void ToolPanel3D::onFitViewClicked()
+{
+    emit fitViewRequested();
+}
+
+void ToolPanel3D::onTopViewClicked()
+{
+    emit topViewRequested();
+}
+
+void ToolPanel3D::onFrontViewClicked()
+{
+    emit frontViewRequested();
+}
+
+void ToolPanel3D::onRightViewClicked()
+{
+    emit rightViewRequested();
+}
+
+void ToolPanel3D::onIsometricViewClicked()
+{
+    emit isometricViewRequested();
+}
+
+// ToolPanel3D 实用工具相关槽函数
+void ToolPanel3D::onClearSceneClicked()
+{
+    emit clearSceneRequested();
+}
+
+void ToolPanel3D::onExportImageClicked()
+{
+    emit exportImageRequested();
+}
+
+void ToolPanel3D::onCoordinateSystemClicked()
+{
+    emit coordinateSystemRequested();
+}
+
+void ToolPanel3D::onDisplaySettingsClicked()
+{
+    emit displaySettingsRequested();
 }
 
 // ========================================= 天空盒相关方法 =========================================
@@ -2052,6 +2340,180 @@ void MainWindow::onCoordinateSystemSettings()
         updateCoordinateRangeLabel();
         updateStatusBar("坐标系统设置已更新");
         LOG_SUCCESS("坐标系统设置已更新", "坐标系统");
+    }
+}
+
+void MainWindow::onClearScene()
+{
+    if (!m_osgWidget) return;
+    
+    int ret = QMessageBox::question(this, tr("清空场景"), 
+        tr("确定要删除所有对象吗？此操作不可撤销。"),
+        QMessageBox::Yes | QMessageBox::No);
+    
+    if (ret == QMessageBox::Yes)
+    {
+        m_osgWidget->removeAllGeos();
+        m_modified = true;
+        updateStatusBar(tr("场景已清空"));
+        updateObjectCount(); // 更新对象数量显示
+        LOG_SUCCESS("场景已清空", "场景");
+        
+        // 更新对象数量显示
+        if (m_objectCountLabel)
+        {
+            m_objectCountLabel->setText(tr("对象: 0"));
+        }
+    }
+}
+
+void MainWindow::onExportImage()
+{
+    if (!m_osgWidget) return;
+    
+    QString fileName = QFileDialog::getSaveFileName(this,
+        tr("导出图像"), "", tr("PNG Files (*.png);;JPEG Files (*.jpg);;BMP Files (*.bmp);;All Files (*)"));
+    
+    if (!fileName.isEmpty())
+    {
+        // 获取当前视图的截图
+        QPixmap pixmap = m_osgWidget->grab();
+        
+        if (pixmap.save(fileName))
+        {
+            updateStatusBar(tr("图像已导出: %1").arg(fileName));
+            LOG_SUCCESS(tr("图像已导出: %1").arg(fileName), "导出");
+        }
+        else
+        {
+            QMessageBox::warning(this, tr("导出失败"), tr("无法保存图像文件: %1").arg(fileName));
+            LOG_ERROR(tr("导出图像失败: %1").arg(fileName), "导出");
+        }
+    }
+}
+
+void MainWindow::onDisplaySettings()
+{
+    // 创建显示设置对话框
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("显示设置"));
+    dialog.setModal(true);
+    dialog.resize(400, 300);
+    
+    QVBoxLayout* mainLayout = new QVBoxLayout(&dialog);
+    
+    // 显示模式设置
+    QGroupBox* displayModeGroup = new QGroupBox(tr("显示模式"), &dialog);
+    QVBoxLayout* displayModeLayout = new QVBoxLayout(displayModeGroup);
+    
+    QCheckBox* wireframeCheck = new QCheckBox(tr("线框模式"), displayModeGroup);
+    QCheckBox* shadedCheck = new QCheckBox(tr("着色模式"), displayModeGroup);
+    QCheckBox* pointModeCheck = new QCheckBox(tr("点模式"), displayModeGroup);
+    
+    // 根据当前状态设置复选框
+    if (m_osgWidget)
+    {
+        // 这里需要根据实际的显示状态来设置复选框
+        // 暂时设置为默认值
+        shadedCheck->setChecked(true);
+    }
+    
+    displayModeLayout->addWidget(wireframeCheck);
+    displayModeLayout->addWidget(shadedCheck);
+    displayModeLayout->addWidget(pointModeCheck);
+    
+    // 背景设置
+    QGroupBox* backgroundGroup = new QGroupBox(tr("背景设置"), &dialog);
+    QVBoxLayout* backgroundLayout = new QVBoxLayout(backgroundGroup);
+    
+    QPushButton* backgroundColorButton = new QPushButton(tr("选择背景颜色"), backgroundGroup);
+    QCheckBox* skyboxCheck = new QCheckBox(tr("启用天空盒"), backgroundGroup);
+    skyboxCheck->setChecked(m_osgWidget ? m_osgWidget->isSkyboxEnabled() : true);
+    
+    backgroundLayout->addWidget(backgroundColorButton);
+    backgroundLayout->addWidget(skyboxCheck);
+    
+    // 坐标系统设置
+    QGroupBox* coordinateGroup = new QGroupBox(tr("坐标系统"), &dialog);
+    QVBoxLayout* coordinateLayout = new QVBoxLayout(coordinateGroup);
+    
+    QCheckBox* coordinateSystemCheck = new QCheckBox(tr("显示坐标系统"), coordinateGroup);
+    QCheckBox* scaleBarCheck = new QCheckBox(tr("显示比例尺"), coordinateGroup);
+    
+    coordinateSystemCheck->setChecked(m_osgWidget ? m_osgWidget->isCoordinateSystemEnabled() : true);
+    scaleBarCheck->setChecked(m_osgWidget ? m_osgWidget->isScaleBarEnabled() : true);
+    
+    coordinateLayout->addWidget(coordinateSystemCheck);
+    coordinateLayout->addWidget(scaleBarCheck);
+    
+    // 按钮
+    QHBoxLayout* buttonLayout = new QHBoxLayout();
+    QPushButton* okButton = new QPushButton(tr("确定"), &dialog);
+    QPushButton* cancelButton = new QPushButton(tr("取消"), &dialog);
+    
+    buttonLayout->addStretch();
+    buttonLayout->addWidget(okButton);
+    buttonLayout->addWidget(cancelButton);
+    
+    // 添加到主布局
+    mainLayout->addWidget(displayModeGroup);
+    mainLayout->addWidget(backgroundGroup);
+    mainLayout->addWidget(coordinateGroup);
+    mainLayout->addLayout(buttonLayout);
+    
+    // 连接信号
+    connect(okButton, &QPushButton::clicked, &dialog, &QDialog::accept);
+    connect(cancelButton, &QPushButton::clicked, &dialog, &QDialog::reject);
+    
+    // 连接显示模式信号
+    connect(wireframeCheck, &QCheckBox::toggled, [this](bool checked) {
+        if (checked && m_osgWidget) {
+            m_osgWidget->setWireframeMode(true);
+            m_osgWidget->setShadedMode(false);
+            m_osgWidget->setPointMode(false);
+        }
+    });
+    
+    connect(shadedCheck, &QCheckBox::toggled, [this](bool checked) {
+        if (checked && m_osgWidget) {
+            m_osgWidget->setWireframeMode(false);
+            m_osgWidget->setShadedMode(true);
+            m_osgWidget->setPointMode(false);
+        }
+    });
+    
+    connect(pointModeCheck, &QCheckBox::toggled, [this](bool checked) {
+        if (checked && m_osgWidget) {
+            m_osgWidget->setWireframeMode(false);
+            m_osgWidget->setShadedMode(false);
+            m_osgWidget->setPointMode(true);
+        }
+    });
+    
+    // 连接天空盒信号
+    connect(skyboxCheck, &QCheckBox::toggled, [this](bool enabled) {
+        if (m_osgWidget) {
+            m_osgWidget->enableSkybox(enabled);
+        }
+    });
+    
+    // 连接坐标系统信号
+    connect(coordinateSystemCheck, &QCheckBox::toggled, [this](bool enabled) {
+        if (m_osgWidget) {
+            m_osgWidget->enableCoordinateSystem(enabled);
+        }
+    });
+    
+    connect(scaleBarCheck, &QCheckBox::toggled, [this](bool enabled) {
+        if (m_osgWidget) {
+            m_osgWidget->enableScaleBar(enabled);
+        }
+    });
+    
+    if (dialog.exec() == QDialog::Accepted)
+    {
+        updateStatusBar(tr("显示设置已更新"));
+        LOG_SUCCESS("显示设置已更新", "显示");
     }
 }
 

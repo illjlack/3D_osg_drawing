@@ -112,53 +112,6 @@ void OSGWidget::initializeScene()
     osgViewer::Viewer* viewer = getOsgViewer();
     if (!viewer) return;
     
-    // 初始化OSG插件系统
-    LOG_INFO("正在初始化OSG插件系统...", "系统");
-    
-    // 设置OSG插件路径
-#ifdef OSG_PLUGIN_PATH
-    QString pluginPath = QString::fromLocal8Bit(OSG_PLUGIN_PATH);
-    LOG_INFO(QString("设置OSG插件路径: %1").arg(pluginPath), "系统");
-    
-    // 设置环境变量
-    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    env.insert("OSG_PLUGIN_PATH", pluginPath);
-    QProcessEnvironment::setSystemEnvironment(env);
-    
-    // 设置OSG插件路径
-    osgDB::Registry* registry = osgDB::Registry::instance();
-    if (registry) {
-        registry->setLibraryFilePathList(pluginPath.toStdString());
-        LOG_INFO("OSG插件路径已设置", "系统");
-    }
-#endif
-    
-    osgDB::Registry* registry = osgDB::Registry::instance();
-    if (registry) {
-        // 获取可用的插件信息
-        LOG_INFO(QString("OSG插件系统初始化完成"), "系统");
-        
-        // 检查是否有osgb插件
-        osgDB::ReaderWriter* osgbReader = registry->getReaderWriterForExtension("osgb");
-        if (osgbReader) {
-            LOG_INFO("找到OSGB文件读取插件", "系统");
-        } else {
-            LOG_WARNING("未找到OSGB文件读取插件", "系统");
-        }
-        
-        // 检查其他常用格式
-        QStringList commonFormats = {"osg", "osgb", "osgt", "ive", "obj", "3ds", "dae"};
-        QStringList supportedFormats;
-        for (const QString& format : commonFormats) {
-            if (registry->getReaderWriterForExtension(format.toStdString())) {
-                supportedFormats << format;
-            }
-        }
-        LOG_INFO(QString("支持的常用格式: %1").arg(supportedFormats.join(", ")), "系统");
-    } else {
-        LOG_ERROR("OSG插件系统初始化失败", "系统");
-    }
-    
     // 设置场景图
     m_rootNode->addChild(m_sceneNode);
     m_rootNode->addChild(m_lightNode);
@@ -279,68 +232,51 @@ void OSGWidget::resetCamera()
 {
     if (!m_cameraController) return;
     
-    // 获取坐标系统范围
-    CoordinateSystem3D* coordSystem = CoordinateSystem3D::getInstance();
-    const CoordinateSystem3D::CoordinateRange& range = coordSystem->getCoordinateRange();
+    // 只考虑实际的几何对象，不考虑坐标系统
+    osg::BoundingSphere bs = m_geoNode->getBound();
     
-    // 修改：将摄像机位置设置为(1,0,0)附近
-    glm::vec3 center = range.center();
-    double maxRange = range.maxRange();
-    
-    // 计算摄像机位置：在(1,0,0)方向，距离为范围的较小比例
-    double distance = maxRange * 0.3; // 减小距离，使缩放更小
-    
-    // 设置摄像机位置在(1,0,0)附近，稍微偏移以避免完全在轴上
-    osg::Vec3d eye(center.x + distance, center.y + distance * 0.1, center.z + distance * 0.1);
-    osg::Vec3d centerOsg(center.x, center.y, center.z);
-    
-    m_cameraController->setPosition(eye, centerOsg, osg::Vec3d(0, 0, 1));
+    if (bs.valid() && bs.radius() > 0)
+    {
+        // 如果有几何对象，使用几何对象的包围盒
+        osg::Vec3d center = bs.center();
+        double radius = bs.radius();
+        double distance = radius * 2.0; // 距离为半径的2倍
+        
+        osg::Vec3d eye = center + osg::Vec3d(distance, distance, distance);
+        m_cameraController->setPosition(eye, center, osg::Vec3d(0, 0, 1));
+    }
+    else
+    {
+        // 如果没有几何对象，使用默认位置
+        osg::Vec3d center(0, 0, 0);
+        osg::Vec3d eye(10, 10, 10);
+        m_cameraController->setPosition(eye, center, osg::Vec3d(0, 0, 1));
+    }
 }
 
 void OSGWidget::fitAll()
 {
     if (!m_cameraController || !m_geoNode.valid()) return;
     
-    // 获取坐标系统范围
-    CoordinateSystem3D* coordSystem = CoordinateSystem3D::getInstance();
-    const CoordinateSystem3D::CoordinateRange& range = coordSystem->getCoordinateRange();
-    
-    // 计算场景包围盒
+    // 只考虑实际的几何对象，不考虑坐标系统
     osg::BoundingSphere bs = m_geoNode->getBound();
-    if (bs.valid())
+    
+    if (bs.valid() && bs.radius() > 0)
     {
-        // 结合坐标系统范围和场景包围盒
-        glm::vec3 coordCenter = range.center();
-        double coordRadius = range.maxRange() * 0.5;
+        // 如果有几何对象，使用几何对象的包围盒
+        osg::Vec3d center = bs.center();
+        double radius = bs.radius();
+        double distance = radius * 2.5; // 距离为半径的2.5倍，留一些边距
         
-        // 如果场景有对象，使用场景和坐标系统的并集
-        if (bs.radius() > 0)
-        {
-            osg::Vec3d sceneCenter = bs.center();
-            double sceneRadius = bs.radius();
-            
-            // 计算并集中心
-            osg::Vec3d combinedCenter(
-                (sceneCenter.x() + coordCenter.x) * 0.5,
-                (sceneCenter.y() + coordCenter.y) * 0.5,
-                (sceneCenter.z() + coordCenter.z) * 0.5
-            );
-            
-            // 计算并集半径
-            double combinedRadius = std::max(sceneRadius, coordRadius) * 1.2; // 20%边距
-            
-            osg::Vec3d eye = combinedCenter + osg::Vec3d(combinedRadius * 2, combinedRadius * 2, combinedRadius * 2);
-            m_cameraController->setPosition(eye, combinedCenter, osg::Vec3d(0, 0, 1));
-        }
-        else
-        {
-            // 如果场景为空，使用坐标系统范围
-            osg::Vec3d center(coordCenter.x, coordCenter.y, coordCenter.z);
-            double distance = coordRadius * 2.0;
-            
-            osg::Vec3d eye = center + osg::Vec3d(distance, distance, distance);
-            m_cameraController->setPosition(eye, center, osg::Vec3d(0, 0, 1));
-        }
+        osg::Vec3d eye = center + osg::Vec3d(distance, distance, distance);
+        m_cameraController->setPosition(eye, center, osg::Vec3d(0, 0, 1));
+    }
+    else
+    {
+        // 如果没有几何对象，使用默认位置
+        osg::Vec3d center(0, 0, 0);
+        osg::Vec3d eye(10, 10, 10);
+        m_cameraController->setPosition(eye, center, osg::Vec3d(0, 0, 1));
     }
 }
 
@@ -348,12 +284,26 @@ void OSGWidget::setViewDirection(const glm::vec3& direction, const glm::vec3& up
 {
     if (!m_cameraController) return;
     
+    // 只考虑实际的几何对象，不考虑坐标系统
     osg::BoundingSphere bs = m_geoNode->getBound();
-    osg::Vec3d center = bs.valid() ? osg::Vec3d(bs.center()) : osg::Vec3d(0, 0, 0);
-    float distance = bs.valid() ? bs.radius() * 3.0f : 10.0f;
+    
+    osg::Vec3d center;
+    double distance;
+    
+    if (bs.valid() && bs.radius() > 0)
+    {
+        // 如果有几何对象，使用几何对象的包围盒
+        center = bs.center();
+        distance = bs.radius() * 3.0;
+    }
+    else
+    {
+        // 如果没有几何对象，使用默认值
+        center = osg::Vec3d(0, 0, 0);
+        distance = 10.0;
+    }
     
     osg::Vec3d eye = center - osg::Vec3d(direction.x, direction.y, direction.z) * distance;
-    
     m_cameraController->setPosition(eye, center, osg::Vec3d(up.x, up.y, up.z));
 }
 
@@ -714,7 +664,7 @@ void OSGWidget::wheelEvent(QWheelEvent* event)
         // Ctrl + 滚轮 = 快速前后移动
         int delta = event->angleDelta().y();
         
-        LOG_DEBUG(QString("Ctrl+滚轮缩放: delta=%1 位置(%2,%3)").arg(delta).arg(event->x()).arg(event->y()), "相机");
+        LOG_DEBUG(QString("Ctrl+滚轮缩放: delta=%1 位置(%2,%3)").arg(delta).arg(event->position().x()).arg(event->position().y()), "相机");
         
         if (m_cameraController)
         {
@@ -727,7 +677,7 @@ void OSGWidget::wheelEvent(QWheelEvent* event)
     {
         // 正常的滚轮缩放（OSG默认行为）
         int delta = event->angleDelta().y();
-        LOG_DEBUG(QString("滚轮缩放: delta=%1 位置(%2,%3)").arg(delta).arg(event->x()).arg(event->y()), "相机");
+        LOG_DEBUG(QString("滚轮缩放: delta=%1 位置(%2,%3)").arg(delta).arg(event->position().x()).arg(event->position().y()), "相机");
         
         osgQOpenGLWidget::wheelEvent(event);
     }
