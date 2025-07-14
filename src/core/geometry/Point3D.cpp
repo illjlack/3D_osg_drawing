@@ -54,6 +54,11 @@ void Point3D_Geo::updateGeometry()
     
     // 更新可见性
     updateFeatureVisibility();
+    
+    // 更新KDTree
+    if (getNodeManager()) {
+        getNodeManager()->updateKdTree();
+    }
 }
 
 osg::ref_ptr<osg::Geometry> Point3D_Geo::createGeometry()
@@ -221,4 +226,32 @@ osg::ref_ptr<osg::Geometry> Point3D_Geo::createPointGeometry(PointShape3D shape,
     geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     
     return geometry;
+} 
+
+bool Point3D_Geo::hitTest(const Ray3D& ray, PickResult3D& result) const
+{
+    // 获取点的位置
+    glm::vec3 pointPos = getPosition();
+    
+    // 计算射线到点的距离
+    glm::vec3 rayDir = glm::normalize(ray.direction);
+    glm::vec3 rayToPoint = pointPos - ray.origin;
+    
+    // 计算射线到点的垂直距离
+    float projection = glm::dot(rayToPoint, rayDir);
+    glm::vec3 closestPoint = ray.origin + projection * rayDir;
+    float distance = glm::length(pointPos - closestPoint);
+    
+    // 如果距离小于点的拾取阈值，则认为命中
+    float pickThreshold = 0.1f; // 拾取阈值
+    if (distance <= pickThreshold && projection >= 0)
+    {
+        result.hit = true;
+        result.distance = projection;
+        result.userData = const_cast<Point3D_Geo*>(this);
+        result.point = pointPos;
+        return true;
+    }
+    
+    return false;
 } 

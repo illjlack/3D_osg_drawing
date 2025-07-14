@@ -19,6 +19,9 @@ public:
     glm::vec3 calculateNormal() const;
     float calculateArea() const;
     float calculatePerimeter() const;
+    
+    // 拾取测试
+    virtual bool hitTest(const Ray3D& ray, PickResult3D& result) const override;
 
 protected:
     virtual osg::ref_ptr<osg::Geometry> createGeometry() override;

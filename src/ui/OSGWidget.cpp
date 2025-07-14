@@ -370,7 +370,15 @@ void OSGWidget::addGeo(Geo3D* geo)
     {
         osg::ref_ptr<Geo3D> geoRef(geo);
         m_geoList.push_back(geoRef);
-        m_geoNode->addChild(geo->getOSGNode().get());
+        
+        // 获取几何体的OSG节点
+        osg::ref_ptr<osg::Group> geoOSGNode = geo->getOSGNode();
+        if (geoOSGNode.valid()) {
+            m_geoNode->addChild(geoOSGNode.get());
+            qDebug() << "Added geometry to scene:" << geo->getGeoType() << "children:" << geoOSGNode->getNumChildren();
+        } else {
+            qDebug() << "Warning: Geometry has no valid OSG node:" << geo->getGeoType();
+        }
         
         // 连接几何对象的信号
         connect(geo, &Geo3D::drawingCompleted, this, &OSGWidget::onGeoDrawingCompleted);
@@ -456,14 +464,27 @@ void OSGWidget::addToSelection(Geo3D* geo)
 {
     if (!geo) return;
     
+    LOG_INFO(QString("尝试添加到选择: 对象类型=%1").arg(geo->getGeoType()), "选择");
+    
     // 检查是否已经在选中列表中
     auto it = std::find(m_selectedGeos.begin(), m_selectedGeos.end(), geo);
     if (it == m_selectedGeos.end())
     {
+        LOG_INFO(QString("对象不在选择列表中，开始添加"), "选择");
+        
         m_selectedGeos.push_back(geo);
-        geo->setStateSelected();
-        updateSelectionHighlight();
+        geo->setStateSelected(); // 这会自动显示包围盒
+        
+        // 发送选择信号
         emit geoSelected(geo);
+        
+        LOG_INFO(QString("添加到选择: 对象类型=%1, 总选择数=%2")
+            .arg(geo->getGeoType())
+            .arg(m_selectedGeos.size()), "选择");
+    }
+    else
+    {
+        LOG_INFO(QString("对象已在选择列表中，跳过"), "选择");
     }
 }
 
@@ -475,7 +496,7 @@ void OSGWidget::removeFromSelection(Geo3D* geo)
     if (it != m_selectedGeos.end())
     {
         m_selectedGeos.erase(it);
-        geo->clearStateSelected();
+        geo->clearStateSelected(); // 这会自动隐藏包围盒
         
         // 如果移除的是当前选中的对象，清空当前选中
         if (m_selectedGeo.get() == geo)
@@ -483,8 +504,12 @@ void OSGWidget::removeFromSelection(Geo3D* geo)
             m_selectedGeo = nullptr;
         }
         
-        updateSelectionHighlight();
+        // 发送选择信号
         emit geoSelected(nullptr);
+        
+        LOG_INFO(QString("从选择中移除: 对象类型=%1, 剩余选择数=%2")
+            .arg(geo->getGeoType())
+            .arg(m_selectedGeos.size()), "选择");
     }
 }
 
@@ -495,14 +520,17 @@ void OSGWidget::clearSelection()
     {
         if (geo)
         {
-            geo->clearStateSelected();
+            geo->clearStateSelected(); // 这会自动隐藏包围盒
         }
     }
     
     m_selectedGeos.clear();
     m_selectedGeo = nullptr;
-    updateSelectionHighlight();
+    
+    // 发送选择信号
     emit geoSelected(nullptr);
+    
+    LOG_INFO("清除所有选择", "选择");
 }
 
 const std::vector<Geo3D*>& OSGWidget::getSelectedGeos() const
@@ -540,7 +568,9 @@ void OSGWidget::stopDraggingControlPoint()
 {
     if (m_isDraggingControlPoint)
     {
-        LOG_DEBUG("停止拖动控制点", "拖动");
+        LOG_DEBUG(QString("停止拖动控制点: 对象=%1, 控制点索引=%2")
+            .arg(m_draggingGeo ? m_draggingGeo->getGeoType() : -1)
+            .arg(m_draggingControlPointIndex), "拖动");
     }
     
     m_isDraggingControlPoint = false;
@@ -551,6 +581,10 @@ void OSGWidget::stopDraggingControlPoint()
 // 高亮管理实现
 void OSGWidget::updateSelectionHighlight()
 {
+    // 暂时禁用高亮更新，避免循环
+    LOG_INFO("updateSelectionHighlight被调用，但暂时禁用", "选择");
+    return;
+    
     // 清除之前的高亮
     if (m_advancedPickingEnabled)
     {
@@ -558,7 +592,7 @@ void OSGWidget::updateSelectionHighlight()
         // 高亮会在下一次拾取时自动更新
     }
     
-    // 为选中的对象创建高亮
+    // 为选中的对象创建高亮和显示包围盒
     highlightSelectedObjects();
 }
 
@@ -567,14 +601,14 @@ void OSGWidget::highlightSelectedObjects()
     if (!m_advancedPickingEnabled || m_selectedGeos.empty())
         return;
     
-    // 为每个选中的对象创建高亮
+    // 为每个选中的对象创建高亮和显示包围盒
     for (auto* geo : m_selectedGeos)
     {
         if (geo)
         {
-            // 这里需要调用高亮系统
+            // 注意：不要在这里再次调用setStateSelected，因为addToSelection已经调用了
+            // 这里只添加额外的高亮效果
             // 暂时使用简化的方式
-            geo->setStateSelected();
         }
     }
 }
@@ -653,22 +687,52 @@ PickResult3D OSGWidget::pick(int x, int y)
         farPoint = osg::Vec3f(x, height() - y, 1.0f) * invVPW;
     }
     
-    Ray3D ray(glm::vec3(nearPoint.x(), nearPoint.y(), nearPoint.z()),
-              glm::vec3(farPoint.x() - nearPoint.x(), farPoint.y() - nearPoint.y(), farPoint.z() - nearPoint.z()));
+    // 计算射线方向和起点
+    glm::vec3 rayOrigin(nearPoint.x(), nearPoint.y(), nearPoint.z());
+    glm::vec3 rayDirection = glm::normalize(glm::vec3(farPoint.x() - nearPoint.x(), 
+                                                      farPoint.y() - nearPoint.y(), 
+                                                      farPoint.z() - nearPoint.z()));
     
-    // 测试所有几何对象
+    Ray3D ray(rayOrigin, rayDirection);
+    
+    // 添加调试信息
+    LOG_DEBUG(QString("射线拾取: 屏幕坐标(%1,%2), 射线起点(%3,%4,%5), 方向(%6,%7,%8)")
+        .arg(x).arg(y)
+        .arg(rayOrigin.x, 0, 'f', 3).arg(rayOrigin.y, 0, 'f', 3).arg(rayOrigin.z, 0, 'f', 3)
+        .arg(rayDirection.x, 0, 'f', 3).arg(rayDirection.y, 0, 'f', 3).arg(rayDirection.z, 0, 'f', 3), "拾取");
+    
+    LOG_DEBUG(QString("几何体数量: %1").arg(m_geoList.size()), "拾取");
+    
+    // 测试所有几何对象，使用KDTree支持的快速查询
     float minDistance = FLT_MAX;
     for (const osg::ref_ptr<Geo3D>& geo : m_geoList)
     {
+        if (!geo) continue;
+        
+        LOG_DEBUG(QString("测试几何体: 类型=%1, 状态=%2")
+            .arg(geo->getGeoType())
+            .arg(geo->isStateComplete() ? "完成" : "未完成"), "拾取");
+        
         PickResult3D geoResult;
-        if (geo->hitTest(ray, geoResult))
+        // 优先使用KDTree支持的hitTest，如果失败则使用传统方法
+        if (geo->hitTestWithKdTree(ray, geoResult) || geo->hitTestVisible(ray, geoResult))
         {
+            LOG_DEBUG(QString("几何体命中: 类型=%1, 距离=%2")
+                .arg(geo->getGeoType())
+                .arg(geoResult.distance, 0, 'f', 3), "拾取");
+            
             if (geoResult.distance < minDistance)
             {
                 minDistance = geoResult.distance;
                 result = geoResult;
             }
         }
+    }
+    
+    if (result.hit) {
+        LOG_DEBUG(QString("射线拾取成功: 距离=%1").arg(result.distance, 0, 'f', 3), "拾取");
+    } else {
+        LOG_DEBUG("射线拾取失败: 没有命中任何几何体", "拾取");
     }
     
     return result;
@@ -849,6 +913,13 @@ void OSGWidget::mouseMoveEvent(QMouseEvent* event)
             
             // 强制更新几何体
             m_draggingGeo->updateGeometry();
+            
+            LOG_DEBUG(QString("拖动控制点: 对象=%1, 控制点=%2, 新位置=(%3,%4,%5)")
+                .arg(m_draggingGeo->getGeoType())
+                .arg(m_draggingControlPointIndex)
+                .arg(newPoint.position.x, 0, 'f', 3)
+                .arg(newPoint.position.y, 0, 'f', 3)
+                .arg(newPoint.position.z, 0, 'f', 3), "拖动");
         }
         else
         {
@@ -863,6 +934,13 @@ void OSGWidget::mouseMoveEvent(QMouseEvent* event)
                 // 更新包围盒（这里需要实现包围盒的更新逻辑）
                 // 暂时只更新控制点
                 m_dragStartPosition = m_lastMouseWorldPos;
+                
+                LOG_DEBUG(QString("拖动包围盒控制点: 对象=%1, 角点=%2, 新位置=(%3,%4,%5)")
+                    .arg(m_draggingGeo->getGeoType())
+                    .arg(m_draggingControlPointIndex)
+                    .arg(newCorner.x, 0, 'f', 3)
+                    .arg(newCorner.y, 0, 'f', 3)
+                    .arg(newCorner.z, 0, 'f', 3), "拖动");
             }
         }
     }
@@ -876,8 +954,8 @@ void OSGWidget::mouseMoveEvent(QMouseEvent* event)
 
 void OSGWidget::mouseReleaseEvent(QMouseEvent* event)
 {
-    // 停止拖动控制点
-    if (event->button() == Qt::LeftButton && m_isDraggingControlPoint)
+    // 处理拖动控制点结束
+    if (m_isDraggingControlPoint)
     {
         stopDraggingControlPoint();
         event->accept();
@@ -937,6 +1015,11 @@ void OSGWidget::handleDrawingInput(QMouseEvent* event)
         // 检查是否按下了Ctrl键（多选模式）
         bool isCtrlPressed = (QApplication::keyboardModifiers() & Qt::ControlModifier);
         
+        LOG_INFO(QString("选择模式点击: 位置(%1,%2), 拾取结果=%3, Ctrl=%4")
+            .arg(event->x()).arg(event->y())
+            .arg(pickResult.hit ? "命中" : "未命中")
+            .arg(isCtrlPressed ? "是" : "否"), "选择");
+        
         if (pickResult.hit)
         {
             Geo3D* pickedGeo = static_cast<Geo3D*>(pickResult.userData);
@@ -959,7 +1042,6 @@ void OSGWidget::handleDrawingInput(QMouseEvent* event)
             {
                 // 普通点击：单选模式
                 clearSelection();
-                selectGeo(pickedGeo);
                 addToSelection(pickedGeo);
             }
         }

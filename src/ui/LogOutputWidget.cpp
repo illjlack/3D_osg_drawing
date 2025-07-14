@@ -31,6 +31,7 @@ LogOutputWidget::LogOutputWidget(QWidget* parent)
     , m_showTimestamp(true)
     , m_showCategory(true)
     , m_needsFullRefresh(false)
+    , m_isFiltering(false)
     , m_uiUpdateTimer(nullptr)
 {
     // 初始化过滤级别为全部
@@ -321,13 +322,47 @@ bool LogOutputWidget::shouldDisplayLog(const LogEntry& entry) const
 void LogOutputWidget::applyFilters()
 {
     QMutexLocker locker(&m_logsMutex);
+    
+    // 清空之前的过滤结果
     m_filteredLogs.clear();
     
-    for (const LogEntry& entry : m_allLogs)
+    // 如果日志数量很大，使用分批处理避免卡死
+    const int BATCH_SIZE = 1000;
+    int totalLogs = m_allLogs.size();
+    
+    if (totalLogs > BATCH_SIZE)
     {
-        if (shouldDisplayLog(entry))
+        // 分批处理大量日志
+        for (int i = 0; i < totalLogs; i += BATCH_SIZE)
         {
-            m_filteredLogs.append(entry);
+            int endIndex = qMin(i + BATCH_SIZE, totalLogs);
+            
+            for (int j = i; j < endIndex; ++j)
+            {
+                const LogEntry& entry = m_allLogs[j];
+                if (shouldDisplayLog(entry))
+                {
+                    m_filteredLogs.append(entry);
+                }
+            }
+            
+            // 让出CPU时间，避免卡死UI
+            if (i + BATCH_SIZE < totalLogs)
+            {
+                QThread::msleep(1);
+                QApplication::processEvents();
+            }
+        }
+    }
+    else
+    {
+        // 小量日志直接处理
+        for (const LogEntry& entry : m_allLogs)
+        {
+            if (shouldDisplayLog(entry))
+            {
+                m_filteredLogs.append(entry);
+            }
         }
     }
 }
@@ -651,6 +686,14 @@ void LogOutputWidget::selectAllText()
 // 槽函数实现
 void LogOutputWidget::onFilterLevelChanged()
 {
+    // 防抖：如果正在处理筛选，跳过
+    if (m_isFiltering)
+    {
+        return;
+    }
+    
+    m_isFiltering = true;
+    
     QSet<LogLevel> selectedLevels;
     
     int currentIndex = m_filterLevelCombo->currentIndex();
@@ -688,10 +731,20 @@ void LogOutputWidget::onFilterLevelChanged()
     
     // 刷新显示
     refreshDisplay();
+    
+    m_isFiltering = false;
 }
 
 void LogOutputWidget::onFilterCategoryChanged(const QString& category)
 {
+    // 防抖：如果正在处理筛选，跳过
+    if (m_isFiltering)
+    {
+        return;
+    }
+    
+    m_isFiltering = true;
+    
     QString filterCategory;
     if (category != "全部" && !category.isEmpty())
     {
@@ -706,6 +759,8 @@ void LogOutputWidget::onFilterCategoryChanged(const QString& category)
     
     // 刷新显示
     refreshDisplay();
+    
+    m_isFiltering = false;
 }
 
 void LogOutputWidget::onAutoScrollToggled(bool checked)

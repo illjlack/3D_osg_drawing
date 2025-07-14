@@ -113,6 +113,11 @@ void Line3D_Geo::updateGeometry()
     
     // 更新可见性
     updateFeatureVisibility();
+    
+    // 更新KDTree
+    if (getNodeManager()) {
+        getNodeManager()->updateKdTree();
+    }
 }
 
 osg::ref_ptr<osg::Geometry> Line3D_Geo::createGeometry()
@@ -347,4 +352,52 @@ void Line3D_Geo::generateBezierCurve()
         // 回退到多段线
         generatePolyline();
     }
+} 
+
+bool Line3D_Geo::hitTest(const Ray3D& ray, PickResult3D& result) const
+{
+    // 获取线的起点和终点
+    glm::vec3 startPos = getStartPoint();
+    glm::vec3 endPos = getEndPoint();
+    
+    // 计算线的方向向量
+    glm::vec3 lineDir = glm::normalize(endPos - startPos);
+    glm::vec3 rayDir = glm::normalize(ray.direction);
+    
+    // 计算两条线之间的最短距离
+    glm::vec3 crossProduct = glm::cross(lineDir, rayDir);
+    float crossLength = glm::length(crossProduct);
+    
+    if (crossLength < 1e-6f) // 两条线平行
+    {
+        return false;
+    }
+    
+    // 计算参数
+    glm::vec3 diff = ray.origin - startPos;
+    float det1 = glm::determinant(glm::mat3(diff, lineDir, rayDir));
+    float det2 = glm::determinant(glm::mat3(diff, lineDir, crossProduct));
+    float det3 = glm::determinant(glm::mat3(diff, rayDir, crossProduct));
+    
+    float t1 = det1 / (crossLength * crossLength);
+    float t2 = det2 / (crossLength * crossLength);
+    
+    // 计算最近点
+    glm::vec3 closestPointOnLine = startPos + t1 * lineDir;
+    glm::vec3 closestPointOnRay = ray.origin + t2 * rayDir;
+    
+    // 计算距离
+    float distance = glm::length(closestPointOnLine - closestPointOnRay);
+    
+    // 检查参数是否在有效范围内
+    if (t1 >= 0.0f && t1 <= 1.0f && t2 >= 0.0f && distance <= 0.1f)
+    {
+        result.hit = true;
+        result.distance = t2;
+        result.userData = const_cast<Line3D_Geo*>(this);
+        result.point = closestPointOnLine;
+        return true;
+    }
+    
+    return false;
 } 

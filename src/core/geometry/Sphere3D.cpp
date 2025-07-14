@@ -62,6 +62,16 @@ void Sphere3D_Geo::updateGeometry()
     
     // 更新可见性
     updateFeatureVisibility();
+    
+    // 更新KDTree
+    if (getNodeManager()) {
+        getNodeManager()->updateKdTree();
+    }
+    
+    // 更新KDTree
+    if (getNodeManager()) {
+        getNodeManager()->updateKdTree();
+    }
 }
 
 
@@ -310,4 +320,47 @@ void Sphere3D_Geo::buildFaceGeometries()
     {
         addFaceGeometry(geometry);
     }
+} 
+
+bool Sphere3D_Geo::hitTest(const Ray3D& ray, PickResult3D& result) const
+{
+    // 获取球体的中心点和半径
+    glm::vec3 center = getCenter();
+    float radius = getRadius();
+    
+    // 射线-球体相交测试
+    glm::vec3 rayDir = glm::normalize(ray.direction);
+    glm::vec3 rayToCenter = center - ray.origin;
+    
+    // 计算射线到球心的投影距离
+    float projection = glm::dot(rayToCenter, rayDir);
+    
+    // 计算射线到球心的垂直距离的平方
+    float distanceSquared = glm::dot(rayToCenter, rayToCenter) - projection * projection;
+    float radiusSquared = radius * radius;
+    
+    // 如果垂直距离的平方大于半径的平方，则射线不命中球体
+    if (distanceSquared > radiusSquared)
+    {
+        return false;
+    }
+    
+    // 计算射线与球体表面的交点距离
+    float halfChord = sqrt(radiusSquared - distanceSquared);
+    float t1 = projection - halfChord;
+    float t2 = projection + halfChord;
+    
+    // 选择最近的交点
+    float t = (t1 >= 0.0f) ? t1 : t2;
+    
+    if (t >= 0.0f)
+    {
+        result.hit = true;
+        result.distance = t;
+        result.userData = const_cast<Sphere3D_Geo*>(this);
+        result.point = ray.origin + t * rayDir;
+        return true;
+    }
+    
+    return false;
 } 

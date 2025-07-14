@@ -98,6 +98,11 @@ void Arc3D_Geo::updateGeometry()
     updateOSGNode();
     clearGeometryDirty();
     
+    // 更新KDTree
+    if (getNodeManager()) {
+        getNodeManager()->updateKdTree();
+    }
+    
     emit geometryUpdated(this);
 }
 
@@ -328,4 +333,52 @@ void Arc3D_Geo::calculateArcParameters()
     
     // 生成圆弧点
     generateArcPoints();
+} 
+
+bool Arc3D_Geo::hitTest(const Ray3D& ray, PickResult3D& result) const
+{
+    // 获取圆弧的参数
+    glm::vec3 center = getCenter();
+    float radius = getRadius();
+    float startAngle = getStartAngle();
+    float endAngle = getEndAngle();
+    
+    // 射线-圆弧相交测试（简化版本，使用包围盒）
+    const BoundingBox3D& bbox = getBoundingBox();
+    if (!bbox.isValid())
+    {
+        return false;
+    }
+    
+    // 使用包围盒进行相交测试
+    glm::vec3 rayDir = glm::normalize(ray.direction);
+    glm::vec3 invDir = 1.0f / rayDir;
+    
+    // 计算与包围盒各面的交点参数
+    float t1 = (bbox.min.x - ray.origin.x) * invDir.x;
+    float t2 = (bbox.max.x - ray.origin.x) * invDir.x;
+    float t3 = (bbox.min.y - ray.origin.y) * invDir.y;
+    float t4 = (bbox.max.y - ray.origin.y) * invDir.y;
+    float t5 = (bbox.min.z - ray.origin.z) * invDir.z;
+    float t6 = (bbox.max.z - ray.origin.z) * invDir.z;
+    
+    // 计算进入和退出参数
+    float tmin = glm::max(glm::max(glm::min(t1, t2), glm::min(t3, t4)), glm::min(t5, t6));
+    float tmax = glm::min(glm::min(glm::max(t1, t2), glm::max(t3, t4)), glm::max(t5, t6));
+    
+    // 检查是否相交
+    if (tmax >= 0 && tmin <= tmax)
+    {
+        float t = (tmin >= 0) ? tmin : tmax;
+        if (t >= 0)
+        {
+            result.hit = true;
+            result.distance = t;
+            result.userData = const_cast<Arc3D_Geo*>(this);
+            result.point = ray.origin + t * rayDir;
+            return true;
+        }
+    }
+    
+    return false;
 } 

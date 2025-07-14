@@ -1061,18 +1061,34 @@ void MainWindow::onGeoSelected(Geo3D* geo)
 {
     if (m_propertyEditor)
     {
-        m_propertyEditor->setGeo(geo);
-    }
-    
-    if (geo)
-    {
-        updateStatusBar(tr("选中几何对象"));
-        LOG_INFO("选中几何对象", "选择");
-    }
-    else
-    {
-        updateStatusBar(tr("取消选择"));
-        LOG_INFO("取消选择", "选择");
+        // 检查是否有多个选中的对象
+        if (m_osgWidget && m_osgWidget->getSelectionCount() > 1)
+        {
+            // 多选情况：显示第一个选中对象的属性
+            const auto& selectedGeos = m_osgWidget->getSelectedGeos();
+            if (!selectedGeos.empty())
+            {
+                m_propertyEditor->setSelectedGeos(selectedGeos);
+                updateStatusBar(tr("选中 %1 个几何对象").arg(m_osgWidget->getSelectionCount()));
+                LOG_INFO(tr("选中 %1 个几何对象").arg(m_osgWidget->getSelectionCount()), "选择");
+            }
+        }
+        else
+        {
+            // 单选情况：显示当前选中对象的属性
+            m_propertyEditor->setGeo(geo);
+            
+            if (geo)
+            {
+                updateStatusBar(tr("选中几何对象"));
+                LOG_INFO("选中几何对象", "选择");
+            }
+            else
+            {
+                updateStatusBar(tr("取消选择"));
+                LOG_INFO("取消选择", "选择");
+            }
+        }
     }
 }
 
@@ -1377,6 +1393,20 @@ void PropertyEditor3D::setGeo(Geo3D* geo)
     updateFromGeo();
 }
 
+void PropertyEditor3D::setSelectedGeos(const std::vector<Geo3D*>& geos)
+{
+    m_selectedGeos = geos;
+    if (!geos.empty())
+    {
+        m_currentGeo = geos[0]; // 显示第一个对象的属性
+    }
+    else
+    {
+        m_currentGeo = nullptr;
+    }
+    updateFromGeo();
+}
+
 void PropertyEditor3D::updateFromGeo()
 {
     if (!m_currentGeo)
@@ -1540,14 +1570,29 @@ void PropertyEditor3D::onPointShapeChanged()
     
     PointShape3D shape = static_cast<PointShape3D>(m_pointShapeCombo->currentData().toInt());
     
-    if (m_currentGeo)
+    if (!m_selectedGeos.empty())
     {
+        // 多选情况：应用到所有选中的对象
+        for (auto* geo : m_selectedGeos)
+        {
+            if (geo)
+            {
+                GeoParameters3D params = geo->getParameters();
+                params.pointShape = shape;
+                geo->setParameters(params);
+            }
+        }
+    }
+    else if (m_currentGeo)
+    {
+        // 单选情况
         GeoParameters3D params = m_currentGeo->getParameters();
         params.pointShape = shape;
         m_currentGeo->setParameters(params);
     }
     else
     {
+        // 全局设置
         GlobalPointShape3D = shape;
     }
     
@@ -1560,14 +1605,29 @@ void PropertyEditor3D::onPointSizeChanged()
     
     float size = static_cast<float>(m_pointSizeSpin->value());
     
-    if (m_currentGeo)
+    if (!m_selectedGeos.empty())
     {
+        // 多选情况：应用到所有选中的对象
+        for (auto* geo : m_selectedGeos)
+        {
+            if (geo)
+            {
+                GeoParameters3D params = geo->getParameters();
+                params.pointSize = size;
+                geo->setParameters(params);
+            }
+        }
+    }
+    else if (m_currentGeo)
+    {
+        // 单选情况
         GeoParameters3D params = m_currentGeo->getParameters();
         params.pointSize = size;
         m_currentGeo->setParameters(params);
     }
     else
     {
+        // 全局设置
         GlobalPointSize3D = size;
     }
     
@@ -1578,22 +1638,36 @@ void PropertyEditor3D::onPointColorChanged()
 {
     if (m_updating) return;
     
-    QColor currentColor = m_currentGeo ? m_currentGeo->getParameters().pointColor.toQColor() : GlobalPointColor3D;
-    QColor color = QColorDialog::getColor(currentColor, this, "选择点颜色");
-    
+    QColor color = QColorDialog::getColor(m_pointColorButton->palette().button().color(), this);
     if (color.isValid())
     {
         updateColorButton(m_pointColorButton, color);
+        Color3D color3D(color); // 使用Color3D的QColor构造函数
         
-        if (m_currentGeo)
+        if (!m_selectedGeos.empty())
         {
+            // 多选情况：应用到所有选中的对象
+            for (auto* geo : m_selectedGeos)
+            {
+                if (geo)
+                {
+                    GeoParameters3D params = geo->getParameters();
+                    params.pointColor = color3D;
+                    geo->setParameters(params);
+                }
+            }
+        }
+        else if (m_currentGeo)
+        {
+            // 单选情况
             GeoParameters3D params = m_currentGeo->getParameters();
-            params.pointColor = Color3D(color);
+            params.pointColor = color3D;
             m_currentGeo->setParameters(params);
         }
         else
         {
-            GlobalPointColor3D = color;
+            // 全局设置
+            GlobalPointColor3D = color3D.toQColor();
         }
         
         emit parametersChanged();
@@ -1651,14 +1725,29 @@ void PropertyEditor3D::onLineColorChanged()
     {
         updateColorButton(m_lineColorButton, color);
         
-        if (m_currentGeo)
+        if (!m_selectedGeos.empty())
         {
+            // 多选情况：应用到所有选中的对象
+            for (auto* geo : m_selectedGeos)
+            {
+                if (geo)
+                {
+                    GeoParameters3D params = geo->getParameters();
+                    params.lineColor = Color3D(color);
+                    geo->setParameters(params);
+                }
+            }
+        }
+        else if (m_currentGeo)
+        {
+            // 单选情况
             GeoParameters3D params = m_currentGeo->getParameters();
             params.lineColor = Color3D(color);
             m_currentGeo->setParameters(params);
         }
         else
         {
+            // 全局设置
             GlobalLineColor3D = color;
         }
         
@@ -1737,14 +1826,29 @@ void PropertyEditor3D::onFillColorChanged()
     {
         updateColorButton(m_fillColorButton, color);
         
-        if (m_currentGeo)
+        if (!m_selectedGeos.empty())
         {
+            // 多选情况：应用到所有选中的对象
+            for (auto* geo : m_selectedGeos)
+            {
+                if (geo)
+                {
+                    GeoParameters3D params = geo->getParameters();
+                    params.fillColor = Color3D(color);
+                    geo->setParameters(params);
+                }
+            }
+        }
+        else if (m_currentGeo)
+        {
+            // 单选情况
             GeoParameters3D params = m_currentGeo->getParameters();
             params.fillColor = Color3D(color);
             m_currentGeo->setParameters(params);
         }
         else
         {
+            // 全局设置
             GlobalFillColor3D = color;
         }
         
@@ -1763,14 +1867,29 @@ void PropertyEditor3D::onBorderColorChanged()
     {
         updateColorButton(m_borderColorButton, color);
         
-        if (m_currentGeo)
+        if (!m_selectedGeos.empty())
         {
+            // 多选情况：应用到所有选中的对象
+            for (auto* geo : m_selectedGeos)
+            {
+                if (geo)
+                {
+                    GeoParameters3D params = geo->getParameters();
+                    params.borderColor = Color3D(color);
+                    geo->setParameters(params);
+                }
+            }
+        }
+        else if (m_currentGeo)
+        {
+            // 单选情况
             GeoParameters3D params = m_currentGeo->getParameters();
             params.borderColor = Color3D(color);
             m_currentGeo->setParameters(params);
         }
         else
         {
+            // 全局设置
             GlobalBorderColor3D = color;
         }
         

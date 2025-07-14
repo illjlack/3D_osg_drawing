@@ -1,17 +1,40 @@
 ﻿#include "GeometryBase.h"
-#include "managers/GeoStateManager.h"
-#include "managers/GeoNodeManager.h"
-#include "managers/GeoMaterialManager.h"
-#include "managers/GeoSnapPointManager.h"
-#include "managers/GeoControlPointManager.h"
-#include "managers/GeoBoundingBoxManager.h"
-#include "managers/GeoRenderManager.h"
-#include <osg/Array>
+#include "../util/LogManager.h"
+#include "../util/MathUtils.h"
+#include "../util/OSGUtils.h"
+#include <osg/ComputeBoundsVisitor>
+#include <osgUtil/LineSegmentIntersector>
+#include <osgUtil/IntersectionVisitor>
+#include <osg/Geode>
+#include <osg/Geometry>
+#include <osg/StateSet>
+#include <osg/Material>
+#include <osg/LineWidth>
+#include <osg/Point>
+#include <osg/PolygonMode>
+#include <osg/BlendFunc>
+#include <osg/Depth>
+#include <osg/MatrixTransform>
 #include <osg/Shape>
+#include <osg/ShapeDrawable>
 #include <osg/PositionAttitudeTransform>
+#include <osg/NodeVisitor>
+#include <osg/UserDataContainer>
+#include <osg/Timer>
+#include <osgViewer/Viewer>
+#include <osg/LineSegment>
 #include <osg/Geode>
 #include <algorithm>
 #include <cmath>
+#include <random>
+#include <QMouseEvent>
+#include <QKeyEvent>
+#include <QObject>
+#include <vector>
+#include <memory>
+#include <map>
+#include <set>
+#include <algorithm>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -82,24 +105,44 @@ void Geo3D::addControlPoint(const Point3D& point)
 {
     m_controlPointManager->addControlPoint(point);
     markGeometryDirty();
+    
+    // 控制点变化后重新构建KDTree
+    if (m_nodeManager) {
+        m_nodeManager->updateKdTree();
+    }
 }
 
 void Geo3D::setControlPoint(int index, const Point3D& point)
 {
     m_controlPointManager->setControlPoint(index, point);
     markGeometryDirty();
+    
+    // 控制点变化后重新构建KDTree
+    if (m_nodeManager) {
+        m_nodeManager->updateKdTree();
+    }
 }
 
 void Geo3D::removeControlPoint(int index)
 {
     m_controlPointManager->removeControlPoint(index);
     markGeometryDirty();
+    
+    // 控制点变化后重新构建KDTree
+    if (m_nodeManager) {
+        m_nodeManager->updateKdTree();
+    }
 }
 
 void Geo3D::clearControlPoints()
 {
     m_controlPointManager->clearControlPoints();
     markGeometryDirty();
+    
+    // 控制点变化后重新构建KDTree
+    if (m_nodeManager) {
+        m_nodeManager->updateKdTree();
+    }
 }
 
 bool Geo3D::hasControlPoints() const
@@ -157,6 +200,11 @@ void Geo3D::setStateSelected()
     {
         m_boundingBoxManager->setVisibleForSelection(true);
     }
+    
+    // 状态变化后重新构建KDTree
+    if (m_nodeManager) {
+        m_nodeManager->updateKdTree();
+    }
 }
 
 void Geo3D::setStateEditing()
@@ -183,6 +231,11 @@ void Geo3D::clearStateSelected()
     {
         m_boundingBoxManager->setVisibleForSelection(false);
     }
+    
+    // 状态变化后重新构建KDTree
+    if (m_nodeManager) {
+        m_nodeManager->updateKdTree();
+    }
 }
 
 void Geo3D::clearStateEditing()
@@ -195,6 +248,11 @@ void Geo3D::setTransform(const Transform3D& transform)
 {
     m_transform = transform;
     markGeometryDirty();
+    
+    // 变换变化后重新构建KDTree
+    if (m_nodeManager) {
+        m_nodeManager->updateKdTree();
+    }
 }
 
 // ========================================= 包围盒管理接口 =========================================
@@ -250,18 +308,33 @@ void Geo3D::setShowPoints(bool show)
 {
     m_renderManager->setShowPoints(show);
     m_parameters.showPoints = show;
+    
+    // 可见性变化后重新构建KDTree
+    if (m_nodeManager) {
+        m_nodeManager->updateKdTree();
+    }
 }
 
 void Geo3D::setShowEdges(bool show)
 {
     m_renderManager->setShowEdges(show);
     m_parameters.showEdges = show;
+    
+    // 可见性变化后重新构建KDTree
+    if (m_nodeManager) {
+        m_nodeManager->updateKdTree();
+    }
 }
 
 void Geo3D::setShowFaces(bool show)
 {
     m_renderManager->setShowFaces(show);
     m_parameters.showFaces = show;
+    
+    // 可见性变化后重新构建KDTree
+    if (m_nodeManager) {
+        m_nodeManager->updateKdTree();
+    }
 }
 
 bool Geo3D::isShowPoints() const
@@ -291,6 +364,11 @@ void Geo3D::setParameters(const GeoParameters3D& params)
     m_renderManager->setShowPoints(params.showPoints);
     m_renderManager->setShowEdges(params.showEdges);
     m_renderManager->setShowFaces(params.showFaces);
+    
+    // 参数变化后重新构建KDTree
+    if (m_nodeManager) {
+        m_nodeManager->updateKdTree();
+    }
     
     emit parametersChanged(this);
 }
@@ -328,12 +406,144 @@ bool Geo3D::hitTest(const Ray3D& ray, PickResult3D& result) const
     return false;
 }
 
+// KDTree支持的快速拾取测试
+bool Geo3D::hitTestWithKdTree(const Ray3D& ray, PickResult3D& result) const
+{
+    if (!m_nodeManager) {
+        qDebug() << "hitTestWithKdTree: No node manager";
+        return false;
+    }
+    
+    // 转换射线到OSG格式
+    osg::Vec3 start = glmToOsgVec3(ray.origin);
+    osg::Vec3 direction = glmToOsgVec3(ray.direction);
+    osg::Vec3 end = start + direction * 10000.0f; // 射线终点
+    
+    qDebug() << "hitTestWithKdTree: Ray from" << start.x() << start.y() << start.z() 
+             << "to" << end.x() << end.y() << end.z();
+    
+    // 使用OSG的线段相交检测器
+    osg::ref_ptr<osgUtil::LineSegmentIntersector> intersector = 
+        new osgUtil::LineSegmentIntersector(start, end);
+    
+    // 设置相交模式
+    intersector->setIntersectionLimit(osgUtil::Intersector::LIMIT_NEAREST);
+    
+    // 执行相交检测
+    osgUtil::IntersectionVisitor visitor(intersector.get());
+    
+    osg::ref_ptr<osg::Group> geoNode = m_nodeManager->getOSGNode();
+    if (!geoNode) {
+        qDebug() << "hitTestWithKdTree: No valid OSG node";
+        return false;
+    }
+    
+    qDebug() << "hitTestWithKdTree: Testing node with" << geoNode->getNumChildren() << "children";
+    
+    geoNode->accept(visitor);
+    
+    if (intersector->containsIntersections()) {
+        const auto& intersections = intersector->getIntersections();
+        if (!intersections.empty()) {
+            const auto& intersection = *intersections.begin();
+            
+            qDebug() << "hitTestWithKdTree: Found intersection at" 
+                     << intersection.getWorldIntersectPoint().x()
+                     << intersection.getWorldIntersectPoint().y()
+                     << intersection.getWorldIntersectPoint().z();
+            
+            // 设置结果
+            result.geoObject = const_cast<Geo3D*>(this);
+            result.point = osgToGlmVec3(intersection.getWorldIntersectPoint());
+            result.distance = (intersection.getWorldIntersectPoint() - start).length();
+            result.geometryType = 2; // 默认为面
+            result.geometryIndex = 0;
+            
+            return true;
+        }
+    }
+    
+    qDebug() << "hitTestWithKdTree: No intersection found";
+    return false;
+}
+
+bool Geo3D::hitTestPoint(const osg::Vec3& point, float radius, PickResult3D& result) const
+{
+    if (!m_nodeManager) return false;
+    
+    // 转换点到glm格式
+    glm::vec3 glmPoint = osgToGlmVec3(point);
+    
+    // 创建一个从相机到该点的射线
+    Ray3D ray;
+    ray.origin = glmPoint + glm::vec3(0, 0, -radius); // 在点前方
+    ray.direction = glm::normalize(glmPoint - ray.origin);
+    
+    // 使用射线拾取
+    return hitTestWithKdTree(ray, result);
+}
+
+bool Geo3D::hitTestVisible(const Ray3D& ray, PickResult3D& result) const
+{
+    if (!m_nodeManager) return false;
+    
+    // 转换射线到OSG格式
+    osg::Vec3 start = glmToOsgVec3(ray.origin);
+    osg::Vec3 direction = glmToOsgVec3(ray.direction);
+    osg::Vec3 end = start + direction * 1000.0f; // 射线终点
+    
+    // 使用OSG的线段相交检测器
+    osg::ref_ptr<osgUtil::LineSegmentIntersector> intersector = 
+        new osgUtil::LineSegmentIntersector(start, end);
+    
+    // 设置相交模式
+    intersector->setIntersectionLimit(osgUtil::Intersector::LIMIT_NEAREST);
+    
+    // 执行相交检测
+    osgUtil::IntersectionVisitor visitor(intersector.get());
+    
+    osg::ref_ptr<osg::Group> geoNode = m_nodeManager->getOSGNode();
+    if (!geoNode) return false;
+    
+    geoNode->accept(visitor);
+    
+    if (intersector->containsIntersections()) {
+        const auto& intersections = intersector->getIntersections();
+        if (!intersections.empty()) {
+            const auto& intersection = *intersections.begin();
+            
+            // 检查是否在几何体的包围盒内
+            osg::ComputeBoundsVisitor cbv;
+            intersection.drawable->accept(cbv);
+            osg::BoundingBox bb = cbv.getBoundingBox();
+            
+            if (bb.contains(intersection.getWorldIntersectPoint())) {
+                // 设置结果
+                result.geoObject = const_cast<Geo3D*>(this);
+                result.point = osgToGlmVec3(intersection.getWorldIntersectPoint());
+                result.distance = (intersection.getWorldIntersectPoint() - start).length();
+                result.geometryType = 2; // 默认为面
+                result.geometryIndex = 0;
+                
+                return true;
+            }
+        }
+    }
+    
+    return false;
+}
+
 // ========================================= 绘制完成 =========================================
 void Geo3D::completeDrawing()
 {
     setStateComplete();
     clearStateEditing();
     updateGeometry();
+    
+    // 绘制完成后自动构建KDTree，以便hitTest检测能够正常工作
+    if (m_nodeManager) {
+        m_nodeManager->buildKdTree();
+    }
     
     emit drawingCompleted(this);
 }
@@ -389,6 +599,11 @@ void Geo3D::initialize()
         m_parameters.resetToGlobal();
         setStateInitialized();
         m_initialized = true;
+        
+        // 初始化时构建KDTree
+        if (m_nodeManager) {
+            m_nodeManager->buildKdTree();
+        }
     }
 }
 
@@ -399,6 +614,8 @@ void Geo3D::updateOSGNode()
     
     if (isGeometryDirty())
     {
+        qDebug() << "Updating OSG node for geometry type:" << m_geoType;
+        
         // 清除旧的几何体
         m_nodeManager->clearGeometry();
         
@@ -406,6 +623,7 @@ void Geo3D::updateOSGNode()
         osg::ref_ptr<osg::Geometry> geometry = createGeometry();
         if (geometry.valid())
         {
+            qDebug() << "Created geometry successfully, vertices:" << geometry->getVertexArray()->getNumElements();
             m_nodeManager->setGeometry(geometry);
             
             // 应用材质
@@ -423,12 +641,18 @@ void Geo3D::updateOSGNode()
             // 更新特征可见性
             updateFeatureVisibility();
         }
+        else
+        {
+            qDebug() << "Failed to create geometry for type:" << m_geoType;
+        }
         
         clearGeometryDirty();
     }
     
     // 更新控制点可视化
     m_nodeManager->updateControlPointsVisualization();
+    
+    qDebug() << "OSG node update complete, node valid:" << m_nodeManager->getOSGNode().valid();
 }
 
 // ========================================= 辅助函数 =========================================
@@ -450,6 +674,111 @@ glm::vec3 Geo3D::osgToGlmVec3(const osg::Vec3& v) const
 glm::vec4 Geo3D::osgToGlmVec4(const osg::Vec4& v) const
 {
     return glm::vec4(v.x(), v.y(), v.z(), v.w());
+}
+
+// ========================================= 几何体属性方法 =========================================
+
+glm::vec3 Geo3D::getCenter() const
+{
+    // 默认实现：返回包围盒的中心
+    const BoundingBox3D& bbox = getBoundingBox();
+    if (bbox.isValid())
+    {
+        return bbox.center();
+    }
+    return glm::vec3(0.0f);
+}
+
+glm::vec3 Geo3D::getPosition() const
+{
+    // 默认实现：返回中心点
+    return getCenter();
+}
+
+glm::vec3 Geo3D::getStartPoint() const
+{
+    // 默认实现：返回第一个控制点
+    const auto& controlPoints = getControlPoints();
+    if (!controlPoints.empty())
+    {
+        return controlPoints[0].position;
+    }
+    return glm::vec3(0.0f);
+}
+
+glm::vec3 Geo3D::getEndPoint() const
+{
+    // 默认实现：返回最后一个控制点
+    const auto& controlPoints = getControlPoints();
+    if (!controlPoints.empty())
+    {
+        return controlPoints.back().position;
+    }
+    return glm::vec3(0.0f);
+}
+
+glm::vec3 Geo3D::getVertex(int index) const
+{
+    // 默认实现：返回控制点
+    const auto& controlPoints = getControlPoints();
+    if (index >= 0 && index < static_cast<int>(controlPoints.size()))
+    {
+        return controlPoints[index].position;
+    }
+    return glm::vec3(0.0f);
+}
+
+float Geo3D::getRadius() const
+{
+    // 默认实现：返回包围盒的最大半径
+    const BoundingBox3D& bbox = getBoundingBox();
+    if (bbox.isValid())
+    {
+        glm::vec3 size = bbox.size();
+        return glm::max(glm::max(size.x, size.y), size.z) * 0.5f;
+    }
+    return 0.0f;
+}
+
+float Geo3D::getHeight() const
+{
+    // 默认实现：返回包围盒的高度
+    const BoundingBox3D& bbox = getBoundingBox();
+    if (bbox.isValid())
+    {
+        return bbox.size().y;
+    }
+    return 0.0f;
+}
+
+float Geo3D::getStartAngle() const
+{
+    // 默认实现：返回0度
+    return 0.0f;
+}
+
+float Geo3D::getEndAngle() const
+{
+    // 默认实现：返回360度
+    return 360.0f;
+}
+
+float Geo3D::getMajorRadius() const
+{
+    // 默认实现：返回包围盒的最大半径
+    return getRadius();
+}
+
+float Geo3D::getMinorRadius() const
+{
+    // 默认实现：返回包围盒的最小半径
+    const BoundingBox3D& bbox = getBoundingBox();
+    if (bbox.isValid())
+    {
+        glm::vec3 size = bbox.size();
+        return glm::min(glm::min(size.x, size.y), size.z) * 0.5f;
+    }
+    return 0.0f;
 }
 
 // ============================================================================

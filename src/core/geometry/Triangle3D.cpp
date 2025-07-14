@@ -59,6 +59,11 @@ void Triangle3D_Geo::updateGeometry()
     
     // 更新可见性
     updateFeatureVisibility();
+    
+    // 更新KDTree
+    if (getNodeManager()) {
+        getNodeManager()->updateKdTree();
+    }
 }
 
 osg::ref_ptr<osg::Geometry> Triangle3D_Geo::createGeometry()
@@ -324,4 +329,62 @@ void Triangle3D_Geo::buildFaceGeometries()
     geometry->addPrimitiveSet(drawArrays);
     
     addFaceGeometry(geometry);
+}
+
+bool Triangle3D_Geo::hitTest(const Ray3D& ray, PickResult3D& result) const
+{
+    // 获取三角形的三个顶点
+    glm::vec3 v0 = getVertex(0);
+    glm::vec3 v1 = getVertex(1);
+    glm::vec3 v2 = getVertex(2);
+    
+    // 射线-三角形相交测试（Möller–Trumbore算法）
+    glm::vec3 rayDir = glm::normalize(ray.direction);
+    
+    // 计算三角形的边向量
+    glm::vec3 edge1 = v1 - v0;
+    glm::vec3 edge2 = v2 - v0;
+    
+    // 计算行列式
+    glm::vec3 h = glm::cross(rayDir, edge2);
+    float a = glm::dot(edge1, h);
+    
+    // 如果a接近0，则射线与三角形平行
+    if (std::abs(a) < 1e-6f)
+    {
+        return false;
+    }
+    
+    float f = 1.0f / a;
+    glm::vec3 s = ray.origin - v0;
+    float u = f * glm::dot(s, h);
+    
+    // 检查u是否在有效范围内
+    if (u < 0.0f || u > 1.0f)
+    {
+        return false;
+    }
+    
+    glm::vec3 q = glm::cross(s, edge1);
+    float v = f * glm::dot(rayDir, q);
+    
+    // 检查v是否在有效范围内
+    if (v < 0.0f || u + v > 1.0f)
+    {
+        return false;
+    }
+    
+    // 计算交点参数t
+    float t = f * glm::dot(edge2, q);
+    
+    if (t >= 0.0f)
+    {
+        result.hit = true;
+        result.distance = t;
+        result.userData = const_cast<Triangle3D_Geo*>(this);
+        result.point = ray.origin + t * rayDir;
+        return true;
+    }
+    
+    return false;
 }

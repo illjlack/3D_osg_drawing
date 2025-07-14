@@ -22,6 +22,9 @@ public:
     // 尺寸访问
     glm::vec3 getSize() const;
     void setSize(const glm::vec3& size);
+    
+    // 拾取测试
+    virtual bool hitTest(const Ray3D& ray, PickResult3D& result) const override;
 
 protected:
     virtual osg::ref_ptr<osg::Geometry> createGeometry() override;

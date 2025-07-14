@@ -14,6 +14,9 @@ public:
     virtual void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
     virtual void keyPressEvent(QKeyEvent* event) override;
     virtual void updateGeometry() override;
+    
+    // 拾取测试
+    virtual bool hitTest(const Ray3D& ray, PickResult3D& result) const override;
 
 protected:
     virtual osg::ref_ptr<osg::Geometry> createGeometry() override;

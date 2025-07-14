@@ -196,6 +196,9 @@ private:
     // 线程安全
     mutable QMutex m_logsMutex;
     
+    // 筛选状态控制
+    bool m_isFiltering;
+    
     // 更新频率控制 - 简化参数
     static const int UI_UPDATE_INTERVAL = 100; // 100ms UI更新间隔
     static const int MAX_UI_BATCH_SIZE = 50;   // UI线程最多处理50条日志

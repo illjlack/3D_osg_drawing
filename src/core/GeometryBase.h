@@ -104,6 +104,19 @@ public:
     // 包围盒管理（通过包围盒管理器）
     GeoBoundingBoxManager* getBoundingBoxManager() const { return m_boundingBoxManager.get(); }
     const BoundingBox3D& getBoundingBox() const;
+    
+    // 几何体属性方法
+    glm::vec3 getCenter() const;
+    glm::vec3 getPosition() const;
+    glm::vec3 getStartPoint() const;
+    glm::vec3 getEndPoint() const;
+    glm::vec3 getVertex(int index) const;
+    float getRadius() const;
+    float getHeight() const;
+    float getStartAngle() const;
+    float getEndAngle() const;
+    float getMajorRadius() const;
+    float getMinorRadius() const;
 
     // 节点管理（通过节点管理器）
     GeoNodeManager* getNodeManager() const { return m_nodeManager.get(); }
@@ -146,6 +159,11 @@ public:
 
     // 拾取测试
     virtual bool hitTest(const Ray3D& ray, PickResult3D& result) const;
+    
+    // KDTree支持的快速拾取测试
+    virtual bool hitTestWithKdTree(const Ray3D& ray, PickResult3D& result) const;
+    virtual bool hitTestPoint(const osg::Vec3& point, float radius, PickResult3D& result) const;
+    virtual bool hitTestVisible(const Ray3D& ray, PickResult3D& result) const;
 
     // 绘制完成
     virtual void completeDrawing();

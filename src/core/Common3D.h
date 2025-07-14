@@ -20,6 +20,9 @@
 #include <osg/Vec4>
 #include <osg/ref_ptr>
 
+// 前向声明
+class Geo3D;
+
 // 全局变量声明
 extern DrawMode3D GlobalDrawMode3D;
 extern PointShape3D GlobalPointShape3D;
@@ -301,7 +304,13 @@ struct PickResult3D
     glm::vec3 normal;
     void* userData;  // 可以存储几何对象指针
     
-    PickResult3D() : hit(false), distance(FLT_MAX), point(0.0f), normal(0.0f), userData(nullptr) {}
+    // KDTree相关成员
+    Geo3D* geoObject;  // 几何对象指针
+    int geometryType;   // 几何体类型 (0:点, 1:线, 2:面)
+    int geometryIndex;  // 几何体索引
+    
+    PickResult3D() : hit(false), distance(FLT_MAX), point(0.0f), normal(0.0f), 
+                     userData(nullptr), geoObject(nullptr), geometryType(0), geometryIndex(-1) {}
 };
 
 // 拾取Feature结构

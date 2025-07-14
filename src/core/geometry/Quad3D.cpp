@@ -59,6 +59,11 @@ void Quad3D_Geo::updateGeometry()
     
     // 更新可见性
     updateFeatureVisibility();
+    
+    // 更新KDTree
+    if (getNodeManager()) {
+        getNodeManager()->updateKdTree();
+    }
 }
 
 osg::ref_ptr<osg::Geometry> Quad3D_Geo::createGeometry()
@@ -332,4 +337,83 @@ void Quad3D_Geo::buildFaceGeometries()
     }
     
     addFaceGeometry(geometry);
+} 
+
+bool Quad3D_Geo::hitTest(const Ray3D& ray, PickResult3D& result) const
+{
+    // 获取四边形的四个顶点
+    glm::vec3 v0 = getVertex(0);
+    glm::vec3 v1 = getVertex(1);
+    glm::vec3 v2 = getVertex(2);
+    glm::vec3 v3 = getVertex(3);
+    
+    // 将四边形分解为两个三角形进行测试
+    // 第一个三角形：v0, v1, v2
+    glm::vec3 edge1 = v1 - v0;
+    glm::vec3 edge2 = v2 - v0;
+    
+    glm::vec3 rayDir = glm::normalize(ray.direction);
+    glm::vec3 h = glm::cross(rayDir, edge2);
+    float a = glm::dot(edge1, h);
+    
+    if (std::abs(a) >= 1e-6f)
+    {
+        float f = 1.0f / a;
+        glm::vec3 s = ray.origin - v0;
+        float u = f * glm::dot(s, h);
+        
+        if (u >= 0.0f && u <= 1.0f)
+        {
+            glm::vec3 q = glm::cross(s, edge1);
+            float v = f * glm::dot(rayDir, q);
+            
+            if (v >= 0.0f && u + v <= 1.0f)
+            {
+                float t = f * glm::dot(edge2, q);
+                if (t >= 0.0f)
+                {
+                    result.hit = true;
+                    result.distance = t;
+                    result.userData = const_cast<Quad3D_Geo*>(this);
+                    result.point = ray.origin + t * rayDir;
+                    return true;
+                }
+            }
+        }
+    }
+    
+    // 第二个三角形：v0, v2, v3
+    edge1 = v2 - v0;
+    edge2 = v3 - v0;
+    
+    h = glm::cross(rayDir, edge2);
+    a = glm::dot(edge1, h);
+    
+    if (std::abs(a) >= 1e-6f)
+    {
+        float f = 1.0f / a;
+        glm::vec3 s = ray.origin - v0;
+        float u = f * glm::dot(s, h);
+        
+        if (u >= 0.0f && u <= 1.0f)
+        {
+            glm::vec3 q = glm::cross(s, edge1);
+            float v = f * glm::dot(rayDir, q);
+            
+            if (v >= 0.0f && u + v <= 1.0f)
+            {
+                float t = f * glm::dot(edge2, q);
+                if (t >= 0.0f)
+                {
+                    result.hit = true;
+                    result.distance = t;
+                    result.userData = const_cast<Quad3D_Geo*>(this);
+                    result.point = ray.origin + t * rayDir;
+                    return true;
+                }
+            }
+        }
+    }
+    
+    return false;
 } 

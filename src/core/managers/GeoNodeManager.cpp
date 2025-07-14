@@ -6,6 +6,10 @@
 #include <osg/Material>
 #include <osg/LineWidth>
 #include <osg/Point>
+#include <osg/KdTree>
+#include <osg/NodeVisitor>
+#include <osg/ComputeBoundsVisitor>
+#include <algorithm>
 
 GeoNodeManager::GeoNodeManager(Geo3D* parent)
     : QObject(parent)
@@ -15,6 +19,7 @@ GeoNodeManager::GeoNodeManager(Geo3D* parent)
     , m_vertexVisible(true)
     , m_edgeVisible(true)
     , m_faceVisible(true)
+    , m_kdTreeDirty(true)
 {
     initializeNodes();
 }
@@ -114,6 +119,9 @@ void GeoNodeManager::addVertexGeometry(osg::Drawable* drawable)
     geode->addDrawable(drawable);
     geode->setName("vertex_geode");
     m_vertexNode->addChild(geode.get());
+    
+    // 标记KDTree需要更新
+    m_kdTreeDirty = true;
 }
 
 void GeoNodeManager::addEdgeGeometry(osg::Drawable* drawable)
@@ -124,6 +132,9 @@ void GeoNodeManager::addEdgeGeometry(osg::Drawable* drawable)
     geode->addDrawable(drawable);
     geode->setName("edge_geode");
     m_edgeNode->addChild(geode.get());
+    
+    // 标记KDTree需要更新
+    m_kdTreeDirty = true;
 }
 
 void GeoNodeManager::addFaceGeometry(osg::Drawable* drawable)
@@ -134,12 +145,16 @@ void GeoNodeManager::addFaceGeometry(osg::Drawable* drawable)
     geode->addDrawable(drawable);
     geode->setName("face_geode");
     m_faceNode->addChild(geode.get());
+    
+    // 标记KDTree需要更新
+    m_kdTreeDirty = true;
 }
 
 void GeoNodeManager::clearVertexGeometries()
 {
     if (m_vertexNode.valid()) {
         m_vertexNode->removeChildren(0, m_vertexNode->getNumChildren());
+        m_kdTreeDirty = true;
     }
 }
 
@@ -147,6 +162,7 @@ void GeoNodeManager::clearEdgeGeometries()
 {
     if (m_edgeNode.valid()) {
         m_edgeNode->removeChildren(0, m_edgeNode->getNumChildren());
+        m_kdTreeDirty = true;
     }
 }
 
@@ -154,6 +170,7 @@ void GeoNodeManager::clearFaceGeometries()
 {
     if (m_faceNode.valid()) {
         m_faceNode->removeChildren(0, m_faceNode->getNumChildren());
+        m_kdTreeDirty = true;
     }
 }
 
@@ -162,6 +179,7 @@ void GeoNodeManager::clearAllGeometries()
     clearVertexGeometries();
     clearEdgeGeometries();
     clearFaceGeometries();
+    clearKdTree();
 }
 
 void GeoNodeManager::setTransformMatrix(const osg::Matrix& matrix)
@@ -394,4 +412,285 @@ void GeoNodeManager::createControlPointVisualization(const Point3D& point, float
     controlPointGeode->setName("control_point");
     
     m_controlPointsNode->addChild(controlPointGeode.get());
+} 
+
+// KDTree管理实现
+void GeoNodeManager::buildKdTree()
+{
+    if (!m_kdTreeDirty) return;
+    
+    // 收集几何体数据
+    collectGeometryData();
+    
+    if (m_geometryInfos.empty()) {
+        m_kdTree = nullptr;
+        return;
+    }
+    
+    // 创建KDTree
+    m_kdTree = new osg::KdTree();
+    
+    // 简化实现：只构建一个包含所有几何体的KDTree
+    // 创建一个临时的Geode来包含所有Drawable
+    osg::ref_ptr<osg::Geode> geode = new osg::Geode();
+    for (const auto& info : m_geometryInfos) {
+        if (m_geometryVisibility[info.index]) {
+            geode->addDrawable(info.drawable.get());
+        }
+    }
+    
+    if (geode->getNumDrawables() > 0) {
+        osg::KdTree::BuildOptions buildOptions;
+        for (unsigned int i = 0; i < geode->getNumDrawables(); ++i) {
+            osg::Drawable* drawable = geode->getDrawable(i);
+            osg::Geometry* geometry = dynamic_cast<osg::Geometry*>(drawable);
+            if (geometry) {
+                m_kdTree->build(buildOptions, geometry);
+            }
+        }
+    }
+    
+    m_kdTreeDirty = false;
+    emit kdTreeUpdated();
+}
+
+void GeoNodeManager::updateKdTree()
+{
+    m_kdTreeDirty = true;
+    buildKdTree();
+}
+
+void GeoNodeManager::clearKdTree()
+{
+    m_kdTree = nullptr;
+    m_geometryInfos.clear();
+    m_geometryVisibility.clear();
+    m_kdTreeDirty = true;
+}
+
+void GeoNodeManager::collectGeometryData()
+{
+    m_geometryInfos.clear();
+    m_geometryVisibility.clear();
+    
+    // 收集点几何体
+    if (m_vertexNode.valid()) {
+        for (unsigned int i = 0; i < m_vertexNode->getNumChildren(); ++i) {
+            osg::Node* child = m_vertexNode->getChild(i);
+            if (osg::Geode* geode = dynamic_cast<osg::Geode*>(child)) {
+                for (unsigned int j = 0; j < geode->getNumDrawables(); ++j) {
+                    osg::Drawable* drawable = geode->getDrawable(j);
+                    if (drawable) {
+                        GeoKdTreeNodeInfo info;
+                        info.drawable = drawable;
+                        info.node = child;
+                        info.geoObject = m_parent;
+                        info.geometryType = 0; // 点
+                        info.index = m_geometryInfos.size();
+                        
+                        m_geometryInfos.push_back(info);
+                        m_geometryVisibility.push_back(m_vertexVisible);
+                    }
+                }
+            }
+        }
+    }
+    
+    // 收集线几何体
+    if (m_edgeNode.valid()) {
+        for (unsigned int i = 0; i < m_edgeNode->getNumChildren(); ++i) {
+            osg::Node* child = m_edgeNode->getChild(i);
+            if (osg::Geode* geode = dynamic_cast<osg::Geode*>(child)) {
+                for (unsigned int j = 0; j < geode->getNumDrawables(); ++j) {
+                    osg::Drawable* drawable = geode->getDrawable(j);
+                    if (drawable) {
+                        GeoKdTreeNodeInfo info;
+                        info.drawable = drawable;
+                        info.node = child;
+                        info.geoObject = m_parent;
+                        info.geometryType = 1; // 线
+                        info.index = m_geometryInfos.size();
+                        
+                        m_geometryInfos.push_back(info);
+                        m_geometryVisibility.push_back(m_edgeVisible);
+                    }
+                }
+            }
+        }
+    }
+    
+    // 收集面几何体
+    if (m_faceNode.valid()) {
+        for (unsigned int i = 0; i < m_faceNode->getNumChildren(); ++i) {
+            osg::Node* child = m_faceNode->getChild(i);
+            if (osg::Geode* geode = dynamic_cast<osg::Geode*>(child)) {
+                for (unsigned int j = 0; j < geode->getNumDrawables(); ++j) {
+                    osg::Drawable* drawable = geode->getDrawable(j);
+                    if (drawable) {
+                        GeoKdTreeNodeInfo info;
+                        info.drawable = drawable;
+                        info.node = child;
+                        info.geoObject = m_parent;
+                        info.geometryType = 2; // 面
+                        info.index = m_geometryInfos.size();
+                        
+                        m_geometryInfos.push_back(info);
+                        m_geometryVisibility.push_back(m_faceVisible);
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+
+osg::Vec3 GeoNodeManager::getGeometryCenter(osg::Drawable* drawable) const
+{
+    if (!drawable) return osg::Vec3();
+    
+    // 计算几何体的包围盒中心
+    osg::ComputeBoundsVisitor cbv;
+    drawable->accept(cbv);
+    osg::BoundingBox bb = cbv.getBoundingBox();
+    
+    return (bb._min + bb._max) * 0.5f;
+}
+
+bool GeoNodeManager::isGeometryInFrustum(const osg::Vec3& center, float radius) const
+{
+    // 简单的视锥体剔除检查
+    // 这里可以根据需要实现更复杂的视锥体剔除
+    return true;
+}
+
+// 快速查询功能实现
+std::vector<GeoKdTreeNodeInfo> GeoNodeManager::queryKdTree(const osg::Vec3& point, float radius)
+{
+    std::vector<GeoKdTreeNodeInfo> results;
+    
+    if (!m_kdTree.valid() || m_kdTreeDirty) {
+        buildKdTree();
+    }
+    
+    if (!m_kdTree.valid()) return results;
+    
+    // 简化实现：直接遍历所有可见几何体
+    for (size_t i = 0; i < m_geometryInfos.size(); ++i) {
+        if (!m_geometryVisibility[i]) continue;
+        
+        const auto& info = m_geometryInfos[i];
+        osg::Vec3 center = getGeometryCenter(info.drawable.get());
+        float distance = (center - point).length();
+        
+        if (distance <= radius) {
+            results.push_back(info);
+        }
+    }
+    
+    return results;
+}
+
+std::vector<GeoKdTreeNodeInfo> GeoNodeManager::queryKdTreeRay(const osg::Vec3& start, const osg::Vec3& direction, float maxDistance)
+{
+    std::vector<GeoKdTreeNodeInfo> results;
+    
+    if (!m_kdTree.valid() || m_kdTreeDirty) {
+        buildKdTree();
+    }
+    
+    if (!m_kdTree.valid()) return results;
+    
+    // 简化实现：直接遍历所有可见几何体
+    for (size_t i = 0; i < m_geometryInfos.size(); ++i) {
+        if (!m_geometryVisibility[i]) continue;
+        
+        const auto& info = m_geometryInfos[i];
+        osg::Vec3 center = getGeometryCenter(info.drawable.get());
+        
+        // 计算到射线的距离
+        osg::Vec3 toCenter = center - start;
+        float projection = toCenter * direction;
+        
+        if (projection < 0 || projection > maxDistance) continue; // 在射线范围外
+        
+        osg::Vec3 closestPoint = start + direction * projection;
+        float distance = (center - closestPoint).length();
+        
+        // 如果距离在合理范围内，认为相交
+        if (distance <= 1.0f) { // 1.0f作为相交阈值
+            results.push_back(info);
+        }
+    }
+    
+    return results;
+}
+
+GeoKdTreeNodeInfo GeoNodeManager::findClosestGeometry(const osg::Vec3& point)
+{
+    GeoKdTreeNodeInfo closest;
+    float minDistance = std::numeric_limits<float>::max();
+    
+    if (!m_kdTree.valid() || m_kdTreeDirty) {
+        buildKdTree();
+    }
+    
+    if (!m_kdTree.valid()) return closest;
+    
+    // 查询附近的几何体
+    std::vector<GeoKdTreeNodeInfo> nearby = queryKdTree(point, 10.0f);
+    
+    for (const auto& info : nearby) {
+        if (!m_geometryVisibility[info.index]) continue;
+        
+        osg::Vec3 center = getGeometryCenter(info.drawable.get());
+        float distance = (center - point).length();
+        
+        if (distance < minDistance) {
+            minDistance = distance;
+            closest = info;
+        }
+    }
+    
+    return closest;
+}
+
+// 几何体可见性查询
+bool GeoNodeManager::isGeometryVisible(int type, int index) const
+{
+    if (index < 0 || index >= static_cast<int>(m_geometryVisibility.size())) {
+        return false;
+    }
+    
+    return m_geometryVisibility[index];
+}
+
+void GeoNodeManager::setGeometryVisible(int type, int index, bool visible)
+{
+    if (index < 0 || index >= static_cast<int>(m_geometryVisibility.size())) {
+        return;
+    }
+    
+    m_geometryVisibility[index] = visible;
+    
+    // 更新对应节点的可见性
+    if (index < static_cast<int>(m_geometryInfos.size())) {
+        const auto& info = m_geometryInfos[index];
+        if (info.node.valid()) {
+            info.node->setNodeMask(visible ? 0xffffffff : 0x0);
+        }
+    }
+}
+
+std::vector<GeoKdTreeNodeInfo> GeoNodeManager::getVisibleGeometries() const
+{
+    std::vector<GeoKdTreeNodeInfo> visible;
+    
+    for (size_t i = 0; i < m_geometryInfos.size(); ++i) {
+        if (m_geometryVisibility[i]) {
+            visible.push_back(m_geometryInfos[i]);
+        }
+    }
+    
+    return visible;
 } 

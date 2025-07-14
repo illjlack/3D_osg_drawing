@@ -172,6 +172,9 @@ public:
     int getPendingLogCount() const;
     int getCurrentLogCount() const;
     double getAverageProcessingTime() const;
+    
+    // 线程控制
+    void requestExit();
 
 signals:
     void logAdded(const LogEntry& entry);
@@ -220,6 +223,7 @@ private:
     
     // 控制标志
     bool m_running;
+    QAtomicInt m_shouldExit;  // 线程退出标志
     QTimer* m_cleanupTimer;
     QTimer* m_performanceTimer;
     

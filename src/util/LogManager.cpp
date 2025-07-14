@@ -19,6 +19,7 @@ LogWorkerThread::LogWorkerThread(QObject* parent)
     , m_fileOutput(false)
     , m_logFilePath("")
     , m_running(false)
+    , m_shouldExit(0)  // 初始化退出标志
     , m_cleanupTimer(nullptr)
     , m_performanceTimer(nullptr)
     , m_totalProcessedLogs(0)
@@ -56,16 +57,22 @@ LogWorkerThread::LogWorkerThread(QObject* parent)
 
 LogWorkerThread::~LogWorkerThread()
 {
+    // 设置退出标志
+    m_shouldExit.storeRelaxed(1);
     m_running = false;
+    
+    // 唤醒等待的线程
     m_queueCondition.wakeAll();
+    
+    // 等待线程退出
     if (isRunning()) {
         quit();
-        wait(3000);
-        if (isRunning()) {
+        if (!wait(3000)) {  // 等待3秒
             terminate();
-            wait(1000);
+            wait(1000);  // 再等待1秒
         }
     }
+    
     delete m_cleanupTimer;
     delete m_performanceTimer;
 }
@@ -75,6 +82,8 @@ void LogWorkerThread::addLog(const LogEntry& entry)
     // 快速过滤
     if (!shouldAcceptLog(entry)) {
         m_droppedLogs.fetchAndAddRelaxed(1);
+        // 添加调试信息
+        qDebug() << "Log filtered out:" << entry.message << "level:" << static_cast<int>(entry.level);
         return;
     }
     
@@ -90,6 +99,9 @@ void LogWorkerThread::addLog(const LogEntry& entry)
     
     m_logQueue.enqueue(entry);
     m_queueCondition.wakeOne();
+    
+    // 添加调试信息
+    qDebug() << "Log added to queue:" << entry.message << "queue size:" << m_logQueue.size();
 }
 
 void LogWorkerThread::setConfig(const LogConfig& config)
@@ -246,6 +258,12 @@ double LogWorkerThread::getAverageProcessingTime() const
     return m_averageProcessingTime;
 }
 
+void LogWorkerThread::requestExit()
+{
+    m_shouldExit.storeRelaxed(1);
+    m_queueCondition.wakeAll();
+}
+
 void LogWorkerThread::run()
 {
     m_running = true;
@@ -266,7 +284,7 @@ void LogWorkerThread::run()
     m_cleanupTimer->start(m_config.autoCleanupInterval * 1000);
     m_performanceTimer->start(10000); // 10秒检查一次性能
     
-    while (m_running) {
+    while (m_running && !m_shouldExit.loadRelaxed()) {
         QElapsedTimer timer;
         timer.start();
         
@@ -278,8 +296,24 @@ void LogWorkerThread::run()
             if (!m_logQueue.isEmpty()) {
                 entry = m_logQueue.dequeue();
                 hasEntry = true;
+                qDebug() << "Processing log entry:" << entry.message;
             } else {
+                // 检查线程是否应该退出
+                if (m_shouldExit.loadRelaxed()) {
+                    qDebug() << "Thread should exit, breaking loop";
+                    break;
+                }
+                // 等待新日志，但最多等待100ms
+                qDebug() << "Waiting for log entries...";
                 m_queueCondition.wait(&m_queueMutex, 100);
+                // 再次检查是否有日志
+                if (!m_logQueue.isEmpty()) {
+                    entry = m_logQueue.dequeue();
+                    hasEntry = true;
+                    qDebug() << "Got log entry after wait:" << entry.message;
+                } else {
+                    qDebug() << "No log entries after wait";
+                }
             }
         }
         
@@ -555,10 +589,12 @@ bool LogWorkerThread::shouldAcceptLog(const LogEntry& entry) const
     // 级别过滤
     if (m_config.enableLevelFilter) {
         if (entry.level < m_config.minLogLevel) {
+            qDebug() << "Log filtered by level:" << static_cast<int>(entry.level) << "<" << static_cast<int>(m_config.minLogLevel);
             return false;
         }
     }
     
+    qDebug() << "Log accepted:" << entry.message;
     return true;
 }
 
@@ -608,9 +644,24 @@ LogManager::LogManager()
 LogManager::~LogManager()
 {
     if (m_workerThread) {
+        qDebug() << "LogManager destructor: stopping worker thread";
+        
+        // 请求线程退出
+        m_workerThread->requestExit();
+        
+        // 停止线程
         m_workerThread->quit();
-        m_workerThread->wait(3000);
+        
+        // 等待线程退出
+        if (!m_workerThread->wait(3000)) {
+            qDebug() << "LogManager destructor: force terminating worker thread";
+            m_workerThread->terminate();
+            m_workerThread->wait(1000);
+        }
+        
+        qDebug() << "LogManager destructor: deleting worker thread";
         delete m_workerThread;
+        m_workerThread = nullptr;
     }
 }
 
