@@ -134,9 +134,6 @@
     <ClInclude Include="src\core\Common3D.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="src\core\GeometryBase.h">
-      <Filter>Core</Filter>
-    </ClInclude>
     <ClInclude Include="src\core\Enums3D.h">
       <Filter>Core</Filter>
     </ClInclude>
@@ -234,6 +231,9 @@
     </QtMoc>
     <QtMoc Include="src\ui\LogOutputWidget.h">
       <Filter>UI</Filter>
+    </QtMoc>
+    <QtMoc Include="src\core\GeometryBase.h">
+      <Filter>Core</Filter>
     </QtMoc>
   </ItemGroup>
 </Project>

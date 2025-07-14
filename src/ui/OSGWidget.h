@@ -76,8 +76,8 @@ public:
 
     
     // 拾取系统诊断
-    QString diagnosePickingSystem();  // 诊断拾取系统
-    bool fixPickingIssues();          // 修复拾取问题
+    //QString diagnosePickingSystem();  // 诊断拾取系统
+    //bool fixPickingIssues();          // 修复拾取问题
     
     // 绘制状态查询
     bool isDrawing() const { return m_isDrawing; }

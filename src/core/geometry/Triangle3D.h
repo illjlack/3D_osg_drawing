@@ -4,7 +4,7 @@
 #include "../GeometryBase.h"
 
 // 三角形几何体类
-class Triangle3D_Geo : public RegularGeo3D
+class Triangle3D_Geo : public Geo3D
 {
 public:
     Triangle3D_Geo();

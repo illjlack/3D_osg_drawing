@@ -3,7 +3,7 @@
 #include "../GeometryBase.h"
 
 // 球几何体类
-class Sphere3D_Geo : public RegularGeo3D
+class Sphere3D_Geo : public Geo3D
 {
 public:
     Sphere3D_Geo();

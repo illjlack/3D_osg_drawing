@@ -3,7 +3,7 @@
 #include "../GeometryBase.h"
 
 // 长方体几何体类
-class Box3D_Geo : public RegularGeo3D
+class Box3D_Geo : public Geo3D
 {
 public:
     Box3D_Geo();

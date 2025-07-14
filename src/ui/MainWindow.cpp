@@ -420,14 +420,6 @@ void MainWindow::createToolBars()
     
     m_viewToolBar->addAction(tr("线框"), this, &MainWindow::onViewWireframe);
     m_viewToolBar->addAction(tr("着色"), this, &MainWindow::onViewShaded);
-    
-    // 添加测试拾取系统按钮
-
-    
-    // 添加诊断拾取系统按钮
-    QAction* diagnosePickingAction = m_viewToolBar->addAction(tr("诊断拾取"));
-    diagnosePickingAction->setToolTip(tr("诊断拾取系统问题"));
-    connect(diagnosePickingAction, &QAction::triggered, this, &MainWindow::onDiagnosePicking);
 }
 
 void MainWindow::createStatusBar()
@@ -2682,44 +2674,4 @@ void MainWindow::onManipulatorTypeChanged()
     
     updateStatusBar(tr("相机操控器切换为: %1").arg(typeName));
     LOG_INFO(tr("相机操控器切换为: %1").arg(typeName), "相机");
-}
-
-
-
-void MainWindow::onDiagnosePicking()
-{
-    if (m_osgWidget)
-    {
-        // 运行拾取系统诊断
-        QString diagnosticReport = m_osgWidget->diagnosePickingSystem();
-        
-        // 显示诊断报告
-        QMessageBox::information(this, tr("拾取系统诊断"), diagnosticReport);
-        
-        // 询问是否要修复问题
-        QMessageBox::StandardButton reply = QMessageBox::question(this, 
-            tr("修复问题"), 
-            tr("是否要尝试修复拾取系统问题？"),
-            QMessageBox::Yes | QMessageBox::No);
-            
-        if (reply == QMessageBox::Yes)
-        {
-            bool success = m_osgWidget->fixPickingIssues();
-            if (success)
-            {
-                QMessageBox::information(this, tr("修复完成"), tr("拾取系统问题修复完成"));
-                updateStatusBar(tr("拾取系统问题修复完成"));
-            }
-            else
-            {
-                QMessageBox::warning(this, tr("修复失败"), tr("拾取系统问题修复失败"));
-                updateStatusBar(tr("拾取系统问题修复失败"));
-            }
-        }
-    }
-    else
-    {
-        LOG_ERROR("OSGWidget not available", "拾取");
-        QMessageBox::warning(this, tr("错误"), tr("OSGWidget不可用"));
-    }
 }

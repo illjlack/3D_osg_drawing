@@ -126,8 +126,6 @@ private slots:
     void onGeoParametersChanged();
     void onAdvancedPickingResult(const PickingResult& result);
 
-    void onDiagnosePicking();  // 诊断拾取系统
-
 private:
     void setupUI();
     void createMenus();
