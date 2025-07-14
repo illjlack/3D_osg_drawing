@@ -26,7 +26,7 @@ void Point3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 
 void Point3D_Geo::completeDrawing()
 {
-    if (!m_controlPoints.empty())
+    if (hasControlPoints())
     {
         Geo3D::completeDrawing();
     }
@@ -46,20 +46,23 @@ void Point3D_Geo::updateGeometry()
     buildEdgeGeometries();
     buildFaceGeometries();
     
+    // 确保节点名称正确设置（用于拾取识别）
+    setupNodeNames();
+    
+    // 更新捕捉点
+    updateSnapPoints();
+    
     // 更新可见性
     updateFeatureVisibility();
 }
 
-
 osg::ref_ptr<osg::Geometry> Point3D_Geo::createGeometry()
 {
-    if (m_controlPoints.empty())
+    if (!hasControlPoints())
         return nullptr;
     
     return createPointGeometry(m_parameters.pointShape, m_parameters.pointSize);
 }
-
-
 
 // ============================================================================
 // 点线面几何体构建实现
@@ -69,7 +72,7 @@ void Point3D_Geo::buildVertexGeometries()
 {
     clearVertexGeometries();
     
-    if (m_controlPoints.empty())
+    if (!hasControlPoints())
         return;
     
     // 创建点的几何体
@@ -98,7 +101,12 @@ osg::ref_ptr<osg::Geometry> Point3D_Geo::createPointGeometry(PointShape3D shape,
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
     
-    const Point3D& point = m_controlPoints[0];
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.empty()) {
+        return nullptr;
+    }
+    
+    const Point3D& point = controlPoints[0];
     
     switch (shape)
     {
@@ -141,6 +149,34 @@ osg::ref_ptr<osg::Geometry> Point3D_Geo::createPointGeometry(PointShape3D shape,
             vertices->push_back(osg::Vec3(point.x() + half, point.y() - half, point.z()));
             
             geometry->addPrimitiveSet(new osg::DrawArrays(GL_TRIANGLES, 0, 3));
+        }
+        break;
+        
+    case Point_Cross3D:
+        {
+            // 创建十字形点
+            float half = size * 0.01f;
+            // 垂直线
+            vertices->push_back(osg::Vec3(point.x(), point.y() - half, point.z()));
+            vertices->push_back(osg::Vec3(point.x(), point.y() + half, point.z()));
+            // 水平线
+            vertices->push_back(osg::Vec3(point.x() - half, point.y(), point.z()));
+            vertices->push_back(osg::Vec3(point.x() + half, point.y(), point.z()));
+            
+            geometry->addPrimitiveSet(new osg::DrawArrays(GL_LINES, 0, 4));
+        }
+        break;
+        
+    case Point_Diamond3D:
+        {
+            // 创建菱形点
+            float half = size * 0.01f;
+            vertices->push_back(osg::Vec3(point.x(), point.y() + half, point.z()));
+            vertices->push_back(osg::Vec3(point.x() + half, point.y(), point.z()));
+            vertices->push_back(osg::Vec3(point.x(), point.y() - half, point.z()));
+            vertices->push_back(osg::Vec3(point.x() - half, point.y(), point.z()));
+            
+            geometry->addPrimitiveSet(new osg::DrawArrays(GL_QUADS, 0, 4));
         }
         break;
         

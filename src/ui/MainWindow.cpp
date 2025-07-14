@@ -1,5 +1,6 @@
 ﻿#include "MainWindow.h"
 #include "../core/GeometryBase.h"
+#include "../core/picking/SimplifiedPickingSystem.h"
 #include <QTimer>
 #include <QSplitter>
 #include <QVBoxLayout>
@@ -504,7 +505,7 @@ void MainWindow::connectSignals()
             }
             // 注意：鼠标位置变化太频繁，不输出到日志，避免日志过多
         });
-        connect(m_osgWidget, &OSGWidget::advancedPickingResult, this, &MainWindow::onAdvancedPickingResult);
+        connect(m_osgWidget, &OSGWidget::simplePickingResult, this, &MainWindow::onSimplePickingResult);
         connect(m_osgWidget, &OSGWidget::manipulatorTypeChanged, this, [this](ManipulatorType type) {
             if (m_manipulatorCombo) {
                 int index = static_cast<int>(type);
@@ -1087,22 +1088,22 @@ void MainWindow::onGeoParametersChanged()
     LOG_INFO("几何对象属性已修改", "属性");
 }
 
-void MainWindow::onAdvancedPickingResult(const PickingResult& result)
+void MainWindow::onSimplePickingResult(const SimplePickingResult& result)
 {
     if (!result.hasResult)
         return;
     
     // 更新状态栏信息
     QString typeStr;
-    switch (result.id.typeCode)
+    switch (result.featureType)
     {
-    case PickingID64::TYPE_VERTEX:
+    case SimplePickingResult::VERTEX:
         typeStr = tr("顶点");
         break;
-    case PickingID64::TYPE_EDGE:
+    case SimplePickingResult::EDGE:
         typeStr = tr("边");
         break;
-    case PickingID64::TYPE_FACE:
+    case SimplePickingResult::FACE:
         typeStr = tr("面");
         break;
     default:
@@ -1110,26 +1111,28 @@ void MainWindow::onAdvancedPickingResult(const PickingResult& result)
         break;
     }
     
-    updateStatusBar(tr("拾取到 %1 - 对象ID: %2, 索引: %3")
-        .arg(typeStr)
-        .arg(result.id.objectID)
-        .arg(result.id.localIdx));
+    QString snapInfo = result.isSnapped ? tr(" (已捕捉)") : "";
     
-    LOG_DEBUG(tr("拾取到 %1 - 对象ID: %2, 索引: %3, 位置: (%4, %5, %6)")
+    updateStatusBar(tr("拾取到 %1 - 几何体: %2%3")
         .arg(typeStr)
-        .arg(result.id.objectID)
-        .arg(result.id.localIdx)
-        .arg(result.worldPos.x, 0, 'f', 3)
-        .arg(result.worldPos.y, 0, 'f', 3)
-        .arg(result.worldPos.z, 0, 'f', 3), "拾取");
+        .arg(result.geometry ? result.geometry->getGeoType() : -1)
+        .arg(snapInfo));
+    
+    LOG_DEBUG(tr("拾取到 %1 - 几何体: %2, 位置: (%3, %4, %5)%6")
+        .arg(typeStr)
+        .arg(result.geometry ? result.geometry->getGeoType() : -1)
+        .arg(result.worldPosition.x, 0, 'f', 3)
+        .arg(result.worldPosition.y, 0, 'f', 3)
+        .arg(result.worldPosition.z, 0, 'f', 3)
+        .arg(snapInfo), "拾取");
     
     // 更新坐标显示
     if (m_positionLabel)
     {
         m_positionLabel->setText(tr("拾取点: (%1, %2, %3)")
-            .arg(result.worldPos.x, 0, 'f', 3)
-            .arg(result.worldPos.y, 0, 'f', 3)
-            .arg(result.worldPos.z, 0, 'f', 3));
+            .arg(result.worldPosition.x, 0, 'f', 3)
+            .arg(result.worldPosition.y, 0, 'f', 3)
+            .arg(result.worldPosition.z, 0, 'f', 3));
     }
 }
 
@@ -2631,7 +2634,6 @@ void MainWindow::onPerspectiveFOVChanged()
     m_osgWidget->setFOV(fov);
     
     updateStatusBar(tr("FOV设置为: %1°").arg(fov));
-    LOG_DEBUG(tr("FOV设置为: %1°").arg(fov), "投影");
 }
 
 void MainWindow::onOrthographicSizeChanged()

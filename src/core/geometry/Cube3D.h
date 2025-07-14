@@ -13,6 +13,15 @@ public:
     virtual void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
     virtual void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
     virtual void updateGeometry() override;
+    
+    // 几何计算
+    float calculateVolume() const;
+    float calculateSurfaceArea() const;
+    glm::vec3 getCenter() const;
+    
+    // 尺寸访问
+    float getSize() const;
+    void setSize(float size);
 
 protected:
     virtual osg::ref_ptr<osg::Geometry> createGeometry() override;

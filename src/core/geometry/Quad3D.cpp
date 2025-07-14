@@ -1,11 +1,19 @@
 ﻿#include "Quad3D.h"
 #include <osg/Array>
 #include <osg/PrimitiveSet>
+#include <cmath>
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 Quad3D_Geo::Quad3D_Geo()
-    : m_normal(0, 0, 1)
+    : m_area(0.0f)
+    , m_normal(0, 0, 1)
 {
     m_geoType = Geo_Quad3D;
+    // 确保基类正确初始化
+    initialize();
 }
 
 void Quad3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
@@ -14,9 +22,11 @@ void Quad3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
     {
         addControlPoint(Point3D(worldPos));
         
-        if (m_controlPoints.size() == 4)
+        const auto& controlPoints = getControlPoints();
+        if (controlPoints.size() == 4)
         {
             calculateNormal();
+            calculateArea();
             completeDrawing();
         }
         
@@ -29,7 +39,6 @@ void Quad3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
     if (!isStateComplete())
     {
         setTempPoint(Point3D(worldPos));
-        markGeometryDirty();
         updateGeometry();
     }
 }
@@ -52,11 +61,10 @@ void Quad3D_Geo::updateGeometry()
     updateFeatureVisibility();
 }
 
-
-
 osg::ref_ptr<osg::Geometry> Quad3D_Geo::createGeometry()
 {
-    if (m_controlPoints.size() < 2)
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.size() < 2)
         return nullptr;
     
     osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry();
@@ -64,10 +72,10 @@ osg::ref_ptr<osg::Geometry> Quad3D_Geo::createGeometry()
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
     osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array();
     
-    if (m_controlPoints.size() == 4 || (m_controlPoints.size() == 3 && getTempPoint().position != glm::vec3(0)))
+    if (controlPoints.size() == 4 || (controlPoints.size() == 3 && getTempPoint().position != glm::vec3(0)))
     {
         // 绘制四边形
-        std::vector<Point3D> points = m_controlPoints;
+        std::vector<Point3D> points = controlPoints;
         if (points.size() == 3)
             points.push_back(getTempPoint());
         
@@ -103,28 +111,15 @@ osg::ref_ptr<osg::Geometry> Quad3D_Geo::createGeometry()
         indices->push_back(0); indices->push_back(2); indices->push_back(3);
         
         geometry->addPrimitiveSet(indices.get());
-        
-        // 边界线
-        if (m_parameters.showBorder)
-        {
-            osg::ref_ptr<osg::DrawElementsUInt> borderIndices = new osg::DrawElementsUInt(GL_LINE_LOOP);
-            borderIndices->push_back(0);
-            borderIndices->push_back(1);
-            borderIndices->push_back(2);
-            borderIndices->push_back(3);
-            
-            geometry->addPrimitiveSet(borderIndices.get());
-        }
     }
     else
     {
-        // 绘制辅助线
-        for (const Point3D& point : m_controlPoints)
+        // 绘制辅助线或点
+        for (const Point3D& point : controlPoints)
         {
             vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
             colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
                                        m_parameters.lineColor.b, m_parameters.lineColor.a));
-            normals->push_back(osg::Vec3(0, 0, 1));
         }
         
         if (getTempPoint().position != glm::vec3(0))
@@ -132,7 +127,6 @@ osg::ref_ptr<osg::Geometry> Quad3D_Geo::createGeometry()
             vertices->push_back(osg::Vec3(getTempPoint().x(), getTempPoint().y(), getTempPoint().z()));
             colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
                                        m_parameters.lineColor.b, m_parameters.lineColor.a * 0.5f));
-            normals->push_back(osg::Vec3(0, 0, 1));
         }
         
         if (vertices->size() >= 2)
@@ -158,14 +152,32 @@ osg::ref_ptr<osg::Geometry> Quad3D_Geo::createGeometry()
     return geometry;
 }
 
-
+float Quad3D_Geo::calculateArea() const
+{
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.size() < 4)
+    {
+        return 0.0f;
+    }
+    
+    // 计算四边形面积（使用两个三角形）
+    glm::vec3 v1 = controlPoints[1].position - controlPoints[0].position;
+    glm::vec3 v2 = controlPoints[2].position - controlPoints[0].position;
+    glm::vec3 v3 = controlPoints[3].position - controlPoints[0].position;
+    
+    float area1 = glm::length(glm::cross(v1, v2)) * 0.5f;
+    float area2 = glm::length(glm::cross(v2, v3)) * 0.5f;
+    
+    return area1 + area2;
+}
 
 void Quad3D_Geo::calculateNormal()
 {
-    if (m_controlPoints.size() >= 3)
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.size() >= 3)
     {
-        glm::vec3 v1 = m_controlPoints[1].position - m_controlPoints[0].position;
-        glm::vec3 v2 = m_controlPoints[2].position - m_controlPoints[0].position;
+        glm::vec3 v1 = controlPoints[1].position - controlPoints[0].position;
+        glm::vec3 v2 = controlPoints[2].position - controlPoints[0].position;
         m_normal = glm::normalize(glm::cross(v1, v2));
     }
 } 
@@ -174,7 +186,8 @@ void Quad3D_Geo::buildVertexGeometries()
 {
     clearVertexGeometries();
     
-    if (m_controlPoints.empty())
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.empty())
         return;
     
     // 创建四边形顶点的几何体
@@ -183,7 +196,7 @@ void Quad3D_Geo::buildVertexGeometries()
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
     
     // 添加控制点作为顶点
-    for (const Point3D& point : m_controlPoints)
+    for (const Point3D& point : controlPoints)
     {
         vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
         colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
@@ -218,7 +231,8 @@ void Quad3D_Geo::buildEdgeGeometries()
 {
     clearEdgeGeometries();
     
-    if (m_controlPoints.size() < 2)
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.size() < 2)
         return;
     
     // 创建四边形边的几何体
@@ -227,35 +241,34 @@ void Quad3D_Geo::buildEdgeGeometries()
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
     
     // 构建所有点（包括临时点）
-    std::vector<Point3D> allPoints = m_controlPoints;
+    std::vector<Point3D> allPoints = controlPoints;
     if (!isStateComplete() && getTempPoint().position != glm::vec3(0))
     {
         allPoints.push_back(getTempPoint());
     }
     
-    // 添加边
+    // 添加边线
     for (size_t i = 0; i < allPoints.size(); ++i)
     {
-        const auto& point1 = allPoints[i];
-        const auto& point2 = allPoints[(i + 1) % allPoints.size()];
-        
-        vertices->push_back(osg::Vec3(point1.x(), point1.y(), point1.z()));
-        vertices->push_back(osg::Vec3(point2.x(), point2.y(), point2.z()));
-        
-        // 临时点的边使用半透明颜色
-        float alpha = (i >= m_controlPoints.size() - 1 && !isStateComplete()) ? 0.5f : 1.0f;
+        vertices->push_back(osg::Vec3(allPoints[i].x(), allPoints[i].y(), allPoints[i].z()));
         colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
-                                   m_parameters.lineColor.b, m_parameters.lineColor.a * alpha));
+                                   m_parameters.lineColor.b, m_parameters.lineColor.a));
+    }
+    
+    // 如果有4个或更多点，形成闭合四边形
+    if (allPoints.size() >= 4)
+    {
+        vertices->push_back(osg::Vec3(allPoints[0].x(), allPoints[0].y(), allPoints[0].z()));
         colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
-                                   m_parameters.lineColor.b, m_parameters.lineColor.a * alpha));
+                                   m_parameters.lineColor.b, m_parameters.lineColor.a));
     }
     
     edgeGeometry->setVertexArray(vertices.get());
     edgeGeometry->setColorArray(colors.get());
     edgeGeometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     
-    // 使用线绘制
-    edgeGeometry->addPrimitiveSet(new osg::DrawArrays(GL_LINES, 0, vertices->size()));
+    // 使用线条绘制
+    edgeGeometry->addPrimitiveSet(new osg::DrawArrays(GL_LINE_STRIP, 0, vertices->size()));
     
     // 设置线宽
     osg::ref_ptr<osg::StateSet> stateSet = edgeGeometry->getOrCreateStateSet();
@@ -270,7 +283,8 @@ void Quad3D_Geo::buildFaceGeometries()
 {
     clearFaceGeometries();
     
-    if (m_controlPoints.size() < 3)
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.size() < 3)
         return;
     
     // 创建四边形面的几何体
@@ -279,7 +293,7 @@ void Quad3D_Geo::buildFaceGeometries()
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
     
     // 构建所有点（包括临时点）
-    std::vector<Point3D> allPoints = m_controlPoints;
+    std::vector<Point3D> allPoints = controlPoints;
     if (!isStateComplete() && getTempPoint().position != glm::vec3(0))
     {
         allPoints.push_back(getTempPoint());

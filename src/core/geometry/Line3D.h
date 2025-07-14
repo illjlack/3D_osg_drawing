@@ -15,6 +15,10 @@ public:
     virtual void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
     virtual void keyPressEvent(QKeyEvent* event) override;
     virtual void updateGeometry() override;
+    virtual void completeDrawing() override;
+    
+    // 几何计算
+    float calculateLength() const;
 
 protected:
     virtual osg::ref_ptr<osg::Geometry> createGeometry() override;
@@ -31,4 +35,5 @@ private:
     void generateBezierCurve();
     
     std::vector<Point3D> m_generatedPoints;
+    float m_totalLength;
 }; 

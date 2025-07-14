@@ -21,21 +21,24 @@ void Sphere3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos
     if (!isStateComplete())
     {
         addControlPoint(Point3D(worldPos));
+        const auto& controlPoints = getControlPoints();
         
-        if (m_controlPoints.size() == 2)
+        if (controlPoints.size() == 2)
         {
-            // 计算球的半径
-            m_radius = glm::length(m_controlPoints[1].position - m_controlPoints[0].position);
+            // 计算球体半径
+            m_radius = glm::length(controlPoints[1].position - controlPoints[0].position);
             completeDrawing();
         }
         
         updateGeometry();
+        emit stateChanged(this);
     }
 }
 
 void Sphere3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!isStateComplete() && m_controlPoints.size() == 1)
+    const auto& controlPoints = getControlPoints();
+    if (!isStateComplete() && controlPoints.size() == 1)
     {
         setTempPoint(Point3D(worldPos));
         markGeometryDirty();
@@ -65,13 +68,14 @@ void Sphere3D_Geo::updateGeometry()
 
 osg::ref_ptr<osg::Geometry> Sphere3D_Geo::createGeometry()
 {
-    if (m_controlPoints.empty())
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.empty())
         return nullptr;
     
     float radius = m_radius;
-    glm::vec3 center = m_controlPoints[0].position;
+    glm::vec3 center = controlPoints[0].position;
     
-    if (m_controlPoints.size() == 1 && getTempPoint().position != glm::vec3(0))
+    if (controlPoints.size() == 1 && getTempPoint().position != glm::vec3(0))
     {
         radius = glm::length(getTempPoint().position - center);
     }
@@ -160,10 +164,11 @@ void Sphere3D_Geo::buildVertexGeometries()
 {
     clearVertexGeometries();
     
-    if (m_controlPoints.empty())
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.empty())
         return;
     
-    glm::vec3 center = m_controlPoints[0].position;
+    glm::vec3 center = controlPoints[0].position;
     float radius = m_radius;
     int segments = m_segments;
     
@@ -210,10 +215,11 @@ void Sphere3D_Geo::buildEdgeGeometries()
 {
     clearEdgeGeometries();
     
-    if (m_controlPoints.empty())
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.empty())
         return;
     
-    glm::vec3 center = m_controlPoints[0].position;
+    glm::vec3 center = controlPoints[0].position;
     float radius = m_radius;
     int segments = m_segments;
     
@@ -297,10 +303,11 @@ void Sphere3D_Geo::buildFaceGeometries()
 {
     clearFaceGeometries();
     
-    if (m_controlPoints.empty())
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.empty())
         return;
     
-    glm::vec3 center = m_controlPoints[0].position;
+    glm::vec3 center = controlPoints[0].position;
     float radius = m_radius;
     int segments = m_segments;
     

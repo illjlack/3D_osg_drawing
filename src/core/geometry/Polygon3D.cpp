@@ -16,7 +16,19 @@ void Polygon3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPo
     if (!isStateComplete())
     {
         addControlPoint(Point3D(worldPos));
+        const auto& controlPoints = getControlPoints();
+        
+        if (controlPoints.size() >= 3)
+        {
+            // 检查是否是双击完成多边形
+            if (event && event->type() == QEvent::MouseButtonDblClick)
+            {
+                completeDrawing();
+            }
+        }
+        
         updateGeometry();
+        emit stateChanged(this);
     }
 }
 
@@ -32,20 +44,27 @@ void Polygon3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos
 
 void Polygon3D_Geo::keyPressEvent(QKeyEvent* event)
 {
-    if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter)
+    if (!isStateComplete())
     {
-        if (m_controlPoints.size() >= 3)
+        const auto& controlPoints = getControlPoints();
+        if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter)
         {
-            calculateNormal();
-            triangulatePolygon();
-            completeDrawing();
+            if (controlPoints.size() >= 3)
+            {
+                completeDrawing();
+            }
         }
-    }
-    else if (event->key() == Qt::Key_Escape)
-    {
-        if (!m_controlPoints.empty())
+        else if (event->key() == Qt::Key_Backspace)
         {
-            removeControlPoint(m_controlPoints.size() - 1);
+            if (!controlPoints.empty())
+            {
+                removeControlPoint(controlPoints.size() - 1);
+                updateGeometry();
+            }
+        }
+        else if (event->key() == Qt::Key_Escape)
+        {
+            clearControlPoints();
             updateGeometry();
         }
     }
@@ -53,143 +72,106 @@ void Polygon3D_Geo::keyPressEvent(QKeyEvent* event)
 
 void Polygon3D_Geo::updateGeometry()
 {
+    if (!isGeometryDirty()) return;
+    
     // 清除点线面节点
     clearVertexGeometries();
     clearEdgeGeometries();
     clearFaceGeometries();
     
-    updateOSGNode();
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.size() < 2)
+    {
+        updateOSGNode();
+        clearGeometryDirty();
+        return;
+    }
     
-    // 构建点线面几何体
+    // 构建几何体
     buildVertexGeometries();
     buildEdgeGeometries();
-    buildFaceGeometries();
     
-    // 更新可见性
-    updateFeatureVisibility();
+    if (isStateComplete() && controlPoints.size() >= 3)
+    {
+        buildFaceGeometries();
+    }
+    
+    updateOSGNode();
+    clearGeometryDirty();
+    
+    emit geometryUpdated(this);
 }
 
 
 
 osg::ref_ptr<osg::Geometry> Polygon3D_Geo::createGeometry()
 {
-    if (m_controlPoints.size() < 2)
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.size() < 3)
         return nullptr;
     
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry();
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
-    osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array();
+    // 计算多边形法向量
+    glm::vec3 normal = calculateNormal();
     
-    if (isStateComplete() && m_controlPoints.size() >= 3)
+    // 创建多边形几何体
+    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+    
+    // 添加顶点
+    for (const Point3D& point : controlPoints)
     {
-        // 绘制完成的多边形
-        for (const Point3D& point : m_controlPoints)
-        {
-            vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
-            normals->push_back(osg::Vec3(m_normal.x, m_normal.y, m_normal.z));
-            colors->push_back(osg::Vec4(m_parameters.fillColor.r, m_parameters.fillColor.g, 
-                                       m_parameters.fillColor.b, m_parameters.fillColor.a));
-        }
-        
-        // 使用三角化的索引
-        if (!m_triangleIndices.empty())
-        {
-            osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(GL_TRIANGLES);
-            for (unsigned int index : m_triangleIndices)
-            {
-                indices->push_back(index);
-            }
-            geometry->addPrimitiveSet(indices.get());
-        }
-        else
-        {
-            // 简单扇形三角化
-            for (size_t i = 1; i < m_controlPoints.size() - 1; ++i)
-            {
-                osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(GL_TRIANGLES);
-                indices->push_back(0);
-                indices->push_back(i);
-                indices->push_back(i + 1);
-                geometry->addPrimitiveSet(indices.get());
-            }
-        }
-        
-        // 边界线
-        if (m_parameters.showBorder)
-        {
-            osg::ref_ptr<osg::DrawElementsUInt> borderIndices = new osg::DrawElementsUInt(GL_LINE_LOOP);
-            for (size_t i = 0; i < m_controlPoints.size(); ++i)
-            {
-                borderIndices->push_back(i);
-            }
-            geometry->addPrimitiveSet(borderIndices.get());
-        }
-    }
-    else
-    {
-        // 绘制过程中的辅助线
-        for (const Point3D& point : m_controlPoints)
-        {
-            vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
-            colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
-                                       m_parameters.lineColor.b, m_parameters.lineColor.a));
-            normals->push_back(osg::Vec3(0, 0, 1));
-        }
-        
-        if (getTempPoint().position != glm::vec3(0))
-        {
-            vertices->push_back(osg::Vec3(getTempPoint().x(), getTempPoint().y(), getTempPoint().z()));
-            colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
-                                       m_parameters.lineColor.b, m_parameters.lineColor.a * 0.5f));
-            normals->push_back(osg::Vec3(0, 0, 1));
-        }
-        
-        if (vertices->size() >= 2)
-        {
-            geometry->addPrimitiveSet(new osg::DrawArrays(GL_LINE_STRIP, 0, vertices->size()));
-        }
-        else
-        {
-            geometry->addPrimitiveSet(new osg::DrawArrays(GL_POINTS, 0, vertices->size()));
-        }
+        vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
     }
     
-    geometry->setVertexArray(vertices.get());
-    geometry->setColorArray(colors.get());
-    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+    geometry->setVertexArray(vertices);
     
-    if (!normals->empty())
+    // 创建三角形索引
+    osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(osg::PrimitiveSet::TRIANGLES);
+    
+    // 简单的扇形三角化
+    for (size_t i = 1; i < controlPoints.size() - 1; ++i)
     {
-        geometry->setNormalArray(normals.get());
-        geometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
+        indices->push_back(0);
+        indices->push_back(i);
+        indices->push_back(i + 1);
     }
+    
+    geometry->addPrimitiveSet(indices);
+    
+    // 设置法向量
+    osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
+    normals->push_back(osg::Vec3(normal.x, normal.y, normal.z));
+    geometry->setNormalArray(normals);
+    geometry->setNormalBinding(osg::Geometry::BIND_OVERALL);
     
     return geometry;
 }
 
 
 
-void Polygon3D_Geo::calculateNormal()
+glm::vec3 Polygon3D_Geo::calculateNormal() const
 {
-    if (m_controlPoints.size() >= 3)
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.size() >= 3)
     {
-        glm::vec3 v1 = m_controlPoints[1].position - m_controlPoints[0].position;
-        glm::vec3 v2 = m_controlPoints[2].position - m_controlPoints[0].position;
-        m_normal = glm::normalize(glm::cross(v1, v2));
+        glm::vec3 v1 = controlPoints[1].position - controlPoints[0].position;
+        glm::vec3 v2 = controlPoints[2].position - controlPoints[0].position;
+        return glm::normalize(glm::cross(v1, v2));
     }
+    return glm::vec3(0, 0, 1); // 默认法向量
 }
 
 void Polygon3D_Geo::triangulatePolygon()
 {
     m_triangleIndices.clear();
     
-    if (m_controlPoints.size() < 3)
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.size() < 3)
         return;
     
     // 简单的耳切三角化算法
     // 这里使用简单的扇形三角化，更复杂的多边形可能需要更高级的算法
-    for (size_t i = 1; i < m_controlPoints.size() - 1; ++i)
+    for (size_t i = 1; i < controlPoints.size() - 1; ++i)
     {
         m_triangleIndices.push_back(0);
         m_triangleIndices.push_back(i);
@@ -201,113 +183,68 @@ void Polygon3D_Geo::buildVertexGeometries()
 {
     clearVertexGeometries();
     
-    if (m_controlPoints.empty())
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.empty())
         return;
     
-    // 创建多边形顶点的几何体
-    osg::ref_ptr<osg::Geometry> vertexGeometry = new osg::Geometry();
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
+    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     
-    // 添加控制点作为顶点
-    for (const Point3D& point : m_controlPoints)
+    // 添加所有控制点
+    for (const Point3D& point : controlPoints)
     {
         vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
-        colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
-                                   m_parameters.pointColor.b, m_parameters.pointColor.a));
     }
     
-    vertexGeometry->setVertexArray(vertices.get());
-    vertexGeometry->setColorArray(colors.get());
-    vertexGeometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+    geometry->setVertexArray(vertices);
     
-    // 使用点绘制
-    vertexGeometry->addPrimitiveSet(new osg::DrawArrays(GL_POINTS, 0, vertices->size()));
+    // 点绘制
+    osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::POINTS, 0, vertices->size());
+    geometry->addPrimitiveSet(drawArrays);
     
-    // 设置点大小
-    osg::ref_ptr<osg::StateSet> stateSet = vertexGeometry->getOrCreateStateSet();
-    osg::ref_ptr<osg::Point> point = new osg::Point();
-    point->setSize(m_parameters.pointSize);
-    stateSet->setAttribute(point.get());
-    
-    addVertexGeometry(vertexGeometry.get());
+    addVertexGeometry(geometry);
 }
 
 void Polygon3D_Geo::buildEdgeGeometries()
 {
     clearEdgeGeometries();
     
-    if (m_controlPoints.size() < 3)
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.size() < 2)
         return;
     
-    // 创建多边形边的几何体
-    osg::ref_ptr<osg::Geometry> edgeGeometry = new osg::Geometry();
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
+    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     
-    // 添加所有边
-    for (size_t i = 0; i < m_controlPoints.size(); ++i)
+    // 添加边顶点
+    for (size_t i = 0; i < controlPoints.size(); ++i)
     {
-        size_t next = (i + 1) % m_controlPoints.size();
-        vertices->push_back(osg::Vec3(m_controlPoints[i].x(), m_controlPoints[i].y(), m_controlPoints[i].z()));
-        vertices->push_back(osg::Vec3(m_controlPoints[next].x(), m_controlPoints[next].y(), m_controlPoints[next].z()));
-        
-        colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
-                                   m_parameters.lineColor.b, m_parameters.lineColor.a));
-        colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
-                                   m_parameters.lineColor.b, m_parameters.lineColor.a));
+        size_t next = (i + 1) % controlPoints.size();
+        vertices->push_back(osg::Vec3(controlPoints[i].x(), controlPoints[i].y(), controlPoints[i].z()));
+        vertices->push_back(osg::Vec3(controlPoints[next].x(), controlPoints[next].y(), controlPoints[next].z()));
     }
     
-    edgeGeometry->setVertexArray(vertices.get());
-    edgeGeometry->setColorArray(colors.get());
-    edgeGeometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+    geometry->setVertexArray(vertices);
     
-    // 使用线绘制
-    edgeGeometry->addPrimitiveSet(new osg::DrawArrays(GL_LINES, 0, vertices->size()));
+    // 线绘制
+    osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::LINES, 0, vertices->size());
+    geometry->addPrimitiveSet(drawArrays);
     
-    // 设置线宽
-    osg::ref_ptr<osg::StateSet> stateSet = edgeGeometry->getOrCreateStateSet();
-    osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth();
-    lineWidth->setWidth(m_parameters.lineWidth);
-    stateSet->setAttribute(lineWidth.get());
-    
-    addEdgeGeometry(edgeGeometry.get());
+    addEdgeGeometry(geometry);
 }
 
 void Polygon3D_Geo::buildFaceGeometries()
 {
     clearFaceGeometries();
     
-    if (m_controlPoints.size() < 3)
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.size() < 3)
         return;
     
-    // 创建多边形面的几何体
-    osg::ref_ptr<osg::Geometry> faceGeometry = new osg::Geometry();
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
-    
-    // 添加所有顶点形成面
-    for (const Point3D& point : m_controlPoints)
+    // 创建面几何体
+    osg::ref_ptr<osg::Geometry> geometry = createGeometry();
+    if (geometry.valid())
     {
-        vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
-        colors->push_back(osg::Vec4(m_parameters.fillColor.r, m_parameters.fillColor.g, 
-                                   m_parameters.fillColor.b, m_parameters.fillColor.a));
+        addFaceGeometry(geometry);
     }
-    
-    faceGeometry->setVertexArray(vertices.get());
-    faceGeometry->setColorArray(colors.get());
-    faceGeometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
-    
-    // 使用三角形绘制（使用三角剖分索引）
-    if (!m_triangleIndices.empty())
-    {
-        osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(GL_TRIANGLES, m_triangleIndices.size());
-        for (size_t i = 0; i < m_triangleIndices.size(); ++i)
-        {
-            (*indices)[i] = m_triangleIndices[i];
-        }
-        faceGeometry->addPrimitiveSet(indices.get());
-    }
-    
-    addFaceGeometry(faceGeometry.get());
 } 

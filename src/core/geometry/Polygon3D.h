@@ -14,6 +14,11 @@ public:
     virtual void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
     virtual void keyPressEvent(QKeyEvent* event) override;
     virtual void updateGeometry() override;
+    
+    // 几何计算
+    glm::vec3 calculateNormal() const;
+    float calculateArea() const;
+    float calculatePerimeter() const;
 
 protected:
     virtual osg::ref_ptr<osg::Geometry> createGeometry() override;
@@ -22,7 +27,6 @@ protected:
     virtual void buildFaceGeometries() override;
     
 private:
-    void calculateNormal();
     void triangulatePolygon();
     
     glm::vec3 m_normal;

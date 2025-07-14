@@ -145,6 +145,90 @@ struct GeoParameters3D
     
     // 重置为全局默认值
     void resetToGlobal();
+    
+    // 一次性设置所有属性
+    void setAllProperties(
+        const PointShape3D& pShape = Point_Circle3D,
+        float pSize = 5.0f,
+        const Color3D& pColor = Color3D(1.0f, 0.0f, 0.0f, 1.0f),
+        bool showPts = true,
+        
+        const LineStyle3D& lStyle = Line_Solid3D,
+        float lWidth = 2.0f,
+        const Color3D& lColor = Color3D(0.0f, 0.0f, 1.0f, 1.0f),
+        float lDashPattern = 1.0f,
+        const NodeLineStyle3D& nlStyle = NodeLine_Polyline3D,
+        bool showEdgs = true,
+        
+        const FillType3D& fType = Fill_Solid3D,
+        const Color3D& fColor = Color3D(0.5f, 0.5f, 0.5f, 1.0f),
+        const Color3D& bColor = Color3D(0.0f, 0.0f, 0.0f, 1.0f),
+        bool showBrd = true,
+        bool showFcs = true,
+        
+        const MaterialType3D& mType = Material_Basic3D,
+        float shininess = 32.0f,
+        float transparency = 1.0f,
+        const SubdivisionLevel3D& subLevel = Subdivision_Medium3D
+    );
+    
+    // 快速设置预设样式
+    void setPresetStyle(const std::string& styleName);
+    
+    // 预设样式
+    static GeoParameters3D getDefaultStyle();
+    static GeoParameters3D getWireframeStyle();
+    static GeoParameters3D getPointStyle();
+    static GeoParameters3D getHighlightStyle();
+    static GeoParameters3D getTransparentStyle();
+    static GeoParameters3D getHighQualityStyle();
+    static GeoParameters3D getLowQualityStyle();
+    
+    // 属性验证
+    bool validateParameters() const;
+    
+    // 参数比较
+    bool operator==(const GeoParameters3D& other) const;
+    bool operator!=(const GeoParameters3D& other) const;
+    
+    // 参数混合（用于动画或渐变）
+    GeoParameters3D lerp(const GeoParameters3D& other, float t) const;
+    
+    // 保存/加载到字符串（用于配置文件）
+    std::string toString() const;
+    bool fromString(const std::string& str);
+};
+
+// 全局参数管理类
+class GlobalParametersManager
+{
+public:
+    // 获取单例实例
+    static GlobalParametersManager& getInstance();
+    
+    // 全局设置
+    void setAllGlobalDefaults(const GeoParameters3D& params);
+    GeoParameters3D getAllGlobalDefaults() const;
+    
+    // 保存/加载全局设置
+    void saveGlobalSettings(const std::string& filename);
+    bool loadGlobalSettings(const std::string& filename);
+    
+    // 重置为默认值
+    void resetToFactoryDefaults();
+    
+    // 通知所有对象更新参数
+    void notifyParametersChanged();
+    
+    // 预设管理
+    void registerPreset(const std::string& name, const GeoParameters3D& params);
+    GeoParameters3D getPreset(const std::string& name) const;
+    std::vector<std::string> getPresetNames() const;
+    
+private:
+    GlobalParametersManager() = default;
+    std::map<std::string, GeoParameters3D> m_presets;
+    static GlobalParametersManager* s_instance;
 };
 
 // 变换矩阵

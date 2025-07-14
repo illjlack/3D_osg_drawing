@@ -22,23 +22,26 @@ void Torus3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
     if (!isStateComplete())
     {
         addControlPoint(Point3D(worldPos));
+        const auto& controlPoints = getControlPoints();
         
-        if (m_controlPoints.size() == 2)
+        if (controlPoints.size() == 2)
         {
-            // 计算圆环参数
-            float distance = glm::length(m_controlPoints[1].position - m_controlPoints[0].position);
-            m_majorRadius = distance;
-            m_minorRadius = distance * 0.2f; // 次半径为主半径的20%
+            // 计算环面参数
+            float distance = glm::length(controlPoints[1].position - controlPoints[0].position);
+            m_majorRadius = distance * 0.7f; // 主半径
+            m_minorRadius = distance * 0.3f; // 副半径
             completeDrawing();
         }
         
         updateGeometry();
+        emit stateChanged(this);
     }
 }
 
 void Torus3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!isStateComplete() && m_controlPoints.size() == 1)
+    const auto& controlPoints = getControlPoints();
+    if (!isStateComplete() && controlPoints.size() == 1)
     {
         setTempPoint(Point3D(worldPos));
         markGeometryDirty();
@@ -68,19 +71,19 @@ void Torus3D_Geo::updateGeometry()
 
 osg::ref_ptr<osg::Geometry> Torus3D_Geo::createGeometry()
 {
-    if (m_controlPoints.empty())
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.empty())
         return nullptr;
     
     float majorRadius = m_majorRadius;
     float minorRadius = m_minorRadius;
-    glm::vec3 center = m_controlPoints[0].position;
-    glm::vec3 axis = m_axis;
+    glm::vec3 center = controlPoints[0].position;
     
-    if (m_controlPoints.size() == 1 && getTempPoint().position != glm::vec3(0))
+    if (controlPoints.size() == 1 && getTempPoint().position != glm::vec3(0))
     {
         float distance = glm::length(getTempPoint().position - center);
-        majorRadius = distance;
-        minorRadius = distance * 0.2f;
+        majorRadius = distance * 0.7f;
+        minorRadius = distance * 0.3f;
     }
     
     osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry();
@@ -92,6 +95,9 @@ osg::ref_ptr<osg::Geometry> Torus3D_Geo::createGeometry()
     if (majorSegments < 8) majorSegments = 16; // 默认16段
     int minorSegments = majorSegments / 2;
     if (minorSegments < 4) minorSegments = 8; // 默认8段
+    
+    // 环面轴向量（默认为Z轴向上）
+    glm::vec3 axis = m_axis;
     
     // 计算垂直于轴的两个正交向量
     glm::vec3 u, v;
@@ -171,7 +177,8 @@ void Torus3D_Geo::buildVertexGeometries()
 {
     clearVertexGeometries();
     
-    if (m_controlPoints.empty())
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.empty())
         return;
     
     // 创建圆环顶点的几何体
@@ -180,7 +187,7 @@ void Torus3D_Geo::buildVertexGeometries()
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
     
     // 生成圆环顶点
-    glm::vec3 center = m_controlPoints[0].position;
+    glm::vec3 center = controlPoints[0].position;
     int majorSegments = static_cast<int>(m_parameters.subdivisionLevel);
     int minorSegments = majorSegments / 2;
     if (majorSegments < 8) majorSegments = 16;
@@ -223,7 +230,8 @@ void Torus3D_Geo::buildEdgeGeometries()
 {
     clearEdgeGeometries();
     
-    if (m_controlPoints.empty())
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.empty())
         return;
     
     // 创建圆环边的几何体
@@ -232,7 +240,7 @@ void Torus3D_Geo::buildEdgeGeometries()
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
     
     // 生成圆环边
-    glm::vec3 center = m_controlPoints[0].position;
+    glm::vec3 center = controlPoints[0].position;
     int majorSegments = static_cast<int>(m_parameters.subdivisionLevel);
     int minorSegments = majorSegments / 2;
     if (majorSegments < 8) majorSegments = 16;
@@ -286,7 +294,8 @@ void Torus3D_Geo::buildFaceGeometries()
 {
     clearFaceGeometries();
     
-    if (m_controlPoints.empty())
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.empty())
         return;
     
     // 创建圆环面的几何体
@@ -295,7 +304,7 @@ void Torus3D_Geo::buildFaceGeometries()
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
     
     // 生成圆环面
-    glm::vec3 center = m_controlPoints[0].position;
+    glm::vec3 center = controlPoints[0].position;
     int majorSegments = static_cast<int>(m_parameters.subdivisionLevel);
     int minorSegments = majorSegments / 2;
     if (majorSegments < 8) majorSegments = 16;

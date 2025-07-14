@@ -2,6 +2,13 @@
 #pragma execution_character_set("utf-8")
 
 #include "Common3D.h"
+#include "managers/GeoStateManager.h"
+#include "managers/GeoNodeManager.h"
+#include "managers/GeoMaterialManager.h"
+#include "managers/GeoSnapPointManager.h"
+#include "managers/GeoControlPointManager.h"
+#include "managers/GeoBoundingBoxManager.h"
+#include "managers/GeoRenderManager.h"
 #include <osg/Node>
 #include <osg/Group>
 #include <osg/Geode>
@@ -50,35 +57,41 @@ public:
     GeoType3D getGeoType() const { return m_geoType; }
     void setGeoType(GeoType3D type) { m_geoType = type; }
 
-    // 状态管理
-    bool isStateInitialized() const { return m_geoState & GeoState_Initialized3D; }
-    bool isStateComplete() const { return m_geoState & GeoState_Complete3D; }
-    bool isStateInvalid() const { return m_geoState & GeoState_Invalid3D; }
-    bool isStateSelected() const { return m_geoState & GeoState_Selected3D; }
-    bool isStateEditing() const { return m_geoState & GeoState_Editing3D; }
-
-    void setStateInitialized() { m_geoState |= GeoState_Initialized3D; }
-    void setStateComplete() { m_geoState |= GeoState_Complete3D; }
-    void setStateInvalid() { m_geoState |= GeoState_Invalid3D; }
-    void setStateSelected() { m_geoState |= GeoState_Selected3D; }
-    void setStateEditing() { m_geoState |= GeoState_Editing3D; }
-
-    void clearStateComplete() { m_geoState &= ~GeoState_Complete3D; }
-    void clearStateInvalid() { m_geoState &= ~GeoState_Invalid3D; }
-    void clearStateSelected() { m_geoState &= ~GeoState_Selected3D; }
-    void clearStateEditing() { m_geoState &= ~GeoState_Editing3D; }
+    // 状态管理（通过状态管理器）
+    GeoStateManager* getStateManager() const { return m_stateManager.get(); }
+    
+    // 简化的状态访问接口
+    bool isStateInitialized() const;
+    bool isStateComplete() const;
+    bool isStateInvalid() const;
+    bool isStateSelected() const;
+    bool isStateEditing() const;
+    
+    void setStateInitialized();
+    void setStateComplete();
+    void setStateInvalid();
+    void setStateSelected();
+    void setStateEditing();
+    
+    void clearStateComplete();
+    void clearStateInvalid();
+    void clearStateSelected();
+    void clearStateEditing();
 
     // 参数管理
     const GeoParameters3D& getParameters() const { return m_parameters; }
     void setParameters(const GeoParameters3D& params);
 
-    // 控制点管理
-    const std::vector<Point3D>& getControlPoints() const { return m_controlPoints; }
+    // 控制点管理（通过控制点管理器）
+    GeoControlPointManager* getControlPointManager() const { return m_controlPointManager.get(); }
+    
+    // 简化的控制点访问接口
+    const std::vector<Point3D>& getControlPoints() const;
     void addControlPoint(const Point3D& point);
     void setControlPoint(int index, const Point3D& point);
     void removeControlPoint(int index);
     void clearControlPoints();
-    bool hasControlPoints() const { return !m_controlPoints.empty(); }
+    bool hasControlPoints() const;
     
     // 临时点（用于绘制过程中的预览）
     const Point3D& getTempPoint() const { return m_tempPoint; }
@@ -88,11 +101,41 @@ public:
     const Transform3D& getTransform() const { return m_transform; }
     void setTransform(const Transform3D& transform);
 
-    // 包围盒
-    const BoundingBox3D& getBoundingBox() const { return m_boundingBox; }
+    // 包围盒管理（通过包围盒管理器）
+    GeoBoundingBoxManager* getBoundingBoxManager() const { return m_boundingBoxManager.get(); }
+    const BoundingBox3D& getBoundingBox() const;
 
-    // OSG节点
-    osg::ref_ptr<osg::Group> getOSGNode() const { return m_osgNode; }
+    // 节点管理（通过节点管理器）
+    GeoNodeManager* getNodeManager() const { return m_nodeManager.get(); }
+    
+    // 简化的节点访问接口
+    osg::ref_ptr<osg::Group> getOSGNode() const;
+    osg::ref_ptr<osg::Group> getVertexNode() const;
+    osg::ref_ptr<osg::Group> getEdgeNode() const;
+    osg::ref_ptr<osg::Group> getFaceNode() const;
+
+    // 材质管理（通过材质管理器）
+    GeoMaterialManager* getMaterialManager() const { return m_materialManager.get(); }
+
+    // 捕捉点管理（通过捕捉点管理器）
+    GeoSnapPointManager* getSnapPointManager() const { return m_snapPointManager.get(); }
+    
+    // 简化的捕捉点访问接口
+    const std::vector<glm::vec3>& getSnapPoints() const;
+    void addSnapPoint(const glm::vec3& point);
+    void clearSnapPoints();
+    void updateSnapPoints();
+
+    // 渲染管理（通过渲染管理器）
+    GeoRenderManager* getRenderManager() const { return m_renderManager.get(); }
+    
+    // 简化的渲染接口
+    void setShowPoints(bool show);
+    void setShowEdges(bool show);
+    void setShowFaces(bool show);
+    bool isShowPoints() const;
+    bool isShowEdges() const;
+    bool isShowFaces() const;
 
     // 事件处理
     virtual void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos);
@@ -109,29 +152,19 @@ public:
     
     // 更新几何体
     virtual void updateGeometry() = 0;
-
-    // 点线面节点管理 - 直接保存到场景中
-    osg::ref_ptr<osg::Group> getVertexNode() const { return m_vertexNode; }
-    osg::ref_ptr<osg::Group> getEdgeNode() const { return m_edgeNode; }
-    osg::ref_ptr<osg::Group> getFaceNode() const { return m_faceNode; }
     
-    // 添加点线面几何体到对应节点
-    void addVertexGeometry(osg::ref_ptr<osg::Geometry> vertexGeo);
-    void addEdgeGeometry(osg::ref_ptr<osg::Geometry> edgeGeo);
-    void addFaceGeometry(osg::ref_ptr<osg::Geometry> faceGeo);
+    // 节点和渲染管理
+    void setupNodeNames();
+    void updateFeatureVisibility();
     
-    // 清除点线面几何体
+    // 点线面几何体管理
+    void addVertexGeometry(osg::Drawable* drawable);
+    void addEdgeGeometry(osg::Drawable* drawable);
+    void addFaceGeometry(osg::Drawable* drawable);
+    
     void clearVertexGeometries();
     void clearEdgeGeometries();
     void clearFaceGeometries();
-    
-    // 显示控制
-    void setShowPoints(bool show);
-    void setShowEdges(bool show);
-    void setShowFaces(bool show);
-    bool isShowPoints() const { return m_parameters.showPoints; }
-    bool isShowEdges() const { return m_parameters.showEdges; }
-    bool isShowFaces() const { return m_parameters.showFaces; }
 
 signals:
     // 几何对象状态变化信号
@@ -146,8 +179,6 @@ protected:
     
     // 更新OSG节点
     virtual void updateOSGNode();
-    virtual void updateMaterial();
-    virtual void updateControlPointsVisualization();
     
     // 创建几何体（子类实现）
     virtual osg::ref_ptr<osg::Geometry> createGeometry() = 0;
@@ -158,8 +189,6 @@ protected:
     glm::vec3 osgToGlmVec3(const osg::Vec3& v) const;
     glm::vec4 osgToGlmVec4(const osg::Vec4& v) const;
     
-    void updateBoundingBox();
-    
     void markGeometryDirty() { m_geometryDirty = true; }
     bool isGeometryDirty() const { return m_geometryDirty; }
     void clearGeometryDirty() { m_geometryDirty = false; }
@@ -168,36 +197,36 @@ protected:
     virtual void buildVertexGeometries() = 0;  // 子类实现具体的顶点几何体构建
     virtual void buildEdgeGeometries() = 0;    // 子类实现具体的边几何体构建
     virtual void buildFaceGeometries() = 0;    // 子类实现具体的面几何体构建
-    void updateFeatureVisibility();
+
+    // 管理器友元类
+    friend class GeoStateManager;
+    friend class GeoNodeManager;
+    friend class GeoMaterialManager;
+    friend class GeoSnapPointManager;
+    friend class GeoControlPointManager;
+    friend class GeoBoundingBoxManager;
+    friend class GeoRenderManager;
 
 protected:
-    // 数据类型，反射用
+    // 基本属性
     GeoType3D m_geoType;
-
-    // 对象状态，生命周期
-    int m_geoState;
-
-    // 绘制参数，点线面的各种属性
     GeoParameters3D m_parameters;
-    
-    // 控制点，
-    std::vector<Point3D> m_controlPoints;
     Point3D m_tempPoint;
     Transform3D m_transform;
-    BoundingBox3D m_boundingBox;
-    
-    osg::ref_ptr<osg::Group> m_osgNode;
-    osg::ref_ptr<osg::Group> m_drawableGroup;
-    osg::ref_ptr<osg::Geometry> m_geometry;
-    osg::ref_ptr<osg::MatrixTransform> m_transformNode;
-    osg::ref_ptr<osg::Group> m_controlPointsNode;
-    
     bool m_geometryDirty;
     bool m_initialized;
-    bool m_parametersChanged;  // 新增：跟踪参数是否发生变化
+    bool m_parametersChanged;
 
-    // 点线面节点管理
-    osg::ref_ptr<osg::Group> m_vertexNode;
-    osg::ref_ptr<osg::Group> m_edgeNode;
-    osg::ref_ptr<osg::Group> m_faceNode;
+    // 管理器组件
+    std::unique_ptr<GeoStateManager> m_stateManager;
+    std::unique_ptr<GeoNodeManager> m_nodeManager;
+    std::unique_ptr<GeoMaterialManager> m_materialManager;
+    std::unique_ptr<GeoSnapPointManager> m_snapPointManager;
+    std::unique_ptr<GeoControlPointManager> m_controlPointManager;
+    std::unique_ptr<GeoBoundingBoxManager> m_boundingBoxManager;
+    std::unique_ptr<GeoRenderManager> m_renderManager;
+
+    // 内部方法
+    void setupManagers();
+    void connectManagerSignals();
 };

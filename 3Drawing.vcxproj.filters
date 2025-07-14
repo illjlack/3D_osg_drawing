@@ -13,6 +13,9 @@
     <Filter Include="Core\Geometry">
       <UniqueIdentifier>{core-geometry-filter-guid}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Core\Managers">
+      <UniqueIdentifier>{core-managers-filter-guid}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Core\Picking">
       <UniqueIdentifier>{core-picking-filter-guid}</UniqueIdentifier>
     </Filter>
@@ -81,15 +84,6 @@
     <ClCompile Include="src\core\geometry\BezierCurve3D.cpp">
       <Filter>Core\Geometry</Filter>
     </ClCompile>
-    <ClCompile Include="src\core\picking\PickingSystem.cpp">
-      <Filter>Core\Picking</Filter>
-    </ClCompile>
-    <ClCompile Include="src\core\picking\PickingIntegration.cpp">
-      <Filter>Core\Picking</Filter>
-    </ClCompile>
-    <ClCompile Include="src\core\picking\PickingIndicator.cpp">
-      <Filter>Core\Picking</Filter>
-    </ClCompile>
     <ClCompile Include="src\util\OSGUtils.cpp">
       <Filter>Util</Filter>
     </ClCompile>
@@ -128,6 +122,30 @@
     </ClCompile>
     <ClCompile Include="src\core\geometry\UndefinedGeo3D.cpp">
       <Filter>Core\Geometry</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\managers\GeoStateManager.cpp">
+      <Filter>Core\Managers</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\managers\GeoControlPointManager.cpp">
+      <Filter>Core\Managers</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\managers\GeoNodeManager.cpp">
+      <Filter>Core\Managers</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\managers\GeoMaterialManager.cpp">
+      <Filter>Core\Managers</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\managers\GeoSnapPointManager.cpp">
+      <Filter>Core\Managers</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\managers\GeoBoundingBoxManager.cpp">
+      <Filter>Core\Managers</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\managers\GeoRenderManager.cpp">
+      <Filter>Core\Managers</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\picking\SimplifiedPickingSystem.cpp">
+      <Filter>Core\Picking</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -176,15 +194,6 @@
     <ClInclude Include="src\core\geometry\BezierCurve3D.h">
       <Filter>Core\Geometry</Filter>
     </ClInclude>
-    <ClInclude Include="src\core\picking\PickingSystem.h">
-      <Filter>Core\Picking</Filter>
-    </ClInclude>
-    <ClInclude Include="src\core\picking\PickingIntegration.h">
-      <Filter>Core\Picking</Filter>
-    </ClInclude>
-    <ClInclude Include="src\core\picking\PickingIndicator.h">
-      <Filter>Core\Picking</Filter>
-    </ClInclude>
     <ClInclude Include="src\util\OSGUtils.h">
       <Filter>Util</Filter>
     </ClInclude>
@@ -205,6 +214,30 @@
     </ClInclude>
     <ClInclude Include="src\core\geometry\UndefinedGeo3D.h">
       <Filter>Core\Geometry</Filter>
+    </ClInclude>
+    <QtMoc Include="src\core\managers\GeoStateManager.h">
+      <Filter>Core\Managers</Filter>
+    </QtMoc>
+    <QtMoc Include="src\core\managers\GeoControlPointManager.h">
+      <Filter>Core\Managers</Filter>
+    </QtMoc>
+    <QtMoc Include="src\core\managers\GeoNodeManager.h">
+      <Filter>Core\Managers</Filter>
+    </QtMoc>
+    <QtMoc Include="src\core\managers\GeoMaterialManager.h">
+      <Filter>Core\Managers</Filter>
+    </QtMoc>
+    <QtMoc Include="src\core\managers\GeoSnapPointManager.h">
+      <Filter>Core\Managers</Filter>
+    </QtMoc>
+    <QtMoc Include="src\core\managers\GeoBoundingBoxManager.h">
+      <Filter>Core\Managers</Filter>
+    </QtMoc>
+    <QtMoc Include="src\core\managers\GeoRenderManager.h">
+      <Filter>Core\Managers</Filter>
+    </QtMoc>
+    <ClInclude Include="src\core\picking\SimplifiedPickingSystem.h">
+      <Filter>Core\Picking</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

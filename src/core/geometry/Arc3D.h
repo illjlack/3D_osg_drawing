@@ -2,6 +2,10 @@
 
 #include "../GeometryBase.h"
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 // 圆弧几何体类
 class Arc3D_Geo : public Geo3D
 {
@@ -22,12 +26,16 @@ protected:
     
 private:
     void calculateArcFromThreePoints();
+    void calculateArcParameters();
     void generateArcPoints();
     
     glm::vec3 m_center;
     float m_radius;
     float m_startAngle;
     float m_endAngle;
+    float m_sweepAngle;
     glm::vec3 m_normal;
+    glm::vec3 m_uAxis;
+    glm::vec3 m_vAxis;
     std::vector<Point3D> m_arcPoints;
 }; 

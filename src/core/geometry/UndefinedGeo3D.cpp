@@ -158,7 +158,8 @@ void UndefinedGeo3D::buildVertexGeometries()
 {
     clearVertexGeometries();
     
-    if (m_controlPoints.empty())
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.empty())
         return;
     
     // 创建未定义几何体顶点的几何体
@@ -167,7 +168,7 @@ void UndefinedGeo3D::buildVertexGeometries()
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
     
     // 添加控制点作为顶点
-    for (const Point3D& point : m_controlPoints)
+    for (const Point3D& point : controlPoints)
     {
         vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
         colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
@@ -194,7 +195,8 @@ void UndefinedGeo3D::buildEdgeGeometries()
 {
     clearEdgeGeometries();
     
-    if (m_controlPoints.size() < 2)
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.size() < 2)
         return;
     
     // 创建未定义几何体边的几何体
@@ -203,10 +205,10 @@ void UndefinedGeo3D::buildEdgeGeometries()
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
     
     // 添加所有边
-    for (size_t i = 0; i < m_controlPoints.size() - 1; ++i)
+    for (size_t i = 0; i < controlPoints.size() - 1; ++i)
     {
-        vertices->push_back(osg::Vec3(m_controlPoints[i].x(), m_controlPoints[i].y(), m_controlPoints[i].z()));
-        vertices->push_back(osg::Vec3(m_controlPoints[i + 1].x(), m_controlPoints[i + 1].y(), m_controlPoints[i + 1].z()));
+        vertices->push_back(osg::Vec3(controlPoints[i].x(), controlPoints[i].y(), controlPoints[i].z()));
+        vertices->push_back(osg::Vec3(controlPoints[i + 1].x(), controlPoints[i + 1].y(), controlPoints[i + 1].z()));
         
         colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
                                    m_parameters.lineColor.b, m_parameters.lineColor.a));
@@ -234,7 +236,8 @@ void UndefinedGeo3D::buildFaceGeometries()
 {
     clearFaceGeometries();
     
-    if (m_controlPoints.size() < 3)
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.size() < 3)
         return;
     
     // 创建未定义几何体面的几何体
@@ -243,7 +246,7 @@ void UndefinedGeo3D::buildFaceGeometries()
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
     
     // 添加所有顶点形成面
-    for (const Point3D& point : m_controlPoints)
+    for (const Point3D& point : controlPoints)
     {
         vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
         colors->push_back(osg::Vec4(m_parameters.fillColor.r, m_parameters.fillColor.g, 
@@ -255,10 +258,10 @@ void UndefinedGeo3D::buildFaceGeometries()
     faceGeometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     
     // 使用三角形绘制（简单的扇形三角剖分）
-    if (m_controlPoints.size() >= 3)
+    if (controlPoints.size() >= 3)
     {
         osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(GL_TRIANGLES);
-        for (size_t i = 1; i < m_controlPoints.size() - 1; ++i)
+        for (size_t i = 1; i < controlPoints.size() - 1; ++i)
         {
             indices->push_back(0);
             indices->push_back(i);

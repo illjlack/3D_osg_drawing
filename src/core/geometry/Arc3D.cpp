@@ -23,84 +23,125 @@ void Arc3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
     if (!isStateComplete())
     {
         addControlPoint(Point3D(worldPos));
+        const auto& controlPoints = getControlPoints();
         
-        if (m_controlPoints.size() == 3)
+        if (controlPoints.size() == 3)
         {
-            calculateArcFromThreePoints();
-            generateArcPoints();
+            // 计算圆弧参数
+            calculateArcParameters();
             completeDrawing();
         }
+        
+        updateGeometry();
+        emit stateChanged(this);
     }
 }
 
 void Arc3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
+    const auto& controlPoints = getControlPoints();
     if (!isStateComplete())
     {
         setTempPoint(Point3D(worldPos));
         markGeometryDirty();
-        if (m_controlPoints.size() == 2)
-        {
-            // 临时计算圆弧预览
-            std::vector<Point3D> tempPoints = m_controlPoints;
-            tempPoints.push_back(getTempPoint());
-            
-            // 临时保存当前控制点
-            auto oldPoints = m_controlPoints;
-            m_controlPoints = tempPoints;
-            
-            calculateArcFromThreePoints();
-            generateArcPoints();
-            
-            // 恢复控制点
-            m_controlPoints = oldPoints;
-        }
-        
         updateGeometry();
     }
 }
 
 void Arc3D_Geo::updateGeometry()
 {
+    if (!isGeometryDirty()) return;
+    
     // 清除点线面节点
     clearVertexGeometries();
     clearEdgeGeometries();
     clearFaceGeometries();
     
+    const auto& controlPoints = getControlPoints();
+    
+    // 临时显示预览
+    if (controlPoints.size() == 2)
+    {
+        const Point3D& tempPoint = getTempPoint();
+        if (tempPoint.position != glm::vec3(0))
+        {
+            // 存储原始控制点
+            std::vector<Point3D> tempPoints = controlPoints;
+            tempPoints.push_back(tempPoint);
+            
+            // 临时计算圆弧参数
+            auto oldPoints = controlPoints;
+            // 临时添加点进行计算
+            addControlPoint(tempPoint);
+            calculateArcParameters();
+            
+            // 构建几何体
+            buildVertexGeometries();
+            buildEdgeGeometries();
+            
+            // 恢复原始控制点
+            clearControlPoints();
+            for (const auto& pt : oldPoints)
+            {
+                addControlPoint(pt);
+            }
+        }
+    }
+    else
+    {
+        // 构建几何体
+        buildVertexGeometries();
+        buildEdgeGeometries();
+        buildFaceGeometries();
+    }
+    
     updateOSGNode();
+    clearGeometryDirty();
     
-    // 构建点线面几何体
-    buildVertexGeometries();
-    buildEdgeGeometries();
-    buildFaceGeometries();
-    
-    // 更新可见性
-    updateFeatureVisibility();
+    emit geometryUpdated(this);
 }
 
 
 
 osg::ref_ptr<osg::Geometry> Arc3D_Geo::createGeometry()
 {
-    if (m_arcPoints.empty())
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.size() < 3)
         return nullptr;
     
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry();
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
+    glm::vec3 p1 = controlPoints[0].position;
+    glm::vec3 p2 = controlPoints[1].position;
+    glm::vec3 p3 = controlPoints[2].position;
     
-    for (const Point3D& point : m_arcPoints)
+    // 计算圆弧参数
+    calculateArcParameters();
+    
+    // 创建圆弧几何体
+    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+    
+    // 生成圆弧点
+    int segments = static_cast<int>(m_parameters.subdivisionLevel);
+    if (segments < 8) segments = 16;
+    
+    for (int i = 0; i <= segments; ++i)
     {
-        vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
-        colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
-                                   m_parameters.lineColor.b, m_parameters.lineColor.a));
+        float t = static_cast<float>(i) / segments;
+        float angle = m_startAngle + t * m_sweepAngle;
+        
+        glm::vec3 point = m_center + m_radius * (
+            cosf(angle) * m_uAxis + 
+            sinf(angle) * m_vAxis
+        );
+        
+        vertices->push_back(osg::Vec3(point.x, point.y, point.z));
     }
     
-    geometry->setVertexArray(vertices.get());
-    geometry->setColorArray(colors.get());
-    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+    geometry->setVertexArray(vertices);
     
-    geometry->addPrimitiveSet(new osg::DrawArrays(GL_LINE_STRIP, 0, vertices->size()));
+    // 线绘制
+    osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::LINE_STRIP, 0, vertices->size());
+    geometry->addPrimitiveSet(drawArrays);
     
     return geometry;
 }
@@ -109,88 +150,65 @@ void Arc3D_Geo::buildVertexGeometries()
 {
     clearVertexGeometries();
     
-    if (m_controlPoints.empty())
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.empty())
         return;
     
-    // 创建圆弧顶点的几何体
-    osg::ref_ptr<osg::Geometry> vertexGeometry = new osg::Geometry();
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
+    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     
-    // 添加控制点作为顶点
-    for (const Point3D& point : m_controlPoints)
+    // 添加控制点
+    for (const Point3D& point : controlPoints)
     {
         vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
-        colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
-                                   m_parameters.pointColor.b, m_parameters.pointColor.a));
     }
     
-    vertexGeometry->setVertexArray(vertices.get());
-    vertexGeometry->setColorArray(colors.get());
-    vertexGeometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+    geometry->setVertexArray(vertices);
     
-    // 使用点绘制
-    vertexGeometry->addPrimitiveSet(new osg::DrawArrays(GL_POINTS, 0, vertices->size()));
+    // 点绘制
+    osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::POINTS, 0, vertices->size());
+    geometry->addPrimitiveSet(drawArrays);
     
-    // 设置点大小
-    osg::ref_ptr<osg::StateSet> stateSet = vertexGeometry->getOrCreateStateSet();
-    osg::ref_ptr<osg::Point> point = new osg::Point();
-    point->setSize(m_parameters.pointSize);
-    stateSet->setAttribute(point.get());
-    
-    addVertexGeometry(vertexGeometry.get());
+    addVertexGeometry(geometry);
 }
 
 void Arc3D_Geo::buildEdgeGeometries()
 {
     clearEdgeGeometries();
     
-    if (m_arcPoints.empty())
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.size() < 2)
         return;
     
-    // 创建圆弧边的几何体
-    osg::ref_ptr<osg::Geometry> edgeGeometry = new osg::Geometry();
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
-    
-    // 添加圆弧点作为边
-    for (const Point3D& point : m_arcPoints)
+    // 创建圆弧几何体
+    osg::ref_ptr<osg::Geometry> geometry = createGeometry();
+    if (geometry.valid())
     {
-        vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
-        colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
-                                   m_parameters.lineColor.b, m_parameters.lineColor.a));
+        addEdgeGeometry(geometry);
     }
-    
-    edgeGeometry->setVertexArray(vertices.get());
-    edgeGeometry->setColorArray(colors.get());
-    edgeGeometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
-    
-    // 使用线绘制
-    edgeGeometry->addPrimitiveSet(new osg::DrawArrays(GL_LINE_STRIP, 0, vertices->size()));
-    
-    // 设置线宽
-    osg::ref_ptr<osg::StateSet> stateSet = edgeGeometry->getOrCreateStateSet();
-    osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth();
-    lineWidth->setWidth(m_parameters.lineWidth);
-    stateSet->setAttribute(lineWidth.get());
-    
-    addEdgeGeometry(edgeGeometry.get());
 }
 
 void Arc3D_Geo::buildFaceGeometries()
 {
     clearFaceGeometries();
-    // 圆弧没有面几何体
+    
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.size() < 3)
+        return;
+    
+    // 圆弧通常不需要面，这里留空
+    // 如果需要扇形，可以在这里实现
 }
 
 void Arc3D_Geo::calculateArcFromThreePoints()
 {
-    if (m_controlPoints.size() < 3)
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.size() < 3)
         return;
     
-    glm::vec3 p1 = m_controlPoints[0].position;
-    glm::vec3 p2 = m_controlPoints[1].position;
-    glm::vec3 p3 = m_controlPoints[2].position;
+    glm::vec3 p1 = controlPoints[0].position;
+    glm::vec3 p2 = controlPoints[1].position;
+    glm::vec3 p3 = controlPoints[2].position;
     
     // 计算圆心
     glm::vec3 a = p2 - p1;
@@ -251,10 +269,35 @@ void Arc3D_Geo::generateArcPoints()
         float t = static_cast<float>(i) / segments;
         float angle = m_startAngle + t * angleRange;
         
-        glm::vec3 ref = glm::normalize(m_controlPoints[0].position - m_center);
+        const auto& controlPoints = getControlPoints();
+        glm::vec3 ref = glm::normalize(controlPoints[0].position - m_center);
         glm::vec3 perpRef = glm::normalize(glm::cross(m_normal, ref));
         
         glm::vec3 point = m_center + m_radius * (static_cast<float>(cos(angle)) * ref + static_cast<float>(sin(angle)) * perpRef);
         m_arcPoints.push_back(Point3D(point));
     }
+}
+
+void Arc3D_Geo::calculateArcParameters()
+{
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.size() < 3)
+        return;
+    
+    // 使用三点计算圆弧
+    calculateArcFromThreePoints();
+    
+    // 计算扫掠角度
+    m_sweepAngle = m_endAngle - m_startAngle;
+    if (m_sweepAngle < 0)
+        m_sweepAngle += 2.0f * static_cast<float>(M_PI);
+    
+    // 计算坐标轴
+    const auto& p1 = controlPoints[0].position;
+    glm::vec3 ref = glm::normalize(p1 - m_center);
+    m_uAxis = ref;
+    m_vAxis = glm::normalize(glm::cross(m_normal, ref));
+    
+    // 生成圆弧点
+    generateArcPoints();
 } 

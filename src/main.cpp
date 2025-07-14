@@ -213,6 +213,26 @@ int main(int argc, char *argv[])
     // 初始化全局3D设置
     initializeGlobal3DSettings();
     
+    // 自动加载配置文件
+    try {
+        GlobalParametersManager& configManager = GlobalParametersManager::getInstance();
+        QString configDir = app.applicationDirPath() + "/config";
+        QDir().mkpath(configDir);
+        QString configFile = configDir + "/global_settings.cfg";
+        
+        if (QFile::exists(configFile)) {
+            if (configManager.loadGlobalSettings(configFile.toStdString())) {
+                LOG_INFO("配置文件加载成功", "系统");
+            } else {
+                LOG_WARNING("配置文件加载失败，使用默认设置", "系统");
+            }
+        } else {
+            LOG_INFO("配置文件不存在，使用默认设置", "系统");
+        }
+    } catch (const std::exception& e) {
+        LOG_ERROR("配置文件加载异常: " + QString::fromStdString(e.what()), "系统");
+    }
+    
     // 创建启动画面
     QPixmap pixmap(400, 300);
     pixmap.fill(QColor(43, 43, 43));
@@ -232,6 +252,21 @@ int main(int argc, char *argv[])
         window.show();
         window.raise();
         window.activateWindow();
+    });
+    
+    // 程序结束时自动保存配置
+    QObject::connect(&app, &QApplication::aboutToQuit, [&]() {
+        try {
+            GlobalParametersManager& configManager = GlobalParametersManager::getInstance();
+            QString configDir = app.applicationDirPath() + "/config";
+            QDir().mkpath(configDir);
+            QString configFile = configDir + "/global_settings.cfg";
+            
+            configManager.saveGlobalSettings(configFile.toStdString());
+            LOG_INFO("配置文件保存成功", "系统");
+        } catch (const std::exception& e) {
+            LOG_ERROR("配置文件保存异常: " + QString::fromStdString(e.what()), "系统");
+        }
     });
     
     return app.exec();

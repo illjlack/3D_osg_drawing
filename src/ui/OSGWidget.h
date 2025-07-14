@@ -2,7 +2,7 @@
 #pragma execution_character_set("utf-8")
 
 #include "../core/Common3D.h"
-#include "../core/picking/PickingSystem.h"
+#include "../core/picking/SimplifiedPickingSystem.h"
 #include "../core/world/Skybox.h"
 #include "../core/world/CoordinateSystem3D.h"
 #include "../core/world/CoordinateSystemRenderer.h"
@@ -73,11 +73,10 @@ public:
     bool isAdvancedPickingEnabled() const;
     void setPickingRadius(int radius);
     void setPickingFrequency(double frequency);
-
     
-    // 拾取系统诊断
-    //QString diagnosePickingSystem();  // 诊断拾取系统
-    //bool fixPickingIssues();          // 修复拾取问题
+    // 拾取系统配置
+    void setPickingConfig(const SimplePickingConfig& config);
+    QString getPickingSystemInfo() const;
     
     // 绘制状态查询
     bool isDrawing() const { return m_isDrawing; }
@@ -142,7 +141,7 @@ public:
 signals:
     void geoSelected(Geo3D* geo);
     void mousePositionChanged(const glm::vec3& worldPos);
-    void advancedPickingResult(const PickingResult& result);
+    void simplePickingResult(const SimplePickingResult& result);
     void cameraMoveSpeedChanged(double speed);
     void wheelMoveSensitivityChanged(double sensitivity);
     void accelerationRateChanged(double rate);
@@ -178,7 +177,7 @@ private:
     QString formatScaleText(double worldUnits);
     
     // 拾取系统回调
-    void onPickingResult(const PickingResult& result);
+    void onSimplePickingResult(const SimplePickingResult& result);
 
 private:
     // OSG场景图相关成员
@@ -202,8 +201,6 @@ private:
     glm::vec3 m_lastMouseWorldPos;
     
     // 拾取系统
-    osg::ref_ptr<PickingEventHandler> m_pickingEventHandler;
-    osg::ref_ptr<SimplePickingIndicatorManager> m_pickingIndicatorManager;
     bool m_advancedPickingEnabled;
     
     // 天空盒

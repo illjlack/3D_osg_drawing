@@ -23,25 +23,28 @@ void Cone3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
     if (!isStateComplete())
     {
         addControlPoint(Point3D(worldPos));
+        const auto& controlPoints = getControlPoints();
         
-        if (m_controlPoints.size() == 2)
+        if (controlPoints.size() == 2)
         {
             // 计算圆锥参数
-            glm::vec3 diff = m_controlPoints[1].position - m_controlPoints[0].position;
+            glm::vec3 diff = controlPoints[1].position - controlPoints[0].position;
             m_height = glm::length(diff);
             if (m_height > 0)
                 m_axis = glm::normalize(diff);
-            m_radius = m_height * 0.4f; // 默认半径为高度的40%
+            m_radius = m_height * 0.3f; // 默认半径为高度的30%
             completeDrawing();
         }
         
         updateGeometry();
+        emit stateChanged(this);
     }
 }
 
 void Cone3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!isStateComplete() && m_controlPoints.size() == 1)
+    const auto& controlPoints = getControlPoints();
+    if (!isStateComplete() && controlPoints.size() == 1)
     {
         setTempPoint(Point3D(worldPos));
         markGeometryDirty();
@@ -71,21 +74,22 @@ void Cone3D_Geo::updateGeometry()
 
 osg::ref_ptr<osg::Geometry> Cone3D_Geo::createGeometry()
 {
-    if (m_controlPoints.empty())
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.empty())
         return nullptr;
     
     float radius = m_radius;
     float height = m_height;
     glm::vec3 axis = m_axis;
-    glm::vec3 base = m_controlPoints[0].position;
+    glm::vec3 base = controlPoints[0].position;
     
-    if (m_controlPoints.size() == 1 && getTempPoint().position != glm::vec3(0))
+    if (controlPoints.size() == 1 && getTempPoint().position != glm::vec3(0))
     {
         glm::vec3 diff = getTempPoint().position - base;
         height = glm::length(diff);
         if (height > 0)
             axis = glm::normalize(diff);
-        radius = height * 0.4f;
+        radius = height * 0.3f;
     }
     
     osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry();
@@ -186,10 +190,11 @@ void Cone3D_Geo::buildVertexGeometries()
 {
     clearVertexGeometries();
     
-    if (m_controlPoints.empty())
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.empty())
         return;
     
-    glm::vec3 center = m_controlPoints[0].position;
+    glm::vec3 center = controlPoints[0].position;
     float radius = m_radius;
     float height = m_height;
     int segments = m_segments;
@@ -237,10 +242,11 @@ void Cone3D_Geo::buildEdgeGeometries()
 {
     clearEdgeGeometries();
     
-    if (m_controlPoints.empty())
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.empty())
         return;
     
-    glm::vec3 center = m_controlPoints[0].position;
+    glm::vec3 center = controlPoints[0].position;
     float radius = m_radius;
     float height = m_height;
     int segments = m_segments;
@@ -296,10 +302,11 @@ void Cone3D_Geo::buildFaceGeometries()
 {
     clearFaceGeometries();
     
-    if (m_controlPoints.empty())
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.empty())
         return;
     
-    glm::vec3 center = m_controlPoints[0].position;
+    glm::vec3 center = controlPoints[0].position;
     float radius = m_radius;
     float height = m_height;
     int segments = m_segments;

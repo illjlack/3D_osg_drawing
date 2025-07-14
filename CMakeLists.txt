@@ -180,11 +180,13 @@ set(PICKING_SOURCES
     src/core/picking/PickingSystem.cpp
     src/core/picking/PickingIntegration.cpp
     src/core/picking/PickingIndicator.cpp
+    src/core/picking/SimplifiedPickingSystem.cpp
 )
 set(PICKING_HEADERS
     src/core/picking/PickingSystem.h
     src/core/picking/PickingIntegration.h
     src/core/picking/PickingIndicator.h
+    src/core/picking/SimplifiedPickingSystem.h
 )
 set(UTIL_SOURCES
     src/util/OSGUtils.cpp

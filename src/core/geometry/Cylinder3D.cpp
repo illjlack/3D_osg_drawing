@@ -23,11 +23,12 @@ void Cylinder3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldP
     if (!isStateComplete())
     {
         addControlPoint(Point3D(worldPos));
+        const auto& controlPoints = getControlPoints();
         
-        if (m_controlPoints.size() == 2)
+        if (controlPoints.size() == 2)
         {
             // 计算圆柱参数
-            glm::vec3 diff = m_controlPoints[1].position - m_controlPoints[0].position;
+            glm::vec3 diff = controlPoints[1].position - controlPoints[0].position;
             m_height = glm::length(diff);
             if (m_height > 0)
                 m_axis = glm::normalize(diff);
@@ -36,12 +37,14 @@ void Cylinder3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldP
         }
         
         updateGeometry();
+        emit stateChanged(this);
     }
 }
 
 void Cylinder3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!isStateComplete() && m_controlPoints.size() == 1)
+    const auto& controlPoints = getControlPoints();
+    if (!isStateComplete() && controlPoints.size() == 1)
     {
         setTempPoint(Point3D(worldPos));
         markGeometryDirty();
@@ -71,15 +74,16 @@ void Cylinder3D_Geo::updateGeometry()
 
 osg::ref_ptr<osg::Geometry> Cylinder3D_Geo::createGeometry()
 {
-    if (m_controlPoints.empty())
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.empty())
         return nullptr;
     
     float radius = m_radius;
     float height = m_height;
     glm::vec3 axis = m_axis;
-    glm::vec3 center = m_controlPoints[0].position;
+    glm::vec3 center = controlPoints[0].position;
     
-    if (m_controlPoints.size() == 1 && getTempPoint().position != glm::vec3(0))
+    if (controlPoints.size() == 1 && getTempPoint().position != glm::vec3(0))
     {
         glm::vec3 diff = getTempPoint().position - center;
         height = glm::length(diff);
@@ -87,9 +91,9 @@ osg::ref_ptr<osg::Geometry> Cylinder3D_Geo::createGeometry()
             axis = glm::normalize(diff);
         radius = height * 0.3f;
     }
-    else if (m_controlPoints.size() == 2)
+    else if (controlPoints.size() == 2)
     {
-        center = (m_controlPoints[0].position + m_controlPoints[1].position) * 0.5f;
+        center = (controlPoints[0].position + controlPoints[1].position) * 0.5f;
     }
     
     osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry();
@@ -227,10 +231,11 @@ void Cylinder3D_Geo::buildVertexGeometries()
 {
     clearVertexGeometries();
     
-    if (m_controlPoints.empty())
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.empty())
         return;
     
-    glm::vec3 center = m_controlPoints[0].position;
+    glm::vec3 center = controlPoints[0].position;
     float radius = m_radius;
     float height = m_height;
     int segments = m_segments;
@@ -278,10 +283,11 @@ void Cylinder3D_Geo::buildEdgeGeometries()
 {
     clearEdgeGeometries();
     
-    if (m_controlPoints.empty())
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.empty())
         return;
     
-    glm::vec3 center = m_controlPoints[0].position;
+    glm::vec3 center = controlPoints[0].position;
     float radius = m_radius;
     float height = m_height;
     int segments = m_segments;
@@ -341,10 +347,11 @@ void Cylinder3D_Geo::buildFaceGeometries()
 {
     clearFaceGeometries();
     
-    if (m_controlPoints.empty())
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.empty())
         return;
     
-    glm::vec3 center = m_controlPoints[0].position;
+    glm::vec3 center = controlPoints[0].position;
     float radius = m_radius;
     float height = m_height;
     int segments = m_segments;

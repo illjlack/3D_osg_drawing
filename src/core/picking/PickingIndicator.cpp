@@ -5,7 +5,7 @@
 #include <osg/CullFace>
 #include <osg/LightModel>
 #include <cmath>
-
+#include "../../util/LogManager.h"
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
@@ -419,6 +419,14 @@ PickingIndicatorManager::PickingIndicatorManager()
     , m_updateInterval(1.0f / 60.0f)  // 60 FPS
 {
     m_indicatorRoot = new osg::Group;
+    m_indicatorRoot->setName("PickingIndicatorRoot");
+    
+    // 设置指示器根节点状态
+    osg::StateSet* stateSet = m_indicatorRoot->getOrCreateStateSet();
+    stateSet->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+    stateSet->setMode(GL_DEPTH_TEST, osg::StateAttribute::OFF);
+    stateSet->setRenderingHint(osg::StateSet::TRANSPARENT_BIN);
+    
     m_highlightSystem = new HighlightSystem;
 }
 
@@ -428,8 +436,15 @@ PickingIndicatorManager::~PickingIndicatorManager()
 
 bool PickingIndicatorManager::initialize()
 {
-    if (!m_highlightSystem->initialize())
+    if (!m_highlightSystem) {
+        LOG_ERROR("Failed to create highlight system", "拾取");
         return false;
+    }
+    
+    if (!m_highlightSystem->initialize()) {
+        LOG_WARNING("Highlight system initialization failed, but continuing", "拾取");
+        // 不返回false，因为指示器功能仍然可以工作
+    }
     
     // 设置默认指示器配置
     IndicatorConfig vertexConfig;
@@ -450,6 +465,7 @@ bool PickingIndicatorManager::initialize()
     faceConfig.lineWidth = 2.0f;
     m_indicatorConfigs[IndicatorType::FACE_INDICATOR] = faceConfig;
     
+    LOG_SUCCESS("PickingIndicatorManager initialized successfully", "拾取");
     return true;
 }
 

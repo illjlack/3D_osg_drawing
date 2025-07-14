@@ -15,18 +15,22 @@ void BezierCurve3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& wor
     if (!isStateComplete())
     {
         addControlPoint(Point3D(worldPos));
+        const auto& controlPoints = getControlPoints();
         
-        if (m_controlPoints.size() >= 2)
+        if (controlPoints.size() >= 2)
         {
             generateBezierPoints();
             updateGeometry();
         }
+        
+        emit stateChanged(this);
     }
 }
 
 void BezierCurve3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!isStateComplete() && !m_controlPoints.empty())
+    const auto& controlPoints = getControlPoints();
+    if (!isStateComplete() && !controlPoints.empty())
     {
         setTempPoint(Point3D(worldPos));
         markGeometryDirty();
@@ -36,18 +40,19 @@ void BezierCurve3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worl
 
 void BezierCurve3D_Geo::keyPressEvent(QKeyEvent* event)
 {
+    const auto& controlPoints = getControlPoints();
     if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter)
     {
-        if (m_controlPoints.size() >= 2)
+        if (controlPoints.size() >= 2)
         {
             completeDrawing();
         }
     }
     else if (event->key() == Qt::Key_Escape)
     {
-        if (!m_controlPoints.empty())
+        if (!controlPoints.empty())
         {
-            removeControlPoint(m_controlPoints.size() - 1);
+            removeControlPoint(controlPoints.size() - 1);
             updateGeometry();
         }
     }
@@ -75,7 +80,8 @@ void BezierCurve3D_Geo::updateGeometry()
 
 osg::ref_ptr<osg::Geometry> BezierCurve3D_Geo::createGeometry()
 {
-    if (m_controlPoints.size() < 2)
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.size() < 2)
         return nullptr;
     
     generateBezierPoints();
@@ -97,7 +103,7 @@ osg::ref_ptr<osg::Geometry> BezierCurve3D_Geo::createGeometry()
     // 如果正在绘制且有临时点，计算包含临时点的贝塞尔曲线
     if (!isStateComplete() && getTempPoint().position != glm::vec3(0))
     {
-        std::vector<Point3D> tempControlPoints = m_controlPoints;
+        std::vector<Point3D> tempControlPoints = controlPoints;
         tempControlPoints.push_back(getTempPoint());
         
         // 生成临时贝塞尔曲线点
@@ -152,7 +158,8 @@ void BezierCurve3D_Geo::buildVertexGeometries()
 {
     clearVertexGeometries();
     
-    if (m_controlPoints.empty())
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.empty())
         return;
     
     // 创建贝塞尔曲线顶点的几何体
@@ -161,7 +168,7 @@ void BezierCurve3D_Geo::buildVertexGeometries()
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
     
     // 添加控制点作为顶点
-    for (const Point3D& point : m_controlPoints)
+    for (const Point3D& point : controlPoints)
     {
         vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
         colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
@@ -230,7 +237,8 @@ void BezierCurve3D_Geo::generateBezierPoints()
 {
     m_bezierPoints.clear();
     
-    if (m_controlPoints.size() < 2)
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.size() < 2)
         return;
     
     int steps = m_parameters.steps > 0 ? m_parameters.steps : 50;
@@ -245,12 +253,13 @@ void BezierCurve3D_Geo::generateBezierPoints()
 
 glm::vec3 BezierCurve3D_Geo::calculateBezierPoint(float t) const
 {
-    if (m_controlPoints.empty())
+    const auto& controlPoints = getControlPoints();
+    if (controlPoints.empty())
         return glm::vec3(0);
     
     // De Casteljau算法
     std::vector<glm::vec3> tempPoints;
-    for (const Point3D& cp : m_controlPoints)
+    for (const Point3D& cp : controlPoints)
     {
         tempPoints.push_back(cp.position);
     }

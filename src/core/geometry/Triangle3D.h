@@ -14,6 +14,9 @@ public:
     virtual void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
     virtual void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
     virtual void updateGeometry() override;
+    
+    // 几何计算
+    float calculateArea() const;
 
 protected:
     virtual osg::ref_ptr<osg::Geometry> createGeometry() override;
@@ -27,4 +30,5 @@ private:
     void calculateNormal();
     
     glm::vec3 m_normal;
+    float m_area;
 }; 

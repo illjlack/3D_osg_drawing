@@ -124,7 +124,7 @@ private slots:
     void onDrawModeChanged(DrawMode3D mode);
     void onGeoSelected(Geo3D* geo);
     void onGeoParametersChanged();
-    void onAdvancedPickingResult(const PickingResult& result);
+    void onSimplePickingResult(const SimplePickingResult& result);
 
 private:
     void setupUI();
