@@ -235,48 +235,42 @@ void Cylinder3D_Geo::buildVertexGeometries()
     if (controlPoints.empty())
         return;
     
-    glm::vec3 center = controlPoints[0].position;
-    float radius = m_radius;
-    float height = m_height;
-    int segments = m_segments;
+    // 只为控制点创建几何体
+    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
-    // 创建圆柱体顶点的几何体
-    osg::ref_ptr<osg::Geometry> vertexGeometry = new osg::Geometry();
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
-    
-    // 生成圆柱体顶点
-    for (int i = 0; i <= segments; ++i)
+    // 添加控制点
+    for (const Point3D& point : controlPoints)
     {
-        float theta = 2.0f * M_PI * i / segments;
-        float x = center.x + radius * cos(theta);
-        float y = center.y + radius * sin(theta);
-        
-        // 底面顶点
-        vertices->push_back(osg::Vec3(x, y, center.z - height * 0.5f));
-        colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
-                                   m_parameters.pointColor.b, m_parameters.pointColor.a));
-        
-        // 顶面顶点
-        vertices->push_back(osg::Vec3(x, y, center.z + height * 0.5f));
+        vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
         colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
                                    m_parameters.pointColor.b, m_parameters.pointColor.a));
     }
     
-    vertexGeometry->setVertexArray(vertices.get());
-    vertexGeometry->setColorArray(colors.get());
-    vertexGeometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+    // 如果有临时点且几何体未完成，添加临时点
+    if (!isStateComplete() && getTempPoint().position != glm::vec3(0))
+    {
+        vertices->push_back(osg::Vec3(getTempPoint().x(), getTempPoint().y(), getTempPoint().z()));
+        colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
+                                   m_parameters.pointColor.b, m_parameters.pointColor.a * 0.5f));
+    }
     
-    // 使用点绘制
-    vertexGeometry->addPrimitiveSet(new osg::DrawArrays(GL_POINTS, 0, vertices->size()));
+    geometry->setVertexArray(vertices);
+    geometry->setColorArray(colors);
+    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     
-    // 设置点大小
-    osg::ref_ptr<osg::StateSet> stateSet = vertexGeometry->getOrCreateStateSet();
-    osg::ref_ptr<osg::Point> point = new osg::Point();
-    point->setSize(m_parameters.pointSize);
-    stateSet->setAttribute(point.get());
+    // 点绘制 - 控制点使用较大的点大小以便拾取
+    osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::POINTS, 0, vertices->size());
+    geometry->addPrimitiveSet(drawArrays);
     
-    addVertexGeometry(vertexGeometry.get());
+    // 设置点的大小
+    osg::ref_ptr<osg::StateSet> stateSet = geometry->getOrCreateStateSet();
+    osg::ref_ptr<osg::Point> point = new osg::Point;
+    point->setSize(8.0f);  // 控制点大小
+    stateSet->setAttribute(point);
+    
+    addVertexGeometry(geometry);
 }
 
 void Cylinder3D_Geo::buildEdgeGeometries()
@@ -287,17 +281,18 @@ void Cylinder3D_Geo::buildEdgeGeometries()
     if (controlPoints.empty())
         return;
     
+    // 创建圆柱体边界线几何体
+    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
+    
     glm::vec3 center = controlPoints[0].position;
     float radius = m_radius;
     float height = m_height;
-    int segments = m_segments;
+    int segments = static_cast<int>(m_parameters.subdivisionLevel);
+    if (segments < 8) segments = 16;
     
-    // 创建圆柱体边的几何体
-    osg::ref_ptr<osg::Geometry> edgeGeometry = new osg::Geometry();
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
-    
-    // 生成圆柱体边
+    // 生成圆柱体边界线
     for (int i = 0; i < segments; ++i)
     {
         float theta1 = 2.0f * M_PI * i / segments;
@@ -316,31 +311,35 @@ void Cylinder3D_Geo::buildEdgeGeometries()
         vertices->push_back(osg::Vec3(x1, y1, center.z + height * 0.5f));
         vertices->push_back(osg::Vec3(x2, y2, center.z + height * 0.5f));
         
-        // 垂直边
-        vertices->push_back(osg::Vec3(x1, y1, center.z - height * 0.5f));
-        vertices->push_back(osg::Vec3(x1, y1, center.z + height * 0.5f));
+        // 垂直边（只显示4条主要的）
+        if (i % (segments / 4) == 0)
+        {
+            vertices->push_back(osg::Vec3(x1, y1, center.z - height * 0.5f));
+            vertices->push_back(osg::Vec3(x1, y1, center.z + height * 0.5f));
+        }
         
-        for (int j = 0; j < 6; ++j)
+        for (int j = 0; j < 4; ++j)
         {
             colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
                                        m_parameters.lineColor.b, m_parameters.lineColor.a));
         }
     }
     
-    edgeGeometry->setVertexArray(vertices.get());
-    edgeGeometry->setColorArray(colors.get());
-    edgeGeometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+    geometry->setVertexArray(vertices);
+    geometry->setColorArray(colors);
+    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     
-    // 使用线绘制
-    edgeGeometry->addPrimitiveSet(new osg::DrawArrays(GL_LINES, 0, vertices->size()));
+    // 线绘制 - 边界线
+    osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::LINES, 0, vertices->size());
+    geometry->addPrimitiveSet(drawArrays);
     
-    // 设置线宽
-    osg::ref_ptr<osg::StateSet> stateSet = edgeGeometry->getOrCreateStateSet();
-    osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth();
-    lineWidth->setWidth(m_parameters.lineWidth);
-    stateSet->setAttribute(lineWidth.get());
+    // 设置线的宽度
+    osg::ref_ptr<osg::StateSet> stateSet = geometry->getOrCreateStateSet();
+    osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth;
+    lineWidth->setWidth(2.0f);  // 边界线宽度
+    stateSet->setAttribute(lineWidth);
     
-    addEdgeGeometry(edgeGeometry.get());
+    addEdgeGeometry(geometry);
 }
 
 void Cylinder3D_Geo::buildFaceGeometries()
@@ -351,91 +350,10 @@ void Cylinder3D_Geo::buildFaceGeometries()
     if (controlPoints.empty())
         return;
     
-    glm::vec3 center = controlPoints[0].position;
-    float radius = m_radius;
-    float height = m_height;
-    int segments = m_segments;
-    
-    // 创建圆柱体面的几何体
-    osg::ref_ptr<osg::Geometry> faceGeometry = new osg::Geometry();
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
-    osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array();
-    
-    // 生成圆柱体面
-    for (int i = 0; i < segments; ++i)
+    // 创建圆柱体面几何体
+    osg::ref_ptr<osg::Geometry> geometry = createGeometry();
+    if (geometry.valid())
     {
-        float theta1 = 2.0f * M_PI * i / segments;
-        float theta2 = 2.0f * M_PI * (i + 1) / segments;
-        
-        float x1 = center.x + radius * cos(theta1);
-        float y1 = center.y + radius * sin(theta1);
-        float x2 = center.x + radius * cos(theta2);
-        float y2 = center.y + radius * sin(theta2);
-        
-        float z1 = center.z - height * 0.5f;
-        float z2 = center.z + height * 0.5f;
-        
-        // 侧面（矩形，分为两个三角形）
-        vertices->push_back(osg::Vec3(x1, y1, z1));
-        vertices->push_back(osg::Vec3(x2, y2, z1));
-        vertices->push_back(osg::Vec3(x2, y2, z2));
-        
-        vertices->push_back(osg::Vec3(x1, y1, z1));
-        vertices->push_back(osg::Vec3(x2, y2, z2));
-        vertices->push_back(osg::Vec3(x1, y1, z2));
-        
-        // 计算法向量
-        glm::vec3 v1(x1 - center.x, y1 - center.y, 0);
-        glm::vec3 v2(x2 - center.x, y2 - center.y, 0);
-        glm::vec3 normal = glm::normalize(glm::cross(v2 - v1, glm::vec3(0, 0, 1)));
-        
-        for (int j = 0; j < 6; ++j)
-        {
-            normals->push_back(osg::Vec3(normal.x, normal.y, normal.z));
-            colors->push_back(osg::Vec4(m_parameters.fillColor.r, m_parameters.fillColor.g, 
-                                       m_parameters.fillColor.b, m_parameters.fillColor.a));
-        }
+        addFaceGeometry(geometry);
     }
-    
-    // 底面和顶面
-    for (int i = 0; i < segments; ++i)
-    {
-        float theta1 = 2.0f * M_PI * i / segments;
-        float theta2 = 2.0f * M_PI * (i + 1) / segments;
-        
-        float x1 = center.x + radius * cos(theta1);
-        float y1 = center.y + radius * sin(theta1);
-        float x2 = center.x + radius * cos(theta2);
-        float y2 = center.y + radius * sin(theta2);
-        
-        // 底面三角形
-        vertices->push_back(osg::Vec3(center.x, center.y, center.z - height * 0.5f));
-        vertices->push_back(osg::Vec3(x1, y1, center.z - height * 0.5f));
-        vertices->push_back(osg::Vec3(x2, y2, center.z - height * 0.5f));
-        
-        // 顶面三角形
-        vertices->push_back(osg::Vec3(center.x, center.y, center.z + height * 0.5f));
-        vertices->push_back(osg::Vec3(x1, y1, center.z + height * 0.5f));
-        vertices->push_back(osg::Vec3(x2, y2, center.z + height * 0.5f));
-        
-        for (int j = 0; j < 6; ++j)
-        {
-            normals->push_back(osg::Vec3(0, 0, -1)); // 底面法向量
-            normals->push_back(osg::Vec3(0, 0, 1));  // 顶面法向量
-            colors->push_back(osg::Vec4(m_parameters.fillColor.r, m_parameters.fillColor.g, 
-                                       m_parameters.fillColor.b, m_parameters.fillColor.a));
-        }
-    }
-    
-    faceGeometry->setVertexArray(vertices.get());
-    faceGeometry->setColorArray(colors.get());
-    faceGeometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
-    faceGeometry->setNormalArray(normals.get());
-    faceGeometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
-    
-    // 使用三角面绘制
-    faceGeometry->addPrimitiveSet(new osg::DrawArrays(GL_TRIANGLES, 0, vertices->size()));
-    
-    addFaceGeometry(faceGeometry.get());
 } 

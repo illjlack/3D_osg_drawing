@@ -12,6 +12,9 @@ GeoBoundingBoxManager::GeoBoundingBoxManager(Geo3D* parent)
     , m_visible(false)
     , m_wireframeColor(1.0f, 0.0f, 1.0f, 1.0f) // 默认紫色
     , m_wireframeWidth(1.0f)
+    , m_controlPointsVisible(true)  // 默认显示控制点
+    , m_controlPointSize(0.1f)
+    , m_controlPointColor(1.0f, 1.0f, 0.0f, 1.0f) // 默认黄色
     , m_centerCached(false)
     , m_sizeCached(false)
     , m_radiusCached(false)
@@ -532,6 +535,13 @@ void GeoBoundingBoxManager::setVisible(bool visible)
     }
 }
 
+void GeoBoundingBoxManager::setVisibleForSelection(bool selected)
+{
+    // 当对象被选中时，显示包围盒和控制点
+    setVisible(selected);
+    setControlPointsVisible(selected);
+}
+
 void GeoBoundingBoxManager::setWireframeColor(const Color3D& color)
 {
     if (m_wireframeColor.r != color.r || 
@@ -670,6 +680,7 @@ void GeoBoundingBoxManager::updateBoundingBoxVisualization()
     // 现在只是占位符
     if (m_parent && m_parent->getNodeManager()) {
         // 可以在这里创建包围盒的线框可视化
+        // 暂时不实现，因为高亮系统会处理包围盒显示
     }
 }
 
@@ -686,4 +697,86 @@ void GeoBoundingBoxManager::markDirty()
     if (m_autoUpdate) {
         updateBoundingBox();
     }
+} 
+
+void GeoBoundingBoxManager::setControlPointsVisible(bool visible)
+{
+    if (m_controlPointsVisible != visible)
+    {
+        m_controlPointsVisible = visible;
+        updateBoundingBoxVisualization();
+        emit boundingBoxChanged();
+    }
+}
+
+void GeoBoundingBoxManager::setControlPointSize(float size)
+{
+    if (m_controlPointSize != size)
+    {
+        m_controlPointSize = size;
+        updateBoundingBoxVisualization();
+        emit boundingBoxChanged();
+    }
+}
+
+void GeoBoundingBoxManager::setControlPointColor(const Color3D& color)
+{
+    if (m_controlPointColor.r != color.r || m_controlPointColor.g != color.g || 
+        m_controlPointColor.b != color.b || m_controlPointColor.a != color.a)
+    {
+        m_controlPointColor = color;
+        updateBoundingBoxVisualization();
+        emit boundingBoxChanged();
+    }
+}
+
+std::vector<glm::vec3> GeoBoundingBoxManager::getControlPointPositions() const
+{
+    std::vector<glm::vec3> positions;
+    
+    if (!m_boundingBox.isValid())
+        return positions;
+    
+    // 返回包围盒的8个角点
+    positions = getCorners();
+    
+    return positions;
+}
+
+int GeoBoundingBoxManager::findNearestControlPoint(const glm::vec3& point, float threshold) const
+{
+    if (!m_boundingBox.isValid())
+        return -1;
+    
+    std::vector<glm::vec3> corners = getCorners();
+    int nearestIndex = -1;
+    float minDistance = threshold;
+    
+    for (int i = 0; i < static_cast<int>(corners.size()); ++i)
+    {
+        glm::vec3 diff = corners[i] - point;
+        float distance = glm::length(diff);
+        
+        if (distance < minDistance)
+        {
+            minDistance = distance;
+            nearestIndex = i;
+        }
+    }
+    
+    return nearestIndex;
+}
+
+glm::vec3 GeoBoundingBoxManager::getControlPointPosition(int index) const
+{
+    if (!isValidControlPointIndex(index))
+        return glm::vec3(0.0f);
+    
+    std::vector<glm::vec3> corners = getCorners();
+    return corners[index];
+}
+
+bool GeoBoundingBoxManager::isValidControlPointIndex(int index) const
+{
+    return index >= 0 && index < 8; // 包围盒有8个角点
 } 

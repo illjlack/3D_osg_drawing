@@ -65,6 +65,25 @@ public:
     Geo3D* getSelectedGeo() const;
     const std::vector<osg::ref_ptr<Geo3D>>& getAllGeos() const;
     
+    // 多选功能
+    void addToSelection(Geo3D* geo);
+    void removeFromSelection(Geo3D* geo);
+    void clearSelection();
+    const std::vector<Geo3D*>& getSelectedGeos() const;
+    bool isSelected(Geo3D* geo) const;
+    int getSelectionCount() const;
+    
+    // 拖动控制点功能
+    void startDraggingControlPoint(Geo3D* geo, int controlPointIndex);
+    void stopDraggingControlPoint();
+    bool isDraggingControlPoint() const { return m_isDraggingControlPoint; }
+    Geo3D* getDraggingGeo() const { return m_draggingGeo; }
+    int getDraggingControlPointIndex() const { return m_draggingControlPointIndex; }
+    
+    // 高亮管理
+    void updateSelectionHighlight();
+    void highlightSelectedObjects();
+    
     // 拾取
     PickResult3D pick(int x, int y);
     
@@ -195,6 +214,16 @@ private:
     osg::ref_ptr<Geo3D> m_currentDrawingGeo;
     std::vector<osg::ref_ptr<Geo3D>> m_geoList;
     osg::ref_ptr<Geo3D> m_selectedGeo;
+    
+    // 多选功能
+    std::vector<Geo3D*> m_selectedGeos;  // 选中的几何对象列表
+    bool m_multiSelectMode;               // 是否处于多选模式
+    
+    // 拖动控制点功能
+    bool m_isDraggingControlPoint;
+    Geo3D* m_draggingGeo;
+    int m_draggingControlPointIndex;
+    glm::vec3 m_dragStartPosition;
     
     // 交互状态
     bool m_isDrawing;

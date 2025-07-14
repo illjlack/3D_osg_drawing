@@ -150,59 +150,63 @@ osg::ref_ptr<osg::Geometry> Cube3D_Geo::createGeometry()
 
 void Cube3D_Geo::buildVertexGeometries()
 {
+    clearVertexGeometries();
+    
     const auto& controlPoints = getControlPoints();
     if (controlPoints.empty())
-    {
         return;
-    }
-
-    glm::vec3 center = controlPoints[0].position;
-    float size = m_size;
     
-    if (controlPoints.size() == 1 && getTempPoint().position != glm::vec3(0))
-    {
-        glm::vec3 diff = getTempPoint().position - center;
-        size = glm::length(diff);
-    }
-    else if (controlPoints.size() == 2)
-    {
-        center = (controlPoints[0].position + controlPoints[1].position) * 0.5f;
-        glm::vec3 diff = controlPoints[1].position - controlPoints[0].position;
-        size = glm::length(diff);
-    }
-
+    // 只为控制点创建几何体
     osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-
-    // 生成立方体的8个顶点
-    float halfSize = size * 0.5f;
+    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
-    vertices->push_back(osg::Vec3(center.x - halfSize, center.y - halfSize, center.z - halfSize));
-    vertices->push_back(osg::Vec3(center.x + halfSize, center.y - halfSize, center.z - halfSize));
-    vertices->push_back(osg::Vec3(center.x + halfSize, center.y + halfSize, center.z - halfSize));
-    vertices->push_back(osg::Vec3(center.x - halfSize, center.y + halfSize, center.z - halfSize));
-    vertices->push_back(osg::Vec3(center.x - halfSize, center.y - halfSize, center.z + halfSize));
-    vertices->push_back(osg::Vec3(center.x + halfSize, center.y - halfSize, center.z + halfSize));
-    vertices->push_back(osg::Vec3(center.x + halfSize, center.y + halfSize, center.z + halfSize));
-    vertices->push_back(osg::Vec3(center.x - halfSize, center.y + halfSize, center.z + halfSize));
-
+    // 添加控制点
+    for (const Point3D& point : controlPoints)
+    {
+        vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
+        colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
+                                   m_parameters.pointColor.b, m_parameters.pointColor.a));
+    }
+    
+    // 如果有临时点且几何体未完成，添加临时点
+    if (!isStateComplete() && getTempPoint().position != glm::vec3(0))
+    {
+        vertices->push_back(osg::Vec3(getTempPoint().x(), getTempPoint().y(), getTempPoint().z()));
+        colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
+                                   m_parameters.pointColor.b, m_parameters.pointColor.a * 0.5f));
+    }
+    
     geometry->setVertexArray(vertices);
-
-    // 点绘制
+    geometry->setColorArray(colors);
+    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+    
+    // 点绘制 - 控制点使用较大的点大小以便拾取
     osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::POINTS, 0, vertices->size());
     geometry->addPrimitiveSet(drawArrays);
-
+    
+    // 设置点的大小
+    osg::ref_ptr<osg::StateSet> stateSet = geometry->getOrCreateStateSet();
+    osg::ref_ptr<osg::Point> point = new osg::Point;
+    point->setSize(8.0f);  // 控制点大小
+    stateSet->setAttribute(point);
+    
     addVertexGeometry(geometry);
 }
 
 void Cube3D_Geo::buildEdgeGeometries()
 {
+    clearEdgeGeometries();
+    
     const auto& controlPoints = getControlPoints();
     if (controlPoints.empty())
-    {
         return;
-    }
-
+    
+    // 创建立方体边界线几何体
+    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
+    
     glm::vec3 center = controlPoints[0].position;
     float size = m_size;
     
@@ -217,10 +221,7 @@ void Cube3D_Geo::buildEdgeGeometries()
         glm::vec3 diff = controlPoints[1].position - controlPoints[0].position;
         size = glm::length(diff);
     }
-
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-
+    
     // 生成立方体的8个顶点
     float halfSize = size * 0.5f;
     
@@ -232,9 +233,18 @@ void Cube3D_Geo::buildEdgeGeometries()
     vertices->push_back(osg::Vec3(center.x + halfSize, center.y - halfSize, center.z + halfSize)); // 5
     vertices->push_back(osg::Vec3(center.x + halfSize, center.y + halfSize, center.z + halfSize)); // 6
     vertices->push_back(osg::Vec3(center.x - halfSize, center.y + halfSize, center.z + halfSize)); // 7
-
+    
+    // 为所有顶点设置颜色
+    for (int i = 0; i < 8; ++i)
+    {
+        colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
+                                   m_parameters.lineColor.b, m_parameters.lineColor.a));
+    }
+    
     geometry->setVertexArray(vertices);
-
+    geometry->setColorArray(colors);
+    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+    
     // 生成立方体的12条边
     osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(osg::PrimitiveSet::LINES);
     
@@ -255,21 +265,27 @@ void Cube3D_Geo::buildEdgeGeometries()
     indices->push_back(1); indices->push_back(5);
     indices->push_back(2); indices->push_back(6);
     indices->push_back(3); indices->push_back(7);
-
+    
     geometry->addPrimitiveSet(indices);
-
+    
+    // 设置线的宽度
+    osg::ref_ptr<osg::StateSet> stateSet = geometry->getOrCreateStateSet();
+    osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth;
+    lineWidth->setWidth(2.0f);  // 边界线宽度
+    stateSet->setAttribute(lineWidth);
+    
     addEdgeGeometry(geometry);
 }
 
 void Cube3D_Geo::buildFaceGeometries()
 {
+    clearFaceGeometries();
+    
     const auto& controlPoints = getControlPoints();
     if (controlPoints.empty())
-    {
         return;
-    }
-
-    // 创建面几何体
+    
+    // 创建立方体面几何体
     osg::ref_ptr<osg::Geometry> geometry = createGeometry();
     if (geometry.valid())
     {

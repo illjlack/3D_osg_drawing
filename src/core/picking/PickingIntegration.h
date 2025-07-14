@@ -41,6 +41,7 @@ private:
     osg::ref_ptr<osg::Geometry> createEdgeIndicator(float size);
     osg::ref_ptr<osg::Geometry> createFaceIndicator(float size);
     void createHighlight(Geo3D* geo);
+    void createBoundingBoxHighlight(Geo3D* geo);
 
 private:
     osg::ref_ptr<osg::Group> m_indicatorRoot;

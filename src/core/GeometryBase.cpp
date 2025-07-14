@@ -151,6 +151,12 @@ void Geo3D::setStateInvalid()
 void Geo3D::setStateSelected()
 {
     m_stateManager->setStateSelected();
+    
+    // 更新包围盒可见性
+    if (m_boundingBoxManager)
+    {
+        m_boundingBoxManager->setVisibleForSelection(true);
+    }
 }
 
 void Geo3D::setStateEditing()
@@ -171,6 +177,12 @@ void Geo3D::clearStateInvalid()
 void Geo3D::clearStateSelected()
 {
     m_stateManager->clearStateSelected();
+    
+    // 更新包围盒可见性
+    if (m_boundingBoxManager)
+    {
+        m_boundingBoxManager->setVisibleForSelection(false);
+    }
 }
 
 void Geo3D::clearStateEditing()

@@ -190,12 +190,12 @@ void Quad3D_Geo::buildVertexGeometries()
     if (controlPoints.empty())
         return;
     
-    // 创建四边形顶点的几何体
-    osg::ref_ptr<osg::Geometry> vertexGeometry = new osg::Geometry();
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
+    // 只为控制点创建几何体
+    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
-    // 添加控制点作为顶点
+    // 添加控制点
     for (const Point3D& point : controlPoints)
     {
         vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
@@ -211,20 +211,21 @@ void Quad3D_Geo::buildVertexGeometries()
                                    m_parameters.pointColor.b, m_parameters.pointColor.a * 0.5f));
     }
     
-    vertexGeometry->setVertexArray(vertices.get());
-    vertexGeometry->setColorArray(colors.get());
-    vertexGeometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+    geometry->setVertexArray(vertices);
+    geometry->setColorArray(colors);
+    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     
-    // 使用点绘制
-    vertexGeometry->addPrimitiveSet(new osg::DrawArrays(GL_POINTS, 0, vertices->size()));
+    // 点绘制 - 控制点使用较大的点大小以便拾取
+    osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::POINTS, 0, vertices->size());
+    geometry->addPrimitiveSet(drawArrays);
     
-    // 设置点大小
-    osg::ref_ptr<osg::StateSet> stateSet = vertexGeometry->getOrCreateStateSet();
-    osg::ref_ptr<osg::Point> point = new osg::Point();
-    point->setSize(m_parameters.pointSize);
-    stateSet->setAttribute(point.get());
+    // 设置点的大小
+    osg::ref_ptr<osg::StateSet> stateSet = geometry->getOrCreateStateSet();
+    osg::ref_ptr<osg::Point> point = new osg::Point;
+    point->setSize(8.0f);  // 控制点大小
+    stateSet->setAttribute(point);
     
-    addVertexGeometry(vertexGeometry.get());
+    addVertexGeometry(geometry);
 }
 
 void Quad3D_Geo::buildEdgeGeometries()
@@ -235,10 +236,10 @@ void Quad3D_Geo::buildEdgeGeometries()
     if (controlPoints.size() < 2)
         return;
     
-    // 创建四边形边的几何体
-    osg::ref_ptr<osg::Geometry> edgeGeometry = new osg::Geometry();
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
+    // 创建四边形边界线几何体
+    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
     // 构建所有点（包括临时点）
     std::vector<Point3D> allPoints = controlPoints;
@@ -263,20 +264,21 @@ void Quad3D_Geo::buildEdgeGeometries()
                                    m_parameters.lineColor.b, m_parameters.lineColor.a));
     }
     
-    edgeGeometry->setVertexArray(vertices.get());
-    edgeGeometry->setColorArray(colors.get());
-    edgeGeometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+    geometry->setVertexArray(vertices);
+    geometry->setColorArray(colors);
+    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     
-    // 使用线条绘制
-    edgeGeometry->addPrimitiveSet(new osg::DrawArrays(GL_LINE_STRIP, 0, vertices->size()));
+    // 线绘制 - 边界线
+    osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::LINE_STRIP, 0, vertices->size());
+    geometry->addPrimitiveSet(drawArrays);
     
-    // 设置线宽
-    osg::ref_ptr<osg::StateSet> stateSet = edgeGeometry->getOrCreateStateSet();
-    osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth();
-    lineWidth->setWidth(m_parameters.lineWidth);
-    stateSet->setAttribute(lineWidth.get());
+    // 设置线的宽度
+    osg::ref_ptr<osg::StateSet> stateSet = geometry->getOrCreateStateSet();
+    osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth;
+    lineWidth->setWidth(2.0f);  // 边界线宽度
+    stateSet->setAttribute(lineWidth);
     
-    addEdgeGeometry(edgeGeometry.get());
+    addEdgeGeometry(geometry);
 }
 
 void Quad3D_Geo::buildFaceGeometries()
@@ -287,43 +289,47 @@ void Quad3D_Geo::buildFaceGeometries()
     if (controlPoints.size() < 3)
         return;
     
-    // 创建四边形面的几何体
-    osg::ref_ptr<osg::Geometry> faceGeometry = new osg::Geometry();
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
-    
-    // 构建所有点（包括临时点）
-    std::vector<Point3D> allPoints = controlPoints;
-    if (!isStateComplete() && getTempPoint().position != glm::vec3(0))
-    {
-        allPoints.push_back(getTempPoint());
-    }
+    // 创建四边形面几何体
+    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
+    osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
     
     // 添加顶点
-    for (const auto& point : allPoints)
+    for (const Point3D& point : controlPoints)
     {
         vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
         colors->push_back(osg::Vec4(m_parameters.fillColor.r, m_parameters.fillColor.g, 
                                    m_parameters.fillColor.b, m_parameters.fillColor.a));
     }
     
-    faceGeometry->setVertexArray(vertices.get());
-    faceGeometry->setColorArray(colors.get());
-    faceGeometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+    // 计算法向量
+    calculateNormal();
+    for (int i = 0; i < controlPoints.size(); ++i)
+    {
+        normals->push_back(osg::Vec3(m_normal.x, m_normal.y, m_normal.z));
+    }
+    
+    geometry->setVertexArray(vertices);
+    geometry->setColorArray(colors);
+    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+    geometry->setNormalArray(normals);
+    geometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
     
     // 使用三角形绘制（两个三角形组成四边形）
-    if (allPoints.size() >= 4)
+    if (controlPoints.size() >= 4)
     {
-        osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(GL_TRIANGLES, 6);
+        osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(osg::PrimitiveSet::TRIANGLES, 6);
         (*indices)[0] = 0; (*indices)[1] = 1; (*indices)[2] = 2;
         (*indices)[3] = 0; (*indices)[4] = 2; (*indices)[5] = 3;
-        faceGeometry->addPrimitiveSet(indices.get());
+        geometry->addPrimitiveSet(indices);
     }
-    else if (allPoints.size() >= 3)
+    else if (controlPoints.size() >= 3)
     {
         // 如果只有3个点，绘制三角形
-        faceGeometry->addPrimitiveSet(new osg::DrawArrays(GL_TRIANGLES, 0, 3));
+        osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, 3);
+        geometry->addPrimitiveSet(drawArrays);
     }
     
-    addFaceGeometry(faceGeometry.get());
+    addFaceGeometry(geometry);
 } 

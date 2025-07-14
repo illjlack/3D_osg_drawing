@@ -181,49 +181,42 @@ void Torus3D_Geo::buildVertexGeometries()
     if (controlPoints.empty())
         return;
     
-    // 创建圆环顶点的几何体
-    osg::ref_ptr<osg::Geometry> vertexGeometry = new osg::Geometry();
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
+    // 只为控制点创建几何体
+    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
-    // 生成圆环顶点
-    glm::vec3 center = controlPoints[0].position;
-    int majorSegments = static_cast<int>(m_parameters.subdivisionLevel);
-    int minorSegments = majorSegments / 2;
-    if (majorSegments < 8) majorSegments = 16;
-    if (minorSegments < 4) minorSegments = 8;
-    
-    for (int i = 0; i <= majorSegments; ++i)
+    // 添加控制点
+    for (const Point3D& point : controlPoints)
     {
-        float majorAngle = 2.0f * M_PI * i / majorSegments;
-        for (int j = 0; j <= minorSegments; ++j)
-        {
-            float minorAngle = 2.0f * M_PI * j / minorSegments;
-            
-            float x = center.x + (m_majorRadius + m_minorRadius * cos(minorAngle)) * cos(majorAngle);
-            float y = center.y + (m_majorRadius + m_minorRadius * cos(minorAngle)) * sin(majorAngle);
-            float z = center.z + m_minorRadius * sin(minorAngle);
-            
-            vertices->push_back(osg::Vec3(x, y, z));
-            colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
-                                       m_parameters.pointColor.b, m_parameters.pointColor.a));
-        }
+        vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
+        colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
+                                   m_parameters.pointColor.b, m_parameters.pointColor.a));
     }
     
-    vertexGeometry->setVertexArray(vertices.get());
-    vertexGeometry->setColorArray(colors.get());
-    vertexGeometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+    // 如果有临时点且几何体未完成，添加临时点
+    if (!isStateComplete() && getTempPoint().position != glm::vec3(0))
+    {
+        vertices->push_back(osg::Vec3(getTempPoint().x(), getTempPoint().y(), getTempPoint().z()));
+        colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
+                                   m_parameters.pointColor.b, m_parameters.pointColor.a * 0.5f));
+    }
     
-    // 使用点绘制
-    vertexGeometry->addPrimitiveSet(new osg::DrawArrays(GL_POINTS, 0, vertices->size()));
+    geometry->setVertexArray(vertices);
+    geometry->setColorArray(colors);
+    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     
-    // 设置点大小
-    osg::ref_ptr<osg::StateSet> stateSet = vertexGeometry->getOrCreateStateSet();
-    osg::ref_ptr<osg::Point> point = new osg::Point();
-    point->setSize(m_parameters.pointSize);
-    stateSet->setAttribute(point.get());
+    // 点绘制 - 控制点使用较大的点大小以便拾取
+    osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::POINTS, 0, vertices->size());
+    geometry->addPrimitiveSet(drawArrays);
     
-    addVertexGeometry(vertexGeometry.get());
+    // 设置点的大小
+    osg::ref_ptr<osg::StateSet> stateSet = geometry->getOrCreateStateSet();
+    osg::ref_ptr<osg::Point> point = new osg::Point;
+    point->setSize(8.0f);  // 控制点大小
+    stateSet->setAttribute(point);
+    
+    addVertexGeometry(geometry);
 }
 
 void Torus3D_Geo::buildEdgeGeometries()
@@ -234,25 +227,25 @@ void Torus3D_Geo::buildEdgeGeometries()
     if (controlPoints.empty())
         return;
     
-    // 创建圆环边的几何体
-    osg::ref_ptr<osg::Geometry> edgeGeometry = new osg::Geometry();
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
+    // 创建圆环边界线几何体
+    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
-    // 生成圆环边
+    // 生成圆环边界线
     glm::vec3 center = controlPoints[0].position;
     int majorSegments = static_cast<int>(m_parameters.subdivisionLevel);
     int minorSegments = majorSegments / 2;
     if (majorSegments < 8) majorSegments = 16;
     if (minorSegments < 4) minorSegments = 8;
     
-    // 主圆环的边
-    for (int i = 0; i < majorSegments; ++i)
+    // 主圆环的边（只显示4条主要的）
+    for (int i = 0; i < majorSegments; i += majorSegments / 4)
     {
         float majorAngle1 = 2.0f * M_PI * i / majorSegments;
         float majorAngle2 = 2.0f * M_PI * (i + 1) / majorSegments;
         
-        for (int j = 0; j < minorSegments; ++j)
+        for (int j = 0; j < minorSegments; j += minorSegments / 4)
         {
             float minorAngle = 2.0f * M_PI * j / minorSegments;
             
@@ -274,20 +267,21 @@ void Torus3D_Geo::buildEdgeGeometries()
         }
     }
     
-    edgeGeometry->setVertexArray(vertices.get());
-    edgeGeometry->setColorArray(colors.get());
-    edgeGeometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+    geometry->setVertexArray(vertices);
+    geometry->setColorArray(colors);
+    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     
-    // 使用线绘制
-    edgeGeometry->addPrimitiveSet(new osg::DrawArrays(GL_LINES, 0, vertices->size()));
+    // 线绘制 - 边界线
+    osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::LINES, 0, vertices->size());
+    geometry->addPrimitiveSet(drawArrays);
     
-    // 设置线宽
-    osg::ref_ptr<osg::StateSet> stateSet = edgeGeometry->getOrCreateStateSet();
-    osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth();
-    lineWidth->setWidth(m_parameters.lineWidth);
-    stateSet->setAttribute(lineWidth.get());
+    // 设置线的宽度
+    osg::ref_ptr<osg::StateSet> stateSet = geometry->getOrCreateStateSet();
+    osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth;
+    lineWidth->setWidth(2.0f);  // 边界线宽度
+    stateSet->setAttribute(lineWidth);
     
-    addEdgeGeometry(edgeGeometry.get());
+    addEdgeGeometry(geometry);
 }
 
 void Torus3D_Geo::buildFaceGeometries()
@@ -298,65 +292,12 @@ void Torus3D_Geo::buildFaceGeometries()
     if (controlPoints.empty())
         return;
     
-    // 创建圆环面的几何体
-    osg::ref_ptr<osg::Geometry> faceGeometry = new osg::Geometry();
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
-    
-    // 生成圆环面
-    glm::vec3 center = controlPoints[0].position;
-    int majorSegments = static_cast<int>(m_parameters.subdivisionLevel);
-    int minorSegments = majorSegments / 2;
-    if (majorSegments < 8) majorSegments = 16;
-    if (minorSegments < 4) minorSegments = 8;
-    
-    for (int i = 0; i <= majorSegments; ++i)
+    // 创建圆环面几何体
+    osg::ref_ptr<osg::Geometry> geometry = createGeometry();
+    if (geometry.valid())
     {
-        float majorAngle = 2.0f * M_PI * i / majorSegments;
-        for (int j = 0; j <= minorSegments; ++j)
-        {
-            float minorAngle = 2.0f * M_PI * j / minorSegments;
-            
-            float x = center.x + (m_majorRadius + m_minorRadius * cos(minorAngle)) * cos(majorAngle);
-            float y = center.y + (m_majorRadius + m_minorRadius * cos(minorAngle)) * sin(majorAngle);
-            float z = center.z + m_minorRadius * sin(minorAngle);
-            
-            vertices->push_back(osg::Vec3(x, y, z));
-            colors->push_back(osg::Vec4(m_parameters.fillColor.r, m_parameters.fillColor.g, 
-                                       m_parameters.fillColor.b, m_parameters.fillColor.a));
-        }
+        addFaceGeometry(geometry);
     }
-    
-    faceGeometry->setVertexArray(vertices.get());
-    faceGeometry->setColorArray(colors.get());
-    faceGeometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
-    
-    // 使用三角形绘制
-    osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(GL_TRIANGLES);
-    for (int i = 0; i < majorSegments; ++i)
-    {
-        for (int j = 0; j < minorSegments; ++j)
-        {
-            int current = i * (minorSegments + 1) + j;
-            int next = (i + 1) * (minorSegments + 1) + j;
-            int currentNext = i * (minorSegments + 1) + j + 1;
-            int nextNext = (i + 1) * (minorSegments + 1) + j + 1;
-            
-            // 第一个三角形
-            indices->push_back(current);
-            indices->push_back(next);
-            indices->push_back(currentNext);
-            
-            // 第二个三角形
-            indices->push_back(currentNext);
-            indices->push_back(next);
-            indices->push_back(nextNext);
-        }
-    }
-    
-    faceGeometry->addPrimitiveSet(indices.get());
-    
-    addFaceGeometry(faceGeometry.get());
 }
 
  

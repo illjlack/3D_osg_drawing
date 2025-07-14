@@ -168,47 +168,42 @@ void Sphere3D_Geo::buildVertexGeometries()
     if (controlPoints.empty())
         return;
     
-    glm::vec3 center = controlPoints[0].position;
-    float radius = m_radius;
-    int segments = m_segments;
+    // 只为控制点创建几何体
+    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
-    // 创建球体顶点的几何体
-    osg::ref_ptr<osg::Geometry> vertexGeometry = new osg::Geometry();
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
-    
-    // 生成球体顶点
-    for (int i = 0; i <= segments; ++i)
+    // 添加控制点
+    for (const Point3D& point : controlPoints)
     {
-        float phi = M_PI * i / segments;
-        for (int j = 0; j <= segments; ++j)
-        {
-            float theta = 2.0f * M_PI * j / segments;
-            
-            float x = center.x + radius * sin(phi) * cos(theta);
-            float y = center.y + radius * sin(phi) * sin(theta);
-            float z = center.z + radius * cos(phi);
-            
-            vertices->push_back(osg::Vec3(x, y, z));
-            colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
-                                       m_parameters.pointColor.b, m_parameters.pointColor.a));
-        }
+        vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
+        colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
+                                   m_parameters.pointColor.b, m_parameters.pointColor.a));
     }
     
-    vertexGeometry->setVertexArray(vertices.get());
-    vertexGeometry->setColorArray(colors.get());
-    vertexGeometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+    // 如果有临时点且几何体未完成，添加临时点
+    if (!isStateComplete() && getTempPoint().position != glm::vec3(0))
+    {
+        vertices->push_back(osg::Vec3(getTempPoint().x(), getTempPoint().y(), getTempPoint().z()));
+        colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
+                                   m_parameters.pointColor.b, m_parameters.pointColor.a * 0.5f));
+    }
     
-    // 使用点绘制
-    vertexGeometry->addPrimitiveSet(new osg::DrawArrays(GL_POINTS, 0, vertices->size()));
+    geometry->setVertexArray(vertices);
+    geometry->setColorArray(colors);
+    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     
-    // 设置点大小
-    osg::ref_ptr<osg::StateSet> stateSet = vertexGeometry->getOrCreateStateSet();
-    osg::ref_ptr<osg::Point> point = new osg::Point();
-    point->setSize(m_parameters.pointSize);
-    stateSet->setAttribute(point.get());
+    // 点绘制 - 控制点使用较大的点大小以便拾取
+    osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::POINTS, 0, vertices->size());
+    geometry->addPrimitiveSet(drawArrays);
     
-    addVertexGeometry(vertexGeometry.get());
+    // 设置点的大小
+    osg::ref_ptr<osg::StateSet> stateSet = geometry->getOrCreateStateSet();
+    osg::ref_ptr<osg::Point> point = new osg::Point;
+    point->setSize(8.0f);  // 控制点大小
+    stateSet->setAttribute(point);
+    
+    addVertexGeometry(geometry);
 }
 
 void Sphere3D_Geo::buildEdgeGeometries()
@@ -219,17 +214,19 @@ void Sphere3D_Geo::buildEdgeGeometries()
     if (controlPoints.empty())
         return;
     
+    // 创建球体边界线几何体
+    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
+    
     glm::vec3 center = controlPoints[0].position;
     float radius = m_radius;
-    int segments = m_segments;
+    int segments = static_cast<int>(m_parameters.subdivisionLevel);
+    if (segments < 8) segments = 16;
     
-    // 创建球体边的几何体
-    osg::ref_ptr<osg::Geometry> edgeGeometry = new osg::Geometry();
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
-    
-    // 生成球体边（经纬线）
-    for (int i = 0; i <= segments; ++i)
+    // 生成主要的经纬线作为边界线
+    // 经线（垂直的圆）
+    for (int i = 0; i <= segments; i += segments / 4)  // 只显示4条主要经线
     {
         float phi = M_PI * i / segments;
         for (int j = 0; j < segments; ++j)
@@ -237,7 +234,6 @@ void Sphere3D_Geo::buildEdgeGeometries()
             float theta1 = 2.0f * M_PI * j / segments;
             float theta2 = 2.0f * M_PI * (j + 1) / segments;
             
-            // 经线
             float x1 = center.x + radius * sin(phi) * cos(theta1);
             float y1 = center.y + radius * sin(phi) * sin(theta1);
             float z1 = center.z + radius * cos(phi);
@@ -256,8 +252,8 @@ void Sphere3D_Geo::buildEdgeGeometries()
         }
     }
     
-    // 纬线
-    for (int j = 0; j < segments; ++j)
+    // 纬线（水平的圆）
+    for (int j = 0; j < segments; j += segments / 4)  // 只显示4条主要纬线
     {
         float theta = 2.0f * M_PI * j / segments;
         for (int i = 0; i < segments; ++i)
@@ -283,20 +279,21 @@ void Sphere3D_Geo::buildEdgeGeometries()
         }
     }
     
-    edgeGeometry->setVertexArray(vertices.get());
-    edgeGeometry->setColorArray(colors.get());
-    edgeGeometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+    geometry->setVertexArray(vertices);
+    geometry->setColorArray(colors);
+    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     
-    // 使用线绘制
-    edgeGeometry->addPrimitiveSet(new osg::DrawArrays(GL_LINES, 0, vertices->size()));
+    // 线绘制 - 边界线
+    osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::LINES, 0, vertices->size());
+    geometry->addPrimitiveSet(drawArrays);
     
-    // 设置线宽
-    osg::ref_ptr<osg::StateSet> stateSet = edgeGeometry->getOrCreateStateSet();
-    osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth();
-    lineWidth->setWidth(m_parameters.lineWidth);
-    stateSet->setAttribute(lineWidth.get());
+    // 设置线的宽度
+    osg::ref_ptr<osg::StateSet> stateSet = geometry->getOrCreateStateSet();
+    osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth;
+    lineWidth->setWidth(2.0f);  // 边界线宽度
+    stateSet->setAttribute(lineWidth);
     
-    addEdgeGeometry(edgeGeometry.get());
+    addEdgeGeometry(geometry);
 }
 
 void Sphere3D_Geo::buildFaceGeometries()
@@ -307,76 +304,10 @@ void Sphere3D_Geo::buildFaceGeometries()
     if (controlPoints.empty())
         return;
     
-    glm::vec3 center = controlPoints[0].position;
-    float radius = m_radius;
-    int segments = m_segments;
-    
-    // 创建球体面的几何体
-    osg::ref_ptr<osg::Geometry> faceGeometry = new osg::Geometry();
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
-    osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array();
-    
-    // 生成球体面
-    for (int i = 0; i < segments; ++i)
+    // 创建球体面几何体
+    osg::ref_ptr<osg::Geometry> geometry = createGeometry();
+    if (geometry.valid())
     {
-        float phi1 = M_PI * i / segments;
-        float phi2 = M_PI * (i + 1) / segments;
-        
-        for (int j = 0; j < segments; ++j)
-        {
-            float theta1 = 2.0f * M_PI * j / segments;
-            float theta2 = 2.0f * M_PI * (j + 1) / segments;
-            
-            // 计算四个顶点
-            float x1 = center.x + radius * sin(phi1) * cos(theta1);
-            float y1 = center.y + radius * sin(phi1) * sin(theta1);
-            float z1 = center.z + radius * cos(phi1);
-            
-            float x2 = center.x + radius * sin(phi1) * cos(theta2);
-            float y2 = center.y + radius * sin(phi1) * sin(theta2);
-            float z2 = center.z + radius * cos(phi1);
-            
-            float x3 = center.x + radius * sin(phi2) * cos(theta2);
-            float y3 = center.y + radius * sin(phi2) * sin(theta2);
-            float z3 = center.z + radius * cos(phi2);
-            
-            float x4 = center.x + radius * sin(phi2) * cos(theta1);
-            float y4 = center.y + radius * sin(phi2) * sin(theta1);
-            float z4 = center.z + radius * cos(phi2);
-            
-            // 添加两个三角形
-            vertices->push_back(osg::Vec3(x1, y1, z1));
-            vertices->push_back(osg::Vec3(x2, y2, z2));
-            vertices->push_back(osg::Vec3(x3, y3, z3));
-            
-            vertices->push_back(osg::Vec3(x1, y1, z1));
-            vertices->push_back(osg::Vec3(x3, y3, z3));
-            vertices->push_back(osg::Vec3(x4, y4, z4));
-            
-            // 计算法向量
-            glm::vec3 v1(x1 - center.x, y1 - center.y, z1 - center.z);
-            glm::vec3 v2(x2 - center.x, y2 - center.y, z2 - center.z);
-            glm::vec3 v3(x3 - center.x, y3 - center.y, z3 - center.z);
-            glm::vec3 normal = glm::normalize(glm::cross(v2 - v1, v3 - v1));
-            
-            for (int k = 0; k < 6; ++k)
-            {
-                normals->push_back(osg::Vec3(normal.x, normal.y, normal.z));
-                colors->push_back(osg::Vec4(m_parameters.fillColor.r, m_parameters.fillColor.g, 
-                                           m_parameters.fillColor.b, m_parameters.fillColor.a));
-            }
-        }
+        addFaceGeometry(geometry);
     }
-    
-    faceGeometry->setVertexArray(vertices.get());
-    faceGeometry->setColorArray(colors.get());
-    faceGeometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
-    faceGeometry->setNormalArray(normals.get());
-    faceGeometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
-    
-    // 使用三角面绘制
-    faceGeometry->addPrimitiveSet(new osg::DrawArrays(GL_TRIANGLES, 0, vertices->size()));
-    
-    addFaceGeometry(faceGeometry.get());
 } 

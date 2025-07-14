@@ -101,17 +101,11 @@ void Arc3D_Geo::updateGeometry()
     emit geometryUpdated(this);
 }
 
-
-
 osg::ref_ptr<osg::Geometry> Arc3D_Geo::createGeometry()
 {
     const auto& controlPoints = getControlPoints();
     if (controlPoints.size() < 3)
         return nullptr;
-    
-    glm::vec3 p1 = controlPoints[0].position;
-    glm::vec3 p2 = controlPoints[1].position;
-    glm::vec3 p3 = controlPoints[2].position;
     
     // 计算圆弧参数
     calculateArcParameters();
@@ -154,6 +148,7 @@ void Arc3D_Geo::buildVertexGeometries()
     if (controlPoints.empty())
         return;
     
+    // 只为控制点创建几何体
     osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     
@@ -165,9 +160,15 @@ void Arc3D_Geo::buildVertexGeometries()
     
     geometry->setVertexArray(vertices);
     
-    // 点绘制
+    // 点绘制 - 控制点使用较大的点大小以便拾取
     osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::POINTS, 0, vertices->size());
     geometry->addPrimitiveSet(drawArrays);
+    
+    // 设置点的大小和颜色
+    osg::ref_ptr<osg::StateSet> stateSet = geometry->getOrCreateStateSet();
+    osg::ref_ptr<osg::Point> point = new osg::Point;
+    point->setSize(8.0f);  // 控制点大小
+    stateSet->setAttribute(point);
     
     addVertexGeometry(geometry);
 }
@@ -177,24 +178,51 @@ void Arc3D_Geo::buildEdgeGeometries()
     clearEdgeGeometries();
     
     const auto& controlPoints = getControlPoints();
-    if (controlPoints.size() < 2)
+    if (controlPoints.size() < 3)
         return;
     
-    // 创建圆弧几何体
-    osg::ref_ptr<osg::Geometry> geometry = createGeometry();
-    if (geometry.valid())
+    // 创建圆弧边界线几何体
+    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+    
+    // 计算圆弧参数
+    calculateArcParameters();
+    
+    // 生成圆弧边界线点
+    int segments = static_cast<int>(m_parameters.subdivisionLevel);
+    if (segments < 8) segments = 16;
+    
+    for (int i = 0; i <= segments; ++i)
     {
-        addEdgeGeometry(geometry);
+        float t = static_cast<float>(i) / segments;
+        float angle = m_startAngle + t * m_sweepAngle;
+        
+        glm::vec3 point = m_center + m_radius * (
+            cosf(angle) * m_uAxis + 
+            sinf(angle) * m_vAxis
+        );
+        
+        vertices->push_back(osg::Vec3(point.x, point.y, point.z));
     }
+    
+    geometry->setVertexArray(vertices);
+    
+    // 线绘制 - 边界线
+    osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::LINE_STRIP, 0, vertices->size());
+    geometry->addPrimitiveSet(drawArrays);
+    
+    // 设置线的宽度
+    osg::ref_ptr<osg::StateSet> stateSet = geometry->getOrCreateStateSet();
+    osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth;
+    lineWidth->setWidth(2.0f);  // 边界线宽度
+    stateSet->setAttribute(lineWidth);
+    
+    addEdgeGeometry(geometry);
 }
 
 void Arc3D_Geo::buildFaceGeometries()
 {
     clearFaceGeometries();
-    
-    const auto& controlPoints = getControlPoints();
-    if (controlPoints.size() < 3)
-        return;
     
     // 圆弧通常不需要面，这里留空
     // 如果需要扇形，可以在这里实现

@@ -187,20 +187,40 @@ void Polygon3D_Geo::buildVertexGeometries()
     if (controlPoints.empty())
         return;
     
+    // 只为控制点创建几何体
     osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
-    // 添加所有控制点
+    // 添加控制点
     for (const Point3D& point : controlPoints)
     {
         vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
+        colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
+                                   m_parameters.pointColor.b, m_parameters.pointColor.a));
+    }
+    
+    // 如果有临时点且几何体未完成，添加临时点
+    if (!isStateComplete() && getTempPoint().position != glm::vec3(0))
+    {
+        vertices->push_back(osg::Vec3(getTempPoint().x(), getTempPoint().y(), getTempPoint().z()));
+        colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
+                                   m_parameters.pointColor.b, m_parameters.pointColor.a * 0.5f));
     }
     
     geometry->setVertexArray(vertices);
+    geometry->setColorArray(colors);
+    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     
-    // 点绘制
+    // 点绘制 - 控制点使用较大的点大小以便拾取
     osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::POINTS, 0, vertices->size());
     geometry->addPrimitiveSet(drawArrays);
+    
+    // 设置点的大小
+    osg::ref_ptr<osg::StateSet> stateSet = geometry->getOrCreateStateSet();
+    osg::ref_ptr<osg::Point> point = new osg::Point;
+    point->setSize(8.0f);  // 控制点大小
+    stateSet->setAttribute(point);
     
     addVertexGeometry(geometry);
 }
@@ -213,22 +233,44 @@ void Polygon3D_Geo::buildEdgeGeometries()
     if (controlPoints.size() < 2)
         return;
     
+    // 创建多边形边界线几何体
     osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
+    
+    // 构建所有点（包括临时点）
+    std::vector<Point3D> allPoints = controlPoints;
+    if (!isStateComplete() && getTempPoint().position != glm::vec3(0))
+    {
+        allPoints.push_back(getTempPoint());
+    }
     
     // 添加边顶点
-    for (size_t i = 0; i < controlPoints.size(); ++i)
+    for (size_t i = 0; i < allPoints.size(); ++i)
     {
-        size_t next = (i + 1) % controlPoints.size();
-        vertices->push_back(osg::Vec3(controlPoints[i].x(), controlPoints[i].y(), controlPoints[i].z()));
-        vertices->push_back(osg::Vec3(controlPoints[next].x(), controlPoints[next].y(), controlPoints[next].z()));
+        size_t next = (i + 1) % allPoints.size();
+        vertices->push_back(osg::Vec3(allPoints[i].x(), allPoints[i].y(), allPoints[i].z()));
+        vertices->push_back(osg::Vec3(allPoints[next].x(), allPoints[next].y(), allPoints[next].z()));
+        
+        colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
+                                   m_parameters.lineColor.b, m_parameters.lineColor.a));
+        colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
+                                   m_parameters.lineColor.b, m_parameters.lineColor.a));
     }
     
     geometry->setVertexArray(vertices);
+    geometry->setColorArray(colors);
+    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     
-    // 线绘制
+    // 线绘制 - 边界线
     osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::LINES, 0, vertices->size());
     geometry->addPrimitiveSet(drawArrays);
+    
+    // 设置线的宽度
+    osg::ref_ptr<osg::StateSet> stateSet = geometry->getOrCreateStateSet();
+    osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth;
+    lineWidth->setWidth(2.0f);  // 边界线宽度
+    stateSet->setAttribute(lineWidth);
     
     addEdgeGeometry(geometry);
 }
@@ -241,7 +283,7 @@ void Polygon3D_Geo::buildFaceGeometries()
     if (controlPoints.size() < 3)
         return;
     
-    // 创建面几何体
+    // 创建多边形面几何体
     osg::ref_ptr<osg::Geometry> geometry = createGeometry();
     if (geometry.valid())
     {

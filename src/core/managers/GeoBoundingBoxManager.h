@@ -91,6 +91,23 @@ public:
     const Color3D& getWireframeColor() const { return m_wireframeColor; }
     void setWireframeWidth(float width);
     float getWireframeWidth() const { return m_wireframeWidth; }
+    
+    // 选中状态管理
+    void setVisibleForSelection(bool selected);
+
+    // 包围盒控制点
+    void setControlPointsVisible(bool visible);
+    bool areControlPointsVisible() const { return m_controlPointsVisible; }
+    void setControlPointSize(float size);
+    float getControlPointSize() const { return m_controlPointSize; }
+    void setControlPointColor(const Color3D& color);
+    const Color3D& getControlPointColor() const { return m_controlPointColor; }
+    
+    // 包围盒控制点查询
+    std::vector<glm::vec3> getControlPointPositions() const;
+    int findNearestControlPoint(const glm::vec3& point, float threshold = 0.1f) const;
+    glm::vec3 getControlPointPosition(int index) const;
+    bool isValidControlPointIndex(int index) const;
 
     // 包围盒统计
     float getVolume() const;
@@ -138,6 +155,11 @@ private:
     bool m_visible;
     Color3D m_wireframeColor;
     float m_wireframeWidth;
+    
+    // 控制点可视化
+    bool m_controlPointsVisible;
+    float m_controlPointSize;
+    Color3D m_controlPointColor;
     
     // 缓存
     mutable bool m_centerCached;

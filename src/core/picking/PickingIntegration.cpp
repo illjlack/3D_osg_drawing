@@ -293,63 +293,119 @@ void SimplePickingIndicatorManager::createHighlight(Geo3D* geo)
     m_currentHighlight = new osg::Group;
     m_highlightRoot->addChild(m_currentHighlight);
     
-    // 遍历几何对象的子节点
-    osg::Group* geoGroup = geo->getOSGNode()->asGroup();
-    if (geoGroup)
+    // 高亮控制点而不是整个对象
+    const auto& controlPoints = geo->getControlPoints();
+    if (!controlPoints.empty())
     {
-        for (unsigned int i = 0; i < geoGroup->getNumChildren(); ++i)
+        // 创建控制点高亮几何体
+        osg::ref_ptr<osg::Geometry> highlightGeometry = new osg::Geometry;
+        osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+        osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
+        
+        // 添加所有控制点
+        for (const auto& cp : controlPoints)
         {
-            osg::Node* child = geoGroup->getChild(i);
-            osg::Geometry* geometry = child->asGeometry();
-            
-            // OSG 3.5.6 兼容性：也检查Geode节点
-            if (!geometry)
-            {
-                osg::Geode* geode = child->asGeode();
-                if (geode && geode->getNumDrawables() > 0)
-                {
-                    geometry = geode->getDrawable(0)->asGeometry();
-                }
-            }
-            
-            if (geometry)
-            {
-                // 创建高亮几何体
-                osg::ref_ptr<osg::Geometry> highlightGeometry = new osg::Geometry;
-                highlightGeometry->setVertexArray(geometry->getVertexArray());
-                
-                // 复制图元集
-                for (unsigned int j = 0; j < geometry->getNumPrimitiveSets(); ++j)
-                {
-                    highlightGeometry->addPrimitiveSet(geometry->getPrimitiveSet(j));
-                }
-                
-                // 设置高亮状态
-                osg::StateSet* stateSet = highlightGeometry->getOrCreateStateSet();
-                
-                // 设置线框模式
-                osg::PolygonMode* polygonMode = new osg::PolygonMode;
-                polygonMode->setMode(osg::PolygonMode::FRONT_AND_BACK, osg::PolygonMode::LINE);
-                stateSet->setAttributeAndModes(polygonMode);
-                
-                // 设置线宽
-                stateSet->setAttributeAndModes(new osg::LineWidth(3.0f));
-                
-                // 设置颜色
-                osg::Material* material = new osg::Material;
-                material->setDiffuse(osg::Material::FRONT_AND_BACK, osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f));
-                stateSet->setAttributeAndModes(material);
-                
-                // 设置多边形偏移
-                osg::PolygonOffset* polygonOffset = new osg::PolygonOffset;
-                polygonOffset->setFactor(-1.0f);
-                polygonOffset->setUnits(-1.0f);
-                stateSet->setAttributeAndModes(polygonOffset);
-                
-                m_currentHighlight->addChild(highlightGeometry);
-            }
+            vertices->push_back(osg::Vec3(cp.x(), cp.y(), cp.z()));
+            colors->push_back(osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f)); // 黄色高亮
         }
+        
+        highlightGeometry->setVertexArray(vertices);
+        highlightGeometry->setColorArray(colors);
+        highlightGeometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+        
+        // 点绘制
+        osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::POINTS, 0, vertices->size());
+        highlightGeometry->addPrimitiveSet(drawArrays);
+        
+        // 设置点的大小
+        osg::ref_ptr<osg::StateSet> stateSet = highlightGeometry->getOrCreateStateSet();
+        osg::ref_ptr<osg::Point> point = new osg::Point;
+        point->setSize(12.0f);  // 高亮控制点大小
+        stateSet->setAttribute(point);
+        
+        // 禁用光照
+        stateSet->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+        
+        // 设置深度测试
+        stateSet->setMode(GL_DEPTH_TEST, osg::StateAttribute::ON);
+        
+        // 设置多边形偏移，避免Z-fighting
+        osg::PolygonOffset* polygonOffset = new osg::PolygonOffset;
+        polygonOffset->setFactor(-1.0f);
+        polygonOffset->setUnits(-1.0f);
+        stateSet->setAttributeAndModes(polygonOffset);
+        
+        m_currentHighlight->addChild(highlightGeometry);
     }
+    
+    // 如果对象被选中，显示包围盒
+    if (geo->isStateSelected())
+    {
+        createBoundingBoxHighlight(geo);
+    }
+    
+    // 为所有选中的对象显示包围盒
+    // 这里需要从OSGWidget获取选中列表，暂时只处理当前对象
+}
+
+void SimplePickingIndicatorManager::createBoundingBoxHighlight(Geo3D* geo)
+{
+    if (!geo) return;
+    
+    auto* boundingBoxManager = geo->getBoundingBoxManager();
+    if (!boundingBoxManager || !boundingBoxManager->isValid())
+        return;
+    
+    // 创建包围盒线框
+    osg::ref_ptr<osg::Geometry> bboxGeometry = new osg::Geometry;
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
+    
+    // 获取包围盒的8个角点
+    std::vector<glm::vec3> corners = boundingBoxManager->getCorners();
+    
+    // 添加所有角点
+    for (const auto& corner : corners)
+    {
+        vertices->push_back(osg::Vec3(corner.x, corner.y, corner.z));
+        colors->push_back(osg::Vec4(0.0f, 1.0f, 1.0f, 1.0f)); // 青色包围盒
+    }
+    
+    bboxGeometry->setVertexArray(vertices);
+    bboxGeometry->setColorArray(colors);
+    bboxGeometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+    
+    // 绘制包围盒线框
+    // 前面
+    osg::ref_ptr<osg::DrawElementsUInt> frontIndices = new osg::DrawElementsUInt(osg::PrimitiveSet::LINE_LOOP);
+    frontIndices->push_back(0); frontIndices->push_back(1); frontIndices->push_back(2); frontIndices->push_back(3);
+    bboxGeometry->addPrimitiveSet(frontIndices);
+    
+    // 后面
+    osg::ref_ptr<osg::DrawElementsUInt> backIndices = new osg::DrawElementsUInt(osg::PrimitiveSet::LINE_LOOP);
+    backIndices->push_back(4); backIndices->push_back(5); backIndices->push_back(6); backIndices->push_back(7);
+    bboxGeometry->addPrimitiveSet(backIndices);
+    
+    // 连接线
+    osg::ref_ptr<osg::DrawElementsUInt> connectIndices = new osg::DrawElementsUInt(osg::PrimitiveSet::LINES);
+    connectIndices->push_back(0); connectIndices->push_back(4);
+    connectIndices->push_back(1); connectIndices->push_back(5);
+    connectIndices->push_back(2); connectIndices->push_back(6);
+    connectIndices->push_back(3); connectIndices->push_back(7);
+    bboxGeometry->addPrimitiveSet(connectIndices);
+    
+    // 设置线框状态
+    osg::StateSet* stateSet = bboxGeometry->getOrCreateStateSet();
+    stateSet->setAttributeAndModes(new osg::LineWidth(2.0f));
+    stateSet->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+    
+    // 设置多边形偏移
+    osg::PolygonOffset* polygonOffset = new osg::PolygonOffset;
+    polygonOffset->setFactor(-1.0f);
+    polygonOffset->setUnits(-1.0f);
+    stateSet->setAttributeAndModes(polygonOffset);
+    
+    m_currentHighlight->addChild(bboxGeometry);
 }
 
 // ============================================================================

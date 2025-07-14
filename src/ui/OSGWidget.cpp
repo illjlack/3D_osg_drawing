@@ -64,9 +64,15 @@ OSGWidget::OSGWidget(QWidget* parent)
     , m_coordinateSystemRenderer(std::make_unique<CoordinateSystemRenderer>())
     , m_coordinateSystemEnabled(true)
     , m_scaleBarEnabled(true)
-    , m_scaleBarPosition(20, 20)
-    , m_scaleBarSize(150, 30)
+    , m_scaleBarPosition(10, 10)
+    , m_scaleBarSize(200, 60)
     , m_updateTimer(new QTimer(this))
+    , m_cachedScaleValue(0.0)
+    , m_mousePosCacheValid(false)
+    , m_multiSelectMode(false)
+    , m_isDraggingControlPoint(false)
+    , m_draggingGeo(nullptr)
+    , m_draggingControlPointIndex(-1)
 {
     setFocusPolicy(Qt::StrongFocus);
     setMouseTracking(true);
@@ -445,6 +451,134 @@ void OSGWidget::deselectAll()
     selectGeo(nullptr);
 }
 
+// 多选功能实现
+void OSGWidget::addToSelection(Geo3D* geo)
+{
+    if (!geo) return;
+    
+    // 检查是否已经在选中列表中
+    auto it = std::find(m_selectedGeos.begin(), m_selectedGeos.end(), geo);
+    if (it == m_selectedGeos.end())
+    {
+        m_selectedGeos.push_back(geo);
+        geo->setStateSelected();
+        updateSelectionHighlight();
+        emit geoSelected(geo);
+    }
+}
+
+void OSGWidget::removeFromSelection(Geo3D* geo)
+{
+    if (!geo) return;
+    
+    auto it = std::find(m_selectedGeos.begin(), m_selectedGeos.end(), geo);
+    if (it != m_selectedGeos.end())
+    {
+        m_selectedGeos.erase(it);
+        geo->clearStateSelected();
+        
+        // 如果移除的是当前选中的对象，清空当前选中
+        if (m_selectedGeo.get() == geo)
+        {
+            m_selectedGeo = nullptr;
+        }
+        
+        updateSelectionHighlight();
+        emit geoSelected(nullptr);
+    }
+}
+
+void OSGWidget::clearSelection()
+{
+    // 清除所有选中对象的状态
+    for (auto* geo : m_selectedGeos)
+    {
+        if (geo)
+        {
+            geo->clearStateSelected();
+        }
+    }
+    
+    m_selectedGeos.clear();
+    m_selectedGeo = nullptr;
+    updateSelectionHighlight();
+    emit geoSelected(nullptr);
+}
+
+const std::vector<Geo3D*>& OSGWidget::getSelectedGeos() const
+{
+    return m_selectedGeos;
+}
+
+bool OSGWidget::isSelected(Geo3D* geo) const
+{
+    if (!geo) return false;
+    return std::find(m_selectedGeos.begin(), m_selectedGeos.end(), geo) != m_selectedGeos.end();
+}
+
+int OSGWidget::getSelectionCount() const
+{
+    return static_cast<int>(m_selectedGeos.size());
+}
+
+// 拖动控制点功能实现
+void OSGWidget::startDraggingControlPoint(Geo3D* geo, int controlPointIndex)
+{
+    if (!geo || controlPointIndex < 0) return;
+    
+    m_isDraggingControlPoint = true;
+    m_draggingGeo = geo;
+    m_draggingControlPointIndex = controlPointIndex;
+    m_dragStartPosition = m_lastMouseWorldPos;
+    
+    LOG_DEBUG(QString("开始拖动控制点: 对象=%1, 控制点索引=%2")
+        .arg(geo->getGeoType())
+        .arg(controlPointIndex), "拖动");
+}
+
+void OSGWidget::stopDraggingControlPoint()
+{
+    if (m_isDraggingControlPoint)
+    {
+        LOG_DEBUG("停止拖动控制点", "拖动");
+    }
+    
+    m_isDraggingControlPoint = false;
+    m_draggingGeo = nullptr;
+    m_draggingControlPointIndex = -1;
+}
+
+// 高亮管理实现
+void OSGWidget::updateSelectionHighlight()
+{
+    // 清除之前的高亮
+    if (m_advancedPickingEnabled)
+    {
+        // 暂时不调用高亮系统，因为SimplifiedPickingSystemManager没有直接的高亮清除方法
+        // 高亮会在下一次拾取时自动更新
+    }
+    
+    // 为选中的对象创建高亮
+    highlightSelectedObjects();
+}
+
+void OSGWidget::highlightSelectedObjects()
+{
+    if (!m_advancedPickingEnabled || m_selectedGeos.empty())
+        return;
+    
+    // 为每个选中的对象创建高亮
+    for (auto* geo : m_selectedGeos)
+    {
+        if (geo)
+        {
+            // 这里需要调用高亮系统
+            // 暂时使用简化的方式
+            geo->setStateSelected();
+        }
+    }
+}
+
 // 高级拾取系统接口
 void OSGWidget::enableAdvancedPicking(bool enabled)
 {
@@ -605,31 +739,52 @@ void OSGWidget::resizeEvent(QResizeEvent* event)
 
 void OSGWidget::mousePressEvent(QMouseEvent* event)
 {
-    // 获取当前键盘状态
-    Qt::KeyboardModifiers currentModifiers = QApplication::keyboardModifiers();
+    // 处理绘制输入
+    handleDrawingInput(event);
     
-    // 非绘制状态：根据模式决定处理方式
-    if (GlobalDrawMode3D == DrawSelect3D || (currentModifiers & Qt::ControlModifier))
+    // 处理拖动控制点
+    if (GlobalDrawMode3D == DrawSelect3D && event->button() == Qt::LeftButton)
     {
-        // 选择模式：正常传递给OSG窗口
-        QString buttonName;
-        switch (event->button()) {
-            case Qt::LeftButton: buttonName = "左键"; break;
-            case Qt::RightButton: buttonName = "右键"; break;
-            case Qt::MiddleButton: buttonName = "中键"; break;
-            default: buttonName = "未知"; break;
+        // 检查是否点击了控制点
+        glm::vec3 worldPos = screenToWorld(event->x(), event->y(), 0.5f);
+        
+        // 检查选中的对象
+        for (auto* geo : m_selectedGeos)
+        {
+            if (!geo) continue;
+            
+            // 检查控制点
+            const auto& controlPoints = geo->getControlPoints();
+            for (int i = 0; i < static_cast<int>(controlPoints.size()); ++i)
+            {
+                glm::vec3 diff = controlPoints[i].position - worldPos;
+                float distance = glm::length(diff);
+                
+                if (distance < 0.1f) // 控制点拾取阈值
+                {
+                    startDraggingControlPoint(geo, i);
+                    event->accept();
+                    return;
+                }
+            }
+            
+            // 检查包围盒控制点
+            auto* boundingBoxManager = geo->getBoundingBoxManager();
+            if (boundingBoxManager && boundingBoxManager->isValid())
+            {
+                int nearestCorner = boundingBoxManager->findNearestControlPoint(worldPos, 0.1f);
+                if (nearestCorner >= 0)
+                {
+                    // 使用包围盒角点作为控制点
+                    startDraggingControlPoint(geo, nearestCorner);
+                    event->accept();
+                    return;
+                }
+            }
         }
-        
-        LOG_DEBUG(QString("鼠标按下: %1 位置(%2,%3)").arg(buttonName).arg(event->x()).arg(event->y()), "相机");
-        
-        osgQOpenGLWidget::mousePressEvent(event);
     }
-    else
-    {
-        // 绘制模式：处理绘制输入
-        handleDrawingInput(event);
-        event->accept();
-    }
+    
+    osgQOpenGLWidget::mousePressEvent(event);
 }
 
 void OSGWidget::mouseMoveEvent(QMouseEvent* event)
@@ -674,6 +829,44 @@ void OSGWidget::mouseMoveEvent(QMouseEvent* event)
         lastMouseUpdate = currentTime;
     }
     
+    // 处理拖动控制点
+    if (m_isDraggingControlPoint && m_draggingGeo && m_draggingControlPointIndex >= 0)
+    {
+        // 计算拖动偏移
+        glm::vec3 dragOffset = m_lastMouseWorldPos - m_dragStartPosition;
+        
+        // 更新控制点位置
+        const auto& controlPoints = m_draggingGeo->getControlPoints();
+        if (m_draggingControlPointIndex < static_cast<int>(controlPoints.size()))
+        {
+            // 更新控制点
+            Point3D newPoint = controlPoints[m_draggingControlPointIndex];
+            newPoint.position += dragOffset;
+            m_draggingGeo->setControlPoint(m_draggingControlPointIndex, newPoint);
+            
+            // 更新拖动起始位置
+            m_dragStartPosition = m_lastMouseWorldPos;
+            
+            // 强制更新几何体
+            m_draggingGeo->updateGeometry();
+        }
+        else
+        {
+            // 处理包围盒控制点
+            auto* boundingBoxManager = m_draggingGeo->getBoundingBoxManager();
+            if (boundingBoxManager && boundingBoxManager->isValid())
+            {
+                // 获取当前包围盒角点
+                glm::vec3 currentCorner = boundingBoxManager->getControlPointPosition(m_draggingControlPointIndex);
+                glm::vec3 newCorner = currentCorner + dragOffset;
+                
+                // 更新包围盒（这里需要实现包围盒的更新逻辑）
+                // 暂时只更新控制点
+                m_dragStartPosition = m_lastMouseWorldPos;
+            }
+        }
+    }
+    
     // 处理绘制预览 - 使用缓存的位置
     if (m_isDrawing && m_currentDrawingGeo)
     {
@@ -683,18 +876,12 @@ void OSGWidget::mouseMoveEvent(QMouseEvent* event)
 
 void OSGWidget::mouseReleaseEvent(QMouseEvent* event)
 {
-    // 如果是相机控制模式，添加日志
-    if (GlobalDrawMode3D == DrawSelect3D || (QApplication::keyboardModifiers() & Qt::ControlModifier))
+    // 停止拖动控制点
+    if (event->button() == Qt::LeftButton && m_isDraggingControlPoint)
     {
-        QString buttonName;
-        switch (event->button()) {
-            case Qt::LeftButton: buttonName = "左键"; break;
-            case Qt::RightButton: buttonName = "右键"; break;
-            case Qt::MiddleButton: buttonName = "中键"; break;
-            default: buttonName = "未知"; break;
-        }
-        
-        LOG_DEBUG(QString("鼠标释放: %1 位置(%2,%3)").arg(buttonName).arg(event->x()).arg(event->y()), "相机");
+        stopDraggingControlPoint();
+        event->accept();
+        return;
     }
     
     osgQOpenGLWidget::mouseReleaseEvent(event);
@@ -746,13 +933,43 @@ void OSGWidget::handleDrawingInput(QMouseEvent* event)
     {
         // 选择模式：拾取对象
         PickResult3D pickResult = pick(event->x(), event->y());
+        
+        // 检查是否按下了Ctrl键（多选模式）
+        bool isCtrlPressed = (QApplication::keyboardModifiers() & Qt::ControlModifier);
+        
         if (pickResult.hit)
         {
-            selectGeo(static_cast<Geo3D*>(pickResult.userData));
+            Geo3D* pickedGeo = static_cast<Geo3D*>(pickResult.userData);
+            
+            if (isCtrlPressed)
+            {
+                // Ctrl+点击：多选模式
+                if (isSelected(pickedGeo))
+                {
+                    // 如果已经选中，则从选中列表中移除
+                    removeFromSelection(pickedGeo);
+                }
+                else
+                {
+                    // 如果未选中，则添加到选中列表
+                    addToSelection(pickedGeo);
+                }
+            }
+            else
+            {
+                // 普通点击：单选模式
+                clearSelection();
+                selectGeo(pickedGeo);
+                addToSelection(pickedGeo);
+            }
         }
         else
         {
-            deselectAll();
+            // 没有点击到对象，清除选择
+            if (!isCtrlPressed)
+            {
+                clearSelection();
+            }
         }
     }
     else
