@@ -10,6 +10,8 @@
 Point3D_Geo::Point3D_Geo()
 {
     m_geoType = Geo_Point3D;
+    // 确保基类正确初始化
+    initialize();
 }
 
 void Point3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
@@ -32,13 +34,22 @@ void Point3D_Geo::completeDrawing()
 
 void Point3D_Geo::updateGeometry()
 {
+    // 清除点线面节点
+    clearVertexGeometries();
+    clearEdgeGeometries();
+    clearFaceGeometries();
+    
     updateOSGNode();
+    
+    // 构建点线面几何体
+    buildVertexGeometries();
+    buildEdgeGeometries();
+    buildFaceGeometries();
+    
+    // 更新可见性
+    updateFeatureVisibility();
 }
 
-std::vector<FeatureType> Point3D_Geo::getSupportedFeatureTypes() const
-{
-    return {FeatureType::VERTEX};
-}
 
 osg::ref_ptr<osg::Geometry> Point3D_Geo::createGeometry()
 {
@@ -48,19 +59,37 @@ osg::ref_ptr<osg::Geometry> Point3D_Geo::createGeometry()
     return createPointGeometry(m_parameters.pointShape, m_parameters.pointSize);
 }
 
-std::vector<PickingFeature> Point3D_Geo::extractVertexFeatures() const
+
+
+// ============================================================================
+// 点线面几何体构建实现
+// ============================================================================
+
+void Point3D_Geo::buildVertexGeometries()
 {
-    std::vector<PickingFeature> features;
+    clearVertexGeometries();
     
-    if (!m_controlPoints.empty())
+    if (m_controlPoints.empty())
+        return;
+    
+    // 创建点的几何体
+    osg::ref_ptr<osg::Geometry> vertexGeometry = createPointGeometry(m_parameters.pointShape, m_parameters.pointSize);
+    if (vertexGeometry.valid())
     {
-        PickingFeature feature(FeatureType::VERTEX, 0);
-        feature.center = osg::Vec3(m_controlPoints[0].x(), m_controlPoints[0].y(), m_controlPoints[0].z());
-        feature.size = m_parameters.pointSize * 0.01f;
-        features.push_back(feature);
+        addVertexGeometry(vertexGeometry.get());
     }
-    
-    return features;
+}
+
+void Point3D_Geo::buildEdgeGeometries()
+{
+    clearEdgeGeometries();
+    // 点对象没有边
+}
+
+void Point3D_Geo::buildFaceGeometries()
+{
+    clearFaceGeometries();
+    // 点对象没有面
 }
 
 osg::ref_ptr<osg::Geometry> Point3D_Geo::createPointGeometry(PointShape3D shape, float size)

@@ -11,6 +11,8 @@
 Line3D_Geo::Line3D_Geo()
 {
     m_geoType = Geo_Line3D;
+    // 确保基类正确初始化
+    initialize();
 }
 
 void Line3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
@@ -58,12 +60,20 @@ void Line3D_Geo::keyPressEvent(QKeyEvent* event)
 
 void Line3D_Geo::updateGeometry()
 {
+    // 清除点线面节点
+    clearVertexGeometries();
+    clearEdgeGeometries();
+    clearFaceGeometries();
+    
     updateOSGNode();
-}
-
-std::vector<FeatureType> Line3D_Geo::getSupportedFeatureTypes() const
-{
-    return {FeatureType::EDGE, FeatureType::VERTEX};
+    
+    // 构建点线面几何体
+    buildVertexGeometries();
+    buildEdgeGeometries();
+    buildFaceGeometries();
+    
+    // 更新可见性
+    updateFeatureVisibility();
 }
 
 osg::ref_ptr<osg::Geometry> Line3D_Geo::createGeometry()
@@ -118,43 +128,86 @@ osg::ref_ptr<osg::Geometry> Line3D_Geo::createGeometry()
     return geometry;
 }
 
-std::vector<PickingFeature> Line3D_Geo::extractEdgeFeatures() const
+// ============================================================================
+// 点线面几何体构建实现
+// ============================================================================
+
+void Line3D_Geo::buildVertexGeometries()
 {
-    std::vector<PickingFeature> features;
+    clearVertexGeometries();
     
-    if (m_generatedPoints.size() >= 2)
+    if (m_controlPoints.empty())
+        return;
+    
+    // 创建线端点的几何体
+    osg::ref_ptr<osg::Geometry> vertexGeometry = new osg::Geometry();
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
+    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
+    
+    // 添加起点和终点
+    for (const auto& point : m_controlPoints)
     {
-        // 每条线段作为一个边Feature
-        for (size_t i = 0; i < m_generatedPoints.size() - 1; ++i)
-        {
-            PickingFeature feature(FeatureType::EDGE, static_cast<uint32_t>(i));
-            
-            // 计算线段中心点
-            glm::vec3 center = (m_generatedPoints[i].position + m_generatedPoints[i+1].position) * 0.5f;
-            feature.center = osg::Vec3(center.x, center.y, center.z);
-            feature.size = 0.08f; // 边指示器大小
-            
-            features.push_back(feature);
-        }
+        vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
+        colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
+                                   m_parameters.pointColor.b, m_parameters.pointColor.a));
     }
     
-    return features;
+    vertexGeometry->setVertexArray(vertices.get());
+    vertexGeometry->setColorArray(colors.get());
+    vertexGeometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+    
+    // 使用点绘制
+    vertexGeometry->addPrimitiveSet(new osg::DrawArrays(GL_POINTS, 0, vertices->size()));
+    
+    // 设置点大小
+    osg::ref_ptr<osg::StateSet> stateSet = vertexGeometry->getOrCreateStateSet();
+    osg::ref_ptr<osg::Point> point = new osg::Point();
+    point->setSize(m_parameters.pointSize);
+    stateSet->setAttribute(point.get());
+    
+    addVertexGeometry(vertexGeometry.get());
 }
 
-std::vector<PickingFeature> Line3D_Geo::extractVertexFeatures() const
+void Line3D_Geo::buildEdgeGeometries()
 {
-    std::vector<PickingFeature> features;
+    clearEdgeGeometries();
     
-    // 从控制点中提取顶点Feature
-    for (size_t i = 0; i < m_controlPoints.size(); ++i)
+    if (m_controlPoints.size() < 2)
+        return;
+    
+    // 创建线的几何体
+    osg::ref_ptr<osg::Geometry> edgeGeometry = new osg::Geometry();
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
+    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
+    
+    // 添加起点和终点
+    for (const auto& point : m_controlPoints)
     {
-        PickingFeature feature(FeatureType::VERTEX, static_cast<uint32_t>(i));
-        feature.center = osg::Vec3(m_controlPoints[i].x(), m_controlPoints[i].y(), m_controlPoints[i].z());
-        feature.size = 0.05f; // 顶点指示器大小
-        features.push_back(feature);
+        vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
+        colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
+                                   m_parameters.lineColor.b, m_parameters.lineColor.a));
     }
     
-    return features;
+    edgeGeometry->setVertexArray(vertices.get());
+    edgeGeometry->setColorArray(colors.get());
+    edgeGeometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+    
+    // 使用线绘制
+    edgeGeometry->addPrimitiveSet(new osg::DrawArrays(GL_LINE_STRIP, 0, vertices->size()));
+    
+    // 设置线宽
+    osg::ref_ptr<osg::StateSet> stateSet = edgeGeometry->getOrCreateStateSet();
+    osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth();
+    lineWidth->setWidth(m_parameters.lineWidth);
+    stateSet->setAttribute(lineWidth.get());
+    
+    addEdgeGeometry(edgeGeometry.get());
+}
+
+void Line3D_Geo::buildFaceGeometries()
+{
+    clearFaceGeometries();
+    // 线对象没有面
 }
 
 void Line3D_Geo::generatePolyline()

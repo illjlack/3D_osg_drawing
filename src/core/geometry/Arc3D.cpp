@@ -14,6 +14,8 @@ Arc3D_Geo::Arc3D_Geo()
     , m_normal(0, 0, 1)
 {
     m_geoType = Geo_Arc3D;
+    // 确保基类正确初始化
+    initialize();
 }
 
 void Arc3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
@@ -60,13 +62,23 @@ void Arc3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 
 void Arc3D_Geo::updateGeometry()
 {
+    // 清除点线面节点
+    clearVertexGeometries();
+    clearEdgeGeometries();
+    clearFaceGeometries();
+    
     updateOSGNode();
+    
+    // 构建点线面几何体
+    buildVertexGeometries();
+    buildEdgeGeometries();
+    buildFaceGeometries();
+    
+    // 更新可见性
+    updateFeatureVisibility();
 }
 
-std::vector<FeatureType> Arc3D_Geo::getSupportedFeatureTypes() const
-{
-    return {FeatureType::EDGE, FeatureType::VERTEX};
-}
+
 
 osg::ref_ptr<osg::Geometry> Arc3D_Geo::createGeometry()
 {
@@ -93,56 +105,82 @@ osg::ref_ptr<osg::Geometry> Arc3D_Geo::createGeometry()
     return geometry;
 }
 
-std::vector<PickingFeature> Arc3D_Geo::extractEdgeFeatures() const
+void Arc3D_Geo::buildVertexGeometries()
 {
-    std::vector<PickingFeature> features;
+    clearVertexGeometries();
     
-    if (m_arcPoints.size() >= 2)
+    if (m_controlPoints.empty())
+        return;
+    
+    // 创建圆弧顶点的几何体
+    osg::ref_ptr<osg::Geometry> vertexGeometry = new osg::Geometry();
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
+    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
+    
+    // 添加控制点作为顶点
+    for (const Point3D& point : m_controlPoints)
     {
-        // 圆弧作为一个整体边Feature
-        PickingFeature feature(FeatureType::EDGE, 0);
-        
-        // 计算圆弧中心点
-        glm::vec3 center = m_center;
-        feature.center = osg::Vec3(center.x, center.y, center.z);
-        feature.size = 0.08f; // 边指示器大小
-        
-        features.push_back(feature);
+        vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
+        colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
+                                   m_parameters.pointColor.b, m_parameters.pointColor.a));
     }
     
-    return features;
+    vertexGeometry->setVertexArray(vertices.get());
+    vertexGeometry->setColorArray(colors.get());
+    vertexGeometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+    
+    // 使用点绘制
+    vertexGeometry->addPrimitiveSet(new osg::DrawArrays(GL_POINTS, 0, vertices->size()));
+    
+    // 设置点大小
+    osg::ref_ptr<osg::StateSet> stateSet = vertexGeometry->getOrCreateStateSet();
+    osg::ref_ptr<osg::Point> point = new osg::Point();
+    point->setSize(m_parameters.pointSize);
+    stateSet->setAttribute(point.get());
+    
+    addVertexGeometry(vertexGeometry.get());
 }
 
-std::vector<PickingFeature> Arc3D_Geo::extractVertexFeatures() const
+void Arc3D_Geo::buildEdgeGeometries()
 {
-    std::vector<PickingFeature> features;
+    clearEdgeGeometries();
     
-    // 从控制点中提取顶点Feature（圆弧的端点）
-    if (m_controlPoints.size() >= 1)
+    if (m_arcPoints.empty())
+        return;
+    
+    // 创建圆弧边的几何体
+    osg::ref_ptr<osg::Geometry> edgeGeometry = new osg::Geometry();
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
+    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
+    
+    // 添加圆弧点作为边
+    for (const Point3D& point : m_arcPoints)
     {
-        // 起点
-        PickingFeature startFeature(FeatureType::VERTEX, 0);
-        startFeature.center = osg::Vec3(m_controlPoints[0].x(), m_controlPoints[0].y(), m_controlPoints[0].z());
-        startFeature.size = 0.05f;
-        features.push_back(startFeature);
+        vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
+        colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
+                                   m_parameters.lineColor.b, m_parameters.lineColor.a));
     }
     
-    if (m_controlPoints.size() >= 3)
-    {
-        // 终点
-        PickingFeature endFeature(FeatureType::VERTEX, 1);
-        endFeature.center = osg::Vec3(m_controlPoints[2].x(), m_controlPoints[2].y(), m_controlPoints[2].z());
-        endFeature.size = 0.05f;
-        features.push_back(endFeature);
-        
-        // 圆心
-        PickingFeature centerFeature(FeatureType::VERTEX, 2);
-        centerFeature.center = osg::Vec3(m_center.x, m_center.y, m_center.z);
-        centerFeature.size = 0.05f;
-        features.push_back(centerFeature);
-    }
+    edgeGeometry->setVertexArray(vertices.get());
+    edgeGeometry->setColorArray(colors.get());
+    edgeGeometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     
-    return features;
+    // 使用线绘制
+    edgeGeometry->addPrimitiveSet(new osg::DrawArrays(GL_LINE_STRIP, 0, vertices->size()));
+    
+    // 设置线宽
+    osg::ref_ptr<osg::StateSet> stateSet = edgeGeometry->getOrCreateStateSet();
+    osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth();
+    lineWidth->setWidth(m_parameters.lineWidth);
+    stateSet->setAttribute(lineWidth.get());
+    
+    addEdgeGeometry(edgeGeometry.get());
+}
+
+void Arc3D_Geo::buildFaceGeometries()
+{
+    clearFaceGeometries();
+    // 圆弧没有面几何体
 }
 
 void Arc3D_Geo::calculateArcFromThreePoints()

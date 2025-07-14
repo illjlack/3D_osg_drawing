@@ -126,6 +126,8 @@ private slots:
     void onGeoParametersChanged();
     void onAdvancedPickingResult(const PickingResult& result);
 
+    void onDiagnosePicking();  // 诊断拾取系统
+
 private:
     void setupUI();
     void createMenus();
@@ -217,6 +219,11 @@ private slots:
     void onShininessChanged();
     void onTransparencyChanged();
     void onSubdivisionLevelChanged();
+    
+    // 点线面显示控制
+    void onShowPointsChanged();
+    void onShowEdgesChanged();
+    void onShowFacesChanged();
 
 private:
     void setupUI();
@@ -225,12 +232,14 @@ private:
     void createSurfaceGroup();
     void createMaterialGroup();
     void createVolumeGroup();
+    void createDisplayGroup();
     
     void updatePointUI();
     void updateLineUI();
     void updateSurfaceUI();
     void updateMaterialUI();
     void updateVolumeUI();
+    void updateDisplayUI();
     
     QPushButton* createColorButton(const QColor& color);
     void updateColorButton(QPushButton* button, const QColor& color);
@@ -269,6 +278,12 @@ private:
     // 体属性控件
     QGroupBox* m_volumeGroup;
     QComboBox* m_subdivisionLevelCombo;
+    
+    // 显示控制控件
+    QGroupBox* m_displayGroup;
+    QCheckBox* m_showPointsCheck;
+    QCheckBox* m_showEdgesCheck;
+    QCheckBox* m_showFacesCheck;
 };
 
 // 工具面板

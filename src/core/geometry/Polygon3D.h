@@ -15,16 +15,11 @@ public:
     virtual void keyPressEvent(QKeyEvent* event) override;
     virtual void updateGeometry() override;
 
-    // 拾取Feature支持
-    virtual std::vector<FeatureType> getSupportedFeatureTypes() const override;
-
 protected:
     virtual osg::ref_ptr<osg::Geometry> createGeometry() override;
-    
-    // Feature抽取
-    virtual std::vector<PickingFeature> extractFaceFeatures() const override;
-    virtual std::vector<PickingFeature> extractEdgeFeatures() const override;
-    virtual std::vector<PickingFeature> extractVertexFeatures() const override;
+    virtual void buildVertexGeometries() override;
+    virtual void buildEdgeGeometries() override;
+    virtual void buildFaceGeometries() override;
     
 private:
     void calculateNormal();

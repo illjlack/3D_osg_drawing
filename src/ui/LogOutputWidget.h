@@ -69,6 +69,7 @@ public:
 
     // 导出日志
     void exportLogs(const QString& filename);
+    void exportLogsWithOptions(const QString& filename, bool exportFiltered);
 
     // 复制选中内容
     void copySelectedText();

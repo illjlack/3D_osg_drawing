@@ -420,6 +420,14 @@ void MainWindow::createToolBars()
     
     m_viewToolBar->addAction(tr("线框"), this, &MainWindow::onViewWireframe);
     m_viewToolBar->addAction(tr("着色"), this, &MainWindow::onViewShaded);
+    
+    // 添加测试拾取系统按钮
+
+    
+    // 添加诊断拾取系统按钮
+    QAction* diagnosePickingAction = m_viewToolBar->addAction(tr("诊断拾取"));
+    diagnosePickingAction->setToolTip(tr("诊断拾取系统问题"));
+    connect(diagnosePickingAction, &QAction::triggered, this, &MainWindow::onDiagnosePicking);
 }
 
 void MainWindow::createStatusBar()
@@ -622,21 +630,13 @@ void MainWindow::onFileNew()
     {
         m_osgWidget->removeAllGeos();
         
-        // 添加一个测试立方体来演示拾取功能
-        Geo3D* testCube = createGeo3D(DrawCube3D);
-        if (testCube)
-        {
-            testCube->addControlPoint(Point3D(-1, -1, -1));
-            testCube->addControlPoint(Point3D(1, 1, 1));
-            testCube->completeDrawing();
-            m_osgWidget->addGeo(testCube);
-        }
+
     }
     
     m_currentFilePath.clear();
     m_modified = false;
     setWindowTitle(tr("3D Drawing Board - 未命名"));
-    updateStatusBar(tr("新建文档 - 已添加测试立方体，试试64位ID拾取功能!"));
+    updateStatusBar(tr("新建文档"));
     updateObjectCount(); // 更新对象数量显示
     LOG_SUCCESS("新建文档成功", "文件");
 }
@@ -1162,12 +1162,14 @@ void PropertyEditor3D::setupUI()
     createSurfaceGroup();
     createMaterialGroup();
     createVolumeGroup();
+    createDisplayGroup();
     
     mainLayout->addWidget(m_pointGroup);
     mainLayout->addWidget(m_lineGroup);
     mainLayout->addWidget(m_surfaceGroup);
     mainLayout->addWidget(m_materialGroup);
     mainLayout->addWidget(m_volumeGroup);
+    mainLayout->addWidget(m_displayGroup);
     mainLayout->addStretch();
 }
 
@@ -1335,6 +1337,30 @@ void PropertyEditor3D::createVolumeGroup()
     layout->addRow("细分级别:", m_subdivisionLevelCombo);
 }
 
+void PropertyEditor3D::createDisplayGroup()
+{
+    m_displayGroup = new QGroupBox("显示控制", this);
+    QFormLayout* layout = new QFormLayout(m_displayGroup);
+    
+    // 显示点
+    m_showPointsCheck = new QCheckBox();
+    m_showPointsCheck->setChecked(true);
+    connect(m_showPointsCheck, &QCheckBox::toggled, this, &PropertyEditor3D::onShowPointsChanged);
+    layout->addRow("显示点:", m_showPointsCheck);
+    
+    // 显示边
+    m_showEdgesCheck = new QCheckBox();
+    m_showEdgesCheck->setChecked(true);
+    connect(m_showEdgesCheck, &QCheckBox::toggled, this, &PropertyEditor3D::onShowEdgesChanged);
+    layout->addRow("显示边:", m_showEdgesCheck);
+    
+    // 显示面
+    m_showFacesCheck = new QCheckBox();
+    m_showFacesCheck->setChecked(true);
+    connect(m_showFacesCheck, &QCheckBox::toggled, this, &PropertyEditor3D::onShowFacesChanged);
+    layout->addRow("显示面:", m_showFacesCheck);
+}
+
 QPushButton* PropertyEditor3D::createColorButton(const QColor& color)
 {
     QPushButton* button = new QPushButton();
@@ -1373,6 +1399,7 @@ void PropertyEditor3D::updateFromGeo()
     updateSurfaceUI();
     updateMaterialUI();
     updateVolumeUI();
+    updateDisplayUI();
     
     m_updating = false;
 }
@@ -1386,6 +1413,7 @@ void PropertyEditor3D::updateGlobalSettings()
     updateSurfaceUI();
     updateMaterialUI();
     updateVolumeUI();
+    updateDisplayUI();
     
     m_updating = false;
 }
@@ -1497,6 +1525,17 @@ void PropertyEditor3D::updateVolumeUI()
             break;
         }
     }
+}
+
+void PropertyEditor3D::updateDisplayUI()
+{
+    bool showPoints = m_currentGeo ? m_currentGeo->isShowPoints() : GlobalShowPoints3D;
+    bool showEdges = m_currentGeo ? m_currentGeo->isShowEdges() : GlobalShowEdges3D;
+    bool showFaces = m_currentGeo ? m_currentGeo->isShowFaces() : GlobalShowFaces3D;
+    
+    m_showPointsCheck->setChecked(showPoints);
+    m_showEdgesCheck->setChecked(showEdges);
+    m_showFacesCheck->setChecked(showFaces);
 }
 
 // PropertyEditor3D 槽函数
@@ -1839,6 +1878,60 @@ void PropertyEditor3D::onSubdivisionLevelChanged()
     else
     {
         GlobalSubdivisionLevel3D = level;
+    }
+    
+    emit parametersChanged();
+}
+
+void PropertyEditor3D::onShowPointsChanged()
+{
+    if (m_updating) return;
+    
+    bool show = m_showPointsCheck->isChecked();
+    
+    if (m_currentGeo)
+    {
+        m_currentGeo->setShowPoints(show);
+    }
+    else
+    {
+        GlobalShowPoints3D = show;
+    }
+    
+    emit parametersChanged();
+}
+
+void PropertyEditor3D::onShowEdgesChanged()
+{
+    if (m_updating) return;
+    
+    bool show = m_showEdgesCheck->isChecked();
+    
+    if (m_currentGeo)
+    {
+        m_currentGeo->setShowEdges(show);
+    }
+    else
+    {
+        GlobalShowEdges3D = show;
+    }
+    
+    emit parametersChanged();
+}
+
+void PropertyEditor3D::onShowFacesChanged()
+{
+    if (m_updating) return;
+    
+    bool show = m_showFacesCheck->isChecked();
+    
+    if (m_currentGeo)
+    {
+        m_currentGeo->setShowFaces(show);
+    }
+    else
+    {
+        GlobalShowFaces3D = show;
     }
     
     emit parametersChanged();
@@ -2589,4 +2682,44 @@ void MainWindow::onManipulatorTypeChanged()
     
     updateStatusBar(tr("相机操控器切换为: %1").arg(typeName));
     LOG_INFO(tr("相机操控器切换为: %1").arg(typeName), "相机");
+}
+
+
+
+void MainWindow::onDiagnosePicking()
+{
+    if (m_osgWidget)
+    {
+        // 运行拾取系统诊断
+        QString diagnosticReport = m_osgWidget->diagnosePickingSystem();
+        
+        // 显示诊断报告
+        QMessageBox::information(this, tr("拾取系统诊断"), diagnosticReport);
+        
+        // 询问是否要修复问题
+        QMessageBox::StandardButton reply = QMessageBox::question(this, 
+            tr("修复问题"), 
+            tr("是否要尝试修复拾取系统问题？"),
+            QMessageBox::Yes | QMessageBox::No);
+            
+        if (reply == QMessageBox::Yes)
+        {
+            bool success = m_osgWidget->fixPickingIssues();
+            if (success)
+            {
+                QMessageBox::information(this, tr("修复完成"), tr("拾取系统问题修复完成"));
+                updateStatusBar(tr("拾取系统问题修复完成"));
+            }
+            else
+            {
+                QMessageBox::warning(this, tr("修复失败"), tr("拾取系统问题修复失败"));
+                updateStatusBar(tr("拾取系统问题修复失败"));
+            }
+        }
+    }
+    else
+    {
+        LOG_ERROR("OSGWidget not available", "拾取");
+        QMessageBox::warning(this, tr("错误"), tr("OSGWidget不可用"));
+    }
 }

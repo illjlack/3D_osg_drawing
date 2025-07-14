@@ -106,13 +106,16 @@ struct PickingID64
 struct PickingObjectData
 {
     osg::ref_ptr<Geo3D> geometry;           // 几何对象引用
-    std::vector<FeatureType> supportedTypes; // 支持的Feature类型
     
-    // Feature几何体(用于渲染拾取)
-    std::map<FeatureType, osg::ref_ptr<osg::Group>> featureGroups;
+    // 直接使用几何对象的点线面节点
+    osg::ref_ptr<osg::Group> vertexGroup;   // 顶点组
+    osg::ref_ptr<osg::Group> edgeGroup;     // 边组
+    osg::ref_ptr<osg::Group> faceGroup;     // 面组
     
     // ID映射
-    std::map<FeatureType, std::vector<PickingID64>> featureIDs;
+    std::vector<PickingID64> vertexIDs;     // 顶点ID
+    std::vector<PickingID64> edgeIDs;       // 边ID
+    std::vector<PickingID64> faceIDs;       // 面ID
     
     PickingObjectData(Geo3D* geo) : geometry(geo) {}
 };
@@ -183,6 +186,13 @@ public:
     osg::Camera* getPickingCamera() const { return m_pickingCamera.get(); }
     osg::Group* getPickingRoot() const { return m_pickingRoot.get(); }
     
+    // 诊断接口
+    bool isInitialized() const { return m_initialized; }
+    int getObjectCount() const { return static_cast<int>(m_objectMap.size()); }
+    int getFeatureCount() const;
+    bool hasValidFrameBuffer() const { return m_fbo.valid() && m_colorTexture.valid() && m_depthTexture.valid(); }
+    bool hasValidShaders() const { return m_pickingProgram.valid() && m_vertexShader.valid() && m_fragmentShader.valid(); }
+    
     // 调试
     void setDebugMode(bool enabled) { m_debugMode = enabled; }
     bool isDebugMode() const { return m_debugMode; }
@@ -195,10 +205,10 @@ private:
     bool createShaders();
     void setupRenderStates();
     
-    // Feature抽取(使用Geo3D接口)
-    void extractFeatures(uint64_t objectID);
-    void buildFeatureGeometry(uint64_t objectID, FeatureType type);
-    void rebuildFeatureGeometry(uint64_t objectID);
+    // 直接使用几何对象的点线面节点
+    void setupPickingNodes(uint64_t objectID);
+    void updatePickingNodes(uint64_t objectID);
+    void rebuildPickingNodes(uint64_t objectID);
     
     // 渲染管线
     void renderPickingPass();

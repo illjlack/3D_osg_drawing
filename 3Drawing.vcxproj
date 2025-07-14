@@ -181,6 +181,9 @@
     <ClCompile Include="src\core\picking\PickingIndicator.cpp">
       <Filter>Core\Picking</Filter>
     </ClCompile>
+    <ClCompile Include="src\core\picking\PickingDiagnostic.cpp">
+      <Filter>Core\Picking</Filter>
+    </ClCompile>
     <ClCompile Include="src\util\OSGUtils.cpp">
       <Filter>Util</Filter>
     </ClCompile>
@@ -261,6 +264,10 @@
     <ClInclude Include="src\core\picking\PickingIndicator.h">
       <Filter>Core\Picking</Filter>
     </ClInclude>
+    <ClInclude Include="src\core\picking\PickingDiagnostic.h">
+      <Filter>Core\Picking</Filter>
+    </ClInclude>
+    <QtMoc Include="src\core\GeometryBase.h" />
     <QtMoc Include="src\core\world\CoordinateSystem3D.h" />
     <QtMoc Include="src\core\world\CoordinateSystemRenderer.h" />
     <ClInclude Include="src\core\world\Skybox.h" />

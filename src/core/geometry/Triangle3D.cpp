@@ -7,6 +7,8 @@ Triangle3D_Geo::Triangle3D_Geo()
     : m_normal(0, 0, 1)
 {
     m_geoType = Geo_Triangle3D;
+    // 确保基类正确初始化
+    initialize();
 }
 
 void Triangle3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
@@ -37,13 +39,23 @@ void Triangle3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPo
 
 void Triangle3D_Geo::updateGeometry()
 {
+    // 清除点线面节点
+    clearVertexGeometries();
+    clearEdgeGeometries();
+    clearFaceGeometries();
+    
     updateOSGNode();
+    
+    // 构建点线面几何体
+    buildVertexGeometries();
+    buildEdgeGeometries();
+    buildFaceGeometries();
+    
+    // 更新可见性
+    updateFeatureVisibility();
 }
 
-std::vector<FeatureType> Triangle3D_Geo::getSupportedFeatureTypes() const
-{
-    return {FeatureType::FACE, FeatureType::EDGE, FeatureType::VERTEX};
-}
+
 
 osg::ref_ptr<osg::Geometry> Triangle3D_Geo::createGeometry()
 {
@@ -150,70 +162,11 @@ osg::ref_ptr<osg::Geometry> Triangle3D_Geo::createGeometry()
     return geometry;
 }
 
-std::vector<PickingFeature> Triangle3D_Geo::extractFaceFeatures() const
-{
-    std::vector<PickingFeature> features;
-    
-    if (m_controlPoints.size() == 3)
-    {
-        PickingFeature feature(FeatureType::FACE, 0);
-        
-        // 计算三角形中心点
-        glm::vec3 center = (m_controlPoints[0].position + 
-                           m_controlPoints[1].position + 
-                           m_controlPoints[2].position) / 3.0f;
-        feature.center = osg::Vec3(center.x, center.y, center.z);
-        feature.size = 0.1f; // 面指示器大小
-        
-        features.push_back(feature);
-    }
-    
-    return features;
-}
 
-std::vector<PickingFeature> Triangle3D_Geo::extractEdgeFeatures() const
-{
-    std::vector<PickingFeature> features;
-    
-    if (m_controlPoints.size() >= 2)
-    {
-        // 每条边作为一个边Feature
-        size_t edgeCount = (m_controlPoints.size() == 3) ? 3 : m_controlPoints.size() - 1;
-        
-        for (size_t i = 0; i < edgeCount; ++i)
-        {
-            PickingFeature feature(FeatureType::EDGE, static_cast<uint32_t>(i));
-            
-            size_t nextIdx = (i + 1) % m_controlPoints.size();
-            if (nextIdx >= m_controlPoints.size()) nextIdx = 0;
-            
-            // 计算边中心点
-            glm::vec3 center = (m_controlPoints[i].position + m_controlPoints[nextIdx].position) * 0.5f;
-            feature.center = osg::Vec3(center.x, center.y, center.z);
-            feature.size = 0.08f; // 边指示器大小
-            
-            features.push_back(feature);
-        }
-    }
-    
-    return features;
-}
 
-std::vector<PickingFeature> Triangle3D_Geo::extractVertexFeatures() const
-{
-    std::vector<PickingFeature> features;
-    
-    // 从控制点中提取顶点Feature
-    for (size_t i = 0; i < m_controlPoints.size(); ++i)
-    {
-        PickingFeature feature(FeatureType::VERTEX, static_cast<uint32_t>(i));
-        feature.center = osg::Vec3(m_controlPoints[i].x(), m_controlPoints[i].y(), m_controlPoints[i].z());
-        feature.size = 0.05f; // 顶点指示器大小
-        features.push_back(feature);
-    }
-    
-    return features;
-}
+
+
+
 
 void Triangle3D_Geo::calculateNormal()
 {
@@ -223,4 +176,157 @@ void Triangle3D_Geo::calculateNormal()
         glm::vec3 v2 = m_controlPoints[2].position - m_controlPoints[0].position;
         m_normal = glm::normalize(glm::cross(v1, v2));
     }
+}
+
+// ============================================================================
+// 点线面几何体构建实现
+// ============================================================================
+
+void Triangle3D_Geo::buildVertexGeometries()
+{
+    clearVertexGeometries();
+    
+    if (m_controlPoints.empty())
+        return;
+    
+    // 创建三角形顶点的几何体
+    osg::ref_ptr<osg::Geometry> vertexGeometry = new osg::Geometry();
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
+    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
+    
+    // 添加控制点作为顶点
+    for (const auto& point : m_controlPoints)
+    {
+        vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
+        colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
+                                   m_parameters.pointColor.b, m_parameters.pointColor.a));
+    }
+    
+    // 如果有临时点且几何体未完成，添加临时点
+    if (!isStateComplete() && getTempPoint().position != glm::vec3(0))
+    {
+        vertices->push_back(osg::Vec3(getTempPoint().x(), getTempPoint().y(), getTempPoint().z()));
+        colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
+                                   m_parameters.pointColor.b, m_parameters.pointColor.a * 0.5f));
+    }
+    
+    vertexGeometry->setVertexArray(vertices.get());
+    vertexGeometry->setColorArray(colors.get());
+    vertexGeometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+    
+    // 使用点绘制
+    vertexGeometry->addPrimitiveSet(new osg::DrawArrays(GL_POINTS, 0, vertices->size()));
+    
+    // 设置点大小
+    osg::ref_ptr<osg::StateSet> stateSet = vertexGeometry->getOrCreateStateSet();
+    osg::ref_ptr<osg::Point> point = new osg::Point();
+    point->setSize(m_parameters.pointSize);
+    stateSet->setAttribute(point.get());
+    
+    addVertexGeometry(vertexGeometry.get());
+}
+
+void Triangle3D_Geo::buildEdgeGeometries()
+{
+    clearEdgeGeometries();
+    
+    if (m_controlPoints.size() < 2)
+        return;
+    
+    // 创建三角形边的几何体
+    osg::ref_ptr<osg::Geometry> edgeGeometry = new osg::Geometry();
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
+    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
+    
+    // 构建所有点（包括临时点）
+    std::vector<Point3D> allPoints = m_controlPoints;
+    if (!isStateComplete() && getTempPoint().position != glm::vec3(0))
+    {
+        allPoints.push_back(getTempPoint());
+    }
+    
+    // 添加边
+    for (size_t i = 0; i < allPoints.size(); ++i)
+    {
+        const auto& point1 = allPoints[i];
+        const auto& point2 = allPoints[(i + 1) % allPoints.size()];
+        
+        vertices->push_back(osg::Vec3(point1.x(), point1.y(), point1.z()));
+        vertices->push_back(osg::Vec3(point2.x(), point2.y(), point2.z()));
+        
+        // 临时点的边使用半透明颜色
+        float alpha = (i >= m_controlPoints.size() - 1 && !isStateComplete()) ? 0.5f : 1.0f;
+        colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
+                                   m_parameters.lineColor.b, m_parameters.lineColor.a * alpha));
+        colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
+                                   m_parameters.lineColor.b, m_parameters.lineColor.a * alpha));
+    }
+    
+    edgeGeometry->setVertexArray(vertices.get());
+    edgeGeometry->setColorArray(colors.get());
+    edgeGeometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+    
+    // 使用线绘制
+    edgeGeometry->addPrimitiveSet(new osg::DrawArrays(GL_LINES, 0, vertices->size()));
+    
+    // 设置线宽
+    osg::ref_ptr<osg::StateSet> stateSet = edgeGeometry->getOrCreateStateSet();
+    osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth();
+    lineWidth->setWidth(m_parameters.lineWidth);
+    stateSet->setAttribute(lineWidth.get());
+    
+    addEdgeGeometry(edgeGeometry.get());
+}
+
+void Triangle3D_Geo::buildFaceGeometries()
+{
+    clearFaceGeometries();
+    
+    if (m_controlPoints.size() < 3)
+        return;
+    
+    // 创建三角形面的几何体
+    osg::ref_ptr<osg::Geometry> faceGeometry = new osg::Geometry();
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
+    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
+    osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array();
+    
+    // 构建所有点（包括临时点）
+    std::vector<Point3D> allPoints = m_controlPoints;
+    if (!isStateComplete() && getTempPoint().position != glm::vec3(0))
+    {
+        allPoints.push_back(getTempPoint());
+    }
+    
+    // 添加顶点
+    for (const auto& point : allPoints)
+    {
+        vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
+        colors->push_back(osg::Vec4(m_parameters.fillColor.r, m_parameters.fillColor.g, 
+                                   m_parameters.fillColor.b, m_parameters.fillColor.a));
+    }
+    
+    // 计算法向量
+    if (allPoints.size() >= 3)
+    {
+        glm::vec3 v1 = allPoints[1].position - allPoints[0].position;
+        glm::vec3 v2 = allPoints[2].position - allPoints[0].position;
+        glm::vec3 normal = glm::normalize(glm::cross(v1, v2));
+        
+        for (size_t i = 0; i < allPoints.size(); ++i)
+        {
+            normals->push_back(osg::Vec3(normal.x, normal.y, normal.z));
+        }
+    }
+    
+    faceGeometry->setVertexArray(vertices.get());
+    faceGeometry->setColorArray(colors.get());
+    faceGeometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+    faceGeometry->setNormalArray(normals.get());
+    faceGeometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
+    
+    // 使用三角面绘制
+    faceGeometry->addPrimitiveSet(new osg::DrawArrays(GL_TRIANGLES, 0, vertices->size()));
+    
+    addFaceGeometry(faceGeometry.get());
 }

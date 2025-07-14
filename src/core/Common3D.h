@@ -42,6 +42,11 @@ extern float GlobalShininess3D;
 extern float GlobalTransparency3D;
 extern SubdivisionLevel3D GlobalSubdivisionLevel3D;
 
+// 显示控制全局变量
+extern bool GlobalShowPoints3D;
+extern bool GlobalShowEdges3D;
+extern bool GlobalShowFaces3D;
+
 extern QStatusBar* GlobalStatusBar3D;
 
 // 三维点结构
@@ -107,6 +112,7 @@ struct GeoParameters3D
     PointShape3D pointShape;
     float pointSize;
     Color3D pointColor;
+    bool showPoints;  // 是否显示点
     
     // 线属性
     LineStyle3D lineStyle;
@@ -114,12 +120,14 @@ struct GeoParameters3D
     Color3D lineColor;
     float lineDashPattern;
     NodeLineStyle3D nodeLineStyle;
+    bool showEdges;  // 是否显示边
     
     // 面属性
     FillType3D fillType;
     Color3D fillColor;
     Color3D borderColor;
     bool showBorder;
+    bool showFaces;  // 是否显示面
     
     // 材质属性
     Material3D material;

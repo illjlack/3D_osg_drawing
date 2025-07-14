@@ -73,6 +73,11 @@ public:
     bool isAdvancedPickingEnabled() const;
     void setPickingRadius(int radius);
     void setPickingFrequency(double frequency);
+
+    
+    // 拾取系统诊断
+    QString diagnosePickingSystem();  // 诊断拾取系统
+    bool fixPickingIssues();          // 修复拾取问题
     
     // 绘制状态查询
     bool isDrawing() const { return m_isDrawing; }
@@ -227,4 +232,10 @@ private:
     static const int MOUSE_CACHE_DURATION = 16; // 16ms缓存时间（约60FPS）
     
     QTimer* m_updateTimer;
+
+private slots:
+    // 几何对象信号响应
+    void onGeoDrawingCompleted(Geo3D* geo);
+    void onGeoGeometryUpdated(Geo3D* geo);
+    void onGeoParametersChanged(Geo3D* geo);
 }; 

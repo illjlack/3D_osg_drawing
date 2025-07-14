@@ -25,6 +25,8 @@
 UndefinedGeo3D::UndefinedGeo3D()
 {
     setGeoType(Geo_UndefinedGeo3D);
+    // 确保基类正确初始化
+    initialize();
     LOG_INFO("创建未定义几何体", "几何体");
 }
 
@@ -54,15 +56,24 @@ void UndefinedGeo3D::updateGeometry()
 {
     if (isGeometryDirty())
     {
+        // 清除点线面节点
+        clearVertexGeometries();
+        clearEdgeGeometries();
+        clearFaceGeometries();
+        
         updateOSGNode();
+        
+        // 构建点线面几何体
+        buildVertexGeometries();
+        buildEdgeGeometries();
+        buildFaceGeometries();
+        
+        // 更新可见性
+        updateFeatureVisibility();
     }
 }
 
-std::vector<FeatureType> UndefinedGeo3D::getSupportedFeatureTypes() const
-{
-    // 未定义几何体支持所有Feature类型
-    return {FeatureType::FACE, FeatureType::EDGE, FeatureType::VERTEX};
-}
+
 
 osg::ref_ptr<osg::Geometry> UndefinedGeo3D::createGeometry()
 {
@@ -141,61 +152,120 @@ osg::ref_ptr<osg::Geometry> UndefinedGeo3D::createDefaultGeometry()
     }
     
     return geometry;
-}
+} 
 
-std::vector<PickingFeature> UndefinedGeo3D::extractVertexFeatures() const
+void UndefinedGeo3D::buildVertexGeometries()
 {
-    std::vector<PickingFeature> features;
-    const auto& controlPoints = getControlPoints();
+    clearVertexGeometries();
     
-    for (size_t i = 0; i < controlPoints.size(); ++i)
+    if (m_controlPoints.empty())
+        return;
+    
+    // 创建未定义几何体顶点的几何体
+    osg::ref_ptr<osg::Geometry> vertexGeometry = new osg::Geometry();
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
+    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
+    
+    // 添加控制点作为顶点
+    for (const Point3D& point : m_controlPoints)
     {
-        PickingFeature feature(FeatureType::VERTEX, static_cast<uint32_t>(i));
-        feature.center = osg::Vec3(controlPoints[i].x(), controlPoints[i].y(), controlPoints[i].z());
-        feature.size = 0.1f; // 设置合适的大小
-        
-        features.push_back(feature);
+        vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
+        colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
+                                   m_parameters.pointColor.b, m_parameters.pointColor.a));
     }
     
-    return features;
+    vertexGeometry->setVertexArray(vertices.get());
+    vertexGeometry->setColorArray(colors.get());
+    vertexGeometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+    
+    // 使用点绘制
+    vertexGeometry->addPrimitiveSet(new osg::DrawArrays(GL_POINTS, 0, vertices->size()));
+    
+    // 设置点大小
+    osg::ref_ptr<osg::StateSet> stateSet = vertexGeometry->getOrCreateStateSet();
+    osg::ref_ptr<osg::Point> point = new osg::Point();
+    point->setSize(m_parameters.pointSize);
+    stateSet->setAttribute(point.get());
+    
+    addVertexGeometry(vertexGeometry.get());
 }
 
-std::vector<PickingFeature> UndefinedGeo3D::extractEdgeFeatures() const
+void UndefinedGeo3D::buildEdgeGeometries()
 {
-    std::vector<PickingFeature> features;
-    const auto& controlPoints = getControlPoints();
+    clearEdgeGeometries();
     
-    if (controlPoints.size() >= 2)
+    if (m_controlPoints.size() < 2)
+        return;
+    
+    // 创建未定义几何体边的几何体
+    osg::ref_ptr<osg::Geometry> edgeGeometry = new osg::Geometry();
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
+    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
+    
+    // 添加所有边
+    for (size_t i = 0; i < m_controlPoints.size() - 1; ++i)
     {
-        for (size_t i = 0; i < controlPoints.size() - 1; ++i)
+        vertices->push_back(osg::Vec3(m_controlPoints[i].x(), m_controlPoints[i].y(), m_controlPoints[i].z()));
+        vertices->push_back(osg::Vec3(m_controlPoints[i + 1].x(), m_controlPoints[i + 1].y(), m_controlPoints[i + 1].z()));
+        
+        colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
+                                   m_parameters.lineColor.b, m_parameters.lineColor.a));
+        colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
+                                   m_parameters.lineColor.b, m_parameters.lineColor.a));
+    }
+    
+    edgeGeometry->setVertexArray(vertices.get());
+    edgeGeometry->setColorArray(colors.get());
+    edgeGeometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+    
+    // 使用线绘制
+    edgeGeometry->addPrimitiveSet(new osg::DrawArrays(GL_LINES, 0, vertices->size()));
+    
+    // 设置线宽
+    osg::ref_ptr<osg::StateSet> stateSet = edgeGeometry->getOrCreateStateSet();
+    osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth();
+    lineWidth->setWidth(m_parameters.lineWidth);
+    stateSet->setAttribute(lineWidth.get());
+    
+    addEdgeGeometry(edgeGeometry.get());
+}
+
+void UndefinedGeo3D::buildFaceGeometries()
+{
+    clearFaceGeometries();
+    
+    if (m_controlPoints.size() < 3)
+        return;
+    
+    // 创建未定义几何体面的几何体
+    osg::ref_ptr<osg::Geometry> faceGeometry = new osg::Geometry();
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
+    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
+    
+    // 添加所有顶点形成面
+    for (const Point3D& point : m_controlPoints)
+    {
+        vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
+        colors->push_back(osg::Vec4(m_parameters.fillColor.r, m_parameters.fillColor.g, 
+                                   m_parameters.fillColor.b, m_parameters.fillColor.a));
+    }
+    
+    faceGeometry->setVertexArray(vertices.get());
+    faceGeometry->setColorArray(colors.get());
+    faceGeometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+    
+    // 使用三角形绘制（简单的扇形三角剖分）
+    if (m_controlPoints.size() >= 3)
+    {
+        osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(GL_TRIANGLES);
+        for (size_t i = 1; i < m_controlPoints.size() - 1; ++i)
         {
-            PickingFeature feature(FeatureType::EDGE, static_cast<uint32_t>(i));
-            
-            // 计算边的中点
-            glm::vec3 midPoint = (controlPoints[i].position + controlPoints[i + 1].position) * 0.5f;
-            feature.center = osg::Vec3(midPoint.x, midPoint.y, midPoint.z);
-            feature.size = glm::length(controlPoints[i + 1].position - controlPoints[i].position);
-            
-            features.push_back(feature);
+            indices->push_back(0);
+            indices->push_back(i);
+            indices->push_back(i + 1);
         }
+        faceGeometry->addPrimitiveSet(indices.get());
     }
     
-    return features;
-}
-
-std::vector<PickingFeature> UndefinedGeo3D::extractFaceFeatures() const
-{
-    std::vector<PickingFeature> features;
-    
-    // 未定义几何体默认有一个面
-    if (!getControlPoints().empty())
-    {
-        PickingFeature feature(FeatureType::FACE, 0);
-        feature.center = osg::Vec3(getControlPoints()[0].x(), getControlPoints()[0].y(), getControlPoints()[0].z());
-        feature.size = 1.0f; // 设置合适的大小
-        
-        features.push_back(feature);
-    }
-    
-    return features;
+    addFaceGeometry(faceGeometry.get());
 } 

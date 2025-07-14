@@ -21,6 +21,9 @@ static const char* pickingVertexShaderSource = R"(
 attribute vec3 osg_Vertex;
 
 uniform mat4 osg_ModelViewProjectionMatrix;
+uniform int u_ObjectID;
+uniform int u_FeatureType;
+uniform int u_FeatureIndex;
 
 void main()
 {
@@ -31,26 +34,29 @@ void main()
 static const char* pickingFragmentShaderSource = R"(
 #version 330 core
 
-uniform samplerBuffer u_IDBuffer;
-uniform int u_IDOffset;
+uniform int u_ObjectID;
+uniform int u_FeatureType;
+uniform int u_FeatureIndex;
 
 out vec4 FragColor;
 
 void main()
 {
-    int primitiveID = gl_PrimitiveID + u_IDOffset;
+    // 将ID信息编码到颜色中
+    // R: ObjectID的低8位
+    // G: ObjectID的8-15位  
+    // B: ObjectID的16-23位
+    // A: FeatureType (0=面, 1=边, 2=点)
     
-    // 从ID缓冲区获取64位ID
-    vec4 idData = texelFetch(u_IDBuffer, primitiveID);
+    int objID = u_ObjectID;
+    int featureType = u_FeatureType;
     
-    // 将64位ID的低32位打包到RGBA
-    uint packedID = uint(idData.x);
-    FragColor = vec4(
-        float((packedID >> 0) & 0xFFu) / 255.0,
-        float((packedID >> 8) & 0xFFu) / 255.0,
-        float((packedID >> 16) & 0xFFu) / 255.0,
-        float((packedID >> 24) & 0xFFu) / 255.0
-    );
+    float r = float((objID >> 0) & 0xFF) / 255.0;
+    float g = float((objID >> 8) & 0xFF) / 255.0;
+    float b = float((objID >> 16) & 0xFF) / 255.0;
+    float a = float(featureType) / 255.0;
+    
+    FragColor = vec4(r, g, b, a);
 }
 )";
 
@@ -266,37 +272,44 @@ uint64_t PickingSystem::addObject(Geo3D* geo)
     if (!geo || !m_initialized)
         return 0;
     
+    // 检查几何对象状态
+    bool isComplete = geo->isStateComplete();
+    int controlPointCount = static_cast<int>(geo->getControlPoints().size());
+    
+    LOG_DEBUG(QString("Adding object to picking system - Complete: %1, ControlPoints: %2")
+        .arg(isComplete)
+        .arg(controlPointCount), "拾取");
+    
+    // 如果几何对象还没有完成绘制，记录警告但不阻止添加
+    if (!isComplete)
+    {
+        LOG_WARNING(QString("Adding incomplete geometry object to picking system. ControlPoints: %1")
+            .arg(controlPointCount), "拾取");
+    }
+    
     uint64_t objectID = m_nextObjectID++;
     
     // 创建拾取数据
     PickingObjectData objData(geo);
-    objData.supportedTypes = geo->getSupportedFeatureTypes();
     
-    // 为每种支持的Feature类型创建组节点
-    for (FeatureType type : objData.supportedTypes)
-    {
-        objData.featureGroups[type] = new osg::Group;
-        
-        // 添加到对应的渲染组
-        switch (type)
-        {
-            case FeatureType::FACE:
-                m_faceGroup->addChild(objData.featureGroups[type]);
-                break;
-            case FeatureType::EDGE:
-                m_edgeGroup->addChild(objData.featureGroups[type]);
-                break;
-            case FeatureType::VERTEX:
-                m_vertexGroup->addChild(objData.featureGroups[type]);
-                break;
-        }
-    }
+    // 直接使用几何对象的点线面节点
+    objData.vertexGroup = geo->getVertexNode();
+    objData.edgeGroup = geo->getEdgeNode();
+    objData.faceGroup = geo->getFaceNode();
+    
+    // 添加到对应的渲染组
+    if (objData.vertexGroup.valid())
+        m_vertexGroup->addChild(objData.vertexGroup);
+    if (objData.edgeGroup.valid())
+        m_edgeGroup->addChild(objData.edgeGroup);
+    if (objData.faceGroup.valid())
+        m_faceGroup->addChild(objData.faceGroup);
     
     m_objectMap.emplace(objectID, std::move(objData));
     m_geoToIDMap[geo] = objectID;
     
-    // 抽取Feature
-    extractFeatures(objectID);
+    // 设置拾取节点
+    setupPickingNodes(objectID);
     
     LOG_INFO(QString("Added object %1 to picking system").arg(objectID), "拾取");
     return objectID;
@@ -318,25 +331,13 @@ void PickingSystem::removeObject(uint64_t objectID)
             m_geoToIDMap.erase(objData.geometry.get());
         }
         
-        // 从渲染组中移除Feature组节点
-        for (auto& pair : objData.featureGroups)
-        {
-            FeatureType type = pair.first;
-            osg::Group* group = pair.second.get();
-            
-            switch (type)
-            {
-                case FeatureType::FACE:
-                    m_faceGroup->removeChild(group);
-                    break;
-                case FeatureType::EDGE:
-                    m_edgeGroup->removeChild(group);
-                    break;
-                case FeatureType::VERTEX:
-                    m_vertexGroup->removeChild(group);
-                    break;
-            }
-        }
+        // 从渲染组中移除点线面组节点
+        if (objData.faceGroup.valid())
+            m_faceGroup->removeChild(objData.faceGroup.get());
+        if (objData.edgeGroup.valid())
+            m_edgeGroup->removeChild(objData.edgeGroup.get());
+        if (objData.vertexGroup.valid())
+            m_vertexGroup->removeChild(objData.vertexGroup.get());
         
         m_objectMap.erase(it);
     }
@@ -365,10 +366,21 @@ void PickingSystem::updateObject(uint64_t objectID)
     if (it != m_objectMap.end())
     {
         Geo3D* geo = it->second.geometry.get();
-        if (geo && geo->needsFeatureUpdate())
+        if (geo)
         {
-            rebuildFeatureGeometry(objectID);
-            geo->markFeatureUpdated();
+            bool isComplete = geo->isStateComplete();
+            
+            LOG_DEBUG(QString("Updating object %1 - isComplete: %2")
+                .arg(objectID)
+                .arg(isComplete), "拾取");
+            
+            // 如果对象完成绘制，更新拾取节点
+            if (isComplete)
+            {
+                updatePickingNodes(objectID);
+                
+                LOG_INFO(QString("Updated picking nodes for object %1").arg(objectID), "拾取");
+            }
         }
     }
 }
@@ -382,6 +394,16 @@ void PickingSystem::updateObject(Geo3D* geo)
     if (it != m_geoToIDMap.end())
     {
         updateObject(it->second);
+    }
+    else
+    {
+        // 如果几何对象还没有在拾取系统中，且已完成绘制，则添加它
+        if (geo->isStateComplete())
+        {
+            LOG_DEBUG(QString("Adding completed geometry to picking system during update: %1")
+                .arg(geo->getGeoType()), "拾取");
+            addObject(geo);
+        }
     }
 }
 
@@ -402,7 +424,7 @@ void PickingSystem::clearAllObjects()
     LOG_INFO("Cleared all objects from picking system", "拾取");
 }
 
-void PickingSystem::extractFeatures(uint64_t objectID)
+void PickingSystem::setupPickingNodes(uint64_t objectID)
 {
     auto it = m_objectMap.find(objectID);
     if (it == m_objectMap.end())
@@ -414,16 +436,54 @@ void PickingSystem::extractFeatures(uint64_t objectID)
     if (!geo)
         return;
     
-    // 为每种支持的Feature类型构建几何体
-    for (FeatureType type : objData.supportedTypes)
+    // 清空ID列表
+    objData.vertexIDs.clear();
+    objData.edgeIDs.clear();
+    objData.faceIDs.clear();
+    
+    // 为顶点节点分配ID
+    if (objData.vertexGroup.valid())
     {
-        buildFeatureGeometry(objectID, type);
+        int vertexCount = objData.vertexGroup->getNumChildren();
+        for (int i = 0; i < vertexCount; ++i)
+        {
+            PickingID64 id(objectID, PickingID64::TYPE_VERTEX, i);
+            objData.vertexIDs.push_back(id);
+        }
+    }
+    
+    // 为边节点分配ID
+    if (objData.edgeGroup.valid())
+    {
+        int edgeCount = objData.edgeGroup->getNumChildren();
+        for (int i = 0; i < edgeCount; ++i)
+        {
+            PickingID64 id(objectID, PickingID64::TYPE_EDGE, i);
+            objData.edgeIDs.push_back(id);
+        }
+    }
+    
+    // 为面节点分配ID
+    if (objData.faceGroup.valid())
+    {
+        int faceCount = objData.faceGroup->getNumChildren();
+        for (int i = 0; i < faceCount; ++i)
+        {
+            PickingID64 id(objectID, PickingID64::TYPE_FACE, i);
+            objData.faceIDs.push_back(id);
+        }
     }
     
     uploadIDBuffer();
+    
+    LOG_DEBUG(QString("Setup picking nodes for object %1 - Vertices: %2, Edges: %3, Faces: %4")
+        .arg(objectID)
+        .arg(objData.vertexIDs.size())
+        .arg(objData.edgeIDs.size())
+        .arg(objData.faceIDs.size()), "拾取");
 }
 
-void PickingSystem::buildFeatureGeometry(uint64_t objectID, FeatureType type)
+void PickingSystem::updatePickingNodes(uint64_t objectID)
 {
     auto it = m_objectMap.find(objectID);
     if (it == m_objectMap.end())
@@ -435,68 +495,21 @@ void PickingSystem::buildFeatureGeometry(uint64_t objectID, FeatureType type)
     if (!geo)
         return;
     
-    // 从Geo3D获取指定类型的Feature
-    std::vector<PickingFeature> features = geo->getFeatures(type);
+    // 更新点线面节点引用
+    objData.vertexGroup = geo->getVertexNode();
+    objData.edgeGroup = geo->getEdgeNode();
+    objData.faceGroup = geo->getFaceNode();
     
-    if (features.empty())
-        return;
-    
-    // 清空原有的ID列表
-    objData.featureIDs[type].clear();
-    
-    // 清空对应的Feature组
-    osg::Group* featureGroup = objData.featureGroups[type].get();
-    if (featureGroup)
-    {
-        featureGroup->removeChildren(0, featureGroup->getNumChildren());
-    }
-    
-    // 为每个Feature创建ID和几何体
-    for (size_t i = 0; i < features.size(); ++i)
-    {
-        const PickingFeature& feature = features[i];
-        
-        // 创建PickingID64
-        PickingID64::TypeCode typeCode;
-        switch (type)
-        {
-            case FeatureType::FACE:   typeCode = PickingID64::TYPE_FACE;   break;
-            case FeatureType::EDGE:   typeCode = PickingID64::TYPE_EDGE;   break;
-            case FeatureType::VERTEX: typeCode = PickingID64::TYPE_VERTEX; break;
-            default: continue;
-        }
-        
-        PickingID64 pickingID(objectID, typeCode, feature.index);
-        objData.featureIDs[type].push_back(pickingID);
-        
-        // 添加Feature几何体到组中
-        if (feature.geometry && featureGroup)
-        {
-            featureGroup->addChild(feature.geometry);
-        }
-    }
-    
-    QString featureTypeStr = (type == FeatureType::FACE ? "face" : 
-                             type == FeatureType::EDGE ? "edge" : "vertex");
-    LOG_DEBUG(QString("Built %1 %2 features for object %3").arg(features.size()).arg(featureTypeStr).arg(objectID), "拾取");
+    // 重新设置拾取节点
+    setupPickingNodes(objectID);
 }
 
-void PickingSystem::rebuildFeatureGeometry(uint64_t objectID)
+void PickingSystem::rebuildPickingNodes(uint64_t objectID)
 {
-    auto it = m_objectMap.find(objectID);
-    if (it == m_objectMap.end())
-        return;
-    
-    PickingObjectData& objData = it->second;
-    
-    // 重建所有支持的Feature类型
-    for (FeatureType type : objData.supportedTypes)
-    {
-        buildFeatureGeometry(objectID, type);
-    }
-    
-    uploadIDBuffer();
+    updatePickingNodes(objectID);
 }
+
+
 
 void PickingSystem::uploadIDBuffer()
 {
@@ -507,12 +520,22 @@ void PickingSystem::uploadIDBuffer()
     {
         const PickingObjectData& objData = objPair.second;
         
-        for (const auto& featurePair : objData.featureIDs)
+        // 添加顶点ID
+        for (const PickingID64& id : objData.vertexIDs)
         {
-            for (const PickingID64& id : featurePair.second)
-            {
-                m_idArray.push_back(id.pack());
-            }
+            m_idArray.push_back(id.pack());
+        }
+        
+        // 添加边ID
+        for (const PickingID64& id : objData.edgeIDs)
+        {
+            m_idArray.push_back(id.pack());
+        }
+        
+        // 添加面ID
+        for (const PickingID64& id : objData.faceIDs)
+        {
+            m_idArray.push_back(id.pack());
         }
     }
     
@@ -536,7 +559,10 @@ void PickingSystem::uploadIDBuffer()
 PickingResult PickingSystem::pick(int mouseX, int mouseY, int sampleRadius)
 {
     if (!m_initialized)
+    {
+        LOG_ERROR("Picking system not initialized", "拾取");
         return PickingResult();
+    }
     
     double currentTime = osg::Timer::instance()->time_s();
     if (currentTime - m_lastPickTime < m_pickFrequencyLimit)
@@ -546,9 +572,25 @@ PickingResult PickingSystem::pick(int mouseX, int mouseY, int sampleRadius)
     
     osg::Timer_t startTime = osg::Timer::instance()->tick();
     
+    // 检查是否有对象
+    if (m_objectMap.empty())
+    {
+        LOG_DEBUG("No objects in picking system", "拾取");
+        return PickingResult();
+    }
+    
     renderPickingPass();
     
     std::vector<PickingCandidate> candidates = sampleRegion(mouseX, mouseY, sampleRadius);
+    
+    if (candidates.empty())
+    {
+        LOG_DEBUG(QString("No candidates found at (%1, %2)").arg(mouseX).arg(mouseY), "拾取");
+    }
+    else
+    {
+        LOG_DEBUG(QString("Found %1 candidates at (%2, %3)").arg(candidates.size()).arg(mouseX).arg(mouseY), "拾取");
+    }
     
     PickingCandidate bestCandidate = selectBestCandidate(candidates);
     
@@ -566,6 +608,7 @@ PickingResult PickingSystem::pick(int mouseX, int mouseY, int sampleRadius)
         if (it != m_objectMap.end())
         {
             result.geometry = it->second.geometry.get();
+            LOG_DEBUG(QString("Picked object %1, type %2").arg(bestCandidate.id.objectID).arg(bestCandidate.id.typeCode), "拾取");
         }
     }
     
@@ -583,17 +626,63 @@ PickingResult PickingSystem::pick(int mouseX, int mouseY, int sampleRadius)
     return result;
 }
 
+int PickingSystem::getFeatureCount() const
+{
+    int count = 0;
+    int objectCount = 0;
+    
+    for (const auto& objPair : m_objectMap)
+    {
+        objectCount++;
+        const PickingObjectData& objData = objPair.second;
+        int objectFeatureCount = 0;
+        
+        objectFeatureCount += static_cast<int>(objData.vertexIDs.size());
+        objectFeatureCount += static_cast<int>(objData.edgeIDs.size());
+        objectFeatureCount += static_cast<int>(objData.faceIDs.size());
+        count += objectFeatureCount;
+        
+        LOG_DEBUG(QString("Object %1 has %2 features").arg(objPair.first).arg(objectFeatureCount), "拾取");
+    }
+    
+    LOG_DEBUG(QString("Total feature count: %1 from %2 objects").arg(count).arg(objectCount), "拾取");
+    return count;
+}
+
 void PickingSystem::renderPickingPass()
 {
-    if (!m_pickingCamera)
+    if (!m_pickingCamera || !m_pickingRoot)
         return;
     
-    // OSG 3.6.5: 触发拾取相机的渲染
-    // 这会渲染拾取场景到FBO中
-    osgViewer::Viewer viewer;
-    viewer.setCamera(m_pickingCamera.get());
-    viewer.setSceneData(m_pickingRoot.get());
-    viewer.frame();
+    // 确保拾取相机与主相机同步
+    if (m_mainCamera)
+    {
+        m_pickingCamera->setViewMatrix(m_mainCamera->getViewMatrix());
+        m_pickingCamera->setProjectionMatrix(m_mainCamera->getProjectionMatrix());
+    }
+    
+    // 设置拾取相机的渲染目标
+    m_pickingCamera->setRenderTargetImplementation(osg::Camera::FRAME_BUFFER_OBJECT);
+    m_pickingCamera->attach(osg::Camera::COLOR_BUFFER0, m_colorTexture);
+    m_pickingCamera->attach(osg::Camera::DEPTH_BUFFER, m_depthTexture);
+    
+    // 使用OSG的渲染遍历器来渲染拾取场景
+    osg::NodeVisitor visitor(osg::NodeVisitor::UPDATE_VISITOR);
+    m_pickingRoot->accept(visitor);
+    
+    // 读取颜色缓冲区数据
+    if (m_colorImage)
+    {
+        m_colorImage->readPixels(0, 0, m_width, m_height, GL_RGBA, GL_UNSIGNED_BYTE);
+    }
+    
+    // 读取深度缓冲区数据
+    if (m_depthImage)
+    {
+        m_depthImage->readPixels(0, 0, m_width, m_height, GL_DEPTH_COMPONENT, GL_FLOAT);
+    }
+    
+    LOG_DEBUG("Picking pass rendered successfully", "拾取");
 }
 
 std::vector<PickingCandidate> PickingSystem::sampleRegion(int centerX, int centerY, int radius)
@@ -662,7 +751,7 @@ PickingCandidate PickingSystem::samplePixel(int x, int y)
     
     int flippedY = m_height - 1 - y;
     
-    // OSG 3.5.6 兼容性：直接访问图像数据
+    // 读取颜色数据
     unsigned char colorData[4] = {0, 0, 0, 0};
     float depth = 1.0f;
     
@@ -671,10 +760,10 @@ PickingCandidate PickingSystem::samplePixel(int x, int y)
     {
         const unsigned char* data = m_colorImage->data();
         int index = (flippedY * m_colorImage->s() + x) * 4;
-        colorData[0] = data[index + 0];
-        colorData[1] = data[index + 1];
-        colorData[2] = data[index + 2];
-        colorData[3] = data[index + 3];
+        colorData[0] = data[index + 0]; // R
+        colorData[1] = data[index + 1]; // G
+        colorData[2] = data[index + 2]; // B
+        colorData[3] = data[index + 3]; // A
     }
     
     if (m_depthImage && m_depthImage->data() && 
@@ -685,20 +774,21 @@ PickingCandidate PickingSystem::samplePixel(int x, int y)
         depth = depthData[index];
     }
     
-    // OSG 3.5.6 兼容性：简化的颜色解码
+    // 解码颜色数据
     uint32_t objectID = colorData[0] | (colorData[1] << 8) | (colorData[2] << 16);
-    float alphaValue = colorData[3] / 255.0f;
+    uint8_t featureType = colorData[3];
     
     if (objectID != 0)
     {
         // 根据alpha值确定类型
         PickingID64::TypeCode typeCode = PickingID64::TYPE_INVALID;
-        if (alphaValue > 0.9f) // 接近1.0，面
-            typeCode = PickingID64::TYPE_FACE;
-        else if (alphaValue > 0.4f && alphaValue < 0.6f) // 接近0.5，边
-            typeCode = PickingID64::TYPE_EDGE;
-        else if (alphaValue > 0.2f && alphaValue < 0.3f) // 接近0.25，点
-            typeCode = PickingID64::TYPE_VERTEX;
+        switch (featureType)
+        {
+            case 0: typeCode = PickingID64::TYPE_FACE; break;   // 面
+            case 1: typeCode = PickingID64::TYPE_EDGE; break;   // 边
+            case 2: typeCode = PickingID64::TYPE_VERTEX; break; // 点
+            default: typeCode = PickingID64::TYPE_INVALID; break;
+        }
         
         candidate.id = PickingID64(objectID, typeCode, 0);
         candidate.depth = depth;

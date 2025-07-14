@@ -412,6 +412,11 @@ void PickingSystemIntegration::updateGeometry(Geo3D* geo)
     PickingSystemManager::getInstance().updateObject(geo);
 }
 
+void PickingSystemIntegration::clearAllObjects()
+{
+    PickingSystemManager::getInstance().getPickingSystem()->clearAllObjects();
+}
+
 PickingResult PickingSystemIntegration::pick(int mouseX, int mouseY, int radius)
 {
     return PickingSystemManager::getInstance().pick(mouseX, mouseY, radius);

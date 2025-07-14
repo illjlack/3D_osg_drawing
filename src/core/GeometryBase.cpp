@@ -17,16 +17,29 @@ Geo3D::Geo3D()
     , m_tempPoint(0, 0, 0)
     , m_geometryDirty(true)
     , m_initialized(false)
-    , m_featuresDirty(true)
+    , m_parametersChanged(false)
 {
     m_osgNode = new osg::Group();
     m_drawableGroup = new osg::Group();
     m_transformNode = new osg::MatrixTransform();
     m_controlPointsNode = new osg::Group();
     
+    // 初始化点线面节点
+    m_vertexNode = new osg::Group();
+    m_edgeNode = new osg::Group();
+    m_faceNode = new osg::Group();
+    
     m_osgNode->addChild(m_transformNode.get());
     m_transformNode->addChild(m_drawableGroup.get());
     m_transformNode->addChild(m_controlPointsNode.get());
+    
+    // 将点线面节点添加到场景中
+    m_transformNode->addChild(m_vertexNode.get());
+    m_transformNode->addChild(m_edgeNode.get());
+    m_transformNode->addChild(m_faceNode.get());
+    
+    // 初始化几何体状态
+    initialize();
 }
 
 Geo3D::~Geo3D()
@@ -37,6 +50,7 @@ void Geo3D::setParameters(const GeoParameters3D& params)
 {
     m_parameters = params;
     markGeometryDirty();
+    emit parametersChanged(this);
 }
 
 void Geo3D::addControlPoint(const Point3D& point)
@@ -44,7 +58,7 @@ void Geo3D::addControlPoint(const Point3D& point)
     m_controlPoints.push_back(point);
     updateBoundingBox();
     markGeometryDirty();
-    markFeaturesDirty();
+    emit geometryUpdated(this);
 }
 
 void Geo3D::setControlPoint(int index, const Point3D& point)
@@ -54,7 +68,7 @@ void Geo3D::setControlPoint(int index, const Point3D& point)
         m_controlPoints[index] = point;
         updateBoundingBox();
         markGeometryDirty();
-        markFeaturesDirty();
+        emit geometryUpdated(this);
     }
 }
 
@@ -65,7 +79,7 @@ void Geo3D::removeControlPoint(int index)
         m_controlPoints.erase(m_controlPoints.begin() + index);
         updateBoundingBox();
         markGeometryDirty();
-        markFeaturesDirty();
+        emit geometryUpdated(this);
     }
 }
 
@@ -74,7 +88,7 @@ void Geo3D::clearControlPoints()
     m_controlPoints.clear();
     m_boundingBox = BoundingBox3D();
     markGeometryDirty();
-    markFeaturesDirty();
+    emit geometryUpdated(this);
 }
 
 void Geo3D::setTransform(const Transform3D& transform)
@@ -154,6 +168,8 @@ void Geo3D::completeDrawing()
     setStateComplete();
     clearStateEditing();
     updateGeometry();
+    emit drawingCompleted(this);
+    emit stateChanged(this);
 }
 
 void Geo3D::initialize()
@@ -288,49 +304,6 @@ void Geo3D::updateBoundingBox()
 }
 
 // ============================================================================
-// IPickingProvider Implementation
-// ============================================================================
-
-std::vector<FeatureType> Geo3D::getSupportedFeatureTypes() const
-{
-    return {};
-}
-
-std::vector<PickingFeature> Geo3D::getFeatures(FeatureType type) const
-{
-    return getCachedFeatures(type);
-}
-
-std::vector<PickingFeature> Geo3D::getCachedFeatures(FeatureType type) const
-{
-    auto it = m_cachedFeatures.find(type);
-    if (it != m_cachedFeatures.end() && !m_featuresDirty)
-    {
-        return it->second;
-    }
-    
-    std::vector<PickingFeature> features;
-    switch (type)
-    {
-        case FeatureType::FACE:
-            features = extractFaceFeatures();
-            break;
-        case FeatureType::EDGE:
-            features = extractEdgeFeatures();
-            break;
-        case FeatureType::VERTEX:
-            features = extractVertexFeatures();
-            break;
-        default:
-            break;
-    }
-    
-    m_cachedFeatures[type] = features;
-    
-    return features;
-}
-
-// ============================================================================
 // RegularGeo3D Implementation
 // ============================================================================
 
@@ -338,30 +311,7 @@ RegularGeo3D::RegularGeo3D()
 {
 }
 
-std::vector<PickingFeature> RegularGeo3D::extractFaceFeatures() const
-{
-    return {};
-}
 
-std::vector<PickingFeature> RegularGeo3D::extractEdgeFeatures() const
-{
-    return {};
-}
-
-std::vector<PickingFeature> RegularGeo3D::extractVertexFeatures() const
-{
-    std::vector<PickingFeature> features;
-    
-    for (size_t i = 0; i < m_controlPoints.size(); ++i)
-    {
-        PickingFeature feature(FeatureType::VERTEX, static_cast<uint32_t>(i));
-        feature.center = osg::Vec3(m_controlPoints[i].x(), m_controlPoints[i].y(), m_controlPoints[i].z());
-        feature.size = 0.05f;
-        features.push_back(feature);
-    }
-    
-    return features;
-}
 
 // ============================================================================
 // MeshGeo3D Implementation
@@ -374,22 +324,9 @@ MeshGeo3D::MeshGeo3D()
 void MeshGeo3D::setMeshData(osg::ref_ptr<osg::Geometry> geometry)
 {
     m_meshGeometry = geometry;
-    markGeometryDirty();
-    markFeaturesDirty();
 }
 
-std::vector<PickingFeature> MeshGeo3D::extractFaceFeatures() const
-{
-    std::vector<PickingFeature> features;
-    
-    if (!m_meshGeometry.valid())
-        return features;
-    
-    // 从三角网格中提取面Feature的简化实现
-    // 子类可以重写以提供更详细的实现
-    
-    return features;
-}
+
 
 // ============================================================================
 // CompositeGeo3D Implementation
@@ -401,11 +338,9 @@ CompositeGeo3D::CompositeGeo3D()
 
 void CompositeGeo3D::addComponent(osg::ref_ptr<Geo3D> component)
 {
-    if (component.valid())
+    if (component)
     {
         m_components.push_back(component);
-        m_drawableGroup->addChild(component->getOSGNode());
-        markFeaturesDirty();
     }
 }
 
@@ -414,47 +349,36 @@ void CompositeGeo3D::removeComponent(osg::ref_ptr<Geo3D> component)
     auto it = std::find(m_components.begin(), m_components.end(), component);
     if (it != m_components.end())
     {
-        m_drawableGroup->removeChild(component->getOSGNode());
         m_components.erase(it);
-        markFeaturesDirty();
     }
 }
 
 void CompositeGeo3D::clearComponents()
 {
-    for (auto& component : m_components)
-    {
-        m_drawableGroup->removeChild(component->getOSGNode());
-    }
     m_components.clear();
-    markFeaturesDirty();
 }
 
-std::vector<PickingFeature> CompositeGeo3D::getFeatures(FeatureType type) const
-{
-    std::vector<PickingFeature> allFeatures;
-    
-    for (const auto& component : m_components)
-    {
-        std::vector<PickingFeature> componentFeatures = component->getFeatures(type);
-        allFeatures.insert(allFeatures.end(), componentFeatures.begin(), componentFeatures.end());
-    }
-    
-    return allFeatures;
-}
+
 
 osg::ref_ptr<osg::Geometry> CompositeGeo3D::createGeometry()
 {
+    // 复合几何体不直接创建几何体，而是由组件组成
     return nullptr;
 }
 
 void CompositeGeo3D::updateGeometry()
 {
+    // 更新所有组件
     for (auto& component : m_components)
     {
-        component->updateGeometry();
+        if (component.valid())
+        {
+            component->updateGeometry();
+        }
     }
 }
+
+
 
 // ============================================================================
 // 工厂函数（临时实现）
@@ -465,4 +389,86 @@ void CompositeGeo3D::updateGeometry()
 Geo3D* createGeo3D(DrawMode3D mode)
 {
     return GeometryFactory::createGeometry(mode);
+}
+
+// ============================================================================
+// 点线面节点管理方法实现
+// ============================================================================
+
+void Geo3D::addVertexGeometry(osg::ref_ptr<osg::Geometry> vertexGeo)
+{
+    if (vertexGeo.valid())
+    {
+        osg::ref_ptr<osg::Geode> geode = new osg::Geode();
+        geode->addDrawable(vertexGeo.get());
+        m_vertexNode->addChild(geode.get());
+    }
+}
+
+void Geo3D::addEdgeGeometry(osg::ref_ptr<osg::Geometry> edgeGeo)
+{
+    if (edgeGeo.valid())
+    {
+        osg::ref_ptr<osg::Geode> geode = new osg::Geode();
+        geode->addDrawable(edgeGeo.get());
+        m_edgeNode->addChild(geode.get());
+    }
+}
+
+void Geo3D::addFaceGeometry(osg::ref_ptr<osg::Geometry> faceGeo)
+{
+    if (faceGeo.valid())
+    {
+        osg::ref_ptr<osg::Geode> geode = new osg::Geode();
+        geode->addDrawable(faceGeo.get());
+        m_faceNode->addChild(geode.get());
+    }
+}
+
+void Geo3D::clearVertexGeometries()
+{
+    m_vertexNode->removeChildren(0, m_vertexNode->getNumChildren());
+}
+
+void Geo3D::clearEdgeGeometries()
+{
+    m_edgeNode->removeChildren(0, m_edgeNode->getNumChildren());
+}
+
+void Geo3D::clearFaceGeometries()
+{
+    m_faceNode->removeChildren(0, m_faceNode->getNumChildren());
+}
+
+void Geo3D::setShowPoints(bool show)
+{
+    m_parameters.showPoints = show;
+    updateFeatureVisibility();
+    emit parametersChanged(this);
+}
+
+void Geo3D::setShowEdges(bool show)
+{
+    m_parameters.showEdges = show;
+    updateFeatureVisibility();
+    emit parametersChanged(this);
+}
+
+void Geo3D::setShowFaces(bool show)
+{
+    m_parameters.showFaces = show;
+    updateFeatureVisibility();
+    emit parametersChanged(this);
+}
+
+void Geo3D::updateFeatureVisibility()
+{
+    // 更新顶点节点可见性
+    m_vertexNode->setNodeMask(m_parameters.showPoints ? 0xffffffff : 0x0);
+    
+    // 更新边节点可见性
+    m_edgeNode->setNodeMask(m_parameters.showEdges ? 0xffffffff : 0x0);
+    
+    // 更新面节点可见性
+    m_faceNode->setNodeMask(m_parameters.showFaces ? 0xffffffff : 0x0);
 } 

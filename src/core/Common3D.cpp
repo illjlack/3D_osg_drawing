@@ -22,6 +22,11 @@ float GlobalShininess3D = 32.0f;
 float GlobalTransparency3D = 1.0f;
 SubdivisionLevel3D GlobalSubdivisionLevel3D = Subdivision_Medium3D;
 
+// 显示控制全局变量
+bool GlobalShowPoints3D = true;
+bool GlobalShowEdges3D = true;
+bool GlobalShowFaces3D = true;
+
 QStatusBar* GlobalStatusBar3D = nullptr;
 
 // GeoParameters3D 实现
@@ -36,6 +41,7 @@ void GeoParameters3D::resetToGlobal()
     pointShape = GlobalPointShape3D;
     pointSize = GlobalPointSize3D;
     pointColor = Color3D(GlobalPointColor3D);
+    showPoints = true;  // 默认显示点
     
     // 线属性
     lineStyle = GlobalLineStyle3D;
@@ -43,12 +49,14 @@ void GeoParameters3D::resetToGlobal()
     lineColor = Color3D(GlobalLineColor3D);
     lineDashPattern = GlobalLineDashPattern3D;
     nodeLineStyle = GlobalNodeLineStyle3D;
+    showEdges = true;  // 默认显示边
     
     // 面属性
     fillType = GlobalFillType3D;
     fillColor = Color3D(GlobalFillColor3D);
     borderColor = Color3D(GlobalBorderColor3D);
     showBorder = GlobalShowBorder3D;
+    showFaces = true;  // 默认显示面
     
     // 材质属性
     material.type = GlobalMaterialType3D;

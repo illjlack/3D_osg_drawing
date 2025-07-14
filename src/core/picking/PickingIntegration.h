@@ -66,6 +66,7 @@ public:
     static void addGeometry(Geo3D* geo);
     static void removeGeometry(Geo3D* geo);
     static void updateGeometry(Geo3D* geo);
+    static void clearAllObjects();
     static PickingResult pick(int mouseX, int mouseY, int radius = 8);
 
 private:

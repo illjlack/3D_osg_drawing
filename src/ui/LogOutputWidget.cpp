@@ -15,6 +15,12 @@
 #include <QThread>
 #include <QWaitCondition>
 #include <QMutexLocker>
+#include <QDialog>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QRadioButton>
+#include <QPushButton>
 
 // ==================== LogOutputWidget 实现 ====================
 
@@ -248,6 +254,9 @@ void LogOutputWidget::addLogEntry(const LogEntry& entry)
     
     // 调度UI更新
     scheduleUIUpdate();
+    
+    // 更新过滤选项（异步，避免阻塞UI）
+    QTimer::singleShot(0, this, &LogOutputWidget::updateFilterOptions);
 }
 
 void LogOutputWidget::scheduleUIUpdate()
@@ -283,17 +292,17 @@ bool LogOutputWidget::shouldDisplayLog(const LogEntry& entry) const
     // 分类过滤
     if (!m_currentFilterCategory.isEmpty())
     {
-        if (entry.category.isEmpty())
+        QStringList keywords = m_currentFilterCategory.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
+        if (keywords.isEmpty())
         {
-            return false;
+            return true; // 如果没有有效关键词，显示所有
         }
         
-        QStringList keywords = m_currentFilterCategory.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
         bool matchesAnyKeyword = false;
         
         for (const QString& keyword : keywords)
         {
-            if (entry.category.contains(keyword, Qt::CaseInsensitive))
+            if (!keyword.isEmpty() && entry.category.contains(keyword, Qt::CaseInsensitive))
             {
                 matchesAnyKeyword = true;
                 break;
@@ -496,6 +505,35 @@ QString LogOutputWidget::getLogLevelText(LogLevel level)
     }
 }
 
+void LogOutputWidget::updateFilterOptions()
+{
+    // 更新分类下拉框选项
+    QString currentText = m_filterCategoryCombo->currentText();
+    m_filterCategoryCombo->clear();
+    m_filterCategoryCombo->addItem("全部", "");
+    
+    // 添加所有可用的分类
+    QMutexLocker locker(&m_logsMutex);
+    for (const QString& category : m_categories)
+    {
+        if (!category.isEmpty())
+        {
+            m_filterCategoryCombo->addItem(category, category);
+        }
+    }
+    
+    // 恢复当前选中的文本
+    int index = m_filterCategoryCombo->findText(currentText);
+    if (index >= 0)
+    {
+        m_filterCategoryCombo->setCurrentIndex(index);
+    }
+    else
+    {
+        m_filterCategoryCombo->setCurrentText(currentText);
+    }
+}
+
 void LogOutputWidget::refreshDisplay()
 {
     m_needsFullRefresh = true;
@@ -540,6 +578,13 @@ void LogOutputWidget::clearLogs()
         m_categories.clear();
     }
     
+    // 通知LogManager清空全局日志
+    LogManager* logManager = LogManager::getInstance();
+    if (logManager)
+    {
+        logManager->clearLogs();
+    }
+    
     // 重置过滤选项
     m_filterCategoryCombo->clear();
     m_filterCategoryCombo->addItem("全部", "");
@@ -557,15 +602,30 @@ void LogOutputWidget::exportLogs(const QString& filename)
     QTextStream stream(&file);
     stream.setCodec("UTF-8");
     
-    // 导出所有日志
+    // 导出过滤后的日志或所有日志
     QMutexLocker locker(&m_logsMutex);
-    for (const LogEntry& entry : m_allLogs)
+    QList<LogEntry> logsToExport = m_filteredLogs.isEmpty() ? m_allLogs : m_filteredLogs;
+    
+    for (const LogEntry& entry : logsToExport)
     {
         stream << formatLogText(entry) << "\n";
     }
     
     file.close();
-    QMessageBox::information(this, "导出成功", "日志已导出到: " + filename);
+    
+    QString message = QString("日志已导出到: %1\n共导出 %2 条日志").arg(filename).arg(logsToExport.size());
+    QMessageBox::information(this, "导出成功", message);
+}
+
+void LogOutputWidget::exportLogs()
+{
+    QString filename = QFileDialog::getSaveFileName(this, "导出日志", 
+                                                   "log_export.txt", "文本文件 (*.txt)");
+    if (!filename.isEmpty())
+    {
+        // 调用带参数的版本，避免无限递归
+        this->exportLogs(filename);
+    }
 }
 
 void LogOutputWidget::copySelectedText()
@@ -613,7 +673,7 @@ void LogOutputWidget::onFilterLevelChanged()
             selectedLevels.insert(LogLevel::Error);
             selectedLevels.insert(LogLevel::Success);
         }
-        else
+        else if (levelValue >= 0)
         {
             selectedLevels.insert(static_cast<LogLevel>(levelValue));
         }
@@ -635,7 +695,7 @@ void LogOutputWidget::onFilterCategoryChanged(const QString& category)
     QString filterCategory;
     if (category != "全部" && !category.isEmpty())
     {
-        filterCategory = category;
+        filterCategory = category.trimmed();
     }
     
     // 更新过滤器
@@ -665,15 +725,45 @@ void LogOutputWidget::onShowCategoryToggled(bool checked)
     refreshDisplay();
 }
 
-void LogOutputWidget::exportLogs()
+void LogOutputWidget::exportLogsWithOptions(const QString& filename, bool exportFiltered)
 {
-    QString filename = QFileDialog::getSaveFileName(this, "导出日志", 
-                                                   "log_export.txt", "文本文件 (*.txt)");
-    if (!filename.isEmpty())
+    QFile file(filename);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
     {
-        exportLogs(filename);
+        QMessageBox::warning(this, "导出失败", "无法创建文件: " + filename);
+        return;
     }
+    
+    QTextStream stream(&file);
+    stream.setCodec("UTF-8");
+    
+    // 根据选项导出日志
+    QMutexLocker locker(&m_logsMutex);
+    QList<LogEntry> logsToExport;
+    
+    if (exportFiltered && !m_filteredLogs.isEmpty())
+    {
+        logsToExport = m_filteredLogs;
+    }
+    else
+    {
+        logsToExport = m_allLogs;
+    }
+    
+    for (const LogEntry& entry : logsToExport)
+    {
+        stream << formatLogText(entry) << "\n";
+    }
+    
+    file.close();
+    
+    QString rangeText = exportFiltered ? "筛选结果" : "所有日志";
+    QString message = QString("日志已导出到: %1\n导出范围: %2\n共导出 %3 条日志")
+                     .arg(filename).arg(rangeText).arg(logsToExport.size());
+    QMessageBox::information(this, "导出成功", message);
 }
+
+
 
 void LogOutputWidget::showContextMenu(const QPoint& pos)
 {

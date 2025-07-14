@@ -3,6 +3,7 @@
 #include "../core/GeometryBase.h"
 #include "../core/picking/PickingSystem.h"
 #include "../core/picking/PickingIntegration.h"
+#include "../core/picking/PickingDiagnostic.h"
 #include "../util/LogManager.h"
 #include <osgViewer/Viewer>
 #include <osgViewer/CompositeViewer>
@@ -354,10 +355,24 @@ void OSGWidget::addGeo(Geo3D* geo)
         m_geoList.push_back(geoRef);
         m_geoNode->addChild(geo->getOSGNode().get());
         
-        // 添加到拾取系统
-        if (m_advancedPickingEnabled)
+        // 连接几何对象的信号
+        connect(geo, &Geo3D::drawingCompleted, this, &OSGWidget::onGeoDrawingCompleted);
+        connect(geo, &Geo3D::geometryUpdated, this, &OSGWidget::onGeoGeometryUpdated);
+        connect(geo, &Geo3D::parametersChanged, this, &OSGWidget::onGeoParametersChanged);
+        
+        // 如果几何对象已经完成绘制，立即添加到拾取系统
+        if (m_advancedPickingEnabled && geo->isStateComplete())
         {
             PickingSystemIntegration::addGeometry(geo);
+            LOG_DEBUG(QString("Added completed geometry to picking system: %1").arg(geo->getGeoType()), "拾取");
+        }
+        else if (m_advancedPickingEnabled)
+        {
+            LOG_DEBUG(QString("Geometry not yet complete, will be added when drawing completes: %1").arg(geo->getGeoType()), "拾取");
+        }
+        else
+        {
+            LOG_DEBUG("Advanced picking is disabled", "拾取");
         }
     }
 }
@@ -370,6 +385,11 @@ void OSGWidget::removeGeo(Geo3D* geo)
             [geo](const osg::ref_ptr<Geo3D>& ref) { return ref.get() == geo; });
         if (it != m_geoList.end())
         {
+            // 断开信号连接
+            disconnect(geo, &Geo3D::drawingCompleted, this, &OSGWidget::onGeoDrawingCompleted);
+            disconnect(geo, &Geo3D::geometryUpdated, this, &OSGWidget::onGeoGeometryUpdated);
+            disconnect(geo, &Geo3D::parametersChanged, this, &OSGWidget::onGeoParametersChanged);
+            
             m_geoNode->removeChild(geo->getOSGNode().get());
             m_geoList.erase(it);
             
@@ -716,9 +736,9 @@ void OSGWidget::handleDrawingInput(QMouseEvent* event)
         // 绘制模式
         if (!m_isDrawing)
         {
-            // 开始新的绘制
-            Geo3D* newGeo = createGeo3D(GlobalDrawMode3D);
-                    if (newGeo)
+        // 开始新的绘制
+        Geo3D* newGeo = createGeo3D(GlobalDrawMode3D);
+        if (newGeo)
         {
             m_currentDrawingGeo = newGeo;
             m_isDrawing = true;
@@ -761,7 +781,7 @@ void OSGWidget::completeCurrentDrawing()
 {
     if (m_currentDrawingGeo)
     {
-        // 完成绘制
+        // 完成绘制 - 这会触发drawingCompleted信号
         m_currentDrawingGeo->completeDrawing();
         
         // 绘制完成后，对象保留在场景中，不需要删除
@@ -1406,6 +1426,91 @@ Geo3D* OSGWidget::getSelectedGeo() const
 const std::vector<osg::ref_ptr<Geo3D>>& OSGWidget::getAllGeos() const
 {
     return m_geoList;
+}
+
+QString OSGWidget::diagnosePickingSystem()
+{
+    LOG_INFO("开始拾取系统诊断", "拾取");
+    
+    QString report = PickingDiagnostic::generateDiagnosticReport();
+    
+    // 添加额外的诊断信息
+    report += "\n=== 额外诊断信息 ===\n";
+    report += QString("高级拾取启用: %1\n").arg(m_advancedPickingEnabled ? "是" : "否");
+    report += QString("几何对象数量: %1\n").arg(m_geoList.size());
+    report += QString("拾取指示器管理器: %1\n").arg(m_pickingIndicatorManager ? "有效" : "无效");
+    
+    if (!m_geoList.empty())
+    {
+        report += "\n几何对象类型:\n";
+        for (const auto& geo : m_geoList)
+        {
+            report += QString("  - %1\n").arg(geo->getGeoType());
+        }
+    }
+    
+    LOG_INFO("拾取系统诊断完成", "拾取");
+    return report;
+}
+
+bool OSGWidget::fixPickingIssues()
+{
+    LOG_INFO("尝试修复拾取系统问题", "拾取");
+    
+    // 重新初始化拾取系统
+    if (m_advancedPickingEnabled)
+    {
+        // 清除现有拾取系统
+        PickingSystemIntegration::clearAllObjects();
+        
+        // 重新添加所有几何对象到拾取系统
+        for (const auto& geo : m_geoList)
+        {
+            PickingSystemIntegration::addGeometry(geo.get());
+        }
+        
+        LOG_SUCCESS("拾取系统修复完成", "拾取");
+        return true;
+    }
+    
+    LOG_WARNING("高级拾取未启用，无法修复", "拾取");
+    return false;
+}
+
+// 几何对象信号响应槽函数
+void OSGWidget::onGeoDrawingCompleted(Geo3D* geo)
+{
+    if (!geo || !m_advancedPickingEnabled)
+        return;
+    
+    LOG_DEBUG(QString("Geometry drawing completed: %1").arg(geo->getGeoType()), "拾取");
+    
+    // 几何对象完成绘制后，添加到拾取系统
+    PickingSystemIntegration::addGeometry(geo);
+    
+    LOG_INFO(QString("Added completed geometry to picking system: %1").arg(geo->getGeoType()), "拾取");
+}
+
+void OSGWidget::onGeoGeometryUpdated(Geo3D* geo)
+{
+    if (!geo || !m_advancedPickingEnabled)
+        return;
+    
+    // 几何对象更新时，更新拾取系统中的Feature
+    PickingSystemIntegration::updateGeometry(geo);
+    
+    LOG_DEBUG(QString("Updated geometry in picking system: %1").arg(geo->getGeoType()), "拾取");
+}
+
+void OSGWidget::onGeoParametersChanged(Geo3D* geo)
+{
+    if (!geo || !m_advancedPickingEnabled)
+        return;
+    
+    // 参数变化时，更新拾取系统中的Feature
+    PickingSystemIntegration::updateGeometry(geo);
+    
+    LOG_DEBUG(QString("Updated geometry parameters in picking system: %1").arg(geo->getGeoType()), "拾取");
 }
 
 

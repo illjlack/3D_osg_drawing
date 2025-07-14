@@ -15,14 +15,13 @@ public:
     virtual void completeDrawing() override;
     virtual void updateGeometry() override;
 
-    // 拾取Feature支持
-    virtual std::vector<FeatureType> getSupportedFeatureTypes() const override;
-
 protected:
     virtual osg::ref_ptr<osg::Geometry> createGeometry() override;
     
-    // Feature抽取
-    virtual std::vector<PickingFeature> extractVertexFeatures() const override;
+    // 点线面几何体构建
+    virtual void buildVertexGeometries() override;
+    virtual void buildEdgeGeometries() override;
+    virtual void buildFaceGeometries() override;
     
 private:
     osg::ref_ptr<osg::Geometry> createPointGeometry(PointShape3D shape, float size);

@@ -24,6 +24,7 @@
 #include <osg/PositionAttitudeTransform>
 #include <QMouseEvent>
 #include <QKeyEvent>
+#include <QObject>
 #include <vector>
 #include <memory>
 #include <map>
@@ -36,31 +37,11 @@ class Geo3D;
 // 几何对象工厂
 Geo3D* createGeo3D(DrawMode3D mode);
 
-// 拾取Provider接口
-class IPickingProvider
-{
-public:
-    virtual ~IPickingProvider() = default;
-    
-    // 获取支持的Feature类型
-    virtual std::vector<FeatureType> getSupportedFeatureTypes() const = 0;
-    
-    // 获取指定类型的所有Feature
-    virtual std::vector<PickingFeature> getFeatures(FeatureType type) const = 0;
-    
-    // 获取指定Feature的详细信息(可选实现)
-    virtual bool getFeatureInfo(FeatureType type, uint32_t index, PickingFeature& feature) const { return false; }
-    
-    // 判断是否需要重新抽取Feature(当几何体发生变化时)
-    virtual bool needsFeatureUpdate() const = 0;
-    
-    // 标记Feature已更新
-    virtual void markFeatureUpdated() = 0;
-};
-
 // 三维几何对象基类
-class Geo3D : public osg::Referenced, public IPickingProvider
+class Geo3D : public QObject, public osg::Referenced
 {
+    Q_OBJECT
+
 public:
     Geo3D();
     virtual ~Geo3D();
@@ -129,11 +110,35 @@ public:
     // 更新几何体
     virtual void updateGeometry() = 0;
 
-    // 实现IPickingProvider接口
-    virtual std::vector<FeatureType> getSupportedFeatureTypes() const override;
-    virtual std::vector<PickingFeature> getFeatures(FeatureType type) const override;
-    virtual bool needsFeatureUpdate() const override { return m_featuresDirty; }
-    virtual void markFeatureUpdated() override { m_featuresDirty = false; }
+    // 点线面节点管理 - 直接保存到场景中
+    osg::ref_ptr<osg::Group> getVertexNode() const { return m_vertexNode; }
+    osg::ref_ptr<osg::Group> getEdgeNode() const { return m_edgeNode; }
+    osg::ref_ptr<osg::Group> getFaceNode() const { return m_faceNode; }
+    
+    // 添加点线面几何体到对应节点
+    void addVertexGeometry(osg::ref_ptr<osg::Geometry> vertexGeo);
+    void addEdgeGeometry(osg::ref_ptr<osg::Geometry> edgeGeo);
+    void addFaceGeometry(osg::ref_ptr<osg::Geometry> faceGeo);
+    
+    // 清除点线面几何体
+    void clearVertexGeometries();
+    void clearEdgeGeometries();
+    void clearFaceGeometries();
+    
+    // 显示控制
+    void setShowPoints(bool show);
+    void setShowEdges(bool show);
+    void setShowFaces(bool show);
+    bool isShowPoints() const { return m_parameters.showPoints; }
+    bool isShowEdges() const { return m_parameters.showEdges; }
+    bool isShowFaces() const { return m_parameters.showFaces; }
+
+signals:
+    // 几何对象状态变化信号
+    void stateChanged(Geo3D* geo);
+    void drawingCompleted(Geo3D* geo);
+    void geometryUpdated(Geo3D* geo);
+    void parametersChanged(Geo3D* geo);
 
 protected:
     // 初始化（第一次调用时）
@@ -158,14 +163,12 @@ protected:
     void markGeometryDirty() { m_geometryDirty = true; }
     bool isGeometryDirty() const { return m_geometryDirty; }
     void clearGeometryDirty() { m_geometryDirty = false; }
-
-    // 子类实现具体的Feature抽取逻辑
-    virtual std::vector<PickingFeature> extractFaceFeatures() const { return {}; }
-    virtual std::vector<PickingFeature> extractEdgeFeatures() const { return {}; }
-    virtual std::vector<PickingFeature> extractVertexFeatures() const { return {}; }
     
-    // 标记Feature需要更新
-    void markFeaturesDirty() { m_featuresDirty = true; }
+    // 点线面节点管理辅助方法
+    virtual void buildVertexGeometries() = 0;  // 子类实现具体的顶点几何体构建
+    virtual void buildEdgeGeometries() = 0;    // 子类实现具体的边几何体构建
+    virtual void buildFaceGeometries() = 0;    // 子类实现具体的面几何体构建
+    void updateFeatureVisibility();
 
 protected:
     // 数据类型，反射用
@@ -184,7 +187,7 @@ protected:
     BoundingBox3D m_boundingBox;
     
     osg::ref_ptr<osg::Group> m_osgNode;
-    osg::ref_ptr<osg::Group> m_drawableGroup;  // 替代Geode
+    osg::ref_ptr<osg::Group> m_drawableGroup;
     osg::ref_ptr<osg::Geometry> m_geometry;
     osg::ref_ptr<osg::MatrixTransform> m_transformNode;
     osg::ref_ptr<osg::Group> m_controlPointsNode;
@@ -193,11 +196,10 @@ protected:
     bool m_initialized;
     bool m_parametersChanged;  // 新增：跟踪参数是否发生变化
 
-    mutable bool m_featuresDirty;
-    mutable std::map<FeatureType, std::vector<PickingFeature>> m_cachedFeatures;
-    
-    // 缓存Feature以提高性能
-    std::vector<PickingFeature> getCachedFeatures(FeatureType type) const;
+    // 点线面节点管理
+    osg::ref_ptr<osg::Group> m_vertexNode;
+    osg::ref_ptr<osg::Group> m_edgeNode;
+    osg::ref_ptr<osg::Group> m_faceNode;
 };
 
 // 规则几何体基类
@@ -206,18 +208,9 @@ class RegularGeo3D : public Geo3D
 public:
     RegularGeo3D();
     virtual ~RegularGeo3D() = default;
-    
-    // 规则几何体默认支持所有Feature类型
-    virtual std::vector<FeatureType> getSupportedFeatureTypes() const override
-    {
-        return {FeatureType::FACE, FeatureType::EDGE, FeatureType::VERTEX};
-    }
 
 protected:
     // 规则几何体可以精确计算Feature
-    virtual std::vector<PickingFeature> extractFaceFeatures() const override;
-    virtual std::vector<PickingFeature> extractEdgeFeatures() const override; 
-    virtual std::vector<PickingFeature> extractVertexFeatures() const override;
 };
 
 // 网格几何体基类
@@ -227,17 +220,8 @@ public:
     MeshGeo3D();
     virtual ~MeshGeo3D() = default;
     
-    // 网格对象通常只提供面Feature
-    virtual std::vector<FeatureType> getSupportedFeatureTypes() const override
-    {
-        return {FeatureType::FACE};
-    }
-    
     // 设置三角网格数据
     void setMeshData(osg::ref_ptr<osg::Geometry> geometry);
-
-protected:
-    virtual std::vector<PickingFeature> extractFaceFeatures() const override;
 
 private:
     osg::ref_ptr<osg::Geometry> m_meshGeometry;
@@ -250,19 +234,10 @@ public:
     CompositeGeo3D();
     virtual ~CompositeGeo3D() = default;
     
-    // 复合对象支持所有Feature类型
-    virtual std::vector<FeatureType> getSupportedFeatureTypes() const override
-    {
-        return {FeatureType::FACE, FeatureType::EDGE, FeatureType::VERTEX};
-    }
-    
     // 组件管理
     void addComponent(osg::ref_ptr<Geo3D> component);
     void removeComponent(osg::ref_ptr<Geo3D> component);
     void clearComponents();
-    
-    // 从所有组件收集Feature
-    virtual std::vector<PickingFeature> getFeatures(FeatureType type) const override;
 
 protected:
     virtual osg::ref_ptr<osg::Geometry> createGeometry() override;
