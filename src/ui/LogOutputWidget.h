@@ -11,7 +11,6 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QPushButton>
-#include <QSpinBox>
 #include <QMenu>
 #include <QScrollBar>
 #include <QTextCursor>
@@ -23,14 +22,11 @@
 #include <QMessageBox>
 #include <QApplication>
 #include <QClipboard>
-#include <QMutex>
 #include <QSet>
-#include <QListWidget>
 #include <QThread>
 #include <QQueue>
 #include <QTimer>
-#include <QWaitCondition>
-#include <QAtomicInt>
+#include <list>
 #include "../util/LogManager.h"
 
 // 为LogLevel提供qHash函数
@@ -106,8 +102,7 @@ private slots:
     // 导出日志（无参数版本）
     void exportLogs();
     
-    // 批量更新UI
-    void processUIUpdate();
+    // 已移除定时刷新相关声明
 
 private:
     // 初始化UI
@@ -140,9 +135,6 @@ private:
     // 限制显示行数
     void limitDisplayLines();
     
-    // 调度UI更新
-    void scheduleUIUpdate();
-    
     // 应用过滤条件
     void applyFilters();
     
@@ -167,7 +159,6 @@ private:
     QList<LogEntry> m_allLogs;
     QList<LogEntry> m_filteredLogs;
     QSet<QString> m_categories;
-    QQueue<LogEntry> m_pendingLogs;
     
     // 过滤条件
     QSet<LogLevel> m_selectedFilterLevels;
@@ -188,18 +179,15 @@ private:
     QTextCharFormat m_timestampFormat;
     QTextCharFormat m_categoryFormat;
     
-    // UI更新控制 - 简化版本
-    QTimer* m_uiUpdateTimer;
-    QList<LogEntry> m_pendingUILogs;
+    // UI更新控制已移除定时刷新相关成员
     bool m_needsFullRefresh;
     
-    // 线程安全
-    mutable QMutex m_logsMutex;
+    // 线程安全 - 使用Qt信号槽机制，无需显式锁
     
     // 筛选状态控制
     bool m_isFiltering;
     
     // 更新频率控制 - 简化参数
-    static const int UI_UPDATE_INTERVAL = 100; // 100ms UI更新间隔
-    static const int MAX_UI_BATCH_SIZE = 50;   // UI线程最多处理50条日志
+    // static const int UI_UPDATE_INTERVAL = 100; // 已移除定时刷新
+    // static const int MAX_UI_BATCH_SIZE = 50;   // 已移除定时刷新
 }; 

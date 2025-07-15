@@ -7,19 +7,15 @@
 #include <QMessageBox>
 #include <QDebug>
 #include <QRegularExpression>
-#include <QTextCodec>
 #include <QMenu>
 #include <QAction>
 #include <QFileInfo>
 #include <QTimer>
 #include <QThread>
-#include <QWaitCondition>
-// 移除QMutexLocker，使用事件队列确保线程安全
-#include <QDialog>
+// 使用Qt信号槽机制确保线程安全
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
-#include <QRadioButton>
 #include <QPushButton>
 
 // ==================== LogOutputWidget 实现 ====================
@@ -32,7 +28,6 @@ LogOutputWidget::LogOutputWidget(QWidget* parent)
     , m_showCategory(true)
     , m_needsFullRefresh(false)
     , m_isFiltering(false)
-    , m_uiUpdateTimer(nullptr)
 {
     // 初始化过滤级别为全部
     m_selectedFilterLevels.insert(LogLevel::Debug);
@@ -44,11 +39,6 @@ LogOutputWidget::LogOutputWidget(QWidget* parent)
     setupUI();
     setupTextFormats();
     
-    // 初始化UI更新定时器
-    m_uiUpdateTimer = new QTimer(this);
-    m_uiUpdateTimer->setSingleShot(true);
-    connect(m_uiUpdateTimer, &QTimer::timeout, this, &LogOutputWidget::processUIUpdate);
-    
     // 连接日志管理器信号
     LogManager* logManager = LogManager::getInstance();
     connect(logManager, &LogManager::logAdded, this, &LogOutputWidget::addLogEntry);
@@ -57,11 +47,6 @@ LogOutputWidget::LogOutputWidget(QWidget* parent)
 
 LogOutputWidget::~LogOutputWidget()
 {
-    if (m_uiUpdateTimer)
-    {
-        m_uiUpdateTimer->stop();
-        delete m_uiUpdateTimer;
-    }
 }
 
 void LogOutputWidget::setupUI()
@@ -245,38 +230,13 @@ void LogOutputWidget::addLogEntry(const LogEntry& entry)
     if (shouldDisplayLog(entry))
     {
         m_filteredLogs.append(entry);
+        // 直接插入UI
+        addLogToTextEdit(entry);
+        limitDisplayLines();
     }
-    
-    // 将日志添加到UI更新队列
-    m_pendingUILogs.append(entry);
-    
-    // 调度UI更新
-    scheduleUIUpdate();
     
     // 更新过滤选项（异步，避免阻塞UI）
     QTimer::singleShot(0, this, &LogOutputWidget::updateFilterOptions);
-}
-
-void LogOutputWidget::scheduleUIUpdate()
-{
-    // 如果没有待处理的日志，不调度更新
-    if (m_pendingUILogs.isEmpty())
-    {
-        return;
-    }
-    
-    // 如果定时器已经在运行，不重复启动
-    if (m_uiUpdateTimer->isActive())
-    {
-        return;
-    }
-    
-    // 根据待处理日志数量调整更新间隔
-    int totalLogs = m_pendingUILogs.size();
-    
-    // 如果日志数量很多，立即更新；否则使用标准间隔
-    int updateInterval = (totalLogs > MAX_UI_BATCH_SIZE) ? 0 : UI_UPDATE_INTERVAL;
-    m_uiUpdateTimer->start(updateInterval);
 }
 
 bool LogOutputWidget::shouldDisplayLog(const LogEntry& entry) const
@@ -359,48 +319,6 @@ void LogOutputWidget::applyFilters()
                 m_filteredLogs.append(entry);
             }
         }
-    }
-}
-
-void LogOutputWidget::processUIUpdate()
-{
-    if (m_pendingUILogs.isEmpty())
-    {
-        return;
-    }
-    
-    qDebug() << "LogOutputWidget::processUIUpdate - 处理UI更新，待处理日志数量:" << m_pendingUILogs.size();
-    
-    // 批量处理UI更新 - 简化版本
-    QList<LogEntry> logsToAdd;
-    int processedCount = 0;
-    
-    // 处理所有待处理的日志
-    while (!m_pendingUILogs.isEmpty() && processedCount < MAX_UI_BATCH_SIZE)
-    {
-        LogEntry entry = m_pendingUILogs.takeFirst();
-        logsToAdd.append(entry);
-        processedCount++;
-    }
-    
-    qDebug() << "LogOutputWidget::processUIUpdate - 准备添加到UI的日志数量:" << logsToAdd.size();
-    
-    // 暂停文本编辑器的重绘以提高性能
-    m_textEdit->setUpdatesEnabled(false);
-    
-    // 批量添加到文本编辑器
-    addLogsToTextEdit(logsToAdd);
-    
-    // 限制显示行数
-    limitDisplayLines();
-    
-    // 恢复文本编辑器的重绘
-    m_textEdit->setUpdatesEnabled(true);
-    
-    // 如果还有待处理的日志，继续调度
-    if (!m_pendingUILogs.isEmpty())
-    {
-        scheduleUIUpdate();
     }
 }
 
@@ -567,7 +485,6 @@ void LogOutputWidget::refreshDisplay()
 {
     m_needsFullRefresh = true;
     m_textEdit->clear();
-    m_pendingUILogs.clear();
     
     // 应用过滤器并显示过滤后的日志
     applyFilters();
@@ -595,8 +512,6 @@ void LogOutputWidget::limitDisplayLines()
 void LogOutputWidget::clearLogs()
 {
     m_textEdit->clear();
-    m_pendingUILogs.clear();
-    m_needsFullRefresh = false;
     
     // 清空所有日志数据
     m_allLogs.clear();

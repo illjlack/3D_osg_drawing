@@ -4,9 +4,9 @@
 #include <QObject>
 #include <QString>
 #include <QDateTime>
-#include <QList>
 #include <QThread>
-#include <QQueue>
+#include <queue>
+#include <list>
 #include <sstream>
 
 // 日志级别枚举
@@ -31,7 +31,19 @@ struct LogEntry
     QString functionName; // 函数名
     QThread* thread;   // 线程信息
     
-    LogEntry() = default;
+    // 默认构造函数
+    LogEntry() 
+        : timestamp(QDateTime::currentDateTime())
+        , level(LogLevel::Info)
+        , message("")
+        , category("")
+        , fileName("")
+        , lineNumber(0)
+        , functionName("")
+        , thread(QThread::currentThread())
+    {}
+    
+    // 参数构造函数
     LogEntry(LogLevel l, const QString& msg, const QString& cat = "",
              const QString& file = "", int line = 0, const QString& func = "")
         : timestamp(QDateTime::currentDateTime())
@@ -43,6 +55,129 @@ struct LogEntry
         , functionName(func)
         , thread(QThread::currentThread())
     {}
+    
+    // 拷贝构造函数
+    LogEntry(const LogEntry& other)
+        : timestamp(other.timestamp)
+        , level(other.level)
+        , message(other.message)
+        , category(other.category)
+        , fileName(other.fileName)
+        , lineNumber(other.lineNumber)
+        , functionName(other.functionName)
+        , thread(other.thread)
+    {}
+    
+    // 移动构造函数
+    LogEntry(LogEntry&& other) noexcept
+        : timestamp(std::move(other.timestamp))
+        , level(other.level)
+        , message(std::move(other.message))
+        , category(std::move(other.category))
+        , fileName(std::move(other.fileName))
+        , lineNumber(other.lineNumber)
+        , functionName(std::move(other.functionName))
+        , thread(other.thread)
+    {
+        // 清空源对象
+        other.level = LogLevel::Info;
+        other.lineNumber = 0;
+        other.thread = nullptr;
+    }
+    
+    // 拷贝赋值运算符
+    LogEntry& operator=(const LogEntry& other)
+    {
+        if (this != &other)
+        {
+            timestamp = other.timestamp;
+            level = other.level;
+            message = other.message;
+            category = other.category;
+            fileName = other.fileName;
+            lineNumber = other.lineNumber;
+            functionName = other.functionName;
+            thread = other.thread;
+        }
+        return *this;
+    }
+    
+    // 移动赋值运算符
+    LogEntry& operator=(LogEntry&& other) noexcept
+    {
+        if (this != &other)
+        {
+            timestamp = std::move(other.timestamp);
+            level = other.level;
+            message = std::move(other.message);
+            category = std::move(other.category);
+            fileName = std::move(other.fileName);
+            lineNumber = other.lineNumber;
+            functionName = std::move(other.functionName);
+            thread = other.thread;
+            
+            // 清空源对象
+            other.level = LogLevel::Info;
+            other.lineNumber = 0;
+            other.thread = nullptr;
+        }
+        return *this;
+    }
+    
+    // 析构函数
+    ~LogEntry()
+    {
+        // 清理资源（QString等会自动清理）
+        thread = nullptr;
+    }
+    
+    // 比较运算符
+    bool operator==(const LogEntry& other) const
+    {
+        return timestamp == other.timestamp &&
+               level == other.level &&
+               message == other.message &&
+               category == other.category &&
+               fileName == other.fileName &&
+               lineNumber == other.lineNumber &&
+               functionName == other.functionName &&
+               thread == other.thread;
+    }
+    
+    bool operator!=(const LogEntry& other) const
+    {
+        return !(*this == other);
+    }
+    
+    // 小于比较运算符（用于排序）
+    bool operator<(const LogEntry& other) const
+    {
+        if (timestamp != other.timestamp)
+            return timestamp < other.timestamp;
+        if (level != other.level)
+            return static_cast<int>(level) < static_cast<int>(other.level);
+        if (category != other.category)
+            return category < other.category;
+        return message < other.message;
+    }
+    
+    // 大于比较运算符
+    bool operator>(const LogEntry& other) const
+    {
+        return other < *this;
+    }
+    
+    // 小于等于比较运算符
+    bool operator<=(const LogEntry& other) const
+    {
+        return !(other < *this);
+    }
+    
+    // 大于等于比较运算符
+    bool operator>=(const LogEntry& other) const
+    {
+        return !(*this < other);
+    }
 };
 
 // 简化的日志配置结构
@@ -78,16 +213,16 @@ public:
     void setLogFilePath(const QString& path);
     void setMaxLogCount(int count);
 
-    // 获取日志（线程安全）
-    QList<LogEntry> getLogs() const;
-    QList<LogEntry> getLogsByLevel(LogLevel level) const;
-    QList<LogEntry> getLogsByCategory(const QString& category) const;
+    // 获取日志列表
+    std::list<LogEntry> getLogs() const;
     
-    // 清理日志
+    // 清空日志
     void clearLogs();
     
-    // 统计信息
+    // 获取待处理日志数量
     int getPendingLogCount() const;
+    
+    // 获取当前日志数量
     int getCurrentLogCount() const;
     
     // 线程控制
@@ -107,10 +242,10 @@ private:
     bool shouldAcceptLog(const LogEntry& entry) const;
 
     // 日志队列
-    QQueue<LogEntry> m_logQueue;
+    std::queue<LogEntry> m_logQueue;
     
     // 日志存储
-    QList<LogEntry> m_logs;
+    std::list<LogEntry> m_logs;
     
     // 配置
     LogConfig m_config;
@@ -142,12 +277,7 @@ public:
     void success(const QString& message, const QString& category = "",
                 const QString& fileName = "", int lineNumber = 0, const QString& functionName = "");
     
-    // 日志查询
-    void requestLogs();
-    void requestLogsByLevel(LogLevel level);
-    void requestLogsByCategory(const QString& category);
-    
-    // 日志管理
+    // 清空日志
     void clearLogs();
     
     // 配置管理
@@ -171,16 +301,17 @@ public:
     int getCurrentLogCount() const;
 
 signals:
+    // 日志添加信号
     void logAdded(const LogEntry& entry);
+    
+    // 日志清空信号
     void logsCleared();
-    void logsReceived(const QList<LogEntry>& logs);
-    void logsByLevelReceived(LogLevel level, const QList<LogEntry>& logs);
-    void logsByCategoryReceived(const QString& category, const QList<LogEntry>& logs);
 
 private:
     LogManager();
     ~LogManager();
     
+    // 这些是线程不安全的，但是应该不影响
     static LogManager* s_instance;
     LogWorkerThread* m_workerThread;
     LogConfig m_config;

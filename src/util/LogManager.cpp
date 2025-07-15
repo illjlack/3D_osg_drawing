@@ -58,11 +58,11 @@ void LogWorkerThread::addLog(const LogEntry& entry)
     // 如果队列过满，丢弃旧的日志
     if (m_logQueue.size() > m_config.maxLogCount * 2) {
         while (m_logQueue.size() > m_config.maxLogCount) {
-            m_logQueue.dequeue();
+            m_logQueue.pop();
         }
     }
     
-    m_logQueue.enqueue(entry);
+    m_logQueue.push(entry);
 }
 
 void LogWorkerThread::setConfig(const LogConfig& config)
@@ -109,33 +109,9 @@ void LogWorkerThread::setMaxLogCount(int count)
     m_config.maxLogCount = count;
 }
 
-QList<LogEntry> LogWorkerThread::getLogs() const
+std::list<LogEntry> LogWorkerThread::getLogs() const
 {
     return m_logs;
-}
-
-QList<LogEntry> LogWorkerThread::getLogsByLevel(LogLevel level) const
-{
-    QList<LogEntry> result;
-    
-    for (const auto& entry : m_logs) {
-        if (entry.level == level) {
-            result.append(entry);
-        }
-    }
-    return result;
-}
-
-QList<LogEntry> LogWorkerThread::getLogsByCategory(const QString& category) const
-{
-    QList<LogEntry> result;
-    
-    for (const auto& entry : m_logs) {
-        if (entry.category == category) {
-            result.append(entry);
-        }
-    }
-    return result;
 }
 
 void LogWorkerThread::clearLogs()
@@ -146,12 +122,12 @@ void LogWorkerThread::clearLogs()
 
 int LogWorkerThread::getPendingLogCount() const
 {
-    return m_logQueue.size();
+    return static_cast<int>(m_logQueue.size());
 }
 
 int LogWorkerThread::getCurrentLogCount() const
 {
-    return m_logs.size();
+    return static_cast<int>(m_logs.size());
 }
 
 void LogWorkerThread::requestExit()
@@ -167,8 +143,9 @@ void LogWorkerThread::run()
         LogEntry entry;
         bool hasEntry = false;
         
-        if (!m_logQueue.isEmpty()) {
-            entry = m_logQueue.dequeue();
+        if (!m_logQueue.empty()) {
+            entry = m_logQueue.front();
+            m_logQueue.pop();
             hasEntry = true;
         } else {
             // 检查线程是否应该退出
@@ -181,11 +158,11 @@ void LogWorkerThread::run()
         
         if (hasEntry) {
             // 处理日志
-            m_logs.append(entry);
+            m_logs.push_back(entry);
             
             // 如果日志数量超过限制，删除最旧的
             if (m_logs.size() > m_config.maxLogCount) {
-                m_logs.removeFirst();
+                m_logs.pop_front();
             }
             
             // 控制台输出
@@ -330,8 +307,13 @@ void LogManager::log(LogLevel level, const QString& message, const QString& cate
                     const QString& fileName, int lineNumber, const QString& functionName)
 {
     if (m_workerThread) {
+        // 当前调用线程构造对象
         LogEntry entry(level, message, category, fileName, lineNumber, functionName);
-        m_workerThread->addLog(entry);
+        
+        // 捕获 entry，并将其推入日志线程中执行（拷贝entry）
+        QMetaObject::invokeMethod(m_workerThread, [this, entry]() {
+            m_workerThread->addLog(entry);
+            }, Qt::QueuedConnection);
     }
 }
 
@@ -363,36 +345,6 @@ void LogManager::success(const QString& message, const QString& category,
                         const QString& fileName, int lineNumber, const QString& functionName)
 {
     log(LogLevel::Success, message, category, fileName, lineNumber, functionName);
-}
-
-void LogManager::requestLogs()
-{
-    if (m_workerThread) {
-        QMetaObject::invokeMethod(m_workerThread, [this]() {
-            QList<LogEntry> logs = m_workerThread->getLogs();
-            emit logsReceived(logs);
-        }, Qt::QueuedConnection);
-    }
-}
-
-void LogManager::requestLogsByLevel(LogLevel level)
-{
-    if (m_workerThread) {
-        QMetaObject::invokeMethod(m_workerThread, [this, level]() {
-            QList<LogEntry> logs = m_workerThread->getLogsByLevel(level);
-            emit logsByLevelReceived(level, logs);
-        }, Qt::QueuedConnection);
-    }
-}
-
-void LogManager::requestLogsByCategory(const QString& category)
-{
-    if (m_workerThread) {
-        QMetaObject::invokeMethod(m_workerThread, [this, category]() {
-            QList<LogEntry> logs = m_workerThread->getLogsByCategory(category);
-            emit logsByCategoryReceived(category, logs);
-        }, Qt::QueuedConnection);
-    }
 }
 
 void LogManager::clearLogs()
