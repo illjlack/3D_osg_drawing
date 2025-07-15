@@ -5,17 +5,9 @@
 #include <QString>
 #include <QDateTime>
 #include <QList>
-#include <QMutex>
-#include <QTimer>
 #include <QThread>
 #include <QQueue>
-#include <QWaitCondition>
-#include <QAtomicInt>
-#include <QVector>
-#include <memory>
 #include <sstream>
-#include <filesystem>
-#include <chrono>
 
 // 日志级别枚举
 enum class LogLevel
@@ -53,86 +45,15 @@ struct LogEntry
     {}
 };
 
-// 日志配置结构
+// 简化的日志配置结构
 struct LogConfig
 {
     int maxLogCount = 1000;              // 最大日志条数
-    int highWaterMark = 800;             // 高水位标记（达到时开始清理）
-    int lowWaterMark = 600;              // 低水位标记（清理到此数量）
-    int batchCleanupSize = 200;          // 批量清理大小
-    int autoCleanupInterval = 30;        // 自动清理间隔（秒）
-    bool enableCircularBuffer = true;     // 启用循环缓冲区
-    bool enableLevelFilter = false;      // 启用日志级别过滤
+    bool enableConsoleOutput = true;      // 启用控制台输出
+    bool enableFileOutput = false;        // 启用文件输出
+    QString logFilePath = "";             // 日志文件路径
     LogLevel minLogLevel = LogLevel::Debug; // 最小日志级别
-    bool enablePerformanceMode = false;  // 启用性能模式（减少格式化）
-    bool enableAsyncWrite = true;        // 启用异步写入
-    int writeBufferSize = 50;            // 写入缓冲区大小
-};
-
-// 高性能循环缓冲区
-template<typename T>
-class CircularBuffer
-{
-public:
-    explicit CircularBuffer(int capacity = 1000)
-        : m_capacity(capacity)
-        , m_buffer(capacity)
-        , m_head(0)
-        , m_size(0)
-    {}
-
-    void push(const T& item)
-    {
-        m_buffer[m_head] = item;
-        m_head = (m_head + 1) % m_capacity;
-        if (m_size < m_capacity) {
-            ++m_size;
-        }
-    }
-
-    void clear()
-    {
-        m_head = 0;
-        m_size = 0;
-    }
-
-    int size() const { return m_size; }
-    int capacity() const { return m_capacity; }
-    bool empty() const { return m_size == 0; }
-    bool full() const { return m_size == m_capacity; }
-
-    QList<T> toList() const
-    {
-        QList<T> result;
-        result.reserve(m_size);
-        int start = (m_head - m_size + m_capacity) % m_capacity;
-        for (int i = 0; i < m_size; ++i) {
-            result.append(m_buffer[(start + i) % m_capacity]);
-        }
-        return result;
-    }
-
-    void resize(int newCapacity)
-    {
-        if (newCapacity == m_capacity) return;
-        
-        QList<T> currentData = toList();
-        m_capacity = newCapacity;
-        m_buffer.resize(newCapacity);
-        m_head = 0;
-        m_size = 0;
-        
-        int keepSize = qMin(currentData.size(), newCapacity);
-        for (int i = currentData.size() - keepSize; i < currentData.size(); ++i) {
-            push(currentData[i]);
-        }
-    }
-
-private:
-    int m_capacity;
-    QVector<T> m_buffer;
-    int m_head;
-    int m_size;
+    bool enableLevelFilter = false;       // 启用日志级别过滤
 };
 
 // 日志工作线程类
@@ -155,10 +76,7 @@ public:
     void setConsoleOutput(bool enabled);
     void setFileOutput(bool enabled);
     void setLogFilePath(const QString& path);
-    
-    // 兼容旧接口
     void setMaxLogCount(int count);
-    void setAutoCleanup(bool enabled, int interval = 60);
 
     // 获取日志（线程安全）
     QList<LogEntry> getLogs() const;
@@ -168,10 +86,9 @@ public:
     // 清理日志
     void clearLogs();
     
-    // 性能统计
+    // 统计信息
     int getPendingLogCount() const;
     int getCurrentLogCount() const;
-    double getAverageProcessingTime() const;
     
     // 线程控制
     void requestExit();
@@ -179,60 +96,28 @@ public:
 signals:
     void logAdded(const LogEntry& entry);
     void logsCleared();
-    void logLevelChanged(LogLevel level);
-    void performanceWarning(const QString& message);
 
 protected:
     void run() override;
 
-private slots:
-    void performCleanup();
-    void checkPerformance();
-
 private:
     void writeToFile(const LogEntry& entry);
-    void batchWriteToFile(const QList<LogEntry>& entries);
     QString formatLogMessage(const LogEntry& entry) const;
     void emitLogAdded(const LogEntry& entry);
-    void intelligentCleanup();
     bool shouldAcceptLog(const LogEntry& entry) const;
-    void updatePerformanceStats(double processTime);
 
     // 日志队列
     QQueue<LogEntry> m_logQueue;
-    mutable QMutex m_queueMutex;
-    QWaitCondition m_queueCondition;
     
-    // 日志存储（支持循环缓冲区）
-    CircularBuffer<LogEntry> m_circularBuffer;
-    QList<LogEntry> m_linearBuffer;
-    mutable QMutex m_bufferMutex;
-    
-    // 写入缓冲区
-    QList<LogEntry> m_writeBuffer;
-    QMutex m_writeBufferMutex;
+    // 日志存储
+    QList<LogEntry> m_logs;
     
     // 配置
     LogConfig m_config;
-    mutable QMutex m_configMutex;
-    
-    // 输出设置
-    bool m_consoleOutput;
-    bool m_fileOutput;
-    QString m_logFilePath;
     
     // 控制标志
     bool m_running;
-    QAtomicInt m_shouldExit;  // 线程退出标志
-    QTimer* m_cleanupTimer;
-    QTimer* m_performanceTimer;
-    
-    // 性能统计
-    QAtomicInt m_totalProcessedLogs;
-    QAtomicInt m_droppedLogs;
-    std::chrono::steady_clock::time_point m_lastStatsReset;
-    double m_averageProcessingTime;
-    mutable QMutex m_statsMutex;
+    bool m_shouldExit;
 };
 
 // 日志管理器类（主线程接口）
@@ -251,13 +136,13 @@ public:
     void info(const QString& message, const QString& category = "",
               const QString& fileName = "", int lineNumber = 0, const QString& functionName = "");
     void warning(const QString& message, const QString& category = "",
-                 const QString& fileName = "", int lineNumber = 0, const QString& functionName = "");
+                const QString& fileName = "", int lineNumber = 0, const QString& functionName = "");
     void error(const QString& message, const QString& category = "",
-               const QString& fileName = "", int lineNumber = 0, const QString& functionName = "");
+              const QString& fileName = "", int lineNumber = 0, const QString& functionName = "");
     void success(const QString& message, const QString& category = "",
-                 const QString& fileName = "", int lineNumber = 0, const QString& functionName = "");
+                const QString& fileName = "", int lineNumber = 0, const QString& functionName = "");
     
-    // 获取日志（异步，通过信号返回）
+    // 日志查询
     void requestLogs();
     void requestLogsByLevel(LogLevel level);
     void requestLogsByCategory(const QString& category);
@@ -272,10 +157,6 @@ public:
     // 兼容旧接口
     void setMaxLogCount(int count);
     int getMaxLogCount() const;
-    void setAutoCleanup(bool enabled);
-    bool isAutoCleanupEnabled() const;
-    void setAutoCleanupInterval(int minutes);
-    int getAutoCleanupInterval() const;
     
     // 日志输出设置
     void setConsoleOutput(bool enabled);
@@ -285,30 +166,16 @@ public:
     void setLogFilePath(const QString& path);
     QString getLogFilePath() const;
     
-    // 性能相关
-    void enablePerformanceMode(bool enabled);
-    bool isPerformanceModeEnabled() const;
-    void setCircularBufferEnabled(bool enabled);
-    bool isCircularBufferEnabled() const;
-    
     // 统计信息
     int getPendingLogCount() const;
     int getCurrentLogCount() const;
-    double getAverageProcessingTime() const;
-    
-    // 预设配置
-    void applyHighVolumeConfig();  // 高并发配置
-    void applyLowMemoryConfig();   // 低内存配置
-    void applyDefaultConfig();     // 默认配置
 
 signals:
     void logAdded(const LogEntry& entry);
     void logsCleared();
-    void logLevelChanged(LogLevel level);
     void logsReceived(const QList<LogEntry>& logs);
     void logsByLevelReceived(LogLevel level, const QList<LogEntry>& logs);
     void logsByCategoryReceived(const QString& category, const QList<LogEntry>& logs);
-    void performanceWarning(const QString& message);
 
 private:
     LogManager();
@@ -317,7 +184,6 @@ private:
     static LogManager* s_instance;
     LogWorkerThread* m_workerThread;
     LogConfig m_config;
-    mutable QMutex m_configMutex;
 };
 
 // 日志辅助类（支持流式输出）
@@ -340,15 +206,9 @@ public:
         return *this;
     }
     
-    LogStream& operator<<(const QString& value)
-    {
-        m_stream << value.toStdString();
-        return *this;
-    }
-    
     ~LogStream()
     {
-        QString message = QString::fromStdString(m_stream.str());
+        QString message = m_stream.str().c_str();
         LogManager::getInstance()->log(m_level, message, m_category, m_fileName, m_lineNumber, m_functionName);
     }
 
@@ -362,22 +222,20 @@ private:
 };
 
 // 便捷宏定义
-#define LOG_DEBUG(msg, cat) LogManager::getInstance()->debug(msg, cat, __FILE__, __LINE__, Q_FUNC_INFO)
-#define LOG_INFO(msg, cat) LogManager::getInstance()->info(msg, cat, __FILE__, __LINE__, Q_FUNC_INFO)
-#define LOG_WARNING(msg, cat) LogManager::getInstance()->warning(msg, cat, __FILE__, __LINE__, Q_FUNC_INFO)
-#define LOG_ERROR(msg, cat) LogManager::getInstance()->error(msg, cat, __FILE__, __LINE__, Q_FUNC_INFO)
-#define LOG_SUCCESS(msg, cat) LogManager::getInstance()->success(msg, cat, __FILE__, __LINE__, Q_FUNC_INFO)
+#define LOG_DEBUG(msg, category) \
+    LogManager::getInstance()->debug(msg, category, __FILE__, __LINE__, __FUNCTION__)
 
-// 流式日志宏
-#define LOG_DEBUG_STREAM(cat) LogStream(LogLevel::Debug, cat, __FILE__, __LINE__, Q_FUNC_INFO)
-#define LOG_INFO_STREAM(cat) LogStream(LogLevel::Info, cat, __FILE__, __LINE__, Q_FUNC_INFO)
-#define LOG_WARNING_STREAM(cat) LogStream(LogLevel::Warning, cat, __FILE__, __LINE__, Q_FUNC_INFO)
-#define LOG_ERROR_STREAM(cat) LogStream(LogLevel::Error, cat, __FILE__, __LINE__, Q_FUNC_INFO)
-#define LOG_SUCCESS_STREAM(cat) LogStream(LogLevel::Success, cat, __FILE__, __LINE__, Q_FUNC_INFO)
+#define LOG_INFO(msg, category) \
+    LogManager::getInstance()->info(msg, category, __FILE__, __LINE__, __FUNCTION__)
 
-// 简化的流式日志宏（无分类）
-#define LOG_DEBUG_S LOG_DEBUG_STREAM("")
-#define LOG_INFO_S LOG_INFO_STREAM("")
-#define LOG_WARNING_S LOG_WARNING_STREAM("")
-#define LOG_ERROR_S LOG_ERROR_STREAM("")
-#define LOG_SUCCESS_S LOG_SUCCESS_STREAM("") 
+#define LOG_WARNING(msg, category) \
+    LogManager::getInstance()->warning(msg, category, __FILE__, __LINE__, __FUNCTION__)
+
+#define LOG_ERROR(msg, category) \
+    LogManager::getInstance()->error(msg, category, __FILE__, __LINE__, __FUNCTION__)
+
+#define LOG_SUCCESS(msg, category) \
+    LogManager::getInstance()->success(msg, category, __FILE__, __LINE__, __FUNCTION__)
+
+#define LOG_STREAM(level, category) \
+    LogStream(level, category, __FILE__, __LINE__, __FUNCTION__) 

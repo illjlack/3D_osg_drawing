@@ -14,7 +14,7 @@
 #include <QTimer>
 #include <QThread>
 #include <QWaitCondition>
-#include <QMutexLocker>
+// 移除QMutexLocker，使用事件队列确保线程安全
 #include <QDialog>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -232,22 +232,19 @@ void LogOutputWidget::addLogEntry(const LogEntry& entry)
 {
     qDebug() << "LogOutputWidget::addLogEntry - 接收到日志:" << entry.message;
     
-    // 线程安全地添加日志
+    // 添加日志到本地存储
+    m_allLogs.append(entry);
+    
+    // 更新分类集合
+    if (!entry.category.isEmpty())
     {
-        QMutexLocker locker(&m_logsMutex);
-        m_allLogs.append(entry);
-        
-        // 更新分类集合
-        if (!entry.category.isEmpty())
-        {
-            m_categories.insert(entry.category);
-        }
-        
-        // 检查是否应该显示
-        if (shouldDisplayLog(entry))
-        {
-            m_filteredLogs.append(entry);
-        }
+        m_categories.insert(entry.category);
+    }
+    
+    // 检查是否应该显示
+    if (shouldDisplayLog(entry))
+    {
+        m_filteredLogs.append(entry);
     }
     
     // 将日志添加到UI更新队列
@@ -321,8 +318,6 @@ bool LogOutputWidget::shouldDisplayLog(const LogEntry& entry) const
 
 void LogOutputWidget::applyFilters()
 {
-    QMutexLocker locker(&m_logsMutex);
-    
     // 清空之前的过滤结果
     m_filteredLogs.clear();
     
@@ -548,7 +543,6 @@ void LogOutputWidget::updateFilterOptions()
     m_filterCategoryCombo->addItem("全部", "");
     
     // 添加所有可用的分类
-    QMutexLocker locker(&m_logsMutex);
     for (const QString& category : m_categories)
     {
         if (!category.isEmpty())
@@ -579,7 +573,6 @@ void LogOutputWidget::refreshDisplay()
     applyFilters();
     
     // 批量添加到UI
-    QMutexLocker locker(&m_logsMutex);
     if (!m_filteredLogs.isEmpty())
     {
         addLogsToTextEdit(m_filteredLogs);
@@ -606,12 +599,9 @@ void LogOutputWidget::clearLogs()
     m_needsFullRefresh = false;
     
     // 清空所有日志数据
-    {
-        QMutexLocker locker(&m_logsMutex);
-        m_allLogs.clear();
-        m_filteredLogs.clear();
-        m_categories.clear();
-    }
+    m_allLogs.clear();
+    m_filteredLogs.clear();
+    m_categories.clear();
     
     // 通知LogManager清空全局日志
     LogManager* logManager = LogManager::getInstance();
@@ -638,7 +628,6 @@ void LogOutputWidget::exportLogs(const QString& filename)
     stream.setCodec("UTF-8");
     
     // 导出过滤后的日志或所有日志
-    QMutexLocker locker(&m_logsMutex);
     QList<LogEntry> logsToExport = m_filteredLogs.isEmpty() ? m_allLogs : m_filteredLogs;
     
     for (const LogEntry& entry : logsToExport)
@@ -793,7 +782,6 @@ void LogOutputWidget::exportLogsWithOptions(const QString& filename, bool export
     stream.setCodec("UTF-8");
     
     // 根据选项导出日志
-    QMutexLocker locker(&m_logsMutex);
     QList<LogEntry> logsToExport;
     
     if (exportFiltered && !m_filteredLogs.isEmpty())
