@@ -97,6 +97,12 @@ public:
     void setPickingConfig(const SimplePickingConfig& config);
     QString getPickingSystemInfo() const;
     
+    // 确保所有几何对象都在拾取系统中
+    void ensureAllGeosInPickingSystem();
+    
+    // 获取拾取系统状态信息
+    QString getPickingSystemStatus() const;
+    
     // 绘制状态查询
     bool isDrawing() const { return m_isDrawing; }
     

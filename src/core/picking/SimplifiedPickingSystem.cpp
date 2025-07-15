@@ -142,11 +142,21 @@ void SimplifiedPickingSystem::updateGeometry(Geo3D* geometry)
 {
     if (!geometry) return;
     
-    // 更新捕捉点缓存
-    std::vector<glm::vec3> snapPoints = extractSnapPoints(geometry);
-    m_snapPointsCache[geometry] = snapPoints;
+    // 检查几何体是否已经在拾取系统中
+    auto it = std::find_if(m_geometries.begin(), m_geometries.end(),
+        [geometry](const osg::ref_ptr<Geo3D>& ref) { return ref.get() == geometry; });
     
-    LOG_DEBUG(QString("更新几何体 - 捕捉点数量: %1").arg(snapPoints.size()), "拾取");
+    if (it == m_geometries.end()) {
+        // 如果几何体不在拾取系统中，先添加它
+        addGeometry(geometry);
+        LOG_DEBUG(QString("几何体不在拾取系统中，已添加: %1").arg(geometry->getGeoType()), "拾取");
+    } else {
+        // 如果几何体已经在拾取系统中，更新捕捉点缓存
+        std::vector<glm::vec3> snapPoints = extractSnapPoints(geometry);
+        m_snapPointsCache[geometry] = snapPoints;
+        
+        LOG_DEBUG(QString("更新几何体 - 捕捉点数量: %1").arg(snapPoints.size()), "拾取");
+    }
 }
 
 void SimplifiedPickingSystem::clearAllGeometries()

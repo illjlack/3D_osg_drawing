@@ -385,15 +385,22 @@ void OSGWidget::addGeo(Geo3D* geo)
         connect(geo, &Geo3D::geometryUpdated, this, &OSGWidget::onGeoGeometryUpdated);
         connect(geo, &Geo3D::parametersChanged, this, &OSGWidget::onGeoParametersChanged);
         
-        // 如果几何对象已经完成绘制，立即添加到简化拾取系统
-        if (m_advancedPickingEnabled && geo->isStateComplete())
+        // 添加到拾取系统 - 对于从文件IO读入的几何对象，强制添加到拾取系统
+        if (m_advancedPickingEnabled)
         {
-            SimplifiedPickingSystemManager::getInstance().addGeometry(geo);
-            LOG_DEBUG(QString("Added completed geometry to simplified picking system: %1").arg(geo->getGeoType()), "拾取");
-        }
-        else if (m_advancedPickingEnabled)
-        {
-            LOG_DEBUG(QString("Geometry not yet complete, will be added when drawing completes: %1").arg(geo->getGeoType()), "拾取");
+            // 检查几何对象是否已经完成绘制
+            if (geo->isStateComplete())
+            {
+                SimplifiedPickingSystemManager::getInstance().addGeometry(geo);
+                LOG_DEBUG(QString("Added completed geometry to simplified picking system: %1").arg(geo->getGeoType()), "拾取");
+            }
+            else
+            {
+                // 对于未完成的几何对象（如从文件读入的），也强制添加到拾取系统
+                // 这样可以确保文件IO读入的几何对象能够被拾取
+                SimplifiedPickingSystemManager::getInstance().addGeometry(geo);
+                LOG_DEBUG(QString("Added incomplete geometry to simplified picking system (from file IO): %1").arg(geo->getGeoType()), "拾取");
+            }
         }
         else
         {
@@ -435,6 +442,13 @@ void OSGWidget::removeAllGeos()
         m_geoList.clear();
         m_selectedGeo = nullptr;
         m_currentDrawingGeo = nullptr;
+        
+        // 清除拾取系统中的所有几何对象
+        if (m_advancedPickingEnabled)
+        {
+            SimplifiedPickingSystemManager::getInstance().clearAllGeometries();
+            LOG_DEBUG("Cleared all geometries from simplified picking system", "拾取");
+        }
     }
 }
 
@@ -650,6 +664,37 @@ void OSGWidget::setPickingConfig(const SimplePickingConfig& config)
 QString OSGWidget::getPickingSystemInfo() const
 {
     return SimplifiedPickingSystemManager::getInstance().getSystemInfo();
+}
+
+void OSGWidget::ensureAllGeosInPickingSystem()
+{
+    if (!m_advancedPickingEnabled) return;
+    
+    LOG_INFO(QString("确保所有几何对象都在拾取系统中，总数量: %1").arg(m_geoList.size()), "拾取");
+    
+    for (const auto& geoRef : m_geoList)
+    {
+        if (geoRef)
+        {
+            // 使用updateGeometry方法，它会自动检查几何对象是否已经在拾取系统中
+            SimplifiedPickingSystemManager::getInstance().updateGeometry(geoRef.get());
+        }
+    }
+    
+    LOG_INFO("所有几何对象已确保在拾取系统中", "拾取");
+}
+
+QString OSGWidget::getPickingSystemStatus() const
+{
+    if (!m_advancedPickingEnabled) {
+        return "拾取系统已禁用";
+    }
+    
+    QString status = QString("拾取系统状态:\n");
+    status += QString("- 几何对象总数: %1\n").arg(m_geoList.size());
+    status += QString("- 拾取系统信息: %1").arg(getPickingSystemInfo());
+    
+    return status;
 }
 
 void OSGWidget::onSimplePickingResult(const SimplePickingResult& result)
@@ -1759,10 +1804,12 @@ void OSGWidget::onGeoDrawingCompleted(Geo3D* geo)
     
     LOG_DEBUG(QString("Geometry drawing completed: %1").arg(geo->getGeoType()), "拾取");
     
-    // 几何对象完成绘制后，添加到简化拾取系统
-    SimplifiedPickingSystemManager::getInstance().addGeometry(geo);
+    // 几何对象完成绘制后，更新简化拾取系统
+    // 注意：如果几何对象已经在拾取系统中，updateGeometry会更新它
+    // 如果不在拾取系统中，addGeometry会添加它
+    SimplifiedPickingSystemManager::getInstance().updateGeometry(geo);
     
-    LOG_INFO(QString("Added completed geometry to simplified picking system: %1").arg(geo->getGeoType()), "拾取");
+    LOG_INFO(QString("Updated completed geometry in simplified picking system: %1").arg(geo->getGeoType()), "拾取");
 }
 
 void OSGWidget::onGeoGeometryUpdated(Geo3D* geo)

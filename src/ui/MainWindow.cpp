@@ -650,13 +650,21 @@ void MainWindow::onFileOpen()
             if (!sceneData.objects.empty())
             {
                 // 成功加载场景数据
+                LOG_INFO(QString("开始添加 %1 个几何对象到场景").arg(sceneData.objects.size()), "文件");
                 for (Geo3D* geo : sceneData.objects)
                 {
                     if (geo)
                     {
                         m_osgWidget->addGeo(geo);
+                        LOG_DEBUG(QString("已添加几何对象到场景: 类型=%1").arg(geo->getGeoType()), "文件");
                     }
                 }
+                
+                // 确保所有从文件IO读入的几何对象都加入了拾取系统
+                m_osgWidget->ensureAllGeosInPickingSystem();
+                
+                // 记录拾取系统状态
+                LOG_INFO(m_osgWidget->getPickingSystemStatus(), "拾取");
                 
                 m_currentFilePath = fileName;
                 m_modified = false;
@@ -673,7 +681,15 @@ void MainWindow::onFileOpen()
                 Geo3D* loadedGeo = GeoOsgbIO::loadFromOsgb(fileName);
                 if (loadedGeo)
                 {
+                    LOG_INFO(QString("加载单个几何对象: 类型=%1").arg(loadedGeo->getGeoType()), "文件");
                     m_osgWidget->addGeo(loadedGeo);
+                    
+                    // 确保从文件IO读入的几何对象加入了拾取系统
+                    m_osgWidget->ensureAllGeosInPickingSystem();
+                    
+                    // 记录拾取系统状态
+                    LOG_INFO(m_osgWidget->getPickingSystemStatus(), "拾取");
+                    
                     m_currentFilePath = fileName;
                     m_modified = false;
                     setWindowTitle(tr("3D Drawing Board - %1").arg(QFileInfo(fileName).baseName()));
