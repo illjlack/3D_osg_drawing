@@ -12,6 +12,7 @@ GeoControlPointManager::GeoControlPointManager(Geo3D* parent)
     , m_controlPointsVisible(true)
     , m_controlPointSize(0.1f)
     , m_controlPointColor(1.0f, 0.0f, 0.0f, 1.0f) // 默认红色
+    , m_tempPoint(Point3D(glm::vec3(0))) // 初始化临时点
 {
 }
 
@@ -257,7 +258,29 @@ void GeoControlPointManager::updateControlPointVisualization()
 {
     // 这里会在节点管理器中实现具体的可视化更新
     // 现在只是占位符，实际实现会调用节点管理器的方法
-    if (m_parent && m_parent->getNodeManager()) {
-        m_parent->getNodeManager()->updateControlPointsVisualization();
+    if (m_parent && m_parent->mm_node()) {
+        m_parent->mm_node()->updateControlPointsVisualization();
+    }
+}
+
+// ==================== 临时点管理 ====================
+
+void GeoControlPointManager::setTempPoint(const Point3D& point)
+{
+    if (m_tempPoint.position != point.position) {
+        m_tempPoint = point;
+        notifyGeometryChanged();
+        updateControlPointVisualization();
+        emit controlPointsChanged();
+    }
+}
+
+void GeoControlPointManager::clearTempPoint()
+{
+    if (m_tempPoint.position != glm::vec3(0)) {
+        m_tempPoint = Point3D(glm::vec3(0));
+        notifyGeometryChanged();
+        updateControlPointVisualization();
+        emit controlPointsChanged();
     }
 } 

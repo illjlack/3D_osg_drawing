@@ -130,11 +130,29 @@ enum GeoState3D
 {
     BeginGeoState3D = EndGeoType3D,
     
+    // 基础状态
     GeoState_Initialized3D = 1 << 0,
     GeoState_Complete3D = 1 << 1,
     GeoState_Invalid3D = 1 << 2,
     GeoState_Selected3D = 1 << 3,
     GeoState_Editing3D = 1 << 4,
+    
+    // 绘制相关失效状态
+    GeoState_ControlPointsInvalid3D = 1 << 5,    // 控制点失效
+    GeoState_OctreeInvalid3D = 1 << 6,           // 八叉树失效
+    GeoState_VertexGeometryInvalid3D = 1 << 7,   // 顶点几何体失效
+    GeoState_EdgeGeometryInvalid3D = 1 << 8,     // 边几何体失效
+    GeoState_FaceGeometryInvalid3D = 1 << 9,     // 面几何体失效
+    GeoState_GeometryInvalid3D = 1 << 10,        // 几何体失效（全部）
+    GeoState_BoundingBoxInvalid3D = 1 << 11,     // 包围盒失效
+    GeoState_DisplayListInvalid3D = 1 << 12,     // 显示列表失效
+    GeoState_TextureInvalid3D = 1 << 13,         // 纹理失效
+    GeoState_MaterialInvalid3D = 1 << 14,        // 材质失效
+    GeoState_TransformInvalid3D = 1 << 15,       // 变换失效
+    
+    // 绘制相关更新状态
+    GeoState_ParametersUpdated3D = 1 << 16,      // 参数更新
+    GeoState_TemporaryPointsUpdated3D = 1 << 17, // 临时点更新
     
     EndGeoState3D
 };

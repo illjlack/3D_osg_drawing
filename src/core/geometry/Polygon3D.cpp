@@ -13,17 +13,17 @@ Polygon3D_Geo::Polygon3D_Geo()
 
 void Polygon3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!isStateComplete())
+    if (!mm_state()->isStateComplete())
     {
-        addControlPoint(Point3D(worldPos));
-        const auto& controlPoints = getControlPoints();
+        mm_controlPoint()->addControlPoint(Point3D(worldPos));
+        const auto& controlPoints = mm_controlPoint()->getControlPoints();
         
         if (controlPoints.size() >= 3)
         {
             // 检查是否是双击完成多边形
             if (event && event->type() == QEvent::MouseButtonDblClick)
             {
-                completeDrawing();
+                mm_state()->setStateComplete();
             }
         }
         
@@ -34,37 +34,37 @@ void Polygon3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPo
 
 void Polygon3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!isStateComplete())
+    if (!mm_state()->isStateComplete())
     {
-        setTempPoint(Point3D(worldPos));
-        markGeometryDirty();
+        // 设置临时点用于预览
+        // 这里需要实现临时点机制
         updateGeometry();
     }
 }
 
 void Polygon3D_Geo::keyPressEvent(QKeyEvent* event)
 {
-    if (!isStateComplete())
+    if (!mm_state()->isStateComplete())
     {
-        const auto& controlPoints = getControlPoints();
+        const auto& controlPoints = mm_controlPoint()->getControlPoints();
         if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter)
         {
             if (controlPoints.size() >= 3)
             {
-                completeDrawing();
+                mm_state()->setStateComplete();
             }
         }
         else if (event->key() == Qt::Key_Backspace)
         {
             if (!controlPoints.empty())
             {
-                removeControlPoint(controlPoints.size() - 1);
+                mm_controlPoint()->removeControlPoint(controlPoints.size() - 1);
                 updateGeometry();
             }
         }
         else if (event->key() == Qt::Key_Escape)
         {
-            clearControlPoints();
+            mm_controlPoint()->clearControlPoints();
             updateGeometry();
         }
     }
@@ -72,18 +72,13 @@ void Polygon3D_Geo::keyPressEvent(QKeyEvent* event)
 
 void Polygon3D_Geo::updateGeometry()
 {
-    if (!isGeometryDirty()) return;
-    
     // 清除点线面节点
-    clearVertexGeometries();
-    clearEdgeGeometries();
-    clearFaceGeometries();
+    mm_node()->clearAllGeometries();
     
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (controlPoints.size() < 2)
     {
         updateOSGNode();
-        clearGeometryDirty();
         return;
     }
     
@@ -91,18 +86,22 @@ void Polygon3D_Geo::updateGeometry()
     buildVertexGeometries();
     buildEdgeGeometries();
     
-    if (isStateComplete() && controlPoints.size() >= 3)
+    if (mm_state()->isStateComplete() && controlPoints.size() >= 3)
     {
         buildFaceGeometries();
     }
     
+    // 更新OSG节点
     updateOSGNode();
-    clearGeometryDirty();
     
-    // 更新KDTree
-    if (getNodeManager()) {
-        getNodeManager()->updateKdTree();
-    }
+    // 更新捕捉点
+    mm_snapPoint()->updateSnapPoints();
+    
+    // 更新包围盒
+    mm_boundingBox()->updateBoundingBox();
+    
+    // 更新空间索引
+    mm_node()->updateSpatialIndex();
     
     emit geometryUpdated(this);
 }
@@ -111,7 +110,7 @@ void Polygon3D_Geo::updateGeometry()
 
 osg::ref_ptr<osg::Geometry> Polygon3D_Geo::createGeometry()
 {
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (controlPoints.size() < 3)
         return nullptr;
     
@@ -156,7 +155,7 @@ osg::ref_ptr<osg::Geometry> Polygon3D_Geo::createGeometry()
 
 glm::vec3 Polygon3D_Geo::calculateNormal() const
 {
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = controlPoint()->getControlPoints();
     if (controlPoints.size() >= 3)
     {
         glm::vec3 v1 = controlPoints[1].position - controlPoints[0].position;
@@ -170,7 +169,7 @@ void Polygon3D_Geo::triangulatePolygon()
 {
     m_triangleIndices.clear();
     
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (controlPoints.size() < 3)
         return;
     
@@ -192,8 +191,12 @@ void Polygon3D_Geo::buildVertexGeometries()
     if (controlPoints.empty())
         return;
     
-    // 只为控制点创建几何体
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+    // 获取现有的几何体
+    osg::ref_ptr<osg::Geometry> geometry = getVertexGeometry();
+    if (!geometry.valid())
+        return;
+    
+    // 创建顶点数组
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
@@ -238,8 +241,12 @@ void Polygon3D_Geo::buildEdgeGeometries()
     if (controlPoints.size() < 2)
         return;
     
+    // 获取现有的几何体
+    osg::ref_ptr<osg::Geometry> geometry = getEdgeGeometry();
+    if (!geometry.valid())
+        return;
+    
     // 创建多边形边界线几何体
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
@@ -288,11 +295,24 @@ void Polygon3D_Geo::buildFaceGeometries()
     if (controlPoints.size() < 3)
         return;
     
+    // 获取现有的几何体
+    osg::ref_ptr<osg::Geometry> geometry = getFaceGeometry();
+    if (!geometry.valid())
+        return;
+    
     // 创建多边形面几何体
-    osg::ref_ptr<osg::Geometry> geometry = createGeometry();
-    if (geometry.valid())
+    osg::ref_ptr<osg::Geometry> newGeometry = createGeometry();
+    if (newGeometry.valid())
     {
-        addFaceGeometry(geometry);
+        // 复制新几何体的数据到现有几何体
+        geometry->setVertexArray(newGeometry->getVertexArray());
+        geometry->setColorArray(newGeometry->getColorArray());
+        geometry->setNormalArray(newGeometry->getNormalArray());
+        geometry->removePrimitiveSet(0, geometry->getNumPrimitiveSets());
+        for (unsigned int i = 0; i < newGeometry->getNumPrimitiveSets(); ++i)
+        {
+            geometry->addPrimitiveSet(newGeometry->getPrimitiveSet(i));
+        }
     }
 } 
 

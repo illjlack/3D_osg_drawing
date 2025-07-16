@@ -20,10 +20,10 @@ Cone3D_Geo::Cone3D_Geo()
 
 void Cone3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!isStateComplete())
+    if (!mm_state()->isStateComplete())
     {
-        addControlPoint(Point3D(worldPos));
-        const auto& controlPoints = getControlPoints();
+        mm_controlPoint()->addControlPoint(Point3D(worldPos));
+        const auto& controlPoints = mm_controlPoint()->getControlPoints();
         
         if (controlPoints.size() == 2)
         {
@@ -33,7 +33,7 @@ void Cone3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
             if (m_height > 0)
                 m_axis = glm::normalize(diff);
             m_radius = m_height * 0.3f; // 默认半径为高度的30%
-            completeDrawing();
+            mm_state()->setStateComplete();
         }
         
         updateGeometry();
@@ -43,11 +43,11 @@ void Cone3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 
 void Cone3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    const auto& controlPoints = getControlPoints();
-    if (!isStateComplete() && controlPoints.size() == 1)
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
+    if (!mm_state()->isStateComplete() && controlPoints.size() == 1)
     {
-        setTempPoint(Point3D(worldPos));
-        markGeometryDirty();
+        // 设置临时点用于预览
+        // 这里需要实现临时点机制
         updateGeometry();
     }
 }
@@ -55,29 +55,29 @@ void Cone3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 void Cone3D_Geo::updateGeometry()
 {
     // 清除点线面节点
-    clearVertexGeometries();
-    clearEdgeGeometries();
-    clearFaceGeometries();
-    
-    updateOSGNode();
+    mm_node()->clearAllGeometries();
     
     // 构建点线面几何体
     buildVertexGeometries();
     buildEdgeGeometries();
     buildFaceGeometries();
     
-    // 更新可见性
-    updateFeatureVisibility();
+    // 更新OSG节点
+    updateOSGNode();
     
-    // 更新KDTree
-    if (getNodeManager()) {
-        getNodeManager()->updateKdTree();
-    }
+    // 更新捕捉点
+    mm_snapPoint()->updateSnapPoints();
+    
+    // 更新包围盒
+    mm_boundingBox()->updateBoundingBox();
+    
+    // 更新空间索引
+    mm_node()->updateSpatialIndex();
 }
 
 osg::ref_ptr<osg::Geometry> Cone3D_Geo::createGeometry()
 {
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (controlPoints.empty())
         return nullptr;
     
@@ -85,15 +85,6 @@ osg::ref_ptr<osg::Geometry> Cone3D_Geo::createGeometry()
     float height = m_height;
     glm::vec3 axis = m_axis;
     glm::vec3 base = controlPoints[0].position;
-    
-    if (controlPoints.size() == 1 && getTempPoint().position != glm::vec3(0))
-    {
-        glm::vec3 diff = getTempPoint().position - base;
-        height = glm::length(diff);
-        if (height > 0)
-            axis = glm::normalize(diff);
-        radius = height * 0.3f;
-    }
     
     osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry();
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
@@ -195,8 +186,12 @@ void Cone3D_Geo::buildVertexGeometries()
     if (controlPoints.empty())
         return;
     
-    // 只为控制点创建几何体
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+    // 获取现有的几何体
+    osg::ref_ptr<osg::Geometry> geometry = getVertexGeometry();
+    if (!geometry.valid())
+        return;
+    
+    // 创建顶点数组
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
@@ -227,14 +222,18 @@ void Cone3D_Geo::buildVertexGeometries()
 
 void Cone3D_Geo::buildEdgeGeometries()
 {
-    clearEdgeGeometries();
+    mm_node()->clearEdgeGeometry();
     
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (controlPoints.size() < 2)
         return;
     
+    // 获取现有的几何体
+    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getEdgeGeometry();
+    if (!geometry.valid())
+        return;
+    
     // 创建圆锥边界线几何体
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
@@ -308,19 +307,23 @@ void Cone3D_Geo::buildEdgeGeometries()
     lineWidth->setWidth(2.0f);  // 边界线宽度
     stateSet->setAttribute(lineWidth);
     
-    addEdgeGeometry(geometry);
+    mm_node()->setEdgeGeometry(geometry);
 }
 
 void Cone3D_Geo::buildFaceGeometries()
 {
-    clearFaceGeometries();
+    mm_node()->clearFaceGeometry();
     
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (controlPoints.size() < 2)
         return;
     
+    // 获取现有的几何体
+    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getFaceGeometry();
+    if (!geometry.valid())
+        return;
+    
     // 创建圆锥底面几何体
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
@@ -377,8 +380,6 @@ void Cone3D_Geo::buildFaceGeometries()
     // 使用三角面绘制
     osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, vertices->size());
     geometry->addPrimitiveSet(drawArrays);
-    
-    addFaceGeometry(geometry);
 } 
 
 bool Cone3D_Geo::hitTest(const Ray3D& ray, PickResult3D& result) const

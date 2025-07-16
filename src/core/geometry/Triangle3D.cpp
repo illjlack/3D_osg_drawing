@@ -8,8 +8,6 @@
 #endif
 
 Triangle3D_Geo::Triangle3D_Geo()
-    : m_area(0.0f)
-    , m_normal(0, 0, 1)
 {
     m_geoType = Geo_Triangle3D;
     // 确保基类正确初始化
@@ -18,16 +16,15 @@ Triangle3D_Geo::Triangle3D_Geo()
 
 void Triangle3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!isStateComplete())
+    if (!mm_state()->isStateComplete())
     {
-        addControlPoint(Point3D(worldPos));
+        mm_controlPoint()->addControlPoint(Point3D(worldPos));
         
-        const auto& controlPoints = getControlPoints();
-        if (controlPoints.size() == 3)
+        const auto& controlPoints = mm_controlPoint()->getControlPoints();
+        if (controlPoints.size() >= 3)
         {
             calculateNormal();
-            calculateArea();
-            completeDrawing();
+            mm_state()->setStateComplete();
         }
         
         updateGeometry();
@@ -36,9 +33,10 @@ void Triangle3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldP
 
 void Triangle3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!isStateComplete())
+    if (!mm_state()->isStateComplete())
     {
-        setTempPoint(Point3D(worldPos));
+        // 设置临时点用于预览
+        // 这里需要实现临时点机制
         updateGeometry();
     }
 }
@@ -46,157 +44,77 @@ void Triangle3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPo
 void Triangle3D_Geo::updateGeometry()
 {
     // 清除点线面节点
-    clearVertexGeometries();
-    clearEdgeGeometries();
-    clearFaceGeometries();
-    
-    updateOSGNode();
+    mm_node()->clearAllGeometries();
     
     // 构建点线面几何体
     buildVertexGeometries();
     buildEdgeGeometries();
     buildFaceGeometries();
     
-    // 更新可见性
-    updateFeatureVisibility();
+    // 更新OSG节点
+    updateOSGNode();
     
-    // 更新KDTree
-    if (getNodeManager()) {
-        getNodeManager()->updateKdTree();
-    }
+    // 更新捕捉点
+    mm_snapPoint()->updateSnapPoints();
+    
+    // 更新包围盒
+    mm_boundingBox()->updateBoundingBox();
+    
+    // 更新空间索引
+    mm_node()->updateSpatialIndex();
 }
 
 osg::ref_ptr<osg::Geometry> Triangle3D_Geo::createGeometry()
 {
-    const auto& controlPoints = getControlPoints();
-    if (controlPoints.size() < 2)
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
+    if (controlPoints.size() < 3)
         return nullptr;
     
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry();
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
-    osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array();
+    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
-    // 根据控制点数量决定绘制内容
-    if (controlPoints.size() == 3 || (controlPoints.size() == 2 && getTempPoint().position != glm::vec3(0)))
+    // 添加三个顶点
+    for (const Point3D& point : controlPoints)
     {
-        // 三个点：绘制完整三角形
-        Point3D p1 = controlPoints[0];
-        Point3D p2 = controlPoints[1];
-        Point3D p3 = (controlPoints.size() == 3) ? controlPoints[2] : getTempPoint();
-        
-        vertices->push_back(osg::Vec3(p1.x(), p1.y(), p1.z()));
-        vertices->push_back(osg::Vec3(p2.x(), p2.y(), p2.z()));
-        vertices->push_back(osg::Vec3(p3.x(), p3.y(), p3.z()));
-        
-        // 计算法向量
-        glm::vec3 v1 = p2.position - p1.position;
-        glm::vec3 v2 = p3.position - p1.position;
-        glm::vec3 normal = glm::normalize(glm::cross(v1, v2));
-        
-        for (int i = 0; i < 3; ++i)
-        {
-            normals->push_back(osg::Vec3(normal.x, normal.y, normal.z));
-        }
-        
-        // 设置颜色
-        Color3D color = isStateComplete() ? m_parameters.fillColor : 
-                       Color3D(m_parameters.fillColor.r, m_parameters.fillColor.g, 
-                              m_parameters.fillColor.b, m_parameters.fillColor.a * 0.5f);
-        
-        for (int i = 0; i < 3; ++i)
-        {
-            colors->push_back(osg::Vec4(color.r, color.g, color.b, color.a));
-        }
-        
-        geometry->addPrimitiveSet(new osg::DrawArrays(GL_TRIANGLES, 0, 3));
-        
-        // 如果需要显示边界
-        if (m_parameters.showBorder || !isStateComplete())
-        {
-            osg::ref_ptr<osg::DrawElementsUInt> wireframe = new osg::DrawElementsUInt(GL_LINE_LOOP, 3);
-            (*wireframe)[0] = 0;
-            (*wireframe)[1] = 1;
-            (*wireframe)[2] = 2;
-            geometry->addPrimitiveSet(wireframe.get());
-        }
-    }
-    else if (controlPoints.size() == 2)
-    {
-        // 两个点：绘制线段
-        Point3D p1 = controlPoints[0];
-        Point3D p2 = controlPoints[1];
-        
-        vertices->push_back(osg::Vec3(p1.x(), p1.y(), p1.z()));
-        vertices->push_back(osg::Vec3(p2.x(), p2.y(), p2.z()));
-        
-        colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
-                                   m_parameters.lineColor.b, m_parameters.lineColor.a));
-        colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
-                                   m_parameters.lineColor.b, m_parameters.lineColor.a));
-        
-        geometry->addPrimitiveSet(new osg::DrawArrays(GL_LINES, 0, 2));
-    }
-    else if (controlPoints.size() == 1)
-    {
-        // 一个点：绘制点
-        Point3D p1 = controlPoints[0];
-        
-        vertices->push_back(osg::Vec3(p1.x(), p1.y(), p1.z()));
-        colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
-                                   m_parameters.pointColor.b, m_parameters.pointColor.a));
-        
-        geometry->addPrimitiveSet(new osg::DrawArrays(GL_POINTS, 0, 1));
+        vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
+        colors->push_back(osg::Vec4(m_parameters.faceColor.r, m_parameters.faceColor.g, 
+                                   m_parameters.faceColor.b, m_parameters.faceColor.a));
     }
     
-    geometry->setVertexArray(vertices.get());
-    geometry->setColorArray(colors.get());
+    geometry->setVertexArray(vertices);
+    geometry->setColorArray(colors);
     geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     
-    if (!normals->empty())
+    // 绘制三角形
+    geometry->addPrimitiveSet(new osg::DrawArrays(GL_TRIANGLES, 0, 3));
+    
+    // 计算法线
+    osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
+    for (int i = 0; i < 3; ++i)
     {
-        geometry->setNormalArray(normals.get());
-        geometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
+        normals->push_back(osg::Vec3(m_normal.x, m_normal.y, m_normal.z));
     }
+    geometry->setNormalArray(normals);
+    geometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
     
     return geometry;
 }
 
-float Triangle3D_Geo::calculateArea() const
-{
-    const auto& controlPoints = getControlPoints();
-    if (controlPoints.size() < 3)
-    {
-        return 0.0f;
-    }
-    
-    glm::vec3 v1 = controlPoints[1].position - controlPoints[0].position;
-    glm::vec3 v2 = controlPoints[2].position - controlPoints[0].position;
-    glm::vec3 cross = glm::cross(v1, v2);
-    return glm::length(cross) * 0.5f;
-}
-
-void Triangle3D_Geo::calculateNormal()
-{
-    const auto& controlPoints = getControlPoints();
-    if (controlPoints.size() >= 3)
-    {
-        glm::vec3 v1 = controlPoints[1].position - controlPoints[0].position;
-        glm::vec3 v2 = controlPoints[2].position - controlPoints[0].position;
-        m_normal = glm::normalize(glm::cross(v1, v2));
-    }
-} 
-
 void Triangle3D_Geo::buildVertexGeometries()
 {
-    clearVertexGeometries();
+    mm_node()->clearVertexGeometry();
     
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (controlPoints.empty())
         return;
     
-    // 只为控制点创建几何体
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+    // 获取现有的几何体
+    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getVertexGeometry();
+    if (!geometry.valid())
+        return;
+    
+    // 创建顶点数组
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
@@ -206,14 +124,6 @@ void Triangle3D_Geo::buildVertexGeometries()
         vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
         colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
                                    m_parameters.pointColor.b, m_parameters.pointColor.a));
-    }
-    
-    // 如果有临时点且几何体未完成，添加临时点
-    if (!isStateComplete() && getTempPoint().position != glm::vec3(0))
-    {
-        vertices->push_back(osg::Vec3(getTempPoint().x(), getTempPoint().y(), getTempPoint().z()));
-        colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
-                                   m_parameters.pointColor.b, m_parameters.pointColor.a * 0.5f));
     }
     
     geometry->setVertexArray(vertices);
@@ -229,81 +139,70 @@ void Triangle3D_Geo::buildVertexGeometries()
     osg::ref_ptr<osg::Point> point = new osg::Point;
     point->setSize(8.0f);  // 控制点大小
     stateSet->setAttribute(point);
-    
-    addVertexGeometry(geometry);
 }
 
 void Triangle3D_Geo::buildEdgeGeometries()
 {
-    clearEdgeGeometries();
+    mm_node()->clearEdgeGeometry();
     
-    const auto& controlPoints = getControlPoints();
-    if (controlPoints.size() < 2)
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
+    if (controlPoints.size() < 3)
         return;
     
-    // 创建三角形边界线几何体
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+    // 获取现有的几何体
+    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getEdgeGeometry();
+    if (!geometry.valid())
+        return;
+    
+    // 创建边的几何体
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
-    // 构建所有点（包括临时点）
-    std::vector<Point3D> allPoints = controlPoints;
-    if (!isStateComplete() && getTempPoint().position != glm::vec3(0))
+    // 添加三个顶点
+    for (const Point3D& point : controlPoints)
     {
-        allPoints.push_back(getTempPoint());
-    }
-    
-    // 添加边线
-    if (allPoints.size() >= 2)
-    {
-        for (size_t i = 0; i < allPoints.size(); ++i)
-        {
-            vertices->push_back(osg::Vec3(allPoints[i].x(), allPoints[i].y(), allPoints[i].z()));
-            colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
-                                       m_parameters.lineColor.b, m_parameters.lineColor.a));
-        }
-        
-        // 如果有3个或更多点，形成闭合三角形
-        if (allPoints.size() >= 3)
-        {
-            vertices->push_back(osg::Vec3(allPoints[0].x(), allPoints[0].y(), allPoints[0].z()));
-            colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
-                                       m_parameters.lineColor.b, m_parameters.lineColor.a));
-        }
+        vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
+        colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
+                                   m_parameters.lineColor.b, m_parameters.lineColor.a));
     }
     
     geometry->setVertexArray(vertices);
     geometry->setColorArray(colors);
     geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     
-    // 线绘制 - 边界线
-    osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::LINE_STRIP, 0, vertices->size());
-    geometry->addPrimitiveSet(drawArrays);
+    // 绘制三条边
+    osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(osg::PrimitiveSet::LINES);
+    indices->push_back(0); indices->push_back(1);  // 边1
+    indices->push_back(1); indices->push_back(2);  // 边2
+    indices->push_back(2); indices->push_back(0);  // 边3
+    
+    geometry->addPrimitiveSet(indices);
     
     // 设置线的宽度
     osg::ref_ptr<osg::StateSet> stateSet = geometry->getOrCreateStateSet();
     osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth;
-    lineWidth->setWidth(2.0f);  // 边界线宽度
+    lineWidth->setWidth(m_parameters.lineWidth);
     stateSet->setAttribute(lineWidth);
-    
-    addEdgeGeometry(geometry);
 }
 
 void Triangle3D_Geo::buildFaceGeometries()
 {
-    clearFaceGeometries();
+    mm_node()->clearFaceGeometry();
     
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (controlPoints.size() < 3)
         return;
     
-    // 创建三角形面几何体
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+    // 获取现有的几何体
+    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getFaceGeometry();
+    if (!geometry.valid())
+        return;
+    
+    // 创建面的几何体
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
-    osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
     
-    // 添加三角形的三个顶点
+    // 添加三个顶点
     for (const Point3D& point : controlPoints)
     {
         vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
@@ -311,78 +210,91 @@ void Triangle3D_Geo::buildFaceGeometries()
                                    m_parameters.fillColor.b, m_parameters.fillColor.a));
     }
     
-    // 计算法向量
-    calculateNormal();
+    geometry->setVertexArray(vertices);
+    geometry->setColorArray(colors);
+    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+    
+    // 绘制三角形面
+    geometry->addPrimitiveSet(new osg::DrawArrays(GL_TRIANGLES, 0, 3));
+    
+    // 计算法线
+    osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
     for (int i = 0; i < 3; ++i)
     {
         normals->push_back(osg::Vec3(m_normal.x, m_normal.y, m_normal.z));
     }
-    
-    geometry->setVertexArray(vertices);
-    geometry->setColorArray(colors);
-    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     geometry->setNormalArray(normals);
     geometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
+}
+
+float Triangle3D_Geo::calculateArea() const
+{
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
+    if (controlPoints.size() < 3)
+        return 0.0f;
     
-    // 使用三角面绘制
-    osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, vertices->size());
-    geometry->addPrimitiveSet(drawArrays);
+    // 计算三角形面积
+    glm::vec3 v1 = controlPoints[1].position - controlPoints[0].position;
+    glm::vec3 v2 = controlPoints[2].position - controlPoints[0].position;
+    glm::vec3 cross = glm::cross(v1, v2);
     
-    addFaceGeometry(geometry);
+    return 0.5f * glm::length(cross);
+}
+
+void Triangle3D_Geo::calculateNormal()
+{
+    const auto& controlPoints = controlPoint()->getControlPoints();
+    if (controlPoints.size() < 3)
+        return;
+    
+    // 计算法线
+    glm::vec3 v1 = controlPoints[1].position - controlPoints[0].position;
+    glm::vec3 v2 = controlPoints[2].position - controlPoints[0].position;
+    m_normal = glm::normalize(glm::cross(v1, v2));
+    
+    // 计算面积
+    m_area = calculateArea();
 }
 
 bool Triangle3D_Geo::hitTest(const Ray3D& ray, PickResult3D& result) const
 {
-    // 获取三角形的三个顶点
-    glm::vec3 v0 = getVertex(0);
-    glm::vec3 v1 = getVertex(1);
-    glm::vec3 v2 = getVertex(2);
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
+    if (controlPoints.size() < 3)
+        return false;
     
-    // 射线-三角形相交测试（Möller–Trumbore算法）
-    glm::vec3 rayDir = glm::normalize(ray.direction);
+    // 射线-三角形相交测试
+    glm::vec3 v0 = controlPoints[0].position;
+    glm::vec3 v1 = controlPoints[1].position;
+    glm::vec3 v2 = controlPoints[2].position;
     
-    // 计算三角形的边向量
     glm::vec3 edge1 = v1 - v0;
     glm::vec3 edge2 = v2 - v0;
-    
-    // 计算行列式
-    glm::vec3 h = glm::cross(rayDir, edge2);
+    glm::vec3 h = glm::cross(ray.direction, edge2);
     float a = glm::dot(edge1, h);
     
-    // 如果a接近0，则射线与三角形平行
     if (std::abs(a) < 1e-6f)
-    {
-        return false;
-    }
+        return false; // 射线与三角形平行
     
     float f = 1.0f / a;
     glm::vec3 s = ray.origin - v0;
     float u = f * glm::dot(s, h);
     
-    // 检查u是否在有效范围内
     if (u < 0.0f || u > 1.0f)
-    {
         return false;
-    }
     
     glm::vec3 q = glm::cross(s, edge1);
-    float v = f * glm::dot(rayDir, q);
+    float v = f * glm::dot(ray.direction, q);
     
-    // 检查v是否在有效范围内
     if (v < 0.0f || u + v > 1.0f)
-    {
         return false;
-    }
     
-    // 计算交点参数t
     float t = f * glm::dot(edge2, q);
     
-    if (t >= 0.0f)
+    if (t > 1e-6f)
     {
-        result.hit = true;
+        result.hitPoint = ray.origin + t * ray.direction;
         result.distance = t;
-        result.userData = const_cast<Triangle3D_Geo*>(this);
-        result.point = ray.origin + t * rayDir;
+        result.normal = m_normal;
         return true;
     }
     

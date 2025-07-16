@@ -69,7 +69,7 @@ bool GeoOsgbIO::saveToOsgb(const QString& path, Geo3D* geo)
     GeoType3D type = geo->getGeoType();
     root->setName(QString("GeoType:%1").arg(type).toStdString());
     // 添加几何体节点
-    root->addChild(geo->getOSGNode());
+            root->addChild(geo->node()->getOSGNode());
     // 保存到osgb
     return osgDB::writeNodeFile(*root, path.toStdString());
 }
@@ -117,7 +117,7 @@ bool GeoOsgbIO::saveSceneToOsgb(const QString& path, const SceneData& sceneData)
             osg::ref_ptr<osg::Group> geoGroup = new osg::Group();
             GeoType3D type = geo->getGeoType();
             geoGroup->setName(QString("GeoType:%1").arg(type).toStdString());
-            geoGroup->addChild(geo->getOSGNode());
+            geoGroup->addChild(geo->node()->getOSGNode());
             root->addChild(geoGroup.get());
         }
     }
@@ -215,7 +215,7 @@ Geo3D* GeoOsgbIO::loadFromOsgb(const QString& path)
     }
     
     // 挂载节点
-    geo->getOSGNode()->addChild(node.get());
+            geo->node()->getOSGNode()->addChild(node.get());
     geo->setGeoType(type);
     
     LOG_SUCCESS(QString("成功加载文件: %1").arg(path), "文件IO");
@@ -300,7 +300,7 @@ SceneData GeoOsgbIO::loadSceneFromOsgb(const QString& path)
             
             if (geo) {
                 // 挂载子节点
-                geo->getOSGNode()->addChild(child);
+                geo->node()->getOSGNode()->addChild(child);
                 geo->setGeoType(type);
                 
                 // 添加到场景数据

@@ -123,6 +123,7 @@ struct GeoParameters3D
     Color3D lineColor;
     float lineDashPattern;
     NodeLineStyle3D nodeLineStyle;
+
     bool showEdges;  // 是否显示边
     
     // 面属性
@@ -137,11 +138,6 @@ struct GeoParameters3D
     
     // 体属性
     SubdivisionLevel3D subdivisionLevel;
-    
-    // 样条曲线属性
-    int splineOrder;
-    int splineNodeCount;
-    int steps;
     
     // 构造函数，使用全局默认值初始化
     GeoParameters3D();

@@ -20,141 +20,55 @@ Arc3D_Geo::Arc3D_Geo()
 
 void Arc3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!isStateComplete())
+    if (!mm_state()->isStateComplete())
     {
-        addControlPoint(Point3D(worldPos));
-        const auto& controlPoints = getControlPoints();
+        mm_controlPoint()->addControlPoint(Point3D(worldPos));
+        const auto& controlPoints = mm_controlPoint()->getControlPoints();
         
         if (controlPoints.size() == 3)
         {
-            // 计算圆弧参数
-            calculateArcParameters();
-            completeDrawing();
+            mm_state()->setStateComplete();
         }
         
-        updateGeometry();
+        
+        mm_state()->setVertexGeometryInvalid();
+        mm_state()->setEdgeGeometryInvalid();
         emit stateChanged(this);
     }
 }
 
 void Arc3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    const auto& controlPoints = getControlPoints();
-    if (!isStateComplete())
+    if (!mm_state()->isStateComplete())
     {
-        setTempPoint(Point3D(worldPos));
-        markGeometryDirty();
-        updateGeometry();
-    }
-}
-
-void Arc3D_Geo::updateGeometry()
-{
-    if (!isGeometryDirty()) return;
-    
-    // 清除点线面节点
-    clearVertexGeometries();
-    clearEdgeGeometries();
-    clearFaceGeometries();
-    
-    const auto& controlPoints = getControlPoints();
-    
-    // 临时显示预览
-    if (controlPoints.size() == 2)
-    {
-        const Point3D& tempPoint = getTempPoint();
-        if (tempPoint.position != glm::vec3(0))
+        const auto& controlPoints = mm_controlPoint()->getControlPoints();
+        
+        // 设置临时点用于预览
+        if (!controlPoints.empty())
         {
-            // 存储原始控制点
-            std::vector<Point3D> tempPoints = controlPoints;
-            tempPoints.push_back(tempPoint);
-            
-            // 临时计算圆弧参数
-            auto oldPoints = controlPoints;
-            // 临时添加点进行计算
-            addControlPoint(tempPoint);
-            calculateArcParameters();
-            
-            // 构建几何体
-            buildVertexGeometries();
-            buildEdgeGeometries();
-            
-            // 恢复原始控制点
-            clearControlPoints();
-            for (const auto& pt : oldPoints)
-            {
-                addControlPoint(pt);
-            }
+            mm_controlPoint()->setTempPoint(Point3D(worldPos));
         }
-    }
-    else
-    {
-        // 构建几何体
-        buildVertexGeometries();
-        buildEdgeGeometries();
-        buildFaceGeometries();
-    }
-    
-    updateOSGNode();
-    clearGeometryDirty();
-    
-    // 更新KDTree
-    if (getNodeManager()) {
-        getNodeManager()->updateKdTree();
-    }
-    
-    emit geometryUpdated(this);
-}
-
-osg::ref_ptr<osg::Geometry> Arc3D_Geo::createGeometry()
-{
-    const auto& controlPoints = getControlPoints();
-    if (controlPoints.size() < 3)
-        return nullptr;
-    
-    // 计算圆弧参数
-    calculateArcParameters();
-    
-    // 创建圆弧几何体
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-    
-    // 生成圆弧点
-    int segments = static_cast<int>(m_parameters.subdivisionLevel);
-    if (segments < 8) segments = 16;
-    
-    for (int i = 0; i <= segments; ++i)
-    {
-        float t = static_cast<float>(i) / segments;
-        float angle = m_startAngle + t * m_sweepAngle;
         
-        glm::vec3 point = m_center + m_radius * (
-            cosf(angle) * m_uAxis + 
-            sinf(angle) * m_vAxis
-        );
-        
-        vertices->push_back(osg::Vec3(point.x, point.y, point.z));
+        // 通过状态管理器通知临时点更新
+        mm_state()->setTemporaryPointsUpdated();
+        emit stateChanged(this);
     }
-    
-    geometry->setVertexArray(vertices);
-    
-    // 线绘制
-    osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::LINE_STRIP, 0, vertices->size());
-    geometry->addPrimitiveSet(drawArrays);
-    
-    return geometry;
 }
 
 void Arc3D_Geo::buildVertexGeometries()
 {
-    clearVertexGeometries();
+    mm_node()->clearVertexGeometry();
     
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (controlPoints.empty())
         return;
     
-    // 只为控制点创建几何体
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+    // 获取现有的几何体
+    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getVertexGeometry();
+    if (!geometry.valid())
+        return;
+    
+    // 创建顶点数组
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     
     // 添加控制点
@@ -175,19 +89,24 @@ void Arc3D_Geo::buildVertexGeometries()
     point->setSize(8.0f);  // 控制点大小
     stateSet->setAttribute(point);
     
-    addVertexGeometry(geometry);
+    // 通过状态管理器清除顶点几何体无效状态
+    mm_state()->clearVertexGeometryInvalid();
 }
 
 void Arc3D_Geo::buildEdgeGeometries()
 {
-    clearEdgeGeometries();
+    mm_node()->clearEdgeGeometry();
     
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (controlPoints.size() < 3)
         return;
     
+    // 获取现有的几何体
+    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getEdgeGeometry();
+    if (!geometry.valid())
+        return;
+    
     // 创建圆弧边界线几何体
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     
     // 计算圆弧参数
@@ -222,20 +141,19 @@ void Arc3D_Geo::buildEdgeGeometries()
     lineWidth->setWidth(2.0f);  // 边界线宽度
     stateSet->setAttribute(lineWidth);
     
-    addEdgeGeometry(geometry);
+    // 通过状态管理器清除边几何体无效状态
+    mm_state()->clearEdgeGeometryInvalid();
 }
 
 void Arc3D_Geo::buildFaceGeometries()
 {
-    clearFaceGeometries();
-    
-    // 圆弧通常不需要面，这里留空
-    // 如果需要扇形，可以在这里实现
+    // 圆弧不需要画面
+    return;
 }
 
 void Arc3D_Geo::calculateArcFromThreePoints()
 {
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (controlPoints.size() < 3)
         return;
     
@@ -302,18 +220,18 @@ void Arc3D_Geo::generateArcPoints()
         float t = static_cast<float>(i) / segments;
         float angle = m_startAngle + t * angleRange;
         
-        const auto& controlPoints = getControlPoints();
+        const auto& controlPoints = mm_controlPoint()->getControlPoints();
         glm::vec3 ref = glm::normalize(controlPoints[0].position - m_center);
         glm::vec3 perpRef = glm::normalize(glm::cross(m_normal, ref));
         
         glm::vec3 point = m_center + m_radius * (static_cast<float>(cos(angle)) * ref + static_cast<float>(sin(angle)) * perpRef);
-        m_arcPoints.push_back(Point3D(point));
+        m_arcPoints.push_back(point);
     }
 }
 
 void Arc3D_Geo::calculateArcParameters()
 {
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (controlPoints.size() < 3)
         return;
     
@@ -333,52 +251,7 @@ void Arc3D_Geo::calculateArcParameters()
     
     // 生成圆弧点
     generateArcPoints();
-} 
-
-bool Arc3D_Geo::hitTest(const Ray3D& ray, PickResult3D& result) const
-{
-    // 获取圆弧的参数
-    glm::vec3 center = getCenter();
-    float radius = getRadius();
-    float startAngle = getStartAngle();
-    float endAngle = getEndAngle();
     
-    // 射线-圆弧相交测试（简化版本，使用包围盒）
-    const BoundingBox3D& bbox = getBoundingBox();
-    if (!bbox.isValid())
-    {
-        return false;
-    }
-    
-    // 使用包围盒进行相交测试
-    glm::vec3 rayDir = glm::normalize(ray.direction);
-    glm::vec3 invDir = 1.0f / rayDir;
-    
-    // 计算与包围盒各面的交点参数
-    float t1 = (bbox.min.x - ray.origin.x) * invDir.x;
-    float t2 = (bbox.max.x - ray.origin.x) * invDir.x;
-    float t3 = (bbox.min.y - ray.origin.y) * invDir.y;
-    float t4 = (bbox.max.y - ray.origin.y) * invDir.y;
-    float t5 = (bbox.min.z - ray.origin.z) * invDir.z;
-    float t6 = (bbox.max.z - ray.origin.z) * invDir.z;
-    
-    // 计算进入和退出参数
-    float tmin = glm::max(glm::max(glm::min(t1, t2), glm::min(t3, t4)), glm::min(t5, t6));
-    float tmax = glm::min(glm::min(glm::max(t1, t2), glm::max(t3, t4)), glm::max(t5, t6));
-    
-    // 检查是否相交
-    if (tmax >= 0 && tmin <= tmax)
-    {
-        float t = (tmin >= 0) ? tmin : tmax;
-        if (t >= 0)
-        {
-            result.hit = true;
-            result.distance = t;
-            result.userData = const_cast<Arc3D_Geo*>(this);
-            result.point = ray.origin + t * rayDir;
-            return true;
-        }
-    }
-    
-    return false;
-} 
+    // 通过状态管理器设置参数更新状态
+    mm_state()->setParametersUpdated();
+}

@@ -287,7 +287,7 @@ osg::ref_ptr<osg::Geometry> SimplePickingIndicatorManager::createFaceIndicator(f
 
 void SimplePickingIndicatorManager::createHighlight(Geo3D* geo)
 {
-    if (!geo || !geo->getOSGNode())
+    if (!geo || !geo->node()->getOSGNode())
         return;
     
     m_currentHighlight = new osg::Group;

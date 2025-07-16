@@ -99,6 +99,12 @@ public:
     void setDebugMode(bool enabled) { m_debugMode = enabled; }
     bool isDebugMode() const { return m_debugMode; }
 
+    // 高亮管理
+    void showHighlight(Geo3D* geometry);
+    void hideHighlight();
+    void showSelectionHighlight(Geo3D* geometry);
+    void hideSelectionHighlight();
+
 private:
     // 核心拾取算法
     SimplePickingResult performRayIntersection(int mouseX, int mouseY);
@@ -112,10 +118,6 @@ private:
     void hideIndicator();
     void updateIndicatorPosition(const glm::vec3& position);
     
-    // 高亮管理
-    void showHighlight(Geo3D* geometry);
-    void hideHighlight();
-    
     // 坐标转换
     glm::vec3 screenToWorld(int x, int y, float depth = 0.0f);
     glm::vec2 worldToScreen(const glm::vec3& worldPos);
@@ -123,6 +125,7 @@ private:
     // 几何体工具
     osg::ref_ptr<osg::Geometry> createIndicatorGeometry(float size);
     osg::ref_ptr<osg::Geometry> createHighlightGeometry(Geo3D* geometry);
+    osg::ref_ptr<osg::Geometry> createControlPointHighlightGeometry(Geo3D* geometry);
     
     // 内部状态
     bool m_initialized = false;
@@ -201,6 +204,10 @@ public:
     
     // 拾取操作
     SimplePickingResult pick(int mouseX, int mouseY);
+    
+    // 选择高亮管理
+    void showSelectionHighlight(Geo3D* geometry);
+    void hideSelectionHighlight();
     
     // 事件处理器
     osgGA::GUIEventHandler* getEventHandler();

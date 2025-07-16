@@ -372,7 +372,7 @@ void OSGWidget::addGeo(Geo3D* geo)
         m_geoList.push_back(geoRef);
         
         // 获取几何体的OSG节点
-        osg::ref_ptr<osg::Group> geoOSGNode = geo->getOSGNode();
+        osg::ref_ptr<osg::Group> geoOSGNode = geo->mm_node()->getOSGNode();
         if (geoOSGNode.valid()) {
             m_geoNode->addChild(geoOSGNode.get());
             qDebug() << "Added geometry to scene:" << geo->getGeoType() << "children:" << geoOSGNode->getNumChildren();
@@ -389,7 +389,7 @@ void OSGWidget::addGeo(Geo3D* geo)
         if (m_advancedPickingEnabled)
         {
             // 检查几何对象是否已经完成绘制
-            if (geo->isStateComplete())
+            if (geo->mm_state()->isStateComplete())
             {
                 SimplifiedPickingSystemManager::getInstance().addGeometry(geo);
                 LOG_DEBUG(QString("Added completed geometry to simplified picking system: %1").arg(geo->getGeoType()), "拾取");
@@ -422,7 +422,7 @@ void OSGWidget::removeGeo(Geo3D* geo)
             disconnect(geo, &Geo3D::geometryUpdated, this, &OSGWidget::onGeoGeometryUpdated);
             disconnect(geo, &Geo3D::parametersChanged, this, &OSGWidget::onGeoParametersChanged);
             
-            m_geoNode->removeChild(geo->getOSGNode().get());
+            m_geoNode->removeChild(geo->mm_node()->getOSGNode().get());
             m_geoList.erase(it);
             
             // 从简化拾取系统移除
@@ -456,13 +456,13 @@ void OSGWidget::selectGeo(Geo3D* geo)
 {
     if (m_selectedGeo)
     {
-        m_selectedGeo->clearStateSelected();
+        m_selectedGeo->mm_state()->clearStateSelected();
     }
     
     m_selectedGeo = geo;
     if (m_selectedGeo)
     {
-        m_selectedGeo->setStateSelected();
+        m_selectedGeo->mm_state()->setStateSelected();
     }
     
     emit geoSelected(geo);
@@ -487,7 +487,13 @@ void OSGWidget::addToSelection(Geo3D* geo)
         LOG_INFO(QString("对象不在选择列表中，开始添加"), "选择");
         
         m_selectedGeos.push_back(geo);
-        geo->setStateSelected(); // 这会自动显示包围盒
+        geo->mm_state()->setStateSelected(); // 这会自动显示包围盒
+        
+        // 显示控制点高亮
+        if (m_advancedPickingEnabled)
+        {
+            SimplifiedPickingSystemManager::getInstance().showSelectionHighlight(geo);
+        }
         
         // 发送选择信号
         emit geoSelected(geo);
@@ -510,7 +516,13 @@ void OSGWidget::removeFromSelection(Geo3D* geo)
     if (it != m_selectedGeos.end())
     {
         m_selectedGeos.erase(it);
-        geo->clearStateSelected(); // 这会自动隐藏包围盒
+        geo->mm_state()->clearStateSelected(); // 这会自动隐藏包围盒
+        
+        // 清除控制点高亮
+        if (m_advancedPickingEnabled)
+        {
+            SimplifiedPickingSystemManager::getInstance().hideSelectionHighlight();
+        }
         
         // 如果移除的是当前选中的对象，清空当前选中
         if (m_selectedGeo.get() == geo)
@@ -534,8 +546,14 @@ void OSGWidget::clearSelection()
     {
         if (geo)
         {
-            geo->clearStateSelected(); // 这会自动隐藏包围盒
+            geo->mm_state()->clearStateSelected(); // 这会自动隐藏包围盒
         }
+    }
+    
+    // 清除控制点高亮
+    if (m_advancedPickingEnabled)
+    {
+        SimplifiedPickingSystemManager::getInstance().hideSelectionHighlight();
     }
     
     m_selectedGeos.clear();
@@ -709,79 +727,81 @@ void OSGWidget::onSimplePickingResult(const SimplePickingResult& result)
 
 
 
-PickResult3D OSGWidget::pick(int x, int y)
-{
-    PickResult3D result;
+// PickResult3D OSGWidget::pick(int x, int y)
+// {
+//     PickResult3D result;
     
-    osgViewer::Viewer* viewer = getOsgViewer();
-    if (!viewer) return result;
+//     osgViewer::Viewer* viewer = getOsgViewer();
+//     if (!viewer) return result;
     
-    osg::Camera* camera = viewer->getCamera();
+//     osg::Camera* camera = viewer->getCamera();
     
-    // 创建射线
-    osg::Vec3f nearPoint, farPoint;
-    if (camera->getViewport())
-    {
-        osg::Matrix VPW = camera->getViewMatrix() * 
-                         camera->getProjectionMatrix() * 
-                         camera->getViewport()->computeWindowMatrix();
-        osg::Matrix invVPW;
-        invVPW.invert(VPW);
+//     // 创建射线
+//     osg::Vec3f nearPoint, farPoint;
+//     if (camera->getViewport())
+//     {
+//         osg::Matrix VPW = camera->getViewMatrix() * 
+//                          camera->getProjectionMatrix() * 
+//                          camera->getViewport()->computeWindowMatrix();
+//         osg::Matrix invVPW;
+//         invVPW.invert(VPW);
         
-        nearPoint = osg::Vec3f(x, height() - y, 0.0f) * invVPW;
-        farPoint = osg::Vec3f(x, height() - y, 1.0f) * invVPW;
-    }
+//         nearPoint = osg::Vec3f(x, height() - y, 0.0f) * invVPW;
+//         farPoint = osg::Vec3f(x, height() - y, 1.0f) * invVPW;
+//     }
     
-    // 计算射线方向和起点
-    glm::vec3 rayOrigin(nearPoint.x(), nearPoint.y(), nearPoint.z());
-    glm::vec3 rayDirection = glm::normalize(glm::vec3(farPoint.x() - nearPoint.x(), 
-                                                      farPoint.y() - nearPoint.y(), 
-                                                      farPoint.z() - nearPoint.z()));
+//     // 计算射线方向和起点
+//     glm::vec3 rayOrigin(nearPoint.x(), nearPoint.y(), nearPoint.z());
+//     glm::vec3 rayDirection = glm::normalize(glm::vec3(farPoint.x() - nearPoint.x(), 
+//                                                       farPoint.y() - nearPoint.y(), 
+//                                                       farPoint.z() - nearPoint.z()));
     
-    Ray3D ray(rayOrigin, rayDirection);
+//     Ray3D ray(rayOrigin, rayDirection);
     
-    // 添加调试信息
-    LOG_DEBUG(QString("射线拾取: 屏幕坐标(%1,%2), 射线起点(%3,%4,%5), 方向(%6,%7,%8)")
-        .arg(x).arg(y)
-        .arg(rayOrigin.x, 0, 'f', 3).arg(rayOrigin.y, 0, 'f', 3).arg(rayOrigin.z, 0, 'f', 3)
-        .arg(rayDirection.x, 0, 'f', 3).arg(rayDirection.y, 0, 'f', 3).arg(rayDirection.z, 0, 'f', 3), "拾取");
+//     // 添加调试信息
+//     LOG_DEBUG(QString("射线拾取: 屏幕坐标(%1,%2), 射线起点(%3,%4,%5), 方向(%6,%7,%8)")
+//         .arg(x).arg(y)
+//         .arg(rayOrigin.x, 0, 'f', 3).arg(rayOrigin.y, 0, 'f', 3).arg(rayOrigin.z, 0, 'f', 3)
+//         .arg(rayDirection.x, 0, 'f', 3).arg(rayDirection.y, 0, 'f', 3).arg(rayDirection.z, 0, 'f', 3), "拾取");
     
-    LOG_DEBUG(QString("几何体数量: %1").arg(m_geoList.size()), "拾取");
+//     LOG_DEBUG(QString("几何体数量: %1").arg(m_geoList.size()), "拾取");
     
-    // 测试所有几何对象，使用KDTree支持的快速查询
-    float minDistance = FLT_MAX;
-    for (const osg::ref_ptr<Geo3D>& geo : m_geoList)
-    {
-        if (!geo) continue;
+//     // 测试所有几何对象，使用KDTree支持的快速查询
+//     float minDistance = FLT_MAX;
+//     for (const osg::ref_ptr<Geo3D>& geo : m_geoList)
+//     {
+//         if (!geo) continue;
         
-        LOG_DEBUG(QString("测试几何体: 类型=%1, 状态=%2")
-            .arg(geo->getGeoType())
-            .arg(geo->isStateComplete() ? "完成" : "未完成"), "拾取");
+//         LOG_DEBUG(QString("测试几何体: 类型=%1, 状态=%2")
+//             .arg(geo->getGeoType())
+//             .arg(geo->isStateComplete() ? "完成" : "未完成"), "拾取");
         
-        PickResult3D geoResult;
-        // 优先使用KDTree支持的hitTest，如果失败则使用传统方法
-        if (geo->hitTestWithKdTree(ray, geoResult) || geo->hitTestVisible(ray, geoResult))
-        {
-            LOG_DEBUG(QString("几何体命中: 类型=%1, 距离=%2")
-                .arg(geo->getGeoType())
-                .arg(geoResult.distance, 0, 'f', 3), "拾取");
+//         PickResult3D geoResult;
+//         // 优先使用KDTree支持的hitTest，如果失败则使用传统方法
+//         if (geo->hitTestWithKdTree(ray, geoResult) || geo->hitTestVisible(ray, geoResult))
+//         {
+//             LOG_DEBUG(QString("几何体命中: 类型=%1, 距离=%2")
+//                 .arg(geo->getGeoType())
+//                 .arg(geoResult.distance, 0, 'f', 3), "拾取");
             
-            if (geoResult.distance < minDistance)
-            {
-                minDistance = geoResult.distance;
-                result = geoResult;
-            }
-        }
-    }
+//             if (geoResult.distance < minDistance)
+//             {
+//                 minDistance = geoResult.distance;
+//                 result = geoResult;
+//             }
+//         }
+//     }
     
-    if (result.hit) {
-        LOG_DEBUG(QString("射线拾取成功: 距离=%1").arg(result.distance, 0, 'f', 3), "拾取");
-    } else {
-        LOG_DEBUG("射线拾取失败: 没有命中任何几何体", "拾取");
-    }
+//     if (result.hit) {
+//         LOG_DEBUG(QString("射线拾取成功: 距离=%1").arg(result.distance, 0, 'f', 3), "拾取");
+//     } else {
+//         LOG_DEBUG("射线拾取失败: 没有命中任何几何体", "拾取");
+//     }
     
-    return result;
-}
+//     return result;
+// }
+
+
 
 glm::vec3 OSGWidget::screenToWorld(int x, int y, float depth)
 {
@@ -863,7 +883,7 @@ void OSGWidget::mousePressEvent(QMouseEvent* event)
             if (!geo) continue;
             
             // 检查控制点
-            const auto& controlPoints = geo->getControlPoints();
+            const auto& controlPoints = geo->mm_controlPoint()->getControlPoints();
             for (int i = 0; i < static_cast<int>(controlPoints.size()); ++i)
             {
                 glm::vec3 diff = controlPoints[i].position - worldPos;
@@ -945,7 +965,7 @@ void OSGWidget::mouseMoveEvent(QMouseEvent* event)
         glm::vec3 dragOffset = m_lastMouseWorldPos - m_dragStartPosition;
         
         // 更新控制点位置
-        const auto& controlPoints = m_draggingGeo->getControlPoints();
+        const auto& controlPoints = m_draggingGeo->mm_controlPoint()->getControlPoints();
         if (m_draggingControlPointIndex < static_cast<int>(controlPoints.size()))
         {
             // 更新控制点
@@ -1054,20 +1074,20 @@ void OSGWidget::handleDrawingInput(QMouseEvent* event)
     
     if (GlobalDrawMode3D == DrawSelect3D)
     {
-        // 选择模式：拾取对象
-        PickResult3D pickResult = pick(event->x(), event->y());
+        // 选择模式：直接使用SimplifiedPickingSystem进行射线选择
+        SimplePickingResult pickResult = SimplifiedPickingSystemManager::getInstance().pick(event->x(), event->y());
         
         // 检查是否按下了Ctrl键（多选模式）
         bool isCtrlPressed = (QApplication::keyboardModifiers() & Qt::ControlModifier);
         
         LOG_INFO(QString("选择模式点击: 位置(%1,%2), 拾取结果=%3, Ctrl=%4")
             .arg(event->x()).arg(event->y())
-            .arg(pickResult.hit ? "命中" : "未命中")
+            .arg(pickResult.hasResult ? "命中" : "未命中")
             .arg(isCtrlPressed ? "是" : "否"), "选择");
         
-        if (pickResult.hit)
+        if (pickResult.hasResult && pickResult.geometry)
         {
-            Geo3D* pickedGeo = static_cast<Geo3D*>(pickResult.userData);
+            Geo3D* pickedGeo = pickResult.geometry;
             
             if (isCtrlPressed)
             {

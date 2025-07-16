@@ -269,9 +269,9 @@ int GeoRenderManager::getVertexCount() const
         // 计算顶点数
         m_cachedVertexCount = 0;
         
-        if (m_parent && m_parent->getNodeManager()) {
-            auto* nodeManager = m_parent->getNodeManager();
-            auto geometry = nodeManager->getGeometry();
+        if (m_parent && m_parent->mm_node()) {
+            auto* nodeManager = m_parent->mm_node();
+            auto geometry = nodeManager->getVertexGeometry();
             
             if (geometry.valid()) {
                 auto vertices = geometry->getVertexArray();
@@ -293,9 +293,9 @@ int GeoRenderManager::getTriangleCount() const
         // 计算三角形数
         m_cachedTriangleCount = 0;
         
-        if (m_parent && m_parent->getNodeManager()) {
-            auto* nodeManager = m_parent->getNodeManager();
-            auto geometry = nodeManager->getGeometry();
+        if (m_parent && m_parent->mm_node()) {
+            auto* nodeManager = m_parent->mm_node();
+            auto geometry = nodeManager->getVertexGeometry();
             
             if (geometry.valid()) {
                 for (unsigned int i = 0; i < geometry->getNumPrimitiveSets(); ++i) {
@@ -330,9 +330,9 @@ size_t GeoRenderManager::getMemoryUsage() const
 {
     size_t usage = 0;
     
-    if (m_parent && m_parent->getNodeManager()) {
-        auto* nodeManager = m_parent->getNodeManager();
-        auto geometry = nodeManager->getGeometry();
+    if (m_parent && m_parent->mm_node()) {
+        auto* nodeManager = m_parent->mm_node();
+        auto geometry = nodeManager->getVertexGeometry();
         
         if (geometry.valid()) {
             // 估算顶点数据内存使用
@@ -477,25 +477,19 @@ void GeoRenderManager::setAnimationSpeed(float speed)
 
 void GeoRenderManager::updateFeatureVisibility()
 {
-    if (!m_parent || !m_parent->getNodeManager()) return;
+    if (!m_parent || !m_parent->mm_node()) return;
     
     // 获取节点管理器
-    auto nodeManager = m_parent->getNodeManager();
+    auto nodeManager = m_parent->mm_node();
     
     // 更新点的可见性
-    if (auto vertexNode = nodeManager->getVertexNode()) {
-        vertexNode->setNodeMask(m_showPoints ? 0xFFFFFFFF : 0x0);
-    }
+    nodeManager->setVertexVisible(m_showPoints);
     
     // 更新边的可见性
-    if (auto edgeNode = nodeManager->getEdgeNode()) {
-        edgeNode->setNodeMask(m_showEdges ? 0xFFFFFFFF : 0x0);
-    }
+    nodeManager->setEdgeVisible(m_showEdges);
     
     // 更新面的可见性
-    if (auto faceNode = nodeManager->getFaceNode()) {
-        faceNode->setNodeMask(m_showFaces ? 0xFFFFFFFF : 0x0);
-    }
+    nodeManager->setFaceVisible(m_showFaces);
     
     // 标记渲染需要更新
     m_needsRenderUpdate = true;
@@ -517,8 +511,8 @@ void GeoRenderManager::updateRenderSettings()
     }
     
     // 应用透明度
-    if (m_parent && m_parent->getMaterialManager()) {
-        m_parent->getMaterialManager()->setTransparency(m_alpha);
+    if (m_parent && m_parent->mm_material()) {
+        m_parent->mm_material()->setTransparency(m_alpha);
     }
 }
 
@@ -530,15 +524,15 @@ void GeoRenderManager::updateHighlightEffect()
         // 应用高亮效果
         // 这里可以修改材质或添加特殊渲染状态
         if (auto* materialManager = m_parent->getMaterialManager()) {
-            // 临时保存原始颜色并应用高亮颜色
-            materialManager->setDiffuse(m_highlightColor);
-        }
-    } else {
-        // 移除高亮效果，恢复原始外观
-        if (auto* materialManager = m_parent->getMaterialManager()) {
-            // 恢复原始材质
-            materialManager->resetMaterial();
-        }
+                    // 临时保存原始颜色并应用高亮颜色
+        materialManager->setDiffuse(m_highlightColor);
+    }
+} else {
+    // 移除高亮效果，恢复原始外观
+    if (auto* materialManager = m_parent->mm_material()) {
+        // 恢复原始材质
+        materialManager->resetMaterial();
+    }
     }
 }
 
@@ -553,11 +547,11 @@ void GeoRenderManager::updateLODSettings()
 void GeoRenderManager::applyRenderOptimizations()
 {
     // 应用各种渲染优化
-    if (m_parent && m_parent->getNodeManager()) {
-        auto* nodeManager = m_parent->getNodeManager();
+    if (m_parent && m_parent->mm_node()) {
+        auto* nodeManager = m_parent->mm_node();
         
         if (m_frustumCulling || m_backfaceCulling || m_occlusionCulling) {
-            nodeManager->optimizeNodes();
+            nodeManager->updateSpatialIndex();
         }
     }
 }

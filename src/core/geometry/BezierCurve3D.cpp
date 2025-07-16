@@ -12,10 +12,10 @@ BezierCurve3D_Geo::BezierCurve3D_Geo()
 
 void BezierCurve3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!isStateComplete())
+    if (!mm_state()->isStateComplete())
     {
-        addControlPoint(Point3D(worldPos));
-        const auto& controlPoints = getControlPoints();
+        mm_controlPoint()->addControlPoint(Point3D(worldPos));
+        const auto& controlPoints = mm_controlPoint()->getControlPoints();
         
         if (controlPoints.size() >= 2)
         {
@@ -29,30 +29,30 @@ void BezierCurve3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& wor
 
 void BezierCurve3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    const auto& controlPoints = getControlPoints();
-    if (!isStateComplete() && !controlPoints.empty())
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
+    if (!mm_state()->isStateComplete() && !controlPoints.empty())
     {
-        setTempPoint(Point3D(worldPos));
-        markGeometryDirty();
+        // 设置临时点用于预览
+        // 这里需要实现临时点机制
         updateGeometry();
     }
 }
 
 void BezierCurve3D_Geo::keyPressEvent(QKeyEvent* event)
 {
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter)
     {
         if (controlPoints.size() >= 2)
         {
-            completeDrawing();
+            mm_state()->setStateComplete();
         }
     }
     else if (event->key() == Qt::Key_Escape)
     {
         if (!controlPoints.empty())
         {
-            removeControlPoint(controlPoints.size() - 1);
+            mm_controlPoint()->removeControlPoint(controlPoints.size() - 1);
             updateGeometry();
         }
     }
@@ -61,31 +61,31 @@ void BezierCurve3D_Geo::keyPressEvent(QKeyEvent* event)
 void BezierCurve3D_Geo::updateGeometry()
 {
     // 清除点线面节点
-    clearVertexGeometries();
-    clearEdgeGeometries();
-    clearFaceGeometries();
-    
-    updateOSGNode();
+    mm_node()->clearAllGeometries();
     
     // 构建点线面几何体
     buildVertexGeometries();
     buildEdgeGeometries();
     buildFaceGeometries();
     
-    // 更新可见性
-    updateFeatureVisibility();
+    // 更新OSG节点
+    updateOSGNode();
     
-    // 更新KDTree
-    if (getNodeManager()) {
-        getNodeManager()->updateKdTree();
-    }
+    // 更新捕捉点
+    mm_snapPoint()->updateSnapPoints();
+    
+    // 更新包围盒
+    mm_boundingBox()->updateBoundingBox();
+    
+    // 更新空间索引
+    mm_node()->updateSpatialIndex();
 }
 
 
 
 osg::ref_ptr<osg::Geometry> BezierCurve3D_Geo::createGeometry()
 {
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (controlPoints.size() < 2)
         return nullptr;
     
@@ -105,51 +105,6 @@ osg::ref_ptr<osg::Geometry> BezierCurve3D_Geo::createGeometry()
                                    m_parameters.lineColor.b, m_parameters.lineColor.a));
     }
     
-    // 如果正在绘制且有临时点，计算包含临时点的贝塞尔曲线
-    if (!isStateComplete() && getTempPoint().position != glm::vec3(0))
-    {
-        std::vector<Point3D> tempControlPoints = controlPoints;
-        tempControlPoints.push_back(getTempPoint());
-        
-        // 生成临时贝塞尔曲线点
-        std::vector<Point3D> tempBezierPoints;
-        int steps = m_parameters.steps > 0 ? m_parameters.steps : 50;
-        
-        for (int i = 0; i <= steps; ++i)
-        {
-            float t = static_cast<float>(i) / steps;
-            // 临时计算贝塞尔点
-            std::vector<glm::vec3> tempVecs;
-            for (const Point3D& cp : tempControlPoints)
-            {
-                tempVecs.push_back(cp.position);
-            }
-            
-            while (tempVecs.size() > 1)
-            {
-                std::vector<glm::vec3> newVecs;
-                for (size_t j = 0; j < tempVecs.size() - 1; ++j)
-                {
-                    newVecs.push_back(glm::mix(tempVecs[j], tempVecs[j+1], t));
-                }
-                tempVecs = newVecs;
-            }
-            
-            if (!tempVecs.empty())
-            {
-                tempBezierPoints.push_back(Point3D(tempVecs[0]));
-            }
-        }
-        
-        // 添加临时点（半透明）
-        for (const Point3D& point : tempBezierPoints)
-        {
-            vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
-            colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
-                                       m_parameters.lineColor.b, m_parameters.lineColor.a * 0.5f));
-        }
-    }
-    
     geometry->setVertexArray(vertices.get());
     geometry->setColorArray(colors.get());
     geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
@@ -161,14 +116,18 @@ osg::ref_ptr<osg::Geometry> BezierCurve3D_Geo::createGeometry()
 
 void BezierCurve3D_Geo::buildVertexGeometries()
 {
-    clearVertexGeometries();
+    mm_node()->clearVertexGeometry();
     
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (controlPoints.empty())
         return;
     
-    // 只为控制点创建几何体
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+    // 获取现有的几何体
+    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getVertexGeometry();
+    if (!geometry.valid())
+        return;
+    
+    // 创建顶点数组
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
@@ -178,14 +137,6 @@ void BezierCurve3D_Geo::buildVertexGeometries()
         vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
         colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
                                    m_parameters.pointColor.b, m_parameters.pointColor.a));
-    }
-    
-    // 如果有临时点且几何体未完成，添加临时点
-    if (!isStateComplete() && getTempPoint().position != glm::vec3(0))
-    {
-        vertices->push_back(osg::Vec3(getTempPoint().x(), getTempPoint().y(), getTempPoint().z()));
-        colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
-                                   m_parameters.pointColor.b, m_parameters.pointColor.a * 0.5f));
     }
     
     geometry->setVertexArray(vertices);
@@ -202,7 +153,7 @@ void BezierCurve3D_Geo::buildVertexGeometries()
     point->setSize(8.0f);  // 控制点大小
     stateSet->setAttribute(point);
     
-    addVertexGeometry(geometry);
+    mm_node()->setVertexGeometry(geometry);
 }
 
 void BezierCurve3D_Geo::buildEdgeGeometries()
@@ -213,8 +164,12 @@ void BezierCurve3D_Geo::buildEdgeGeometries()
     if (controlPoints.size() < 2)
         return;
     
+    // 获取现有的几何体
+    osg::ref_ptr<osg::Geometry> geometry = getEdgeGeometry();
+    if (!geometry.valid())
+        return;
+    
     // 创建贝塞尔曲线边界线几何体
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     

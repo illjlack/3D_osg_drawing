@@ -343,14 +343,14 @@ void HighlightSystem::clearHighlight()
 
 void HighlightSystem::createHighlightGeometry(Geo3D* geo, const osg::Vec4& color)
 {
-    if (!geo || !geo->getOSGNode())
+    if (!geo || !geo->node()->getOSGNode())
         return;
     
     m_currentHighlight = new osg::Group;
     m_highlightRoot->addChild(m_currentHighlight);
     
     // 遍历几何对象的子节点
-    osg::Group* geoGroup = geo->getOSGNode()->asGroup();
+            osg::Group* geoGroup = geo->node()->getOSGNode()->asGroup();
     if (geoGroup)
     {
         for (unsigned int i = 0; i < geoGroup->getNumChildren(); ++i)

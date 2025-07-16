@@ -65,6 +65,12 @@ public:
     void setControlPointColor(const Color3D& color);
     const Color3D& getControlPointColor() const { return m_controlPointColor; }
 
+    // 临时点管理
+    void setTempPoint(const Point3D& point);
+    void clearTempPoint();
+    Point3D getTempPoint() const { return m_tempPoint; }
+    bool hasTempPoint() const { return m_tempPoint.position != glm::vec3(0); }
+
 signals:
     void controlPointAdded(int index, const Point3D& point);
     void controlPointRemoved(int index);
@@ -91,4 +97,5 @@ private:
     bool m_controlPointsVisible;
     float m_controlPointSize;
     Color3D m_controlPointColor;
+    Point3D m_tempPoint; // 新增临时点
 }; 

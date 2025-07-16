@@ -12,14 +12,18 @@ public:
     
     // 事件处理
     virtual void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
-    virtual void completeDrawing() override;
-    virtual void updateGeometry() override;
+    virtual void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
+    
+    // 几何计算
+    float calculateVolume() const;
+    float calculateSurfaceArea() const;
+    glm::vec3 getCenter() const;
     
     // 拾取测试
     virtual bool hitTest(const Ray3D& ray, PickResult3D& result) const override;
 
 protected:
-    virtual osg::ref_ptr<osg::Geometry> createGeometry() override;
+    virtual osg::ref_ptr<osg::Geometry> createGeometry();
     
     // 点线面几何体构建
     virtual void buildVertexGeometries() override;
@@ -27,5 +31,5 @@ protected:
     virtual void buildFaceGeometries() override;
     
 private:
-    osg::ref_ptr<osg::Geometry> createPointGeometry(PointShape3D shape, float size);
+    void calculatePointParameters();
 }; 

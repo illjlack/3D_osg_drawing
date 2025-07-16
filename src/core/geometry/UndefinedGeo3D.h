@@ -10,25 +10,27 @@ public:
     UndefinedGeo3D();
     virtual ~UndefinedGeo3D() = default;
     
-    // 设置自定义数据
-    void setCustomData(const QVariantMap& data) { m_customData = data; }
-    QVariantMap getCustomData() const { return m_customData; }
-    
     // 事件处理
     virtual void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
-    virtual void completeDrawing() override;
-    virtual void updateGeometry() override;
+    virtual void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
+    
+    // 几何计算
+    float calculateVolume() const;
+    float calculateSurfaceArea() const;
+    glm::vec3 getCenter() const;
     
     // 拾取测试
-    virtual bool hitTest(const Ray3D& ray, PickResult3D& result) const override;
+    virtual bool hitTest(const Ray3D& ray, PickResult3D& result) const;
 
 protected:
-    virtual osg::ref_ptr<osg::Geometry> createGeometry() override;
-    virtual void buildVertexGeometries() override;
-    virtual void buildEdgeGeometries() override;
-    virtual void buildFaceGeometries() override;
+    virtual osg::ref_ptr<osg::Geometry> createGeometry();
+    
+    // 点线面几何体构建
+    virtual void buildVertexGeometries();
+    virtual void buildEdgeGeometries();
+    virtual void buildFaceGeometries();
     
 private:
-    QVariantMap m_customData;  // 自定义数据
-    osg::ref_ptr<osg::Geometry> createDefaultGeometry();
+    glm::vec3 m_normal = glm::vec3(0.0f);
+    void calculateUndefinedParameters();
 }; 

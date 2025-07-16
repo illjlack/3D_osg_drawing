@@ -14,17 +14,17 @@ Box3D_Geo::Box3D_Geo()
 
 void Box3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!isStateComplete())
+    if (!mm_state()->isStateComplete())
     {
-        addControlPoint(Point3D(worldPos));
-        const auto& controlPoints = getControlPoints();
+        mm_controlPoint()->addControlPoint(Point3D(worldPos));
+        const auto& controlPoints = mm_controlPoint()->getControlPoints();
         
         if (controlPoints.size() == 2)
         {
             // 计算长方体尺寸
             glm::vec3 diff = controlPoints[1].position - controlPoints[0].position;
             m_size = glm::abs(diff);
-            completeDrawing();
+            mm_state()->setStateComplete();
         }
         
         updateGeometry();
@@ -34,43 +34,40 @@ void Box3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 
 void Box3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    const auto& controlPoints = getControlPoints();
-    if (!isStateComplete() && controlPoints.size() == 1)
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
+    if (!mm_state()->isStateComplete() && controlPoints.size() == 1)
     {
-        setTempPoint(Point3D(worldPos));
-        markGeometryDirty();
+        // 设置临时点用于预览
+        // 这里需要实现临时点机制
         updateGeometry();
     }
 }
 
 void Box3D_Geo::updateGeometry()
 {
-    if (!isGeometryDirty()) return;
-    
     // 清除点线面节点
-    clearVertexGeometries();
-    clearEdgeGeometries();
-    clearFaceGeometries();
+    mm_node()->clearAllGeometries();
     
     // 构建几何体
     buildVertexGeometries();
     buildEdgeGeometries();
     buildFaceGeometries();
     
+    // 更新OSG节点
     updateOSGNode();
-    clearGeometryDirty();
     
-    // 更新KDTree
-    if (getNodeManager()) {
-        getNodeManager()->updateKdTree();
-    }
+    // 更新包围盒
+    mm_boundingBox()->updateBoundingBox();
+    
+    // 更新空间索引
+    mm_node()->updateSpatialIndex();
     
     emit geometryUpdated(this);
 }
 
 osg::ref_ptr<osg::Geometry> Box3D_Geo::createGeometry()
 {
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (controlPoints.empty())
     {
         return nullptr;
@@ -79,12 +76,7 @@ osg::ref_ptr<osg::Geometry> Box3D_Geo::createGeometry()
     glm::vec3 center = controlPoints[0].position;
     glm::vec3 size = m_size;
     
-    if (controlPoints.size() == 1 && getTempPoint().position != glm::vec3(0))
-    {
-        glm::vec3 diff = getTempPoint().position - center;
-        size = glm::abs(diff);
-    }
-    else if (controlPoints.size() == 2)
+    if (controlPoints.size() == 2)
     {
         center = (controlPoints[0].position + controlPoints[1].position) * 0.5f;
         glm::vec3 diff = controlPoints[1].position - controlPoints[0].position;
@@ -155,14 +147,18 @@ osg::ref_ptr<osg::Geometry> Box3D_Geo::createGeometry()
 
 void Box3D_Geo::buildVertexGeometries()
 {
-    clearVertexGeometries();
+    mm_node()->clearVertexGeometry();
     
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (controlPoints.empty())
         return;
     
-    // 只为控制点创建几何体
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+    // 获取现有的几何体
+    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getVertexGeometry();
+    if (!geometry.valid())
+        return;
+    
+    // 创建顶点数组
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
@@ -172,14 +168,6 @@ void Box3D_Geo::buildVertexGeometries()
         vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
         colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
                                    m_parameters.pointColor.b, m_parameters.pointColor.a));
-    }
-    
-    // 如果有临时点且几何体未完成，添加临时点
-    if (!isStateComplete() && getTempPoint().position != glm::vec3(0))
-    {
-        vertices->push_back(osg::Vec3(getTempPoint().x(), getTempPoint().y(), getTempPoint().z()));
-        colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
-                                   m_parameters.pointColor.b, m_parameters.pointColor.a * 0.5f));
     }
     
     geometry->setVertexArray(vertices);
@@ -196,50 +184,43 @@ void Box3D_Geo::buildVertexGeometries()
     point->setSize(8.0f);  // 控制点大小
     stateSet->setAttribute(point);
     
-    addVertexGeometry(geometry);
+    mm_node()->setVertexGeometry(geometry);
 }
 
 void Box3D_Geo::buildEdgeGeometries()
 {
-    clearEdgeGeometries();
+    mm_node()->clearEdgeGeometry();
     
-    const auto& controlPoints = getControlPoints();
-    if (controlPoints.empty())
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
+    if (controlPoints.size() < 2)
         return;
     
-    // 创建长方体边界线几何体
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+    // 获取现有的几何体
+    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getEdgeGeometry();
+    if (!geometry.valid())
+        return;
+    
+    // 创建边的几何体（长方体边界线）
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
-    glm::vec3 center = (controlPoints.size() == 1) ? controlPoints[0].position :
-                       (controlPoints[0].position + controlPoints[1].position) * 0.5f;
-    glm::vec3 size = m_size;
-    
-    if (controlPoints.size() == 1 && getTempPoint().position != glm::vec3(0))
-    {
-        glm::vec3 diff = getTempPoint().position - center;
-        size = glm::abs(diff);
-    }
-    else if (controlPoints.size() == 2)
-    {
-        glm::vec3 diff = controlPoints[1].position - controlPoints[0].position;
-        size = glm::abs(diff);
-    }
-    
-    // 生成长方体的8个顶点
+    // 计算长方体的8个顶点
+    glm::vec3 center = (controlPoints[0].position + controlPoints[1].position) * 0.5f;
+    glm::vec3 diff = controlPoints[1].position - controlPoints[0].position;
+    glm::vec3 size = glm::abs(diff);
     glm::vec3 halfSize = size * 0.5f;
     
-    vertices->push_back(osg::Vec3(center.x - halfSize.x, center.y - halfSize.y, center.z - halfSize.z)); // 0
-    vertices->push_back(osg::Vec3(center.x + halfSize.x, center.y - halfSize.y, center.z - halfSize.z)); // 1
-    vertices->push_back(osg::Vec3(center.x + halfSize.x, center.y + halfSize.y, center.z - halfSize.z)); // 2
-    vertices->push_back(osg::Vec3(center.x - halfSize.x, center.y + halfSize.y, center.z - halfSize.z)); // 3
-    vertices->push_back(osg::Vec3(center.x - halfSize.x, center.y - halfSize.y, center.z + halfSize.z)); // 4
-    vertices->push_back(osg::Vec3(center.x + halfSize.x, center.y - halfSize.y, center.z + halfSize.z)); // 5
-    vertices->push_back(osg::Vec3(center.x + halfSize.x, center.y + halfSize.y, center.z + halfSize.z)); // 6
-    vertices->push_back(osg::Vec3(center.x - halfSize.x, center.y + halfSize.y, center.z + halfSize.z)); // 7
+    // 添加8个顶点
+    vertices->push_back(osg::Vec3(center.x - halfSize.x, center.y - halfSize.y, center.z - halfSize.z));
+    vertices->push_back(osg::Vec3(center.x + halfSize.x, center.y - halfSize.y, center.z - halfSize.z));
+    vertices->push_back(osg::Vec3(center.x + halfSize.x, center.y + halfSize.y, center.z - halfSize.z));
+    vertices->push_back(osg::Vec3(center.x - halfSize.x, center.y + halfSize.y, center.z - halfSize.z));
+    vertices->push_back(osg::Vec3(center.x - halfSize.x, center.y - halfSize.y, center.z + halfSize.z));
+    vertices->push_back(osg::Vec3(center.x + halfSize.x, center.y - halfSize.y, center.z + halfSize.z));
+    vertices->push_back(osg::Vec3(center.x + halfSize.x, center.y + halfSize.y, center.z + halfSize.z));
+    vertices->push_back(osg::Vec3(center.x - halfSize.x, center.y + halfSize.y, center.z + halfSize.z));
     
-    // 为所有顶点设置颜色
+    // 为每个顶点设置颜色
     for (int i = 0; i < 8; ++i)
     {
         colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
@@ -250,22 +231,22 @@ void Box3D_Geo::buildEdgeGeometries()
     geometry->setColorArray(colors);
     geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     
-    // 生成长方体的12条边
+    // 绘制边界线
     osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(osg::PrimitiveSet::LINES);
     
-    // 底面的4条边
+    // 前面
     indices->push_back(0); indices->push_back(1);
     indices->push_back(1); indices->push_back(2);
     indices->push_back(2); indices->push_back(3);
     indices->push_back(3); indices->push_back(0);
     
-    // 顶面的4条边
+    // 后面
     indices->push_back(4); indices->push_back(5);
     indices->push_back(5); indices->push_back(6);
     indices->push_back(6); indices->push_back(7);
     indices->push_back(7); indices->push_back(4);
     
-    // 垂直的4条边
+    // 连接前后
     indices->push_back(0); indices->push_back(4);
     indices->push_back(1); indices->push_back(5);
     indices->push_back(2); indices->push_back(6);
@@ -278,24 +259,89 @@ void Box3D_Geo::buildEdgeGeometries()
     osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth;
     lineWidth->setWidth(2.0f);  // 边界线宽度
     stateSet->setAttribute(lineWidth);
-    
-    addEdgeGeometry(geometry);
 }
 
 void Box3D_Geo::buildFaceGeometries()
 {
-    clearFaceGeometries();
+    mm_node()->clearFaceGeometry();
     
-    const auto& controlPoints = getControlPoints();
-    if (controlPoints.empty())
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
+    if (controlPoints.size() < 2)
         return;
     
-    // 创建长方体面几何体
-    osg::ref_ptr<osg::Geometry> geometry = createGeometry();
-    if (geometry.valid())
+    // 获取现有的几何体
+    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getFaceGeometry();
+    if (!geometry.valid())
+        return;
+    
+    // 创建面的几何体
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
+    
+    // 计算长方体的8个顶点
+    glm::vec3 center = (controlPoints[0].position + controlPoints[1].position) * 0.5f;
+    glm::vec3 diff = controlPoints[1].position - controlPoints[0].position;
+    glm::vec3 size = glm::abs(diff);
+    glm::vec3 halfSize = size * 0.5f;
+    
+    // 添加8个顶点
+    vertices->push_back(osg::Vec3(center.x - halfSize.x, center.y - halfSize.y, center.z - halfSize.z));
+    vertices->push_back(osg::Vec3(center.x + halfSize.x, center.y - halfSize.y, center.z - halfSize.z));
+    vertices->push_back(osg::Vec3(center.x + halfSize.x, center.y + halfSize.y, center.z - halfSize.z));
+    vertices->push_back(osg::Vec3(center.x - halfSize.x, center.y + halfSize.y, center.z - halfSize.z));
+    vertices->push_back(osg::Vec3(center.x - halfSize.x, center.y - halfSize.y, center.z + halfSize.z));
+    vertices->push_back(osg::Vec3(center.x + halfSize.x, center.y - halfSize.y, center.z + halfSize.z));
+    vertices->push_back(osg::Vec3(center.x + halfSize.x, center.y + halfSize.y, center.z + halfSize.z));
+    vertices->push_back(osg::Vec3(center.x - halfSize.x, center.y + halfSize.y, center.z + halfSize.z));
+    
+    // 为每个顶点设置颜色
+    for (int i = 0; i < 8; ++i)
     {
-        addFaceGeometry(geometry);
+        colors->push_back(osg::Vec4(m_parameters.faceColor.r, m_parameters.faceColor.g, 
+                                   m_parameters.faceColor.b, m_parameters.faceColor.a));
     }
+    
+    geometry->setVertexArray(vertices);
+    geometry->setColorArray(colors);
+    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+    
+    // 绘制6个面（每个面2个三角形）
+    osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(osg::PrimitiveSet::TRIANGLES);
+    
+    // 前面
+    indices->push_back(0); indices->push_back(1); indices->push_back(2);
+    indices->push_back(0); indices->push_back(2); indices->push_back(3);
+    
+    // 右面
+    indices->push_back(1); indices->push_back(5); indices->push_back(6);
+    indices->push_back(1); indices->push_back(6); indices->push_back(2);
+    
+    // 后面
+    indices->push_back(5); indices->push_back(4); indices->push_back(7);
+    indices->push_back(5); indices->push_back(7); indices->push_back(6);
+    
+    // 左面
+    indices->push_back(4); indices->push_back(0); indices->push_back(3);
+    indices->push_back(4); indices->push_back(3); indices->push_back(7);
+    
+    // 顶面
+    indices->push_back(3); indices->push_back(2); indices->push_back(6);
+    indices->push_back(3); indices->push_back(6); indices->push_back(7);
+    
+    // 底面
+    indices->push_back(4); indices->push_back(5); indices->push_back(1);
+    indices->push_back(4); indices->push_back(1); indices->push_back(0);
+    
+    geometry->addPrimitiveSet(indices);
+    
+    // 计算法线
+    osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
+    for (int i = 0; i < 8; ++i)
+    {
+        normals->push_back(osg::Vec3(0, 0, 1)); // 简化法线
+    }
+    geometry->setNormalArray(normals);
+    geometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
 }
 
 // 计算长方体的体积
@@ -313,7 +359,7 @@ float Box3D_Geo::calculateSurfaceArea() const
 // 获取长方体的中心点
 glm::vec3 Box3D_Geo::getCenter() const
 {
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (controlPoints.size() == 2)
     {
         return (controlPoints[0].position + controlPoints[1].position) * 0.5f;
@@ -342,7 +388,7 @@ void Box3D_Geo::setSize(const glm::vec3& size)
 bool Box3D_Geo::hitTest(const Ray3D& ray, PickResult3D& result) const
 {
     // 获取包围盒
-    const BoundingBox3D& bbox = getBoundingBox();
+    const BoundingBox3D& bbox = mm_boundingBox()->getBoundingBox();
     if (!bbox.isValid())
     {
         return false;

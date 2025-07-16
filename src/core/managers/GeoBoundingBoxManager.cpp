@@ -74,7 +74,7 @@ void GeoBoundingBoxManager::updateFromControlPoints()
 {
     if (!m_parent) return;
     
-    auto* controlManager = m_parent->getControlPointManager();
+    auto* controlManager = m_parent->mm_controlPoint();
     if (controlManager && controlManager->hasControlPoints()) {
         const auto& controlPoints = controlManager->getControlPoints();
         
@@ -654,7 +654,7 @@ void GeoBoundingBoxManager::calculateBoundingBoxFromOSGGeometry()
 {
     if (!m_parent) return;
     
-    auto* nodeManager = m_parent->getNodeManager();
+    auto* nodeManager = m_parent->mm_node();
     if (!nodeManager) return;
     
     auto geometry = nodeManager->getGeometry();
@@ -678,7 +678,7 @@ void GeoBoundingBoxManager::updateBoundingBoxVisualization()
 {
     // 这里可以添加包围盒线框的可视化
     // 现在只是占位符
-    if (m_parent && m_parent->getNodeManager()) {
+    if (m_parent && m_parent->mm_node()) {
         // 可以在这里创建包围盒的线框可视化
         // 暂时不实现，因为高亮系统会处理包围盒显示
     }

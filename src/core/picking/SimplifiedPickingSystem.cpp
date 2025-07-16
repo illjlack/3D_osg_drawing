@@ -194,17 +194,19 @@ SimplePickingResult SimplifiedPickingSystem::pick(int mouseX, int mouseY)
         result = calculateSnapping(result);
     }
     
-    // 更新指示器和高亮
+    // 更新指示器，但不更新高亮（高亮只在选择时显示）
     if (result.hasResult) {
         if (m_config.enableIndicator) {
             showIndicator(result);
         }
-        if (m_config.enableHighlight) {
-            showHighlight(result.geometry);
-        }
+        // 注释掉高亮，因为高亮只在选择时显示
+        // if (m_config.enableHighlight) {
+        //     showHighlight(result.geometry);
+        // }
     } else {
         hideIndicator();
-        hideHighlight();
+        // 不清除高亮，因为高亮是选择状态的一部分
+        // hideHighlight();
     }
     
     // 调用回调
@@ -259,65 +261,62 @@ SimplePickingResult SimplifiedPickingSystem::performRayIntersection(int mouseX, 
     osg::Vec3 nearPoint = osg::Vec3(mouseX, viewport->height() - mouseY, 0.0f) * invVPW;
     osg::Vec3 farPoint = osg::Vec3(mouseX, viewport->height() - mouseY, 1.0f) * invVPW;
     
-    // 创建线段相交检测器
-    osg::ref_ptr<osgUtil::LineSegmentIntersector> intersector = 
-        new osgUtil::LineSegmentIntersector(nearPoint, farPoint);
+    // 计算射线方向和起点
+    glm::vec3 rayOrigin(nearPoint.x(), nearPoint.y(), nearPoint.z());
+    glm::vec3 rayDirection = glm::normalize(glm::vec3(farPoint.x() - nearPoint.x(), 
+                                                      farPoint.y() - nearPoint.y(), 
+                                                      farPoint.z() - nearPoint.z()));
     
-    // 设置相交模式
-    intersector->setIntersectionLimit(osgUtil::Intersector::LIMIT_NEAREST);
+    Ray3D ray(rayOrigin, rayDirection);
     
-    // 执行相交检测
-    osgUtil::IntersectionVisitor visitor(intersector.get());
+    // 添加调试信息
+    LOG_DEBUG(QString("射线拾取: 屏幕坐标(%1,%2), 射线起点(%3,%4,%5), 方向(%6,%7,%8)")
+        .arg(mouseX).arg(mouseY)
+        .arg(rayOrigin.x, 0, 'f', 3).arg(rayOrigin.y, 0, 'f', 3).arg(rayOrigin.z, 0, 'f', 3)
+        .arg(rayDirection.x, 0, 'f', 3).arg(rayDirection.y, 0, 'f', 3).arg(rayDirection.z, 0, 'f', 3), "拾取");
     
-    float bestDistance = FLT_MAX;
-    osgUtil::LineSegmentIntersector::Intersection bestIntersection;
-    bool foundIntersection = false;
+    LOG_DEBUG(QString("几何体数量: %1").arg(m_geometries.size()), "拾取");
     
-    // 只检测我们管理的几何体
-    for (auto& geoRef : m_geometries) {
-        Geo3D* geo = geoRef.get();
+    // 测试所有几何对象，使用对象的hitTest方法
+    float minDistance = FLT_MAX;
+    for (const osg::ref_ptr<Geo3D>& geo : m_geometries)
+    {
         if (!geo) continue;
         
-        osg::ref_ptr<osg::Group> geoNode = geo->getOSGNode();
-        if (!geoNode) continue;
+        LOG_DEBUG(QString("测试几何体: 类型=%1, 状态=%2")
+            .arg(geo->getGeoType())
+            .arg(geo->isStateComplete() ? "完成" : "未完成"), "拾取");
         
-        // 为每个几何体单独执行相交检测
-        osg::ref_ptr<osgUtil::LineSegmentIntersector> geoIntersector = 
-            new osgUtil::LineSegmentIntersector(nearPoint, farPoint);
-        osgUtil::IntersectionVisitor geoVisitor(geoIntersector.get());
-        
-        geoNode->accept(geoVisitor);
-        
-        if (geoIntersector->containsIntersections()) {
-            const auto& intersections = geoIntersector->getIntersections();
-            for (const auto& intersection : intersections) {
-                float distance = (intersection.getWorldIntersectPoint() - nearPoint).length();
-                if (distance < bestDistance) {
-                    bestDistance = distance;
-                    bestIntersection = intersection;
-                    foundIntersection = true;
-                    result.geometry = geo;
-                }
+        PickResult3D geoResult;
+        // 使用对象的hitTest方法进行射线相交检测
+        if (geo->hitTest(ray, geoResult))
+        {
+            LOG_DEBUG(QString("几何体命中: 类型=%1, 距离=%2")
+                .arg(geo->getGeoType())
+                .arg(geoResult.distance, 0, 'f', 3), "拾取");
+            
+            if (geoResult.distance < minDistance)
+            {
+                minDistance = geoResult.distance;
+                
+                // 转换为SimplePickingResult
+                result.hasResult = true;
+                result.geometry = geo.get();
+                result.worldPosition = geoResult.point;
+                result.distance = geoResult.distance;
+                result.screenX = mouseX;
+                result.screenY = mouseY;
+                result.featureType = SimplePickingResult::FACE; // 默认为面
+                result.isSnapped = false;
+                result.snapPosition = result.worldPosition;
             }
         }
     }
     
-    if (foundIntersection) {
-        result.hasResult = true;
-        result.worldPosition = glm::vec3(
-            bestIntersection.getWorldIntersectPoint().x(),
-            bestIntersection.getWorldIntersectPoint().y(),
-            bestIntersection.getWorldIntersectPoint().z()
-        );
-        result.surfaceNormal = glm::vec3(
-            bestIntersection.getWorldIntersectNormal().x(),
-            bestIntersection.getWorldIntersectNormal().y(),
-            bestIntersection.getWorldIntersectNormal().z()
-        );
-        result.distance = bestDistance;
-        result.screenX = mouseX;
-        result.screenY = mouseY;
-        result.featureType = SimplePickingResult::FACE; // 默认为面
+    if (result.hasResult) {
+        LOG_DEBUG(QString("射线拾取成功: 距离=%1").arg(result.distance, 0, 'f', 3), "拾取");
+    } else {
+        LOG_DEBUG("射线拾取失败: 没有命中任何几何体", "拾取");
     }
     
     return result;
@@ -456,8 +455,8 @@ void SimplifiedPickingSystem::showHighlight(Geo3D* geometry)
     // 清除之前的高亮
     hideHighlight();
     
-    // 创建高亮几何体
-    osg::ref_ptr<osg::Geometry> highlightGeometry = createHighlightGeometry(geometry);
+    // 创建控制点高亮几何体
+    osg::ref_ptr<osg::Geometry> highlightGeometry = createControlPointHighlightGeometry(geometry);
     if (highlightGeometry) {
         m_highlightNode->addChild(highlightGeometry);
         m_highlightedGeometry = geometry;
@@ -465,6 +464,29 @@ void SimplifiedPickingSystem::showHighlight(Geo3D* geometry)
 }
 
 void SimplifiedPickingSystem::hideHighlight()
+{
+    if (m_highlightNode) {
+        m_highlightNode->removeChildren(0, m_highlightNode->getNumChildren());
+        m_highlightedGeometry = nullptr;
+    }
+}
+
+void SimplifiedPickingSystem::showSelectionHighlight(Geo3D* geometry)
+{
+    if (!geometry || !m_highlightNode) return;
+    
+    // 清除之前的选择高亮
+    hideSelectionHighlight();
+    
+    // 创建控制点高亮几何体
+    osg::ref_ptr<osg::Geometry> highlightGeometry = createControlPointHighlightGeometry(geometry);
+    if (highlightGeometry) {
+        m_highlightNode->addChild(highlightGeometry);
+        m_highlightedGeometry = geometry;
+    }
+}
+
+void SimplifiedPickingSystem::hideSelectionHighlight()
 {
     if (m_highlightNode) {
         m_highlightNode->removeChildren(0, m_highlightNode->getNumChildren());
@@ -543,7 +565,7 @@ osg::ref_ptr<osg::Geometry> SimplifiedPickingSystem::createHighlightGeometry(Geo
 {
     if (!geometry) return nullptr;
     
-    osg::ref_ptr<osg::Group> geoNode = geometry->getOSGNode();
+    osg::ref_ptr<osg::Group> geoNode = geometry->mm_node()->getOSGNode();
     if (!geoNode) return nullptr;
     
     // 创建高亮几何体组
@@ -596,6 +618,58 @@ osg::ref_ptr<osg::Geometry> SimplifiedPickingSystem::createHighlightGeometry(Geo
     geoNode->accept(visitor);
     
     return highlightGroup->getNumChildren() > 0 ? highlightGroup->getChild(0)->asGeometry() : nullptr;
+}
+
+osg::ref_ptr<osg::Geometry> SimplifiedPickingSystem::createControlPointHighlightGeometry(Geo3D* geometry)
+{
+    if (!geometry) return nullptr;
+    
+    // 创建控制点高亮几何体
+    osg::ref_ptr<osg::Geometry> highlightGeometry = new osg::Geometry;
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
+    
+    // 获取控制点
+    const auto& controlPoints = geometry->getControlPoints();
+    if (!controlPoints.empty())
+    {
+        // 添加所有控制点
+        for (const auto& cp : controlPoints)
+        {
+            vertices->push_back(osg::Vec3(cp.x(), cp.y(), cp.z()));
+            colors->push_back(osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f)); // 黄色高亮
+        }
+        
+        highlightGeometry->setVertexArray(vertices);
+        highlightGeometry->setColorArray(colors);
+        highlightGeometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+        
+        // 点绘制
+        osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::POINTS, 0, vertices->size());
+        highlightGeometry->addPrimitiveSet(drawArrays);
+        
+        // 设置点的大小
+        osg::StateSet* stateSet = highlightGeometry->getOrCreateStateSet();
+        osg::ref_ptr<osg::Point> point = new osg::Point;
+        point->setSize(12.0f);  // 高亮控制点大小
+        stateSet->setAttribute(point);
+        
+        // 禁用光照
+        stateSet->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+        
+        // 设置深度测试
+        stateSet->setMode(GL_DEPTH_TEST, osg::StateAttribute::ON);
+        
+        // 设置多边形偏移，避免Z-fighting
+        osg::PolygonOffset* polygonOffset = new osg::PolygonOffset;
+        polygonOffset->setFactor(-1.0f);
+        polygonOffset->setUnits(-1.0f);
+        stateSet->setAttributeAndModes(polygonOffset);
+        
+        return highlightGeometry;
+    }
+    
+    return nullptr;
 }
 
 // ============================================================================
@@ -753,6 +827,20 @@ SimplePickingResult SimplifiedPickingSystemManager::pick(int mouseX, int mouseY)
         return m_pickingSystem->pick(mouseX, mouseY);
     }
     return SimplePickingResult();
+}
+
+void SimplifiedPickingSystemManager::showSelectionHighlight(Geo3D* geometry)
+{
+    if (m_pickingSystem) {
+        m_pickingSystem->showSelectionHighlight(geometry);
+    }
+}
+
+void SimplifiedPickingSystemManager::hideSelectionHighlight()
+{
+    if (m_pickingSystem) {
+        m_pickingSystem->hideSelectionHighlight();
+    }
 }
 
 osgGA::GUIEventHandler* SimplifiedPickingSystemManager::getEventHandler()

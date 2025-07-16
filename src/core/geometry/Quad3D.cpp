@@ -18,16 +18,16 @@ Quad3D_Geo::Quad3D_Geo()
 
 void Quad3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!isStateComplete())
+    if (!mm_state()->isStateComplete())
     {
-        addControlPoint(Point3D(worldPos));
+        mm_controlPoint()->addControlPoint(Point3D(worldPos));
         
-        const auto& controlPoints = getControlPoints();
+        const auto& controlPoints = mm_controlPoint()->getControlPoints();
         if (controlPoints.size() == 4)
         {
             calculateNormal();
             calculateArea();
-            completeDrawing();
+            mm_state()->setStateComplete();
         }
         
         updateGeometry();
@@ -36,9 +36,10 @@ void Quad3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 
 void Quad3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!isStateComplete())
+    if (!mm_state()->isStateComplete())
     {
-        setTempPoint(Point3D(worldPos));
+        // 设置临时点用于预览
+        // 这里需要实现临时点机制
         updateGeometry();
     }
 }
@@ -46,29 +47,29 @@ void Quad3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 void Quad3D_Geo::updateGeometry()
 {
     // 清除点线面节点
-    clearVertexGeometries();
-    clearEdgeGeometries();
-    clearFaceGeometries();
-    
-    updateOSGNode();
+    mm_node()->clearAllGeometries();
     
     // 构建点线面几何体
     buildVertexGeometries();
     buildEdgeGeometries();
     buildFaceGeometries();
     
-    // 更新可见性
-    updateFeatureVisibility();
+    // 更新OSG节点
+    updateOSGNode();
     
-    // 更新KDTree
-    if (getNodeManager()) {
-        getNodeManager()->updateKdTree();
-    }
+    // 更新捕捉点
+    mm_snapPoint()->updateSnapPoints();
+    
+    // 更新包围盒
+    mm_boundingBox()->updateBoundingBox();
+    
+    // 更新空间索引
+    mm_node()->updateSpatialIndex();
 }
 
 osg::ref_ptr<osg::Geometry> Quad3D_Geo::createGeometry()
 {
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (controlPoints.size() < 2)
         return nullptr;
     
@@ -159,7 +160,7 @@ osg::ref_ptr<osg::Geometry> Quad3D_Geo::createGeometry()
 
 float Quad3D_Geo::calculateArea() const
 {
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (controlPoints.size() < 4)
     {
         return 0.0f;
@@ -178,7 +179,7 @@ float Quad3D_Geo::calculateArea() const
 
 void Quad3D_Geo::calculateNormal()
 {
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = controlPoint()->getControlPoints();
     if (controlPoints.size() >= 3)
     {
         glm::vec3 v1 = controlPoints[1].position - controlPoints[0].position;
@@ -195,8 +196,12 @@ void Quad3D_Geo::buildVertexGeometries()
     if (controlPoints.empty())
         return;
     
-    // 只为控制点创建几何体
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+    // 获取现有的几何体
+    osg::ref_ptr<osg::Geometry> geometry = getVertexGeometry();
+    if (!geometry.valid())
+        return;
+    
+    // 创建顶点数组
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
@@ -241,8 +246,12 @@ void Quad3D_Geo::buildEdgeGeometries()
     if (controlPoints.size() < 2)
         return;
     
+    // 获取现有的几何体
+    osg::ref_ptr<osg::Geometry> geometry = getEdgeGeometry();
+    if (!geometry.valid())
+        return;
+    
     // 创建四边形边界线几何体
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
@@ -294,8 +303,12 @@ void Quad3D_Geo::buildFaceGeometries()
     if (controlPoints.size() < 3)
         return;
     
+    // 获取现有的几何体
+    osg::ref_ptr<osg::Geometry> geometry = getFaceGeometry();
+    if (!geometry.valid())
+        return;
+    
     // 创建四边形面几何体
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;

@@ -85,7 +85,7 @@ public:
     void highlightSelectedObjects();
     
     // 拾取
-    PickResult3D pick(int x, int y);
+    // PickResult3D pick(int x, int y);
     
     // 高级拾取系统
     void enableAdvancedPicking(bool enabled);

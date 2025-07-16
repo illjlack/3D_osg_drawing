@@ -1570,9 +1570,9 @@ void PropertyEditor3D::updateVolumeUI()
 
 void PropertyEditor3D::updateDisplayUI()
 {
-    bool showPoints = m_currentGeo ? m_currentGeo->isShowPoints() : GlobalShowPoints3D;
-    bool showEdges = m_currentGeo ? m_currentGeo->isShowEdges() : GlobalShowEdges3D;
-    bool showFaces = m_currentGeo ? m_currentGeo->isShowFaces() : GlobalShowFaces3D;
+    bool showPoints = m_currentGeo ? m_currentGeo->mm_render()->isShowPoints() : GlobalShowPoints3D;
+    bool showEdges = m_currentGeo ? m_currentGeo->mm_render()->isShowEdges() : GlobalShowEdges3D;
+    bool showFaces = m_currentGeo ? m_currentGeo->mm_render()->isShowFaces() : GlobalShowFaces3D;
     
     m_showPointsCheck->setChecked(showPoints);
     m_showEdgesCheck->setChecked(showEdges);
@@ -2021,7 +2021,7 @@ void PropertyEditor3D::onShowPointsChanged()
     
     if (m_currentGeo)
     {
-        m_currentGeo->setShowPoints(show);
+        m_currentGeo->mm_render()->setShowPoints(show);
     }
     else
     {
@@ -2039,7 +2039,7 @@ void PropertyEditor3D::onShowEdgesChanged()
     
     if (m_currentGeo)
     {
-        m_currentGeo->setShowEdges(show);
+        m_currentGeo->mm_render()->setShowEdges(show);
     }
     else
     {
@@ -2057,7 +2057,7 @@ void PropertyEditor3D::onShowFacesChanged()
     
     if (m_currentGeo)
     {
-        m_currentGeo->setShowFaces(show);
+        m_currentGeo->mm_render()->setShowFaces(show);
     }
     else
     {

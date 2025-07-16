@@ -14,17 +14,18 @@ Cube3D_Geo::Cube3D_Geo()
 
 void Cube3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!isStateComplete())
+    if (!mm_state()->isStateComplete())
     {
-        addControlPoint(Point3D(worldPos));
-        const auto& controlPoints = getControlPoints();
+        mm_controlPoint()->addControlPoint(Point3D(worldPos));
+        const auto& controlPoints = mm_controlPoint()->getControlPoints();
         
         if (controlPoints.size() == 2)
         {
-            // 计算立方体大小
+            // 计算正方体尺寸
             glm::vec3 diff = controlPoints[1].position - controlPoints[0].position;
-            m_size = glm::length(diff);
-            completeDrawing();
+            float maxDiff = std::max(std::max(std::abs(diff.x), std::abs(diff.y)), std::abs(diff.z));
+            m_size = maxDiff;
+            mm_state()->setStateComplete();
         }
         
         updateGeometry();
@@ -34,43 +35,41 @@ void Cube3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 
 void Cube3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    const auto& controlPoints = getControlPoints();
-    if (!isStateComplete() && controlPoints.size() == 1)
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
+    if (!mm_state()->isStateComplete() && controlPoints.size() == 1)
     {
-        setTempPoint(Point3D(worldPos));
-        markGeometryDirty();
+        // 设置临时点用于预览
+        // 这里需要实现临时点机制
         updateGeometry();
     }
 }
 
 void Cube3D_Geo::updateGeometry()
 {
-    if (!isGeometryDirty()) return;
-    
     // 清除点线面节点
-    clearVertexGeometries();
-    clearEdgeGeometries();
-    clearFaceGeometries();
+    mm_node()->clearAllGeometries();
     
-    // 构建几何体
+    // 构建点线面几何体
     buildVertexGeometries();
     buildEdgeGeometries();
     buildFaceGeometries();
     
+    // 更新OSG节点
     updateOSGNode();
-    clearGeometryDirty();
     
-    // 更新KDTree
-    if (getNodeManager()) {
-        getNodeManager()->updateKdTree();
-    }
+    // 更新捕捉点
+    mm_snapPoint()->updateSnapPoints();
     
-    emit geometryUpdated(this);
+    // 更新包围盒
+    mm_boundingBox()->updateBoundingBox();
+    
+    // 更新空间索引
+    mm_node()->updateSpatialIndex();
 }
 
 osg::ref_ptr<osg::Geometry> Cube3D_Geo::createGeometry()
 {
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (controlPoints.empty())
     {
         return nullptr;
@@ -79,22 +78,17 @@ osg::ref_ptr<osg::Geometry> Cube3D_Geo::createGeometry()
     glm::vec3 center = controlPoints[0].position;
     float size = m_size;
     
-    if (controlPoints.size() == 1 && getTempPoint().position != glm::vec3(0))
-    {
-        glm::vec3 diff = getTempPoint().position - center;
-        size = glm::length(diff);
-    }
-    else if (controlPoints.size() == 2)
+    if (controlPoints.size() == 2)
     {
         center = (controlPoints[0].position + controlPoints[1].position) * 0.5f;
         glm::vec3 diff = controlPoints[1].position - controlPoints[0].position;
-        size = glm::length(diff);
+        size = std::max(std::max(std::abs(diff.x), std::abs(diff.y)), std::abs(diff.z));
     }
 
     osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
 
-    // 生成立方体的8个顶点
+    // 生成正方体的8个顶点
     float halfSize = size * 0.5f;
     
     vertices->push_back(osg::Vec3(center.x - halfSize, center.y - halfSize, center.z - halfSize)); // 0
@@ -108,7 +102,7 @@ osg::ref_ptr<osg::Geometry> Cube3D_Geo::createGeometry()
 
     geometry->setVertexArray(vertices);
 
-    // 生成立方体的面
+    // 生成正方体的面
     osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(osg::PrimitiveSet::TRIANGLES);
     
     // 前面
@@ -143,9 +137,9 @@ osg::ref_ptr<osg::Geometry> Cube3D_Geo::createGeometry()
     normals->push_back(osg::Vec3(0, 0, -1));
     normals->push_back(osg::Vec3(0, 0, -1));
     normals->push_back(osg::Vec3(0, 0, -1));
-    normals->push_back(osg::Vec3(0, 0, -1));
-    normals->push_back(osg::Vec3(0, 0, -1));
     normals->push_back(osg::Vec3(0, 0, 1)); // 后面
+    normals->push_back(osg::Vec3(0, 0, 1));
+    normals->push_back(osg::Vec3(0, 0, 1));
     normals->push_back(osg::Vec3(0, 0, 1));
     geometry->setNormalArray(normals);
     geometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
@@ -155,14 +149,18 @@ osg::ref_ptr<osg::Geometry> Cube3D_Geo::createGeometry()
 
 void Cube3D_Geo::buildVertexGeometries()
 {
-    clearVertexGeometries();
+    mm_node()->clearVertexGeometry();
     
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (controlPoints.empty())
         return;
     
-    // 只为控制点创建几何体
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+    // 获取现有的几何体
+    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getVertexGeometry();
+    if (!geometry.valid())
+        return;
+    
+    // 创建顶点数组
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
@@ -172,14 +170,6 @@ void Cube3D_Geo::buildVertexGeometries()
         vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
         colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
                                    m_parameters.pointColor.b, m_parameters.pointColor.a));
-    }
-    
-    // 如果有临时点且几何体未完成，添加临时点
-    if (!isStateComplete() && getTempPoint().position != glm::vec3(0))
-    {
-        vertices->push_back(osg::Vec3(getTempPoint().x(), getTempPoint().y(), getTempPoint().z()));
-        colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
-                                   m_parameters.pointColor.b, m_parameters.pointColor.a * 0.5f));
     }
     
     geometry->setVertexArray(vertices);
@@ -196,50 +186,43 @@ void Cube3D_Geo::buildVertexGeometries()
     point->setSize(8.0f);  // 控制点大小
     stateSet->setAttribute(point);
     
-    addVertexGeometry(geometry);
+    mm_node()->setVertexGeometry(geometry);
 }
 
 void Cube3D_Geo::buildEdgeGeometries()
 {
-    clearEdgeGeometries();
+    mm_node()->clearEdgeGeometry();
     
-    const auto& controlPoints = getControlPoints();
-    if (controlPoints.empty())
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
+    if (controlPoints.size() < 2)
         return;
     
-    // 创建立方体边界线几何体
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+    // 获取现有的几何体
+    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getEdgeGeometry();
+    if (!geometry.valid())
+        return;
+    
+    // 创建边的几何体（正方体边界线）
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
-    glm::vec3 center = controlPoints[0].position;
-    float size = m_size;
-    
-    if (controlPoints.size() == 1 && getTempPoint().position != glm::vec3(0))
-    {
-        glm::vec3 diff = getTempPoint().position - center;
-        size = glm::length(diff);
-    }
-    else if (controlPoints.size() == 2)
-    {
-        center = (controlPoints[0].position + controlPoints[1].position) * 0.5f;
-        glm::vec3 diff = controlPoints[1].position - controlPoints[0].position;
-        size = glm::length(diff);
-    }
-    
-    // 生成立方体的8个顶点
+    // 计算正方体的8个顶点
+    glm::vec3 center = (controlPoints[0].position + controlPoints[1].position) * 0.5f;
+    glm::vec3 diff = controlPoints[1].position - controlPoints[0].position;
+    float size = std::max(std::max(std::abs(diff.x), std::abs(diff.y)), std::abs(diff.z));
     float halfSize = size * 0.5f;
     
-    vertices->push_back(osg::Vec3(center.x - halfSize, center.y - halfSize, center.z - halfSize)); // 0
-    vertices->push_back(osg::Vec3(center.x + halfSize, center.y - halfSize, center.z - halfSize)); // 1
-    vertices->push_back(osg::Vec3(center.x + halfSize, center.y + halfSize, center.z - halfSize)); // 2
-    vertices->push_back(osg::Vec3(center.x - halfSize, center.y + halfSize, center.z - halfSize)); // 3
-    vertices->push_back(osg::Vec3(center.x - halfSize, center.y - halfSize, center.z + halfSize)); // 4
-    vertices->push_back(osg::Vec3(center.x + halfSize, center.y - halfSize, center.z + halfSize)); // 5
-    vertices->push_back(osg::Vec3(center.x + halfSize, center.y + halfSize, center.z + halfSize)); // 6
-    vertices->push_back(osg::Vec3(center.x - halfSize, center.y + halfSize, center.z + halfSize)); // 7
+    // 添加8个顶点
+    vertices->push_back(osg::Vec3(center.x - halfSize, center.y - halfSize, center.z - halfSize));
+    vertices->push_back(osg::Vec3(center.x + halfSize, center.y - halfSize, center.z - halfSize));
+    vertices->push_back(osg::Vec3(center.x + halfSize, center.y + halfSize, center.z - halfSize));
+    vertices->push_back(osg::Vec3(center.x - halfSize, center.y + halfSize, center.z - halfSize));
+    vertices->push_back(osg::Vec3(center.x - halfSize, center.y - halfSize, center.z + halfSize));
+    vertices->push_back(osg::Vec3(center.x + halfSize, center.y - halfSize, center.z + halfSize));
+    vertices->push_back(osg::Vec3(center.x + halfSize, center.y + halfSize, center.z + halfSize));
+    vertices->push_back(osg::Vec3(center.x - halfSize, center.y + halfSize, center.z + halfSize));
     
-    // 为所有顶点设置颜色
+    // 为每个顶点设置颜色
     for (int i = 0; i < 8; ++i)
     {
         colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
@@ -250,22 +233,22 @@ void Cube3D_Geo::buildEdgeGeometries()
     geometry->setColorArray(colors);
     geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     
-    // 生成立方体的12条边
+    // 绘制边界线
     osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(osg::PrimitiveSet::LINES);
     
-    // 底面的4条边
+    // 前面
     indices->push_back(0); indices->push_back(1);
     indices->push_back(1); indices->push_back(2);
     indices->push_back(2); indices->push_back(3);
     indices->push_back(3); indices->push_back(0);
     
-    // 顶面的4条边
+    // 后面
     indices->push_back(4); indices->push_back(5);
     indices->push_back(5); indices->push_back(6);
     indices->push_back(6); indices->push_back(7);
     indices->push_back(7); indices->push_back(4);
     
-    // 垂直的4条边
+    // 连接前后
     indices->push_back(0); indices->push_back(4);
     indices->push_back(1); indices->push_back(5);
     indices->push_back(2); indices->push_back(6);
@@ -278,105 +261,169 @@ void Cube3D_Geo::buildEdgeGeometries()
     osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth;
     lineWidth->setWidth(2.0f);  // 边界线宽度
     stateSet->setAttribute(lineWidth);
-    
-    addEdgeGeometry(geometry);
 }
 
 void Cube3D_Geo::buildFaceGeometries()
 {
-    clearFaceGeometries();
+    mm_node()->clearFaceGeometry();
     
-    const auto& controlPoints = getControlPoints();
-    if (controlPoints.empty())
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
+    if (controlPoints.size() < 2)
         return;
     
-    // 创建立方体面几何体
-    osg::ref_ptr<osg::Geometry> geometry = createGeometry();
-    if (geometry.valid())
+    // 获取现有的几何体
+    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getFaceGeometry();
+    if (!geometry.valid())
+        return;
+    
+    // 创建面的几何体
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
+    
+    // 计算正方体的8个顶点
+    glm::vec3 center = (controlPoints[0].position + controlPoints[1].position) * 0.5f;
+    glm::vec3 diff = controlPoints[1].position - controlPoints[0].position;
+    float size = std::max(std::max(std::abs(diff.x), std::abs(diff.y)), std::abs(diff.z));
+    float halfSize = size * 0.5f;
+    
+    // 添加8个顶点
+    vertices->push_back(osg::Vec3(center.x - halfSize, center.y - halfSize, center.z - halfSize));
+    vertices->push_back(osg::Vec3(center.x + halfSize, center.y - halfSize, center.z - halfSize));
+    vertices->push_back(osg::Vec3(center.x + halfSize, center.y + halfSize, center.z - halfSize));
+    vertices->push_back(osg::Vec3(center.x - halfSize, center.y + halfSize, center.z - halfSize));
+    vertices->push_back(osg::Vec3(center.x - halfSize, center.y - halfSize, center.z + halfSize));
+    vertices->push_back(osg::Vec3(center.x + halfSize, center.y - halfSize, center.z + halfSize));
+    vertices->push_back(osg::Vec3(center.x + halfSize, center.y + halfSize, center.z + halfSize));
+    vertices->push_back(osg::Vec3(center.x - halfSize, center.y + halfSize, center.z + halfSize));
+    
+    // 为每个顶点设置颜色
+    for (int i = 0; i < 8; ++i)
     {
-        addFaceGeometry(geometry);
+        colors->push_back(osg::Vec4(m_parameters.faceColor.r, m_parameters.faceColor.g, 
+                                   m_parameters.faceColor.b, m_parameters.faceColor.a));
     }
+    
+    geometry->setVertexArray(vertices);
+    geometry->setColorArray(colors);
+    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+    
+    // 绘制6个面（每个面2个三角形）
+    osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(osg::PrimitiveSet::TRIANGLES);
+    
+    // 前面
+    indices->push_back(0); indices->push_back(1); indices->push_back(2);
+    indices->push_back(0); indices->push_back(2); indices->push_back(3);
+    
+    // 右面
+    indices->push_back(1); indices->push_back(5); indices->push_back(6);
+    indices->push_back(1); indices->push_back(6); indices->push_back(2);
+    
+    // 后面
+    indices->push_back(5); indices->push_back(4); indices->push_back(7);
+    indices->push_back(5); indices->push_back(7); indices->push_back(6);
+    
+    // 左面
+    indices->push_back(4); indices->push_back(0); indices->push_back(3);
+    indices->push_back(4); indices->push_back(3); indices->push_back(7);
+    
+    // 顶面
+    indices->push_back(3); indices->push_back(2); indices->push_back(6);
+    indices->push_back(3); indices->push_back(6); indices->push_back(7);
+    
+    // 底面
+    indices->push_back(4); indices->push_back(5); indices->push_back(1);
+    indices->push_back(4); indices->push_back(1); indices->push_back(0);
+    
+    geometry->addPrimitiveSet(indices);
+    
+    // 计算法线
+    osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
+    for (int i = 0; i < 8; ++i)
+    {
+        normals->push_back(osg::Vec3(0, 0, 1)); // 简化法线
+    }
+    geometry->setNormalArray(normals);
+    geometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
 }
 
-// 计算立方体的体积
 float Cube3D_Geo::calculateVolume() const
 {
     return m_size * m_size * m_size;
 }
 
-// 计算立方体的表面积
 float Cube3D_Geo::calculateSurfaceArea() const
 {
     return 6.0f * m_size * m_size;
 }
 
-// 获取立方体的中心点
 glm::vec3 Cube3D_Geo::getCenter() const
 {
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (controlPoints.size() == 2)
     {
         return (controlPoints[0].position + controlPoints[1].position) * 0.5f;
     }
-    else if (controlPoints.size() == 1)
-    {
-        return controlPoints[0].position;
-    }
-    return glm::vec3(0);
+    return controlPoints[0].position;
 }
 
-// 获取立方体的大小
 float Cube3D_Geo::getSize() const
 {
     return m_size;
 }
 
-// 设置立方体的大小
 void Cube3D_Geo::setSize(float size)
 {
     m_size = size;
-    markGeometryDirty();
     updateGeometry();
-} 
+}
 
 bool Cube3D_Geo::hitTest(const Ray3D& ray, PickResult3D& result) const
 {
-    // 获取立方体的包围盒
-    const BoundingBox3D& bbox = getBoundingBox();
-    if (!bbox.isValid())
-    {
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
+    if (controlPoints.size() < 2)
         return false;
-    }
+    
+    // 计算正方体的包围盒
+    glm::vec3 center = (controlPoints[0].position + controlPoints[1].position) * 0.5f;
+    glm::vec3 diff = controlPoints[1].position - controlPoints[0].position;
+    float size = std::max(std::max(std::abs(diff.x), std::abs(diff.y)), std::abs(diff.z));
+    float halfSize = size * 0.5f;
+    
+    glm::vec3 min = center - glm::vec3(halfSize);
+    glm::vec3 max = center + glm::vec3(halfSize);
     
     // 射线-包围盒相交测试
-    glm::vec3 rayDir = glm::normalize(ray.direction);
-    glm::vec3 invDir = 1.0f / rayDir;
+    float tmin = (min.x - ray.origin.x) / ray.direction.x;
+    float tmax = (max.x - ray.origin.x) / ray.direction.x;
     
-    // 计算与包围盒各面的交点参数
-    float t1 = (bbox.min.x - ray.origin.x) * invDir.x;
-    float t2 = (bbox.max.x - ray.origin.x) * invDir.x;
-    float t3 = (bbox.min.y - ray.origin.y) * invDir.y;
-    float t4 = (bbox.max.y - ray.origin.y) * invDir.y;
-    float t5 = (bbox.min.z - ray.origin.z) * invDir.z;
-    float t6 = (bbox.max.z - ray.origin.z) * invDir.z;
+    if (tmin > tmax) std::swap(tmin, tmax);
     
-    // 计算进入和退出参数
-    float tmin = glm::max(glm::max(glm::min(t1, t2), glm::min(t3, t4)), glm::min(t5, t6));
-    float tmax = glm::min(glm::min(glm::max(t1, t2), glm::max(t3, t4)), glm::max(t5, t6));
+    float tymin = (min.y - ray.origin.y) / ray.direction.y;
+    float tymax = (max.y - ray.origin.y) / ray.direction.y;
     
-    // 检查是否相交
-    if (tmax >= 0 && tmin <= tmax)
-    {
-        float t = (tmin >= 0) ? tmin : tmax;
-        if (t >= 0)
-        {
-            result.hit = true;
-            result.distance = t;
-            result.userData = const_cast<Cube3D_Geo*>(this);
-            result.point = ray.origin + t * rayDir;
-            return true;
-        }
-    }
+    if (tymin > tymax) std::swap(tymin, tymax);
     
-    return false;
+    if (tmin > tymax || tymin > tmax)
+        return false;
+    
+    if (tymin > tmin) tmin = tymin;
+    if (tymax < tmax) tmax = tymax;
+    
+    float tzmin = (min.z - ray.origin.z) / ray.direction.z;
+    float tzmax = (max.z - ray.origin.z) / ray.direction.z;
+    
+    if (tzmin > tzmax) std::swap(tzmin, tzmax);
+    
+    if (tmin > tzmax || tzmin > tmax)
+        return false;
+    
+    if (tzmin > tmin) tmin = tzmin;
+    if (tzmax < tmax) tmax = tzmax;
+    
+    if (tmax < 0)
+        return false;
+    
+    result.hitPoint = ray.origin + tmin * ray.direction;
+    result.distance = tmin;
+    return true;
 } 

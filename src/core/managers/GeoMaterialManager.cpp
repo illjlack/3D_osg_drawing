@@ -372,8 +372,8 @@ void GeoMaterialManager::applyStateSet(osg::ref_ptr<osg::StateSet> stateSet)
     m_stateSet = stateSet;
     
     // 应用到几何体
-    if (m_parent && m_parent->getNodeManager()) {
-        auto geometry = m_parent->getNodeManager()->getGeometry();
+    if (m_parent && m_parent->mm_node()) {
+        auto geometry = m_parent->mm_node()->getVertexGeometry();
         if (geometry.valid()) {
             geometry->setStateSet(stateSet.get());
         }

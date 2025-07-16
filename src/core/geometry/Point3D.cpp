@@ -16,17 +16,16 @@ Point3D_Geo::Point3D_Geo()
 
 void Point3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!isStateComplete())
+    if (!mm_state()->isStateComplete())
     {
-        addControlPoint(Point3D(worldPos));
-        markGeometryDirty();
-        completeDrawing();
+        mm_controlPoint()->addControlPoint(Point3D(worldPos));
+        mm_state()->setStateComplete();
     }
 }
 
 void Point3D_Geo::completeDrawing()
 {
-    if (hasControlPoints())
+    if (mm_controlPoint()->hasControlPoints())
     {
         Geo3D::completeDrawing();
     }
@@ -35,35 +34,29 @@ void Point3D_Geo::completeDrawing()
 void Point3D_Geo::updateGeometry()
 {
     // 清除点线面节点
-    clearVertexGeometries();
-    clearEdgeGeometries();
-    clearFaceGeometries();
-    
-    updateOSGNode();
+    mm_node()->clearAllGeometries();
     
     // 构建点线面几何体
     buildVertexGeometries();
     buildEdgeGeometries();
     buildFaceGeometries();
     
-    // 确保节点名称正确设置（用于拾取识别）
-    setupNodeNames();
+    // 更新OSG节点
+    updateOSGNode();
     
     // 更新捕捉点
-    updateSnapPoints();
+    mm_snapPoint()->updateSnapPoints();
     
-    // 更新可见性
-    updateFeatureVisibility();
+    // 更新包围盒
+    mm_boundingBox()->updateBoundingBox();
     
-    // 更新KDTree
-    if (getNodeManager()) {
-        getNodeManager()->updateKdTree();
-    }
+    // 更新空间索引
+    mm_node()->updateSpatialIndex();
 }
 
 osg::ref_ptr<osg::Geometry> Point3D_Geo::createGeometry()
 {
-    if (!hasControlPoints())
+    if (!mm_controlPoint()->hasControlPoints())
         return nullptr;
     
     return createPointGeometry(m_parameters.pointShape, m_parameters.pointSize);
@@ -75,17 +68,21 @@ osg::ref_ptr<osg::Geometry> Point3D_Geo::createGeometry()
 
 void Point3D_Geo::buildVertexGeometries()
 {
-    clearVertexGeometries();
+    mm_node()->clearVertexGeometry();
     
-    if (!hasControlPoints())
+    if (!mm_controlPoint()->hasControlPoints())
         return;
     
-    // 只为控制点创建几何体
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+    // 获取现有的几何体
+    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getVertexGeometry();
+    if (!geometry.valid())
+        return;
+    
+    // 创建顶点数组
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     const Point3D& point = controlPoints[0];
     
     // 添加控制点
@@ -106,19 +103,17 @@ void Point3D_Geo::buildVertexGeometries()
     osg::ref_ptr<osg::Point> pointAttr = new osg::Point;
     pointAttr->setSize(8.0f);  // 控制点大小
     stateSet->setAttribute(pointAttr);
-    
-    addVertexGeometry(geometry);
 }
 
 void Point3D_Geo::buildEdgeGeometries()
 {
-    clearEdgeGeometries();
+    mm_node()->clearEdgeGeometry();
     // 点对象没有边
 }
 
 void Point3D_Geo::buildFaceGeometries()
 {
-    clearFaceGeometries();
+    mm_node()->clearFaceGeometry();
     // 点对象没有面
 }
 

@@ -145,29 +145,20 @@ void GeoSnapPointManager::generateEdgeSnaps()
     
     if (!m_parent) return;
     
-    auto* nodeManager = m_parent->getNodeManager();
+    auto* nodeManager = m_parent->mm_node();
     if (!nodeManager) return;
     
-    auto edgeNode = nodeManager->getEdgeNode();
-    if (!edgeNode.valid()) return;
+    auto edgeGeometry = nodeManager->getEdgeGeometry();
+    if (!edgeGeometry.valid()) return;
     
-    // 遍历边节点获取顶点数据
-    for (unsigned int i = 0; i < edgeNode->getNumChildren(); ++i) {
-        auto child = edgeNode->getChild(i);
-        if (auto geode = dynamic_cast<osg::Geode*>(child)) {
-            for (unsigned int j = 0; j < geode->getNumDrawables(); ++j) {
-                if (auto geometry = dynamic_cast<osg::Geometry*>(geode->getDrawable(j))) {
-                    if (auto vertices = dynamic_cast<osg::Vec3Array*>(geometry->getVertexArray())) {
-                        std::vector<glm::vec3> edgeVertices;
-                        for (unsigned int k = 0; k < vertices->size(); ++k) {
-                            const osg::Vec3& vertex = (*vertices)[k];
-                            edgeVertices.push_back(glm::vec3(vertex.x(), vertex.y(), vertex.z()));
-                        }
-                        addEdgeSnapPoints(edgeVertices);
-                    }
-                }
-            }
+    // 从边几何体获取顶点数据
+    if (auto vertices = dynamic_cast<osg::Vec3Array*>(edgeGeometry->getVertexArray())) {
+        std::vector<glm::vec3> edgeVertices;
+        for (unsigned int k = 0; k < vertices->size(); ++k) {
+            const osg::Vec3& vertex = (*vertices)[k];
+            edgeVertices.push_back(glm::vec3(vertex.x(), vertex.y(), vertex.z()));
         }
+        addEdgeSnapPoints(edgeVertices);
     }
 }
 
@@ -177,29 +168,20 @@ void GeoSnapPointManager::generateFaceSnaps()
         return;
     }
     
-    auto* nodeManager = m_parent->getNodeManager();
+    auto* nodeManager = m_parent->mm_node();
     if (!nodeManager) return;
     
-    auto faceNode = nodeManager->getFaceNode();
-    if (!faceNode.valid()) return;
+    auto faceGeometry = nodeManager->getFaceGeometry();
+    if (!faceGeometry.valid()) return;
     
-    // 遍历面节点获取顶点数据
-    for (unsigned int i = 0; i < faceNode->getNumChildren(); ++i) {
-        auto child = faceNode->getChild(i);
-        if (auto geode = dynamic_cast<osg::Geode*>(child)) {
-            for (unsigned int j = 0; j < geode->getNumDrawables(); ++j) {
-                if (auto geometry = dynamic_cast<osg::Geometry*>(geode->getDrawable(j))) {
-                    if (auto vertices = dynamic_cast<osg::Vec3Array*>(geometry->getVertexArray())) {
-                        std::vector<glm::vec3> faceVertices;
-                        for (unsigned int k = 0; k < vertices->size(); ++k) {
-                            const osg::Vec3& vertex = (*vertices)[k];
-                            faceVertices.push_back(glm::vec3(vertex.x(), vertex.y(), vertex.z()));
-                        }
-                        addFaceSnapPoints(faceVertices);
-                    }
-                }
-            }
+    // 从面几何体获取顶点数据
+    if (auto vertices = dynamic_cast<osg::Vec3Array*>(faceGeometry->getVertexArray())) {
+        std::vector<glm::vec3> faceVertices;
+        for (unsigned int k = 0; k < vertices->size(); ++k) {
+            const osg::Vec3& vertex = (*vertices)[k];
+            faceVertices.push_back(glm::vec3(vertex.x(), vertex.y(), vertex.z()));
         }
+        addFaceSnapPoints(faceVertices);
     }
 }
 
@@ -505,28 +487,19 @@ void GeoSnapPointManager::generateSnapPointsFromGeometry()
 {
     if (!m_parent) return;
     
-    auto* nodeManager = m_parent->getNodeManager();
+    auto* nodeManager = m_parent->mm_node();
     if (!nodeManager) return;
     
-    auto vertexNode = nodeManager->getVertexNode();
-    if (!vertexNode.valid()) return;
+    auto vertexGeometry = nodeManager->getVertexGeometry();
+    if (!vertexGeometry.valid()) return;
     
-    // 从顶点节点提取捕捉点
-    for (unsigned int i = 0; i < vertexNode->getNumChildren(); ++i) {
-        auto child = vertexNode->getChild(i);
-        if (auto geode = dynamic_cast<osg::Geode*>(child)) {
-            for (unsigned int j = 0; j < geode->getNumDrawables(); ++j) {
-                if (auto geometry = dynamic_cast<osg::Geometry*>(geode->getDrawable(j))) {
-                    if (auto vertices = dynamic_cast<osg::Vec3Array*>(geometry->getVertexArray())) {
-                        for (unsigned int k = 0; k < vertices->size(); ++k) {
-                            const osg::Vec3& vertex = (*vertices)[k];
-                            SnapPoint snapPoint(glm::vec3(vertex.x(), vertex.y(), vertex.z()), 
-                                              SNAP_VERTEX, k, 0.2f);
-                            m_snapPoints.push_back(snapPoint);
-                        }
-                    }
-                }
-            }
+    // 从顶点几何体提取捕捉点
+    if (auto vertices = dynamic_cast<osg::Vec3Array*>(vertexGeometry->getVertexArray())) {
+        for (unsigned int k = 0; k < vertices->size(); ++k) {
+            const osg::Vec3& vertex = (*vertices)[k];
+            SnapPoint snapPoint(glm::vec3(vertex.x(), vertex.y(), vertex.z()), 
+                              SNAP_VERTEX, k, 0.2f);
+            m_snapPoints.push_back(snapPoint);
         }
     }
 }
@@ -589,7 +562,7 @@ void GeoSnapPointManager::updateSnapPointVisualization()
 {
     // 这个方法会在需要时由节点管理器调用
     // 现在只是占位符
-    if (m_parent && m_parent->getNodeManager()) {
+    if (m_parent && m_parent->mm_node()) {
         // 可以在这里添加捕捉点的可视化代码
     }
 } 

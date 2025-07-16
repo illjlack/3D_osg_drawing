@@ -19,10 +19,10 @@ Torus3D_Geo::Torus3D_Geo()
 
 void Torus3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!isStateComplete())
+    if (!mm_state()->isStateComplete())
     {
-        addControlPoint(Point3D(worldPos));
-        const auto& controlPoints = getControlPoints();
+        mm_controlPoint()->addControlPoint(Point3D(worldPos));
+        const auto& controlPoints = mm_controlPoint()->getControlPoints();
         
         if (controlPoints.size() == 2)
         {
@@ -30,7 +30,7 @@ void Torus3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
             float distance = glm::length(controlPoints[1].position - controlPoints[0].position);
             m_majorRadius = distance * 0.7f; // 主半径
             m_minorRadius = distance * 0.3f; // 副半径
-            completeDrawing();
+            mm_state()->setStateComplete();
         }
         
         updateGeometry();
@@ -40,11 +40,11 @@ void Torus3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 
 void Torus3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    const auto& controlPoints = getControlPoints();
-    if (!isStateComplete() && controlPoints.size() == 1)
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
+    if (!mm_state()->isStateComplete() && controlPoints.size() == 1)
     {
-        setTempPoint(Point3D(worldPos));
-        markGeometryDirty();
+        // 设置临时点用于预览
+        // 这里需要实现临时点机制
         updateGeometry();
     }
 }
@@ -52,44 +52,37 @@ void Torus3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 void Torus3D_Geo::updateGeometry()
 {
     // 清除点线面节点
-    clearVertexGeometries();
-    clearEdgeGeometries();
-    clearFaceGeometries();
-    
-    updateOSGNode();
+    mm_node()->clearAllGeometries();
     
     // 构建点线面几何体
     buildVertexGeometries();
     buildEdgeGeometries();
     buildFaceGeometries();
     
-    // 更新可见性
-    updateFeatureVisibility();
+    // 更新OSG节点
+    updateOSGNode();
     
-    // 更新KDTree
-    if (getNodeManager()) {
-        getNodeManager()->updateKdTree();
-    }
+    // 更新捕捉点
+    mm_snapPoint()->updateSnapPoints();
+    
+    // 更新包围盒
+    mm_boundingBox()->updateBoundingBox();
+    
+    // 更新空间索引
+    mm_node()->updateSpatialIndex();
 }
 
 
 
 osg::ref_ptr<osg::Geometry> Torus3D_Geo::createGeometry()
 {
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (controlPoints.empty())
         return nullptr;
     
     float majorRadius = m_majorRadius;
     float minorRadius = m_minorRadius;
     glm::vec3 center = controlPoints[0].position;
-    
-    if (controlPoints.size() == 1 && getTempPoint().position != glm::vec3(0))
-    {
-        float distance = glm::length(getTempPoint().position - center);
-        majorRadius = distance * 0.7f;
-        minorRadius = distance * 0.3f;
-    }
     
     osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry();
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
@@ -186,8 +179,12 @@ void Torus3D_Geo::buildVertexGeometries()
     if (controlPoints.empty())
         return;
     
-    // 只为控制点创建几何体
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+    // 获取现有的几何体
+    osg::ref_ptr<osg::Geometry> geometry = getVertexGeometry();
+    if (!geometry.valid())
+        return;
+    
+    // 创建顶点数组
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
@@ -232,8 +229,12 @@ void Torus3D_Geo::buildEdgeGeometries()
     if (controlPoints.empty())
         return;
     
+    // 获取现有的几何体
+    osg::ref_ptr<osg::Geometry> geometry = getEdgeGeometry();
+    if (!geometry.valid())
+        return;
+    
     // 创建圆环边界线几何体
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
@@ -297,11 +298,24 @@ void Torus3D_Geo::buildFaceGeometries()
     if (controlPoints.empty())
         return;
     
+    // 获取现有的几何体
+    osg::ref_ptr<osg::Geometry> geometry = getFaceGeometry();
+    if (!geometry.valid())
+        return;
+    
     // 创建圆环面几何体
-    osg::ref_ptr<osg::Geometry> geometry = createGeometry();
-    if (geometry.valid())
+    osg::ref_ptr<osg::Geometry> newGeometry = createGeometry();
+    if (newGeometry.valid())
     {
-        addFaceGeometry(geometry);
+        // 复制新几何体的数据到现有几何体
+        geometry->setVertexArray(newGeometry->getVertexArray());
+        geometry->setColorArray(newGeometry->getColorArray());
+        geometry->setNormalArray(newGeometry->getNormalArray());
+        geometry->removePrimitiveSet(0, geometry->getNumPrimitiveSets());
+        for (unsigned int i = 0; i < newGeometry->getNumPrimitiveSets(); ++i)
+        {
+            geometry->addPrimitiveSet(newGeometry->getPrimitiveSet(i));
+        }
     }
 }
 

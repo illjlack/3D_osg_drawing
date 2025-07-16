@@ -484,7 +484,7 @@ void CPUPickingSystem::buildGeometryData(Geo3D* geometry)
     if (!geometry) return;
     
     // 为几何体的OSG节点构建包围盒信息
-    osg::ref_ptr<osg::Group> osgNode = geometry->getOSGNode();
+            osg::ref_ptr<osg::Group> osgNode = geometry->node()->getOSGNode();
     if (osgNode) {
         // 计算包围球
         osg::BoundingSphere bs = osgNode->getBound();
@@ -723,7 +723,7 @@ Geo3D* CPUPickingSystem::findGeometryFromNode(osg::Node* node)
             Geo3D* geometry = pair.second->geometry.get();
             if (!geometry) continue;
             
-            osg::ref_ptr<osg::Group> osgNode = geometry->getOSGNode();
+            osg::ref_ptr<osg::Group> osgNode = geometry->node()->getOSGNode();
             if (!osgNode) continue;
             
             // 检查是否是几何体的根节点或子节点

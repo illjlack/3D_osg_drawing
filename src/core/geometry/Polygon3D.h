@@ -13,25 +13,25 @@ public:
     virtual void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
     virtual void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
     virtual void keyPressEvent(QKeyEvent* event) override;
-    virtual void updateGeometry() override;
     
     // 几何计算
-    glm::vec3 calculateNormal() const;
     float calculateArea() const;
-    float calculatePerimeter() const;
+    glm::vec3 getCenter() const;
     
     // 拾取测试
-    virtual bool hitTest(const Ray3D& ray, PickResult3D& result) const override;
+    virtual bool hitTest(const Ray3D& ray, PickResult3D& result) const;
 
 protected:
-    virtual osg::ref_ptr<osg::Geometry> createGeometry() override;
-    virtual void buildVertexGeometries() override;
-    virtual void buildEdgeGeometries() override;
-    virtual void buildFaceGeometries() override;
+    virtual osg::ref_ptr<osg::Geometry> createGeometry();
+    
+    // 点线面几何体构建
+    virtual void buildVertexGeometries();
+    virtual void buildEdgeGeometries();
+    virtual void buildFaceGeometries();
     
 private:
+    glm::vec3 m_normal = glm::vec3(0.0f);
+    std::vector<unsigned int> m_triangleIndices;
+    void calculatePolygonParameters();
     void triangulatePolygon();
-    
-    glm::vec3 m_normal;
-    std::vector<uint32_t> m_triangleIndices;
 }; 

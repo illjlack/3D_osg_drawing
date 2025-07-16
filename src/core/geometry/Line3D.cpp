@@ -18,18 +18,14 @@ Line3D_Geo::Line3D_Geo()
 
 void Line3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!isStateComplete())
+    if (!mm_state()->isStateComplete())
     {
-        addControlPoint(Point3D(worldPos));
+        mm_controlPoint()->addControlPoint(Point3D(worldPos));
         
-        const auto& controlPoints = getControlPoints();
+        const auto& controlPoints = mm_controlPoint()->getControlPoints();
         if (controlPoints.size() >= 2)
         {
-            completeDrawing();
-        }
-        else
-        {
-            markGeometryDirty();
+            mm_state()->setStateComplete();
         }
         
         updateGeometry();
@@ -38,10 +34,10 @@ void Line3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 
 void Line3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!isStateComplete())
+    if (!mm_state()->isStateComplete())
     {
-        setTempPoint(Point3D(worldPos));
-        markGeometryDirty();
+        // 设置临时点用于预览
+        // 这里需要实现临时点机制
         updateGeometry();
     }
 }
@@ -50,16 +46,16 @@ void Line3D_Geo::keyPressEvent(QKeyEvent* event)
 {
     if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter)
     {
-        if (getControlPoints().size() >= 2)
+        if (mm_controlPoint()->getControlPoints().size() >= 2)
         {
-            completeDrawing();
+            mm_state()->setStateComplete();
         }
     }
     else if (event->key() == Qt::Key_Escape)
     {
-        if (!getControlPoints().empty())
+        if (!mm_controlPoint()->getControlPoints().empty())
         {
-            removeControlPoint(getControlPoints().size() - 1);
+            mm_controlPoint()->removeLastControlPoint();
             updateGeometry();
         }
     }
@@ -67,7 +63,7 @@ void Line3D_Geo::keyPressEvent(QKeyEvent* event)
 
 void Line3D_Geo::completeDrawing()
 {
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (controlPoints.size() >= 2)
     {
         Geo3D::completeDrawing();
@@ -76,7 +72,7 @@ void Line3D_Geo::completeDrawing()
 
 float Line3D_Geo::calculateLength() const
 {
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     
     float totalLength = 0.0f;
     if (controlPoints.size() < 2)
@@ -94,36 +90,30 @@ float Line3D_Geo::calculateLength() const
 void Line3D_Geo::updateGeometry()
 {
     // 清除点线面节点
-    clearVertexGeometries();
-    clearEdgeGeometries();
-    clearFaceGeometries();
-    
-    updateOSGNode();
+    mm_node()->clearAllGeometries();
     
     // 构建点线面几何体
     buildVertexGeometries();
     buildEdgeGeometries();
     buildFaceGeometries();
     
-    // 确保节点名称正确设置（用于拾取识别）
-    setupNodeNames();
+    // 更新OSG节点
+    updateOSGNode();
     
     // 更新捕捉点
-    updateSnapPoints();
+    mm_snapPoint()->updateSnapPoints();
     
-    // 更新可见性
-    updateFeatureVisibility();
+    // 更新包围盒
+    mm_boundingBox()->updateBoundingBox();
     
-    // 更新KDTree
-    if (getNodeManager()) {
-        getNodeManager()->updateKdTree();
-    }
+    // 更新空间索引
+    mm_node()->updateSpatialIndex();
 }
 
 osg::ref_ptr<osg::Geometry> Line3D_Geo::createGeometry()
 {
-    const auto& controlPoints = getControlPoints();
-    if (controlPoints.size() < 2 && getTempPoint().position == glm::vec3(0))
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
+    if (controlPoints.size() < 2)
         return nullptr;
     
     switch (m_parameters.nodeLineStyle)
@@ -156,14 +146,6 @@ osg::ref_ptr<osg::Geometry> Line3D_Geo::createGeometry()
                                    m_parameters.lineColor.b, m_parameters.lineColor.a));
     }
     
-    // 如果正在绘制且有临时点，添加到最后一个点的线
-    if (!isStateComplete() && getTempPoint().position != glm::vec3(0))
-    {
-        vertices->push_back(osg::Vec3(getTempPoint().x(), getTempPoint().y(), getTempPoint().z()));
-        colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
-                                   m_parameters.lineColor.b, m_parameters.lineColor.a * 0.5f));
-    }
-    
     geometry->setVertexArray(vertices.get());
     geometry->setColorArray(colors.get());
     geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
@@ -179,14 +161,18 @@ osg::ref_ptr<osg::Geometry> Line3D_Geo::createGeometry()
 
 void Line3D_Geo::buildVertexGeometries()
 {
-    clearVertexGeometries();
+    mm_node()->clearVertexGeometry();
     
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (controlPoints.empty())
         return;
     
-    // 只为控制点创建几何体
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+    // 获取现有的几何体
+    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getVertexGeometry();
+    if (!geometry.valid())
+        return;
+    
+    // 创建顶点数组
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
@@ -196,14 +182,6 @@ void Line3D_Geo::buildVertexGeometries()
         vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
         colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
                                    m_parameters.pointColor.b, m_parameters.pointColor.a));
-    }
-    
-    // 如果有临时点且几何体未完成，添加临时点
-    if (!isStateComplete() && getTempPoint().position != glm::vec3(0))
-    {
-        vertices->push_back(osg::Vec3(getTempPoint().x(), getTempPoint().y(), getTempPoint().z()));
-        colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
-                                   m_parameters.pointColor.b, m_parameters.pointColor.a * 0.5f));
     }
     
     geometry->setVertexArray(vertices);
@@ -219,32 +197,27 @@ void Line3D_Geo::buildVertexGeometries()
     osg::ref_ptr<osg::Point> point = new osg::Point;
     point->setSize(8.0f);  // 控制点大小
     stateSet->setAttribute(point);
-    
-    addVertexGeometry(geometry);
 }
 
 void Line3D_Geo::buildEdgeGeometries()
 {
-    clearEdgeGeometries();
+    mm_node()->clearEdgeGeometry();
     
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (controlPoints.size() < 2)
         return;
     
-    // 创建线段边界线几何体
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+    // 获取现有的几何体
+    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getEdgeGeometry();
+    if (!geometry.valid())
+        return;
+    
+    // 创建边的几何体
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
-    // 构建所有点（包括临时点）
-    std::vector<Point3D> allPoints = controlPoints;
-    if (!isStateComplete() && getTempPoint().position != glm::vec3(0))
-    {
-        allPoints.push_back(getTempPoint());
-    }
-    
-    // 添加所有点用于线段绘制
-    for (const auto& point : allPoints)
+    // 添加边的顶点
+    for (const Point3D& point : controlPoints)
     {
         vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
         colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
@@ -255,22 +228,20 @@ void Line3D_Geo::buildEdgeGeometries()
     geometry->setColorArray(colors);
     geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     
-    // 线绘制 - 边界线
+    // 线绘制
     osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::LINE_STRIP, 0, vertices->size());
     geometry->addPrimitiveSet(drawArrays);
     
     // 设置线的宽度
     osg::ref_ptr<osg::StateSet> stateSet = geometry->getOrCreateStateSet();
     osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth;
-    lineWidth->setWidth(2.0f);  // 边界线宽度
+    lineWidth->setWidth(m_parameters.lineWidth);
     stateSet->setAttribute(lineWidth);
-    
-    addEdgeGeometry(geometry);
 }
 
 void Line3D_Geo::buildFaceGeometries()
 {
-    clearFaceGeometries();
+    mm_node()->clearFaceGeometry();
     // 线对象没有面
 }
 
@@ -278,7 +249,7 @@ void Line3D_Geo::generatePolyline()
 {
     m_generatedPoints.clear();
     
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (controlPoints.empty())
         return;
     
@@ -292,7 +263,7 @@ void Line3D_Geo::generatePolyline()
 void Line3D_Geo::generateSpline()
 {
     // 样条曲线生成（简化实现）
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     
     m_generatedPoints.clear();
     if (controlPoints.size() < 2)
@@ -324,7 +295,7 @@ void Line3D_Geo::generateSpline()
 void Line3D_Geo::generateBezierCurve()
 {
     // 贝塞尔曲线生成（简化实现）
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     
     m_generatedPoints.clear();
     if (controlPoints.size() < 2)
