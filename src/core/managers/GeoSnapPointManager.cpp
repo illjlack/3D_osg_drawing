@@ -118,7 +118,7 @@ void GeoSnapPointManager::generateControlPointSnaps()
         return;
     }
     
-    auto* controlManager = m_parent->getControlPointManager();
+    auto* controlManager = m_parent->mm_controlPoint();
     if (controlManager) {
         const auto& controlPoints = controlManager->getControlPoints();
         for (int i = 0; i < static_cast<int>(controlPoints.size()); ++i) {
@@ -191,7 +191,7 @@ void GeoSnapPointManager::generateBoundingBoxSnaps()
         return;
     }
     
-    auto* boundingBoxManager = m_parent->getBoundingBoxManager();
+    auto* boundingBoxManager = m_parent->mm_boundingBox();
     if (boundingBoxManager && boundingBoxManager->isValid()) {
         const auto& bbox = boundingBoxManager->getBoundingBox();
         auto corners = boundingBoxManager->getCorners();

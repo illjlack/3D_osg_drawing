@@ -523,7 +523,7 @@ void GeoRenderManager::updateHighlightEffect()
     if (m_highlighted) {
         // 应用高亮效果
         // 这里可以修改材质或添加特殊渲染状态
-        if (auto* materialManager = m_parent->getMaterialManager()) {
+        if (auto* materialManager = m_parent->mm_material()) {
                     // 临时保存原始颜色并应用高亮颜色
         materialManager->setDiffuse(m_highlightColor);
     }

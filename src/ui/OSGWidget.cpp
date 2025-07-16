@@ -381,9 +381,9 @@ void OSGWidget::addGeo(Geo3D* geo)
         }
         
         // 连接几何对象的信号
-        connect(geo, &Geo3D::drawingCompleted, this, &OSGWidget::onGeoDrawingCompleted);
-        connect(geo, &Geo3D::geometryUpdated, this, &OSGWidget::onGeoGeometryUpdated);
-        connect(geo, &Geo3D::parametersChanged, this, &OSGWidget::onGeoParametersChanged);
+        // connect(geo, &Geo3D::drawingCompleted, this, &OSGWidget::onGeoDrawingCompleted);
+        // connect(geo, &Geo3D::geometryUpdated, this, &OSGWidget::onGeoGeometryUpdated);
+        // connect(geo, &Geo3D::parametersChanged, this, &OSGWidget::onGeoParametersChanged);
         
         // 添加到拾取系统 - 对于从文件IO读入的几何对象，强制添加到拾取系统
         if (m_advancedPickingEnabled)
@@ -418,9 +418,9 @@ void OSGWidget::removeGeo(Geo3D* geo)
         if (it != m_geoList.end())
         {
             // 断开信号连接
-            disconnect(geo, &Geo3D::drawingCompleted, this, &OSGWidget::onGeoDrawingCompleted);
-            disconnect(geo, &Geo3D::geometryUpdated, this, &OSGWidget::onGeoGeometryUpdated);
-            disconnect(geo, &Geo3D::parametersChanged, this, &OSGWidget::onGeoParametersChanged);
+            // disconnect(geo, &Geo3D::drawingCompleted, this, &OSGWidget::onGeoDrawingCompleted);
+            // disconnect(geo, &Geo3D::geometryUpdated, this, &OSGWidget::onGeoGeometryUpdated);
+            // disconnect(geo, &Geo3D::parametersChanged, this, &OSGWidget::onGeoParametersChanged);
             
             m_geoNode->removeChild(geo->mm_node()->getOSGNode().get());
             m_geoList.erase(it);
@@ -898,7 +898,7 @@ void OSGWidget::mousePressEvent(QMouseEvent* event)
             }
             
             // 检查包围盒控制点
-            auto* boundingBoxManager = geo->getBoundingBoxManager();
+            auto* boundingBoxManager = geo->mm_boundingBox();
             if (boundingBoxManager && boundingBoxManager->isValid())
             {
                 int nearestCorner = boundingBoxManager->findNearestControlPoint(worldPos, 0.1f);
@@ -971,13 +971,13 @@ void OSGWidget::mouseMoveEvent(QMouseEvent* event)
             // 更新控制点
             Point3D newPoint = controlPoints[m_draggingControlPointIndex];
             newPoint.position += dragOffset;
-            m_draggingGeo->setControlPoint(m_draggingControlPointIndex, newPoint);
+            m_draggingGeo->mm_controlPoint()->setControlPoint(m_draggingControlPointIndex, newPoint);
             
             // 更新拖动起始位置
             m_dragStartPosition = m_lastMouseWorldPos;
             
-            // 强制更新几何体
-            m_draggingGeo->updateGeometry();
+            // 强制更新几何体 - 通过状态管理器触发更新
+            m_draggingGeo->mm_state()->setControlPointsUpdated();
             
             LOG_DEBUG(QString("拖动控制点: 对象=%1, 控制点=%2, 新位置=(%3,%4,%5)")
                 .arg(m_draggingGeo->getGeoType())
@@ -989,7 +989,7 @@ void OSGWidget::mouseMoveEvent(QMouseEvent* event)
         else
         {
             // 处理包围盒控制点
-            auto* boundingBoxManager = m_draggingGeo->getBoundingBoxManager();
+            auto* boundingBoxManager = m_draggingGeo->mm_boundingBox();
             if (boundingBoxManager && boundingBoxManager->isValid())
             {
                 // 获取当前包围盒角点
@@ -1144,7 +1144,7 @@ void OSGWidget::handleDrawingInput(QMouseEvent* event)
             m_currentDrawingGeo->mousePressEvent(event, clampedPos);
             
             // 检查是否完成绘制
-            if (m_currentDrawingGeo->isStateComplete())
+            if (m_currentDrawingGeo->mm_state()->isStateComplete())
             {
                 completeCurrentDrawing();
             }
@@ -1170,8 +1170,7 @@ void OSGWidget::completeCurrentDrawing()
     if (m_currentDrawingGeo)
     {
         // 完成绘制 - 这会触发drawingCompleted信号
-        m_currentDrawingGeo->completeDrawing();
-        
+        m_currentDrawingGeo->mm_state()->setStateComplete();
         // 绘制完成后，对象保留在场景中，不需要删除
         m_currentDrawingGeo = nullptr;
         m_isDrawing = false;

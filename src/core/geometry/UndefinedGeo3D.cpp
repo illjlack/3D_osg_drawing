@@ -35,126 +35,23 @@ void UndefinedGeo3D::mousePressEvent(QMouseEvent* event, const glm::vec3& worldP
 {
     if (!mm_state()->isStateComplete())
     {
+        // 添加控制点
         mm_controlPoint()->addControlPoint(Point3D(worldPos.x, worldPos.y, worldPos.z));
         
         if (mm_controlPoint()->getControlPoints().size() >= 1)
         {
             mm_state()->setStateComplete();
         }
+        
+        mm_state()->setControlPointsUpdated();
     }
 }
 
-void UndefinedGeo3D::completeDrawing()
+void UndefinedGeo3D::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    mm_state()->setStateComplete();
-    updateGeometry();
-    
-    LOG_INFO("完成未定义几何体绘制", "几何体");
+    // 未定义几何体的鼠标移动事件 - 默认实现
+    // 未定义几何体不需要处理鼠标移动事件
 }
-
-void UndefinedGeo3D::updateGeometry()
-{
-    // 清除点线面节点
-    mm_node()->clearAllGeometries();
-    
-    // 构建点线面几何体
-    buildVertexGeometries();
-    buildEdgeGeometries();
-    buildFaceGeometries();
-    
-    // 更新OSG节点
-    updateOSGNode();
-    
-    // 更新捕捉点
-    mm_snapPoint()->updateSnapPoints();
-    
-    // 更新包围盒
-    mm_boundingBox()->updateBoundingBox();
-    
-    // 更新空间索引
-    mm_node()->updateSpatialIndex();
-}
-
-
-
-osg::ref_ptr<osg::Geometry> UndefinedGeo3D::createGeometry()
-{
-    return createDefaultGeometry();
-}
-
-osg::ref_ptr<osg::Geometry> UndefinedGeo3D::createDefaultGeometry()
-{
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry();
-    
-    if (controlPoint()->getControlPoints().empty())
-    {
-        // 如果没有控制点，创建一个默认的立方体
-        osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
-        osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
-        
-        // 创建一个简单的立方体
-        float size = 1.0f;
-        vertices->push_back(osg::Vec3(-size, -size, -size));
-        vertices->push_back(osg::Vec3( size, -size, -size));
-        vertices->push_back(osg::Vec3( size,  size, -size));
-        vertices->push_back(osg::Vec3(-size,  size, -size));
-        vertices->push_back(osg::Vec3(-size, -size,  size));
-        vertices->push_back(osg::Vec3( size, -size,  size));
-        vertices->push_back(osg::Vec3( size,  size,  size));
-        vertices->push_back(osg::Vec3(-size,  size,  size));
-        
-        // 设置颜色
-        osg::Vec4 color(0.8f, 0.8f, 0.8f, 1.0f);
-        for (int i = 0; i < 8; ++i)
-        {
-            colors->push_back(color);
-        }
-        
-        geometry->setVertexArray(vertices.get());
-        geometry->setColorArray(colors.get());
-        geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
-        
-        // 添加线框绘制
-        osg::ref_ptr<osg::DrawElementsUInt> lines = new osg::DrawElementsUInt(GL_LINES);
-        // 立方体的12条边
-        int indices[] = {
-            0,1, 1,2, 2,3, 3,0,  // 底面
-            4,5, 5,6, 6,7, 7,4,  // 顶面
-            0,4, 1,5, 2,6, 3,7   // 竖边
-        };
-        for (int i = 0; i < 24; ++i)
-        {
-            lines->push_back(indices[i]);
-        }
-        geometry->addPrimitiveSet(lines.get());
-        
-        LOG_DEBUG("创建默认立方体几何体", "几何体");
-    }
-    else
-    {
-        // 根据控制点创建几何体
-        const auto& controlPoints = controlPoint()->getControlPoints();
-        osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
-        osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
-        
-        for (const auto& point : controlPoints)
-        {
-            vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
-            colors->push_back(osg::Vec4(0.8f, 0.8f, 0.8f, 1.0f));
-        }
-        
-        geometry->setVertexArray(vertices.get());
-        geometry->setColorArray(colors.get());
-        geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
-        
-        // 绘制点
-        geometry->addPrimitiveSet(new osg::DrawArrays(GL_POINTS, 0, vertices->size()));
-        
-        LOG_DEBUG(QString("根据控制点创建几何体，点数: %1").arg(controlPoints.size()), "几何体");
-    }
-    
-    return geometry;
-} 
 
 void UndefinedGeo3D::buildVertexGeometries()
 {
@@ -197,14 +94,14 @@ void UndefinedGeo3D::buildVertexGeometries()
 
 void UndefinedGeo3D::buildEdgeGeometries()
 {
-    clearEdgeGeometries();
+    mm_node()->clearEdgeGeometry();
     
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (controlPoints.size() < 2)
         return;
     
     // 获取现有的几何体
-    osg::ref_ptr<osg::Geometry> edgeGeometry = getEdgeGeometry();
+    osg::ref_ptr<osg::Geometry> edgeGeometry = mm_node()->getEdgeGeometry();
     if (!edgeGeometry.valid())
         return;
     
@@ -237,19 +134,19 @@ void UndefinedGeo3D::buildEdgeGeometries()
     lineWidth->setWidth(m_parameters.lineWidth);
     stateSet->setAttribute(lineWidth.get());
     
-    addEdgeGeometry(edgeGeometry.get());
+    // 几何体已经通过mm_node()->getEdgeGeometry()获取，直接使用
 }
 
 void UndefinedGeo3D::buildFaceGeometries()
 {
-    clearFaceGeometries();
+    mm_node()->clearFaceGeometry();
     
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (controlPoints.size() < 3)
         return;
     
     // 获取现有的几何体
-    osg::ref_ptr<osg::Geometry> faceGeometry = getFaceGeometry();
+    osg::ref_ptr<osg::Geometry> faceGeometry = mm_node()->getFaceGeometry();
     if (!faceGeometry.valid())
         return;
     
@@ -282,5 +179,5 @@ void UndefinedGeo3D::buildFaceGeometries()
         faceGeometry->addPrimitiveSet(indices.get());
     }
     
-    addFaceGeometry(faceGeometry.get());
+    // 几何体已经通过mm_node()->getFaceGeometry()获取，直接使用
 }

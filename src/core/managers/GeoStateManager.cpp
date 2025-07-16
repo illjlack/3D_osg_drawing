@@ -94,7 +94,7 @@ void GeoStateManager::setTemporaryPointsUpdated()
     m_geoState |= GeoState_TemporaryPointsUpdated3D;
     
     if (oldState != m_geoState) {
-        setControlPointsInvalid();
+        setControlPointsUpdated();
         LOG_DEBUG("设置状态：临时点更新，控制点失效", "状态管理");
     }
 }

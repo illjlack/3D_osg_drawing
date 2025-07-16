@@ -17,7 +17,9 @@ void Box3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
     if (!mm_state()->isStateComplete())
     {
+        // 添加控制点
         mm_controlPoint()->addControlPoint(Point3D(worldPos));
+        
         const auto& controlPoints = mm_controlPoint()->getControlPoints();
         
         if (controlPoints.size() == 2)
@@ -28,42 +30,19 @@ void Box3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
             mm_state()->setStateComplete();
         }
         
-        updateGeometry();
-        emit stateChanged(this);
+        mm_state()->setControlPointsUpdated();
     }
 }
 
 void Box3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
     const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (!mm_state()->isStateComplete() && controlPoints.size() == 1)
+    if (!mm_state()->isStateComplete() && controlPoints.size() < 2)
     {
         // 设置临时点用于预览
-        // 这里需要实现临时点机制
-        updateGeometry();
+        mm_controlPoint()->setTempPoint(Point3D(worldPos));
+        mm_state()->setTemporaryPointsUpdated();
     }
-}
-
-void Box3D_Geo::updateGeometry()
-{
-    // 清除点线面节点
-    mm_node()->clearAllGeometries();
-    
-    // 构建几何体
-    buildVertexGeometries();
-    buildEdgeGeometries();
-    buildFaceGeometries();
-    
-    // 更新OSG节点
-    updateOSGNode();
-    
-    // 更新包围盒
-    mm_boundingBox()->updateBoundingBox();
-    
-    // 更新空间索引
-    mm_node()->updateSpatialIndex();
-    
-    emit geometryUpdated(this);
 }
 
 void Box3D_Geo::buildVertexGeometries()
@@ -105,7 +84,7 @@ void Box3D_Geo::buildVertexGeometries()
     point->setSize(8.0f);  // 控制点大小
     stateSet->setAttribute(point);
     
-    mm_node()->setVertexGeometry(geometry);
+    // 几何体已经通过mm_node()->getVertexGeometry()获取，直接使用
 }
 
 void Box3D_Geo::buildEdgeGeometries()
@@ -230,8 +209,8 @@ void Box3D_Geo::buildFaceGeometries()
     // 为每个顶点设置颜色
     for (int i = 0; i < 8; ++i)
     {
-        colors->push_back(osg::Vec4(m_parameters.faceColor.r, m_parameters.faceColor.g, 
-                                   m_parameters.faceColor.b, m_parameters.faceColor.a));
+        colors->push_back(osg::Vec4(m_parameters.fillColor.r, m_parameters.fillColor.g, 
+                                   m_parameters.fillColor.b, m_parameters.fillColor.a));
     }
     
     geometry->setVertexArray(vertices);

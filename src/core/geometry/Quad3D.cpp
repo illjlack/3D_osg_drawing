@@ -21,156 +21,56 @@ void Quad3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
     if (!mm_state()->isStateComplete())
     {
+        // 添加控制点
         mm_controlPoint()->addControlPoint(Point3D(worldPos));
         
         const auto& controlPoints = mm_controlPoint()->getControlPoints();
         if (controlPoints.size() == 4)
         {
-            calculateNormal();
-            calculateArea();
+            // 直接计算法向量和面积
+            const auto& v1 = controlPoints[0].position;
+            const auto& v2 = controlPoints[1].position;
+            const auto& v3 = controlPoints[2].position;
+            const auto& v4 = controlPoints[3].position;
+            
+            // 计算法向量（使用前三个点）
+            glm::vec3 edge1 = v2 - v1;
+            glm::vec3 edge2 = v3 - v1;
+            m_normal = glm::normalize(glm::cross(edge1, edge2));
+            
+            // 计算面积（使用两个三角形）
+            glm::vec3 cross1 = glm::cross(v2 - v1, v3 - v1);
+            glm::vec3 cross2 = glm::cross(v3 - v1, v4 - v1);
+            m_area = 0.5f * (glm::length(cross1) + glm::length(cross2));
+            
             mm_state()->setStateComplete();
         }
         
-        updateGeometry();
+        mm_state()->setControlPointsUpdated();
     }
 }
 
 void Quad3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!mm_state()->isStateComplete())
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
+    if (!mm_state()->isStateComplete() && controlPoints.size() < 4)
     {
         // 设置临时点用于预览
-        // 这里需要实现临时点机制
-        updateGeometry();
+        mm_controlPoint()->setTempPoint(Point3D(worldPos));
+        mm_state()->setTemporaryPointsUpdated();
     }
 }
-
-void Quad3D_Geo::updateGeometry()
-{
-    // 清除点线面节点
-    mm_node()->clearAllGeometries();
-    
-    // 构建点线面几何体
-    buildVertexGeometries();
-    buildEdgeGeometries();
-    buildFaceGeometries();
-    
-    // 更新OSG节点
-    updateOSGNode();
-    
-    // 更新捕捉点
-    mm_snapPoint()->updateSnapPoints();
-    
-    // 更新包围盒
-    mm_boundingBox()->updateBoundingBox();
-    
-    // 更新空间索引
-    mm_node()->updateSpatialIndex();
-}
-
-osg::ref_ptr<osg::Geometry> Quad3D_Geo::createGeometry()
-{
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (controlPoints.size() < 2)
-        return nullptr;
-    
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry();
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
-    osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array();
-    
-    if (controlPoints.size() == 4 || (controlPoints.size() == 3 && getTempPoint().position != glm::vec3(0)))
-    {
-        // 绘制四边形
-        std::vector<Point3D> points = controlPoints;
-        if (points.size() == 3)
-            points.push_back(getTempPoint());
-        
-        // 添加顶点（按顺序）
-        for (const Point3D& point : points)
-        {
-            vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
-        }
-        
-        // 计算法向量
-        glm::vec3 v1 = points[1].position - points[0].position;
-        glm::vec3 v2 = points[2].position - points[0].position;
-        glm::vec3 normal = glm::normalize(glm::cross(v1, v2));
-        
-        for (int i = 0; i < 4; ++i)
-        {
-            normals->push_back(osg::Vec3(normal.x, normal.y, normal.z));
-        }
-        
-        // 设置颜色
-        Color3D color = isStateComplete() ? m_parameters.fillColor : 
-                       Color3D(m_parameters.fillColor.r, m_parameters.fillColor.g, 
-                              m_parameters.fillColor.b, m_parameters.fillColor.a * 0.5f);
-        
-        for (int i = 0; i < 4; ++i)
-        {
-            colors->push_back(osg::Vec4(color.r, color.g, color.b, color.a));
-        }
-        
-        // 将四边形三角化
-        osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(GL_TRIANGLES);
-        indices->push_back(0); indices->push_back(1); indices->push_back(2);
-        indices->push_back(0); indices->push_back(2); indices->push_back(3);
-        
-        geometry->addPrimitiveSet(indices.get());
-    }
-    else
-    {
-        // 绘制辅助线或点
-        for (const Point3D& point : controlPoints)
-        {
-            vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
-            colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
-                                       m_parameters.lineColor.b, m_parameters.lineColor.a));
-        }
-        
-        if (getTempPoint().position != glm::vec3(0))
-        {
-            vertices->push_back(osg::Vec3(getTempPoint().x(), getTempPoint().y(), getTempPoint().z()));
-            colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
-                                       m_parameters.lineColor.b, m_parameters.lineColor.a * 0.5f));
-        }
-        
-        if (vertices->size() >= 2)
-        {
-            geometry->addPrimitiveSet(new osg::DrawArrays(GL_LINE_STRIP, 0, vertices->size()));
-        }
-        else
-        {
-            geometry->addPrimitiveSet(new osg::DrawArrays(GL_POINTS, 0, vertices->size()));
-        }
-    }
-    
-    geometry->setVertexArray(vertices.get());
-    geometry->setColorArray(colors.get());
-    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
-    
-    if (!normals->empty())
-    {
-        geometry->setNormalArray(normals.get());
-        geometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
-    }
-    
-    return geometry;
-}
-
- 
 
 void Quad3D_Geo::buildVertexGeometries()
 {
-    clearVertexGeometries();
+    mm_node()->clearVertexGeometry();
     
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (controlPoints.empty())
         return;
     
     // 获取现有的几何体
-    osg::ref_ptr<osg::Geometry> geometry = getVertexGeometry();
+    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getVertexGeometry();
     if (!geometry.valid())
         return;
     
@@ -186,14 +86,6 @@ void Quad3D_Geo::buildVertexGeometries()
                                    m_parameters.pointColor.b, m_parameters.pointColor.a));
     }
     
-    // 如果有临时点且几何体未完成，添加临时点
-    if (!isStateComplete() && getTempPoint().position != glm::vec3(0))
-    {
-        vertices->push_back(osg::Vec3(getTempPoint().x(), getTempPoint().y(), getTempPoint().z()));
-        colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
-                                   m_parameters.pointColor.b, m_parameters.pointColor.a * 0.5f));
-    }
-    
     geometry->setVertexArray(vertices);
     geometry->setColorArray(colors);
     geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
@@ -207,20 +99,18 @@ void Quad3D_Geo::buildVertexGeometries()
     osg::ref_ptr<osg::Point> point = new osg::Point;
     point->setSize(8.0f);  // 控制点大小
     stateSet->setAttribute(point);
-    
-    addVertexGeometry(geometry);
 }
 
 void Quad3D_Geo::buildEdgeGeometries()
 {
-    clearEdgeGeometries();
+    mm_node()->clearEdgeGeometry();
     
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (controlPoints.size() < 2)
         return;
     
     // 获取现有的几何体
-    osg::ref_ptr<osg::Geometry> geometry = getEdgeGeometry();
+    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getEdgeGeometry();
     if (!geometry.valid())
         return;
     
@@ -230,9 +120,9 @@ void Quad3D_Geo::buildEdgeGeometries()
     
     // 构建所有点（包括临时点）
     std::vector<Point3D> allPoints = controlPoints;
-    if (!isStateComplete() && getTempPoint().position != glm::vec3(0))
+    if (!mm_state()->isStateComplete() && mm_controlPoint()->getTempPoint().position != glm::vec3(0))
     {
-        allPoints.push_back(getTempPoint());
+        allPoints.push_back(mm_controlPoint()->getTempPoint());
     }
     
     // 添加边线
@@ -265,7 +155,7 @@ void Quad3D_Geo::buildEdgeGeometries()
     lineWidth->setWidth(2.0f);  // 边界线宽度
     stateSet->setAttribute(lineWidth);
     
-    addEdgeGeometry(geometry);
+    // 几何体已经通过mm_node()->getEdgeGeometry()获取，直接使用
 }
 
 void Quad3D_Geo::buildFaceGeometries()
@@ -353,84 +243,5 @@ void Quad3D_Geo::buildFaceGeometries()
         geometry->addPrimitiveSet(drawArrays);
     }
     
-    addFaceGeometry(geometry);
-} 
-
-bool Quad3D_Geo::hitTest(const Ray3D& ray, PickResult3D& result) const
-{
-    // 获取四边形的四个顶点
-    glm::vec3 v0 = getVertex(0);
-    glm::vec3 v1 = getVertex(1);
-    glm::vec3 v2 = getVertex(2);
-    glm::vec3 v3 = getVertex(3);
-    
-    // 将四边形分解为两个三角形进行测试
-    // 第一个三角形：v0, v1, v2
-    glm::vec3 edge1 = v1 - v0;
-    glm::vec3 edge2 = v2 - v0;
-    
-    glm::vec3 rayDir = glm::normalize(ray.direction);
-    glm::vec3 h = glm::cross(rayDir, edge2);
-    float a = glm::dot(edge1, h);
-    
-    if (std::abs(a) >= 1e-6f)
-    {
-        float f = 1.0f / a;
-        glm::vec3 s = ray.origin - v0;
-        float u = f * glm::dot(s, h);
-        
-        if (u >= 0.0f && u <= 1.0f)
-        {
-            glm::vec3 q = glm::cross(s, edge1);
-            float v = f * glm::dot(rayDir, q);
-            
-            if (v >= 0.0f && u + v <= 1.0f)
-            {
-                float t = f * glm::dot(edge2, q);
-                if (t >= 0.0f)
-                {
-                    result.hit = true;
-                    result.distance = t;
-                    result.userData = const_cast<Quad3D_Geo*>(this);
-                    result.point = ray.origin + t * rayDir;
-                    return true;
-                }
-            }
-        }
-    }
-    
-    // 第二个三角形：v0, v2, v3
-    edge1 = v2 - v0;
-    edge2 = v3 - v0;
-    
-    h = glm::cross(rayDir, edge2);
-    a = glm::dot(edge1, h);
-    
-    if (std::abs(a) >= 1e-6f)
-    {
-        float f = 1.0f / a;
-        glm::vec3 s = ray.origin - v0;
-        float u = f * glm::dot(s, h);
-        
-        if (u >= 0.0f && u <= 1.0f)
-        {
-            glm::vec3 q = glm::cross(s, edge1);
-            float v = f * glm::dot(rayDir, q);
-            
-            if (v >= 0.0f && u + v <= 1.0f)
-            {
-                float t = f * glm::dot(edge2, q);
-                if (t >= 0.0f)
-                {
-                    result.hit = true;
-                    result.distance = t;
-                    result.userData = const_cast<Quad3D_Geo*>(this);
-                    result.point = ray.origin + t * rayDir;
-                    return true;
-                }
-            }
-        }
-    }
-    
-    return false;
+    // 几何体已经通过mm_node()->getFaceGeometry()获取，直接使用
 } 

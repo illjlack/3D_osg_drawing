@@ -23,7 +23,9 @@ void Arc3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
     if (!mm_state()->isStateComplete())
     {
+        // 添加控制点
         mm_controlPoint()->addControlPoint(Point3D(worldPos));
+        
         const auto& controlPoints = mm_controlPoint()->getControlPoints();
         
         if (controlPoints.size() == 3)
@@ -31,10 +33,7 @@ void Arc3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
             mm_state()->setStateComplete();
         }
         
-        
-        mm_state()->setVertexGeometryInvalid();
-        mm_state()->setEdgeGeometryInvalid();
-        emit stateChanged(this);
+        mm_state()->setControlPointsUpdated();
     }
 }
 
@@ -52,7 +51,6 @@ void Arc3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
         
         // 通过状态管理器通知临时点更新
         mm_state()->setTemporaryPointsUpdated();
-        emit stateChanged(this);
     }
 }
 

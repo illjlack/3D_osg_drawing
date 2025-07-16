@@ -19,87 +19,37 @@ void Triangle3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldP
 {
     if (!mm_state()->isStateComplete())
     {
+        // 添加控制点
         mm_controlPoint()->addControlPoint(Point3D(worldPos));
         
         const auto& controlPoints = mm_controlPoint()->getControlPoints();
         if (controlPoints.size() >= 3)
         {
-            calculateNormal();
+            // 直接计算法向量
+            const auto& v1 = controlPoints[0].position;
+            const auto& v2 = controlPoints[1].position;
+            const auto& v3 = controlPoints[2].position;
+            
+            glm::vec3 edge1 = v2 - v1;
+            glm::vec3 edge2 = v3 - v1;
+            m_normal = glm::normalize(glm::cross(edge1, edge2));
+            
             mm_state()->setStateComplete();
         }
         
-        updateGeometry();
+        mm_state()->setControlPointsUpdated();
     }
 }
 
 void Triangle3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!mm_state()->isStateComplete())
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
+    if (!mm_state()->isStateComplete() && controlPoints.size() < 3)
     {
         // 设置临时点用于预览
-        // 这里需要实现临时点机制
-        updateGeometry();
+        mm_controlPoint()->setTempPoint(Point3D(worldPos));
+        mm_state()->setTemporaryPointsUpdated();
     }
-}
-
-void Triangle3D_Geo::updateGeometry()
-{
-    // 清除点线面节点
-    mm_node()->clearAllGeometries();
-    
-    // 构建点线面几何体
-    buildVertexGeometries();
-    buildEdgeGeometries();
-    buildFaceGeometries();
-    
-    // 更新OSG节点
-    updateOSGNode();
-    
-    // 更新捕捉点
-    mm_snapPoint()->updateSnapPoints();
-    
-    // 更新包围盒
-    mm_boundingBox()->updateBoundingBox();
-    
-    // 更新空间索引
-    mm_node()->updateSpatialIndex();
-}
-
-osg::ref_ptr<osg::Geometry> Triangle3D_Geo::createGeometry()
-{
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (controlPoints.size() < 3)
-        return nullptr;
-    
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
-    
-    // 添加三个顶点
-    for (const Point3D& point : controlPoints)
-    {
-        vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
-        colors->push_back(osg::Vec4(m_parameters.faceColor.r, m_parameters.faceColor.g, 
-                                   m_parameters.faceColor.b, m_parameters.faceColor.a));
-    }
-    
-    geometry->setVertexArray(vertices);
-    geometry->setColorArray(colors);
-    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
-    
-    // 绘制三角形
-    geometry->addPrimitiveSet(new osg::DrawArrays(GL_TRIANGLES, 0, 3));
-    
-    // 计算法线
-    osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
-    for (int i = 0; i < 3; ++i)
-    {
-        normals->push_back(osg::Vec3(m_normal.x, m_normal.y, m_normal.z));
-    }
-    geometry->setNormalArray(normals);
-    geometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
-    
-    return geometry;
 }
 
 void Triangle3D_Geo::buildVertexGeometries()
@@ -244,47 +194,4 @@ void Triangle3D_Geo::buildFaceGeometries()
 
 
 
-bool Triangle3D_Geo::hitTest(const Ray3D& ray, PickResult3D& result) const
-{
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (controlPoints.size() < 3)
-        return false;
-    
-    // 射线-三角形相交测试
-    glm::vec3 v0 = controlPoints[0].position;
-    glm::vec3 v1 = controlPoints[1].position;
-    glm::vec3 v2 = controlPoints[2].position;
-    
-    glm::vec3 edge1 = v1 - v0;
-    glm::vec3 edge2 = v2 - v0;
-    glm::vec3 h = glm::cross(ray.direction, edge2);
-    float a = glm::dot(edge1, h);
-    
-    if (std::abs(a) < 1e-6f)
-        return false; // 射线与三角形平行
-    
-    float f = 1.0f / a;
-    glm::vec3 s = ray.origin - v0;
-    float u = f * glm::dot(s, h);
-    
-    if (u < 0.0f || u > 1.0f)
-        return false;
-    
-    glm::vec3 q = glm::cross(s, edge1);
-    float v = f * glm::dot(ray.direction, q);
-    
-    if (v < 0.0f || u + v > 1.0f)
-        return false;
-    
-    float t = f * glm::dot(edge2, q);
-    
-    if (t > 1e-6f)
-    {
-        result.hitPoint = ray.origin + t * ray.direction;
-        result.distance = t;
-        result.normal = m_normal;
-        return true;
-    }
-    
-    return false;
-}
+// hitTest方法已移除，使用OSG内置拾取系统

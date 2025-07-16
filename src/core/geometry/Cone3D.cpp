@@ -23,7 +23,9 @@ void Cone3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
     if (!mm_state()->isStateComplete())
     {
+        // 添加控制点
         mm_controlPoint()->addControlPoint(Point3D(worldPos));
+        
         const auto& controlPoints = mm_controlPoint()->getControlPoints();
         
         if (controlPoints.size() == 2)
@@ -37,8 +39,7 @@ void Cone3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
             mm_state()->setStateComplete();
         }
         
-        updateGeometry();
-        emit stateChanged(this);
+        mm_state()->setControlPointsUpdated();
     }
 }
 
@@ -48,32 +49,9 @@ void Cone3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
     if (!mm_state()->isStateComplete() && controlPoints.size() == 1)
     {
         // 设置临时点用于预览
-        // 这里需要实现临时点机制
-        updateGeometry();
+        mm_controlPoint()->setTempPoint(Point3D(worldPos));
+        mm_state()->setTemporaryPointsUpdated();
     }
-}
-
-void Cone3D_Geo::updateGeometry()
-{
-    // 清除点线面节点
-    mm_node()->clearAllGeometries();
-    
-    // 构建点线面几何体
-    buildVertexGeometries();
-    buildEdgeGeometries();
-    buildFaceGeometries();
-    
-    // 更新OSG节点
-    updateOSGNode();
-    
-    // 更新捕捉点
-    mm_snapPoint()->updateSnapPoints();
-    
-    // 更新包围盒
-    mm_boundingBox()->updateBoundingBox();
-    
-    // 更新空间索引
-    mm_node()->updateSpatialIndex();
 }
 
 // ============================================================================
@@ -82,14 +60,14 @@ void Cone3D_Geo::updateGeometry()
 
 void Cone3D_Geo::buildVertexGeometries()
 {
-    clearVertexGeometries();
+    mm_node()->clearVertexGeometry();
     
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (controlPoints.empty())
         return;
     
     // 获取现有的几何体
-    osg::ref_ptr<osg::Geometry> geometry = getVertexGeometry();
+    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getVertexGeometry();
     if (!geometry.valid())
         return;
     
@@ -119,7 +97,7 @@ void Cone3D_Geo::buildVertexGeometries()
     point->setSize(8.0f);  // 控制点大小
     stateSet->setAttribute(point);
     
-    addVertexGeometry(geometry);
+    // 不再调用 addVertexGeometry(geometry)，直接操作 mm_node()->getVertexGeometry()
 }
 
 void Cone3D_Geo::buildEdgeGeometries()
@@ -205,7 +183,7 @@ void Cone3D_Geo::buildEdgeGeometries()
     lineWidth->setWidth(2.0f);  // 边界线宽度
     stateSet->setAttribute(lineWidth);
     
-    mm_node()->setEdgeGeometry(geometry);
+    // 几何体已经通过mm_node()->getEdgeGeometry()获取，直接使用
 }
 
 void Cone3D_Geo::buildFaceGeometries()
@@ -275,63 +253,4 @@ void Cone3D_Geo::buildFaceGeometries()
     // 使用三角面绘制
     osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, vertices->size());
     geometry->addPrimitiveSet(drawArrays);
-} 
-
-bool Cone3D_Geo::hitTest(const Ray3D& ray, PickResult3D& result) const
-{
-    // 获取圆锥体的参数
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (controlPoints.size() < 2)
-        return false;
-        
-    // 使用lambda表达式计算圆锥体参数
-    auto calculateConeParams = [&]() -> MathUtils::ConeParameters {
-        glm::vec3 base = controlPoints[0].position;
-        glm::vec3 apex = controlPoints[1].position;
-        return MathUtils::calculateConeParameters(base, apex, m_radius);
-    };
-    
-    auto coneParams = calculateConeParams();
-    glm::vec3 center = MathUtils::calculateConeCenter(coneParams);
-    float radius = coneParams.radius;
-    float height = coneParams.height;
-    
-    // 射线-圆锥体相交测试（简化版本，使用包围盒）
-    const BoundingBox3D& bbox = getBoundingBox();
-    if (!bbox.isValid())
-    {
-        return false;
-    }
-    
-    // 使用包围盒进行相交测试
-    glm::vec3 rayDir = glm::normalize(ray.direction);
-    glm::vec3 invDir = 1.0f / rayDir;
-    
-    // 计算与包围盒各面的交点参数
-    float t1 = (bbox.min.x - ray.origin.x) * invDir.x;
-    float t2 = (bbox.max.x - ray.origin.x) * invDir.x;
-    float t3 = (bbox.min.y - ray.origin.y) * invDir.y;
-    float t4 = (bbox.max.y - ray.origin.y) * invDir.y;
-    float t5 = (bbox.min.z - ray.origin.z) * invDir.z;
-    float t6 = (bbox.max.z - ray.origin.z) * invDir.z;
-    
-    // 计算进入和退出参数
-    float tmin = glm::max(glm::max(glm::min(t1, t2), glm::min(t3, t4)), glm::min(t5, t6));
-    float tmax = glm::min(glm::min(glm::max(t1, t2), glm::max(t3, t4)), glm::max(t5, t6));
-    
-    // 检查是否相交
-    if (tmax >= 0 && tmin <= tmax)
-    {
-        float t = (tmin >= 0) ? tmin : tmax;
-        if (t >= 0)
-        {
-            result.hit = true;
-            result.distance = t;
-            result.userData = const_cast<Cone3D_Geo*>(this);
-            result.point = ray.origin + t * rayDir;
-            return true;
-        }
-    }
-    
-    return false;
-} 
+}

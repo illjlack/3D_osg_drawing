@@ -277,39 +277,54 @@ SimplePickingResult SimplifiedPickingSystem::performRayIntersection(int mouseX, 
     
     LOG_DEBUG(QString("几何体数量: %1").arg(m_geometries.size()), "拾取");
     
-    // 测试所有几何对象，使用对象的hitTest方法
-    float minDistance = FLT_MAX;
-    for (const osg::ref_ptr<Geo3D>& geo : m_geometries)
-    {
-        if (!geo) continue;
+    // 使用OSG的内置拾取系统
+    osgUtil::LineSegmentIntersector::Intersections intersections;
+    
+    // 创建射线拾取器
+    osg::ref_ptr<osgUtil::LineSegmentIntersector> picker = 
+        new osgUtil::LineSegmentIntersector(osgUtil::Intersector::WINDOW, mouseX, mouseY);
+    
+    // 设置拾取精度（移除不存在的精度设置）
+    
+    // 执行拾取
+    osgUtil::IntersectionVisitor iv(picker.get());
+    if (m_sceneRoot) {
+        m_sceneRoot->accept(iv);
+    }
+    
+    // 处理拾取结果
+    intersections = picker->getIntersections();
+    
+    if (!intersections.empty()) {
+        // 获取最近的交点
+        const osgUtil::LineSegmentIntersector::Intersection& intersection = *intersections.begin();
         
-        LOG_DEBUG(QString("测试几何体: 类型=%1, 状态=%2")
-            .arg(geo->getGeoType())
-            .arg(geo->isStateComplete() ? "完成" : "未完成"), "拾取");
-        
-        PickResult3D geoResult;
-        // 使用对象的hitTest方法进行射线相交检测
-        if (geo->hitTest(ray, geoResult))
-        {
-            LOG_DEBUG(QString("几何体命中: 类型=%1, 距离=%2")
-                .arg(geo->getGeoType())
-                .arg(geoResult.distance, 0, 'f', 3), "拾取");
-            
-            if (geoResult.distance < minDistance)
-            {
-                minDistance = geoResult.distance;
-                
-                // 转换为SimplePickingResult
-                result.hasResult = true;
-                result.geometry = geo.get();
-                result.worldPosition = geoResult.point;
-                result.distance = geoResult.distance;
-                result.screenX = mouseX;
-                result.screenY = mouseY;
-                result.featureType = SimplePickingResult::FACE; // 默认为面
-                result.isSnapped = false;
-                result.snapPosition = result.worldPosition;
+        // 找到对应的几何体
+        Geo3D* pickedGeometry = nullptr;
+        for (const osg::ref_ptr<Geo3D>& geo : m_geometries) {
+            if (geo && geo->mm_node()->getOSGNode() == intersection.nodePath.back()) {
+                pickedGeometry = geo.get();
+                break;
             }
+        }
+        
+        if (pickedGeometry) {
+            LOG_DEBUG(QString("OSG拾取成功: 几何体类型=%1, 距离=%2")
+                .arg(pickedGeometry->getGeoType())
+                .arg(intersection.ratio, 0, 'f', 3), "拾取");
+            
+            // 转换为SimplePickingResult
+            result.hasResult = true;
+            result.geometry = pickedGeometry;
+            result.worldPosition = glm::vec3(intersection.getWorldIntersectPoint().x(),
+                                           intersection.getWorldIntersectPoint().y(),
+                                           intersection.getWorldIntersectPoint().z());
+            result.distance = intersection.ratio;
+            result.screenX = mouseX;
+            result.screenY = mouseY;
+            result.featureType = SimplePickingResult::FACE; // 默认为面
+            result.isSnapped = false;
+            result.snapPosition = result.worldPosition;
         }
     }
     
@@ -374,7 +389,7 @@ std::vector<glm::vec3> SimplifiedPickingSystem::extractSnapPoints(Geo3D* geometr
     if (!geometry) return snapPoints;
     
     // 获取几何体的控制点
-    const auto& controlPoints = geometry->getControlPoints();
+    const auto& controlPoints = geometry->mm_controlPoint()->getControlPoints();
     for (const auto& point : controlPoints) {
         // 将Point3D转换为glm::vec3
         glm::vec3 glmPoint(point.x(), point.y(), point.z());
@@ -630,7 +645,7 @@ osg::ref_ptr<osg::Geometry> SimplifiedPickingSystem::createControlPointHighlight
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
     // 获取控制点
-    const auto& controlPoints = geometry->getControlPoints();
+    const auto& controlPoints = geometry->mm_controlPoint()->getControlPoints();
     if (!controlPoints.empty())
     {
         // 添加所有控制点

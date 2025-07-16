@@ -657,7 +657,7 @@ void GeoBoundingBoxManager::calculateBoundingBoxFromOSGGeometry()
     auto* nodeManager = m_parent->mm_node();
     if (!nodeManager) return;
     
-    auto geometry = nodeManager->getGeometry();
+    auto geometry = nodeManager->getVertexGeometry();
     if (!geometry.valid()) return;
     
     // 从OSG几何体计算包围盒

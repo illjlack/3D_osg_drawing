@@ -249,17 +249,16 @@ void GeoControlPointManager::validateIndex(int index) const
 void GeoControlPointManager::notifyGeometryChanged()
 {
     // 通知父对象几何体需要更新
-    if (m_parent) {
-        m_parent->markGeometryDirty();
+    if (m_parent && m_parent->mm_state()) {
+        m_parent->mm_state()->setGeometryInvalid();
     }
 }
 
 void GeoControlPointManager::updateControlPointVisualization()
 {
-    // 这里会在节点管理器中实现具体的可视化更新
-    // 现在只是占位符，实际实现会调用节点管理器的方法
-    if (m_parent && m_parent->mm_node()) {
-        m_parent->mm_node()->updateControlPointsVisualization();
+    // 控制点可视化更新 - 通过状态管理器触发几何体更新
+    if (m_parent && m_parent->mm_state()) {
+        m_parent->mm_state()->setControlPointsUpdated();
     }
 }
 

@@ -42,36 +42,29 @@ void GeoParameters3D::resetToGlobal()
     // 点属性
     pointShape = GlobalPointShape3D;
     pointSize = GlobalPointSize3D;
-    pointColor = Color3D(GlobalPointColor3D);
-    showPoints = true;  // 默认显示点
+    pointColor = GlobalPointColor3D;
+    showPoints = GlobalShowPoints3D;
     
     // 线属性
     lineStyle = GlobalLineStyle3D;
     lineWidth = GlobalLineWidth3D;
-    lineColor = Color3D(GlobalLineColor3D);
+    lineColor = GlobalLineColor3D;
     lineDashPattern = GlobalLineDashPattern3D;
     nodeLineStyle = GlobalNodeLineStyle3D;
-    showEdges = true;  // 默认显示边
+    showEdges = GlobalShowEdges3D;
     
     // 面属性
     fillType = GlobalFillType3D;
-    fillColor = Color3D(GlobalFillColor3D);
-    borderColor = Color3D(GlobalBorderColor3D);
+    fillColor = GlobalFillColor3D;
+    borderColor = GlobalBorderColor3D;
     showBorder = GlobalShowBorder3D;
-    showFaces = true;  // 默认显示面
+    showFaces = GlobalShowFaces3D;
     
     // 材质属性
     material.type = GlobalMaterialType3D;
-    material.shininess = GlobalShininess3D;
-    material.transparency = GlobalTransparency3D;
     
     // 体属性
     subdivisionLevel = GlobalSubdivisionLevel3D;
-    
-    // 样条曲线属性
-    splineOrder = 3;
-    splineNodeCount = 10;
-    steps = 50;
 }
 
 // 初始化全局设置

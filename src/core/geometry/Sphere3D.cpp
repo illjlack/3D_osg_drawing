@@ -21,7 +21,9 @@ void Sphere3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos
 {
     if (!mm_state()->isStateComplete())
     {
+        // 添加控制点
         mm_controlPoint()->addControlPoint(Point3D(worldPos));
+        
         const auto& controlPoints = mm_controlPoint()->getControlPoints();
         
         if (controlPoints.size() == 2)
@@ -31,8 +33,7 @@ void Sphere3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos
             mm_state()->setStateComplete();
         }
         
-        updateGeometry();
-        emit stateChanged(this);
+        mm_state()->setControlPointsUpdated();
     }
 }
 
@@ -42,107 +43,9 @@ void Sphere3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
     if (!mm_state()->isStateComplete() && controlPoints.size() == 1)
     {
         // 设置临时点用于预览
-        // 这里需要实现临时点机制
-        updateGeometry();
+        mm_controlPoint()->setTempPoint(Point3D(worldPos));
+        mm_state()->setTemporaryPointsUpdated();
     }
-}
-
-void Sphere3D_Geo::updateGeometry()
-{
-    // 清除点线面节点
-    mm_node()->clearAllGeometries();
-    
-    // 构建点线面几何体
-    buildVertexGeometries();
-    buildEdgeGeometries();
-    buildFaceGeometries();
-    
-    // 更新OSG节点
-    updateOSGNode();
-    
-    // 更新捕捉点
-    mm_snapPoint()->updateSnapPoints();
-    
-    // 更新包围盒
-    mm_boundingBox()->updateBoundingBox();
-    
-    // 更新空间索引
-    mm_node()->updateSpatialIndex();
-}
-
-osg::ref_ptr<osg::Geometry> Sphere3D_Geo::createGeometry()
-{
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (controlPoints.empty())
-        return nullptr;
-    
-    float radius = m_radius;
-    glm::vec3 center = controlPoints[0].position;
-    
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry();
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
-    osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array();
-    
-    int latSegments = static_cast<int>(m_parameters.subdivisionLevel);
-    int lonSegments = latSegments * 2;
-    
-    Color3D color = m_parameters.faceColor;
-    
-    // 生成球面顶点
-    for (int lat = 0; lat <= latSegments; ++lat)
-    {
-        float theta = static_cast<float>(M_PI * lat / latSegments); // 纬度角 0 到 π
-        float sinTheta = sin(theta);
-        float cosTheta = cos(theta);
-        
-        for (int lon = 0; lon <= lonSegments; ++lon)
-        {
-            float phi = static_cast<float>(2.0 * M_PI * lon / lonSegments); // 经度角 0 到 2π
-            float sinPhi = sin(phi);
-            float cosPhi = cos(phi);
-            
-            // 球面坐标到笛卡尔坐标
-            glm::vec3 normal(sinTheta * cosPhi, sinTheta * sinPhi, cosTheta);
-            glm::vec3 point = center + radius * normal;
-            
-            vertices->push_back(osg::Vec3(point.x, point.y, point.z));
-            normals->push_back(osg::Vec3(normal.x, normal.y, normal.z));
-            colors->push_back(osg::Vec4(color.r, color.g, color.b, color.a));
-        }
-    }
-    
-    // 生成三角形索引
-    osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(GL_TRIANGLES);
-    
-    for (int lat = 0; lat < latSegments; ++lat)
-    {
-        for (int lon = 0; lon < lonSegments; ++lon)
-        {
-            int current = lat * (lonSegments + 1) + lon;
-            int next = current + lonSegments + 1;
-            
-            // 第一个三角形
-            indices->push_back(current);
-            indices->push_back(next);
-            indices->push_back(current + 1);
-            
-            // 第二个三角形
-            indices->push_back(current + 1);
-            indices->push_back(next);
-            indices->push_back(next + 1);
-        }
-    }
-    
-    geometry->setVertexArray(vertices.get());
-    geometry->setColorArray(colors.get());
-    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
-    geometry->setNormalArray(normals.get());
-    geometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
-    
-    geometry->addPrimitiveSet(indices.get());
-    
-    return geometry;
 }
 
 // ============================================================================
@@ -316,8 +219,8 @@ void Sphere3D_Geo::buildFaceGeometries()
             
             vertices->push_back(osg::Vec3(point.x, point.y, point.z));
             normals->push_back(osg::Vec3(normal.x, normal.y, normal.z));
-            colors->push_back(osg::Vec4(m_parameters.faceColor.r, m_parameters.faceColor.g, 
-                                       m_parameters.faceColor.b, m_parameters.faceColor.a));
+            colors->push_back(osg::Vec4(m_parameters.fillColor.r, m_parameters.fillColor.g, 
+                            m_parameters.fillColor.b, m_parameters.fillColor.a));
         }
     }
     
@@ -352,36 +255,4 @@ void Sphere3D_Geo::buildFaceGeometries()
     geometry->addPrimitiveSet(indices);
 }
 
-bool Sphere3D_Geo::hitTest(const Ray3D& ray, PickResult3D& result) const
-{
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (controlPoints.empty())
-        return false;
-    
-    // 射线-球体相交测试
-    glm::vec3 center = controlPoints[0].position;
-    float radius = m_radius;
-    
-    glm::vec3 oc = ray.origin - center;
-    float a = glm::dot(ray.direction, ray.direction);
-    float b = 2.0f * glm::dot(oc, ray.direction);
-    float c = glm::dot(oc, oc) - radius * radius;
-    
-    float discriminant = b * b - 4 * a * c;
-    
-    if (discriminant < 0)
-        return false;
-    
-    float t1 = (-b - sqrt(discriminant)) / (2.0f * a);
-    float t2 = (-b + sqrt(discriminant)) / (2.0f * a);
-    
-    if (t1 < 0 && t2 < 0)
-        return false;
-    
-    float t = (t1 < 0) ? t2 : t1;
-    
-    result.hitPoint = ray.origin + t * ray.direction;
-    result.distance = t;
-    result.normal = glm::normalize(result.hitPoint - center);
-    return true;
-} 
+// hitTest方法已移除，使用OSG内置拾取系统 

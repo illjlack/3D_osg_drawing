@@ -72,24 +72,24 @@ void Geo3D::setupManagers()
 void Geo3D::connectManagerSignals()
 {
     // 状态管理器信号连接
-    connect(m_stateManager.get(), &GeoStateManager::stateChanged, 
-            this, [this](int, int) { emit stateChanged(this); });
+    connect(m_stateManager.get(), &GeoStateManager::stateCompleted, 
+            this, [this]() { });
     
     // 控制点管理器信号连接
     connect(m_controlPointManager.get(), &GeoControlPointManager::controlPointsChanged,
-            this, [this]() { emit geometryUpdated(this); });
+            this, [this]() { });
     
     // 包围盒管理器信号连接
     connect(m_boundingBoxManager.get(), &GeoBoundingBoxManager::boundingBoxChanged,
-            this, [this]() { emit geometryUpdated(this); });
+            this, [this]() { });
     
     // 材质管理器信号连接
     connect(m_materialManager.get(), &GeoMaterialManager::materialChanged,
-            this, [this]() { emit parametersChanged(this); });
+            this, [this]() { });
     
     // 渲染管理器信号连接
     connect(m_renderManager.get(), &GeoRenderManager::renderModeChanged,
-            this, [this](GeoRenderManager::RenderMode) { emit geometryUpdated(this); });
+            this, [this](GeoRenderManager::RenderMode) { });
 }
 
 // ========================================= 参数管理 =========================================
@@ -109,7 +109,6 @@ void Geo3D::setParameters(const GeoParameters3D& params)
         m_nodeManager->updateSpatialIndex();
     }
     
-    emit parametersChanged(this);
 }
 
 // ========================================= 初始化和更新 =========================================
