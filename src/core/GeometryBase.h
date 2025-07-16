@@ -85,15 +85,6 @@ protected:
     virtual void buildEdgeGeometries() = 0;    // 子类实现具体的边几何体构建
     virtual void buildFaceGeometries() = 0;    // 子类实现具体的面几何体构建
 
-    // 管理器友元类
-    friend class GeoStateManager;
-    friend class GeoNodeManager;
-    friend class GeoMaterialManager;
-    friend class GeoSnapPointManager;
-    friend class GeoControlPointManager;
-    friend class GeoBoundingBoxManager;
-    friend class GeoRenderManager;
-
 protected:
     // 基本属性
     GeoType3D m_geoType;

@@ -2,6 +2,7 @@
 #include <osg/Array>
 #include <osg/PrimitiveSet>
 #include <QKeyEvent>
+#include "../../util/MathUtils.h"
 
 BezierCurve3D_Geo::BezierCurve3D_Geo()
 {
@@ -158,14 +159,14 @@ void BezierCurve3D_Geo::buildVertexGeometries()
 
 void BezierCurve3D_Geo::buildEdgeGeometries()
 {
-    clearEdgeGeometries();
+    mm_node()->clearEdgeGeometry();
     
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (controlPoints.size() < 2)
         return;
     
     // 获取现有的几何体
-    osg::ref_ptr<osg::Geometry> geometry = getEdgeGeometry();
+    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getEdgeGeometry();
     if (!geometry.valid())
         return;
     
@@ -173,8 +174,24 @@ void BezierCurve3D_Geo::buildEdgeGeometries()
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
-    // 生成贝塞尔曲线点
-    generateBezierPoints();
+    // 使用lambda表达式生成贝塞尔曲线点
+    auto generateBezierPoints = [&]() {
+        std::vector<glm::vec3> controlVecs;
+        for (const Point3D& cp : controlPoints)
+        {
+            controlVecs.push_back(cp.position);
+        }
+        return MathUtils::generateBezierCurve(controlVecs, m_parameters.steps > 0 ? m_parameters.steps : 50);
+    };
+    
+    auto bezierPoints = generateBezierPoints();
+    
+    // 更新成员变量
+    m_bezierPoints.clear();
+    for (const auto& point : bezierPoints)
+    {
+        m_bezierPoints.push_back(Point3D(point));
+    }
     
     // 添加贝塞尔曲线点作为边
     for (const Point3D& point : m_bezierPoints)
@@ -185,45 +202,27 @@ void BezierCurve3D_Geo::buildEdgeGeometries()
     }
     
     // 如果正在绘制且有临时点，计算包含临时点的贝塞尔曲线
-    if (!isStateComplete() && getTempPoint().position != glm::vec3(0))
+    if (!mm_state()->isStateComplete() && mm_controlPoint()->getTempPoint().position != glm::vec3(0))
     {
         std::vector<Point3D> tempControlPoints = controlPoints;
-        tempControlPoints.push_back(getTempPoint());
+        tempControlPoints.push_back(mm_controlPoint()->getTempPoint());
         
-        // 生成临时贝塞尔曲线点
-        std::vector<Point3D> tempBezierPoints;
-        int steps = m_parameters.steps > 0 ? m_parameters.steps : 50;
-        
-        for (int i = 0; i <= steps; ++i)
-        {
-            float t = static_cast<float>(i) / steps;
-            // 临时计算贝塞尔点
+        // 使用lambda表达式生成临时贝塞尔曲线点
+        auto generateTempBezierPoints = [&]() {
             std::vector<glm::vec3> tempVecs;
             for (const Point3D& cp : tempControlPoints)
             {
                 tempVecs.push_back(cp.position);
             }
-            
-            while (tempVecs.size() > 1)
-            {
-                std::vector<glm::vec3> newVecs;
-                for (size_t j = 0; j < tempVecs.size() - 1; ++j)
-                {
-                    newVecs.push_back(glm::mix(tempVecs[j], tempVecs[j+1], t));
-                }
-                tempVecs = newVecs;
-            }
-            
-            if (!tempVecs.empty())
-            {
-                tempBezierPoints.push_back(Point3D(tempVecs[0]));
-            }
-        }
+            return MathUtils::generateBezierCurve(tempVecs, m_parameters.steps > 0 ? m_parameters.steps : 50);
+        };
+        
+        auto tempBezierPoints = generateTempBezierPoints();
         
         // 添加临时点（半透明）
-        for (const Point3D& point : tempBezierPoints)
+        for (const auto& point : tempBezierPoints)
         {
-            vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
+            vertices->push_back(osg::Vec3(point.x, point.y, point.z));
             colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
                                        m_parameters.lineColor.b, m_parameters.lineColor.a * 0.5f));
         }
@@ -243,7 +242,8 @@ void BezierCurve3D_Geo::buildEdgeGeometries()
     lineWidth->setWidth(2.0f);  // 边界线宽度
     stateSet->setAttribute(lineWidth);
     
-    addEdgeGeometry(geometry);
+    // 通过状态管理器清除边几何体无效状态
+    mm_state()->clearEdgeGeometryInvalid();
 }
 
 void BezierCurve3D_Geo::buildFaceGeometries()
@@ -252,95 +252,4 @@ void BezierCurve3D_Geo::buildFaceGeometries()
     // 贝塞尔曲线没有面几何体
 }
 
-void BezierCurve3D_Geo::generateBezierPoints()
-{
-    m_bezierPoints.clear();
-    
-    const auto& controlPoints = getControlPoints();
-    if (controlPoints.size() < 2)
-        return;
-    
-    int steps = m_parameters.steps > 0 ? m_parameters.steps : 50;
-    
-    for (int i = 0; i <= steps; ++i)
-    {
-        float t = static_cast<float>(i) / steps;
-        glm::vec3 point = calculateBezierPoint(t);
-        m_bezierPoints.push_back(Point3D(point));
-    }
-}
-
-glm::vec3 BezierCurve3D_Geo::calculateBezierPoint(float t) const
-{
-    const auto& controlPoints = getControlPoints();
-    if (controlPoints.empty())
-        return glm::vec3(0);
-    
-    // De Casteljau算法
-    std::vector<glm::vec3> tempPoints;
-    for (const Point3D& cp : controlPoints)
-    {
-        tempPoints.push_back(cp.position);
-    }
-    
-    while (tempPoints.size() > 1)
-    {
-        std::vector<glm::vec3> newPoints;
-        for (size_t j = 0; j < tempPoints.size() - 1; ++j)
-        {
-            newPoints.push_back(glm::mix(tempPoints[j], tempPoints[j+1], t));
-        }
-        tempPoints = newPoints;
-    }
-    
-    return tempPoints.empty() ? glm::vec3(0) : tempPoints[0];
-} 
-
-bool BezierCurve3D_Geo::hitTest(const Ray3D& ray, PickResult3D& result) const
-{
-    // 获取贝塞尔曲线的控制点
-    const std::vector<Point3D>& controlPoints = getControlPoints();
-    if (controlPoints.size() < 2)
-    {
-        return false;
-    }
-    
-    // 射线-贝塞尔曲线相交测试（简化版本，使用包围盒）
-    const BoundingBox3D& bbox = getBoundingBox();
-    if (!bbox.isValid())
-    {
-        return false;
-    }
-    
-    // 使用包围盒进行相交测试
-    glm::vec3 rayDir = glm::normalize(ray.direction);
-    glm::vec3 invDir = 1.0f / rayDir;
-    
-    // 计算与包围盒各面的交点参数
-    float t1 = (bbox.min.x - ray.origin.x) * invDir.x;
-    float t2 = (bbox.max.x - ray.origin.x) * invDir.x;
-    float t3 = (bbox.min.y - ray.origin.y) * invDir.y;
-    float t4 = (bbox.max.y - ray.origin.y) * invDir.y;
-    float t5 = (bbox.min.z - ray.origin.z) * invDir.z;
-    float t6 = (bbox.max.z - ray.origin.z) * invDir.z;
-    
-    // 计算进入和退出参数
-    float tmin = glm::max(glm::max(glm::min(t1, t2), glm::min(t3, t4)), glm::min(t5, t6));
-    float tmax = glm::min(glm::min(glm::max(t1, t2), glm::max(t3, t4)), glm::max(t5, t6));
-    
-    // 检查是否相交
-    if (tmax >= 0 && tmin <= tmax)
-    {
-        float t = (tmin >= 0) ? tmin : tmax;
-        if (t >= 0)
-        {
-            result.hit = true;
-            result.distance = t;
-            result.userData = const_cast<BezierCurve3D_Geo*>(this);
-            result.point = ray.origin + t * rayDir;
-            return true;
-        }
-    }
-    
-    return false;
-} 
+ 

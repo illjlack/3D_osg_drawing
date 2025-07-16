@@ -53,6 +53,172 @@ public:
     static glm::vec3 evaluateBezier(const std::vector<glm::vec3>& controlPoints, float t);
     static glm::vec3 evaluateSpline(const std::vector<glm::vec3>& controlPoints, float t);
     
+    // 圆弧计算
+    struct ArcParameters {
+        glm::vec3 center;
+        float radius;
+        float startAngle;
+        float endAngle;
+        float sweepAngle;
+        glm::vec3 normal;
+        glm::vec3 uAxis;
+        glm::vec3 vAxis;
+    };
+    
+    static ArcParameters calculateArcFromThreePoints(const glm::vec3& p1, const glm::vec3& p2, const glm::vec3& p3);
+    static std::vector<glm::vec3> generateArcPoints(const ArcParameters& params, int segments = 50);
+    
+    // 贝塞尔曲线计算
+    static glm::vec3 evaluateBezierPoint(const std::vector<glm::vec3>& controlPoints, float t);
+    static std::vector<glm::vec3> generateBezierCurve(const std::vector<glm::vec3>& controlPoints, int steps = 50);
+    
+    // 圆锥体计算
+    struct ConeParameters {
+        glm::vec3 base;
+        glm::vec3 apex;
+        float radius;
+        float height;
+        glm::vec3 axis;
+        glm::vec3 uAxis;
+        glm::vec3 vAxis;
+    };
+    
+    static ConeParameters calculateConeParameters(const glm::vec3& base, const glm::vec3& apex, float radius);
+    static float calculateConeVolume(const ConeParameters& params);
+    static float calculateConeSurfaceArea(const ConeParameters& params);
+    static glm::vec3 calculateConeCenter(const ConeParameters& params);
+    
+    // 球体计算
+    struct SphereParameters {
+        glm::vec3 center;
+        float radius;
+        int segments;
+    };
+    
+    static SphereParameters calculateSphereParameters(const glm::vec3& center, float radius, int segments = 16);
+    static float calculateSphereVolume(const SphereParameters& params);
+    static float calculateSphereSurfaceArea(const SphereParameters& params);
+    static glm::vec3 calculateSphereCenter(const SphereParameters& params);
+    
+    // 长方体计算
+    struct BoxParameters {
+        glm::vec3 min;
+        glm::vec3 max;
+        glm::vec3 size;
+        glm::vec3 center;
+    };
+    
+    static BoxParameters calculateBoxParameters(const glm::vec3& min, const glm::vec3& max);
+    static float calculateBoxVolume(const BoxParameters& params);
+    static float calculateBoxSurfaceArea(const BoxParameters& params);
+    static glm::vec3 calculateBoxCenter(const BoxParameters& params);
+    static glm::vec3 calculateBoxSize(const BoxParameters& params);
+    
+    // 圆柱体计算
+    struct CylinderParameters {
+        glm::vec3 base;
+        glm::vec3 top;
+        float radius;
+        float height;
+        glm::vec3 axis;
+        glm::vec3 uAxis;
+        glm::vec3 vAxis;
+    };
+    
+    static CylinderParameters calculateCylinderParameters(const glm::vec3& base, const glm::vec3& top, float radius);
+    static float calculateCylinderVolume(const CylinderParameters& params);
+    static float calculateCylinderSurfaceArea(const CylinderParameters& params);
+    static glm::vec3 calculateCylinderCenter(const CylinderParameters& params);
+    
+    // 圆环体计算
+    struct TorusParameters {
+        glm::vec3 center;
+        float majorRadius;
+        float minorRadius;
+        glm::vec3 axis;
+        glm::vec3 uAxis;
+        glm::vec3 vAxis;
+    };
+    
+    static TorusParameters calculateTorusParameters(const glm::vec3& center, float majorRadius, float minorRadius, const glm::vec3& axis = glm::vec3(0, 0, 1));
+    static float calculateTorusVolume(const TorusParameters& params);
+    static float calculateTorusSurfaceArea(const TorusParameters& params);
+    static glm::vec3 calculateTorusCenter(const TorusParameters& params);
+    
+    // 三角形计算
+    struct TriangleParameters {
+        glm::vec3 v1;
+        glm::vec3 v2;
+        glm::vec3 v3;
+        glm::vec3 center;
+        glm::vec3 normal;
+        float area;
+    };
+    
+    static TriangleParameters calculateTriangleParameters(const glm::vec3& v1, const glm::vec3& v2, const glm::vec3& v3);
+    static float calculateTriangleArea(const TriangleParameters& params);
+    static glm::vec3 calculateTriangleCenter(const TriangleParameters& params);
+    static glm::vec3 calculateTriangleNormal(const TriangleParameters& params);
+    
+    // 四边形计算
+    struct QuadParameters {
+        glm::vec3 v1;
+        glm::vec3 v2;
+        glm::vec3 v3;
+        glm::vec3 v4;
+        glm::vec3 center;
+        glm::vec3 normal;
+        float area;
+    };
+    
+    static QuadParameters calculateQuadParameters(const glm::vec3& v1, const glm::vec3& v2, const glm::vec3& v3, const glm::vec3& v4);
+    static float calculateQuadArea(const QuadParameters& params);
+    static glm::vec3 calculateQuadCenter(const QuadParameters& params);
+    static glm::vec3 calculateQuadNormal(const QuadParameters& params);
+    
+    // 多边形计算
+    struct PolygonParameters {
+        std::vector<glm::vec3> vertices;
+        glm::vec3 center;
+        glm::vec3 normal;
+        float area;
+        std::vector<unsigned int> triangleIndices;
+    };
+    
+    static PolygonParameters calculatePolygonParameters(const std::vector<glm::vec3>& vertices);
+    static float calculatePolygonArea(const PolygonParameters& params);
+    static glm::vec3 calculatePolygonCenter(const PolygonParameters& params);
+    static glm::vec3 calculatePolygonNormal(const PolygonParameters& params);
+    static std::vector<unsigned int> triangulatePolygon(const std::vector<glm::vec3>& vertices);
+    
+    // 线段计算
+    struct LineParameters {
+        glm::vec3 start;
+        glm::vec3 end;
+        glm::vec3 direction;
+        float length;
+        glm::vec3 center;
+    };
+    
+    static LineParameters calculateLineParameters(const glm::vec3& start, const glm::vec3& end);
+    static float calculateLineLength(const LineParameters& params);
+    static glm::vec3 calculateLineCenter(const LineParameters& params);
+    static glm::vec3 calculateLineDirection(const LineParameters& params);
+    
+    // 立方体计算
+    struct CubeParameters {
+        glm::vec3 center;
+        float size;
+        glm::vec3 min;
+        glm::vec3 max;
+    };
+    
+    static CubeParameters calculateCubeParameters(const glm::vec3& center, float size);
+    static float calculateCubeVolume(const CubeParameters& params);
+    static float calculateCubeSurfaceArea(const CubeParameters& params);
+    static glm::vec3 calculateCubeCenter(const CubeParameters& params);
+    static float calculateCubeSize(const CubeParameters& params);
+    
     // 旋转和变换
     static glm::mat4 createRotationMatrix(const glm::vec3& axis, float angle);
     static glm::mat4 createTranslationMatrix(const glm::vec3& translation);

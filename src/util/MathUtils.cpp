@@ -206,6 +206,476 @@ glm::vec3 MathUtils::osgToGlm(const osg::Vec3& vec)
     return glm::vec3(vec.x(), vec.y(), vec.z());
 }
 
+MathUtils::ArcParameters MathUtils::calculateArcFromThreePoints(const glm::vec3& p1, const glm::vec3& p2, const glm::vec3& p3)
+{
+    ArcParameters params;
+    
+    // 计算法向量
+    glm::vec3 a = p2 - p1;
+    glm::vec3 b = p3 - p2;
+    params.normal = normalize(glm::cross(a, b));
+    
+    // 计算圆心
+    glm::vec3 midAB = (p1 + p2) * 0.5f;
+    glm::vec3 midBC = (p2 + p3) * 0.5f;
+    
+    glm::vec3 perpA = glm::cross(a, params.normal);
+    glm::vec3 perpB = glm::cross(b, params.normal);
+    
+    // 解线性方程组找圆心
+    float t = 0.0f;
+    if (glm::length(perpA) > EPSILON && glm::length(perpB) > EPSILON)
+    {
+        glm::vec3 diff = midBC - midAB;
+        float denom = glm::dot(perpA, perpB);
+        if (std::abs(denom) > EPSILON)
+        {
+            t = glm::dot(diff, perpB) / denom;
+        }
+    }
+    
+    params.center = midAB + t * perpA;
+    params.radius = glm::length(p1 - params.center);
+    
+    // 计算起始和结束角度
+    glm::vec3 ref = normalize(p1 - params.center);
+    glm::vec3 perpRef = normalize(glm::cross(params.normal, ref));
+    
+    glm::vec3 v1 = normalize(p1 - params.center);
+    glm::vec3 v3 = normalize(p3 - params.center);
+    
+    params.startAngle = atan2(glm::dot(v1, perpRef), glm::dot(v1, ref));
+    params.endAngle = atan2(glm::dot(v3, perpRef), glm::dot(v3, ref));
+    
+    // 确保角度范围正确
+    if (params.endAngle < params.startAngle)
+        params.endAngle += 2.0f * PI;
+    
+    // 计算扫掠角度
+    params.sweepAngle = params.endAngle - params.startAngle;
+    if (params.sweepAngle < 0)
+        params.sweepAngle += 2.0f * PI;
+    
+    // 计算坐标轴
+    params.uAxis = ref;
+    params.vAxis = normalize(glm::cross(params.normal, ref));
+    
+    return params;
+}
+
+std::vector<glm::vec3> MathUtils::generateArcPoints(const ArcParameters& params, int segments)
+{
+    std::vector<glm::vec3> points;
+    points.reserve(segments + 1);
+    
+    if (params.radius <= 0)
+        return points;
+    
+    float angleRange = params.sweepAngle;
+    
+    for (int i = 0; i <= segments; ++i)
+    {
+        float t = static_cast<float>(i) / segments;
+        float angle = params.startAngle + t * angleRange;
+        
+        glm::vec3 point = params.center + params.radius * (
+            std::cos(angle) * params.uAxis + 
+            std::sin(angle) * params.vAxis
+        );
+        points.push_back(point);
+    }
+    
+    return points;
+}
+
+glm::vec3 MathUtils::evaluateBezierPoint(const std::vector<glm::vec3>& controlPoints, float t)
+{
+    if (controlPoints.empty())
+        return glm::vec3(0);
+    
+    // De Casteljau算法
+    std::vector<glm::vec3> tempPoints = controlPoints;
+    
+    while (tempPoints.size() > 1)
+    {
+        std::vector<glm::vec3> newPoints;
+        for (size_t j = 0; j < tempPoints.size() - 1; ++j)
+        {
+            newPoints.push_back(glm::mix(tempPoints[j], tempPoints[j+1], t));
+        }
+        tempPoints = newPoints;
+    }
+    
+    return tempPoints.empty() ? glm::vec3(0) : tempPoints[0];
+}
+
+std::vector<glm::vec3> MathUtils::generateBezierCurve(const std::vector<glm::vec3>& controlPoints, int steps)
+{
+    std::vector<glm::vec3> curvePoints;
+    curvePoints.reserve(steps + 1);
+    
+    if (controlPoints.size() < 2)
+        return curvePoints;
+    
+    for (int i = 0; i <= steps; ++i)
+    {
+        float t = static_cast<float>(i) / steps;
+        glm::vec3 point = evaluateBezierPoint(controlPoints, t);
+        curvePoints.push_back(point);
+    }
+    
+    return curvePoints;
+}
+
+MathUtils::ConeParameters MathUtils::calculateConeParameters(const glm::vec3& base, const glm::vec3& apex, float radius)
+{
+    ConeParameters params;
+    params.base = base;
+    params.apex = apex;
+    params.radius = radius;
+    params.axis = normalize(apex - base);
+    params.height = distance(apex, base);
+    
+    // 计算垂直于轴的两个正交向量
+    if (std::abs(params.axis.z) < 0.9f)
+    {
+        params.uAxis = normalize(glm::cross(params.axis, glm::vec3(0, 0, 1)));
+    }
+    else
+    {
+        params.uAxis = normalize(glm::cross(params.axis, glm::vec3(1, 0, 0)));
+    }
+    params.vAxis = normalize(glm::cross(params.axis, params.uAxis));
+    
+    return params;
+}
+
+float MathUtils::calculateConeVolume(const ConeParameters& params)
+{
+    return (1.0f / 3.0f) * PI * params.radius * params.radius * params.height;
+}
+
+float MathUtils::calculateConeSurfaceArea(const ConeParameters& params)
+{
+    float slantHeight = std::sqrt(params.radius * params.radius + params.height * params.height);
+    return PI * params.radius * (params.radius + slantHeight);
+}
+
+glm::vec3 MathUtils::calculateConeCenter(const ConeParameters& params)
+{
+    return (params.base + params.apex) * 0.5f;
+}
+
+MathUtils::SphereParameters MathUtils::calculateSphereParameters(const glm::vec3& center, float radius, int segments)
+{
+    SphereParameters params;
+    params.center = center;
+    params.radius = radius;
+    params.segments = segments;
+    return params;
+}
+
+float MathUtils::calculateSphereVolume(const SphereParameters& params)
+{
+    return (4.0f / 3.0f) * PI * params.radius * params.radius * params.radius;
+}
+
+float MathUtils::calculateSphereSurfaceArea(const SphereParameters& params)
+{
+    return 4.0f * PI * params.radius * params.radius;
+}
+
+glm::vec3 MathUtils::calculateSphereCenter(const SphereParameters& params)
+{
+    return params.center;
+}
+
+MathUtils::BoxParameters MathUtils::calculateBoxParameters(const glm::vec3& min, const glm::vec3& max)
+{
+    BoxParameters params;
+    params.min = min;
+    params.max = max;
+    params.size = max - min;
+    params.center = (min + max) * 0.5f;
+    return params;
+}
+
+float MathUtils::calculateBoxVolume(const BoxParameters& params)
+{
+    return params.size.x * params.size.y * params.size.z;
+}
+
+float MathUtils::calculateBoxSurfaceArea(const BoxParameters& params)
+{
+    return 2.0f * (params.size.x * params.size.y + params.size.y * params.size.z + params.size.z * params.size.x);
+}
+
+glm::vec3 MathUtils::calculateBoxCenter(const BoxParameters& params)
+{
+    return params.center;
+}
+
+glm::vec3 MathUtils::calculateBoxSize(const BoxParameters& params)
+{
+    return params.size;
+}
+
+MathUtils::CylinderParameters MathUtils::calculateCylinderParameters(const glm::vec3& base, const glm::vec3& top, float radius)
+{
+    CylinderParameters params;
+    params.base = base;
+    params.top = top;
+    params.radius = radius;
+    params.axis = normalize(top - base);
+    params.height = distance(top, base);
+    
+    // 计算垂直于轴的两个正交向量
+    if (std::abs(params.axis.z) < 0.9f)
+    {
+        params.uAxis = normalize(glm::cross(params.axis, glm::vec3(0, 0, 1)));
+    }
+    else
+    {
+        params.uAxis = normalize(glm::cross(params.axis, glm::vec3(1, 0, 0)));
+    }
+    params.vAxis = normalize(glm::cross(params.axis, params.uAxis));
+    
+    return params;
+}
+
+float MathUtils::calculateCylinderVolume(const CylinderParameters& params)
+{
+    return PI * params.radius * params.radius * params.height;
+}
+
+float MathUtils::calculateCylinderSurfaceArea(const CylinderParameters& params)
+{
+    return 2.0f * PI * params.radius * (params.radius + params.height);
+}
+
+glm::vec3 MathUtils::calculateCylinderCenter(const CylinderParameters& params)
+{
+    return (params.base + params.top) * 0.5f;
+}
+
+MathUtils::TorusParameters MathUtils::calculateTorusParameters(const glm::vec3& center, float majorRadius, float minorRadius, const glm::vec3& axis)
+{
+    TorusParameters params;
+    params.center = center;
+    params.majorRadius = majorRadius;
+    params.minorRadius = minorRadius;
+    params.axis = normalize(axis);
+    
+    // 计算垂直于轴的两个正交向量
+    if (std::abs(params.axis.z) < 0.9f)
+    {
+        params.uAxis = normalize(glm::cross(params.axis, glm::vec3(0, 0, 1)));
+    }
+    else
+    {
+        params.uAxis = normalize(glm::cross(params.axis, glm::vec3(1, 0, 0)));
+    }
+    params.vAxis = normalize(glm::cross(params.axis, params.uAxis));
+    
+    return params;
+}
+
+float MathUtils::calculateTorusVolume(const TorusParameters& params)
+{
+    return 2.0f * PI * PI * params.majorRadius * params.minorRadius * params.minorRadius;
+}
+
+float MathUtils::calculateTorusSurfaceArea(const TorusParameters& params)
+{
+    return 4.0f * PI * PI * params.majorRadius * params.minorRadius;
+}
+
+glm::vec3 MathUtils::calculateTorusCenter(const TorusParameters& params)
+{
+    return params.center;
+}
+
+MathUtils::TriangleParameters MathUtils::calculateTriangleParameters(const glm::vec3& v1, const glm::vec3& v2, const glm::vec3& v3)
+{
+    TriangleParameters params;
+    params.v1 = v1;
+    params.v2 = v2;
+    params.v3 = v3;
+    params.center = (v1 + v2 + v3) / 3.0f;
+    params.normal = calculateNormal(v1, v2, v3);
+    params.area = calculateTriangleArea(params);
+    return params;
+}
+
+float MathUtils::calculateTriangleArea(const TriangleParameters& params)
+{
+    glm::vec3 edge1 = params.v2 - params.v1;
+    glm::vec3 edge2 = params.v3 - params.v1;
+    return 0.5f * glm::length(glm::cross(edge1, edge2));
+}
+
+glm::vec3 MathUtils::calculateTriangleCenter(const TriangleParameters& params)
+{
+    return params.center;
+}
+
+glm::vec3 MathUtils::calculateTriangleNormal(const TriangleParameters& params)
+{
+    return params.normal;
+}
+
+MathUtils::QuadParameters MathUtils::calculateQuadParameters(const glm::vec3& v1, const glm::vec3& v2, const glm::vec3& v3, const glm::vec3& v4)
+{
+    QuadParameters params;
+    params.v1 = v1;
+    params.v2 = v2;
+    params.v3 = v3;
+    params.v4 = v4;
+    params.center = (v1 + v2 + v3 + v4) / 4.0f;
+    params.normal = calculateNormal(v1, v2, v3);
+    params.area = calculateQuadArea(params);
+    return params;
+}
+
+float MathUtils::calculateQuadArea(const QuadParameters& params)
+{
+    // 将四边形分解为两个三角形计算面积
+    TriangleParameters tri1 = calculateTriangleParameters(params.v1, params.v2, params.v3);
+    TriangleParameters tri2 = calculateTriangleParameters(params.v1, params.v3, params.v4);
+    return calculateTriangleArea(tri1) + calculateTriangleArea(tri2);
+}
+
+glm::vec3 MathUtils::calculateQuadCenter(const QuadParameters& params)
+{
+    return params.center;
+}
+
+glm::vec3 MathUtils::calculateQuadNormal(const QuadParameters& params)
+{
+    return params.normal;
+}
+
+MathUtils::PolygonParameters MathUtils::calculatePolygonParameters(const std::vector<glm::vec3>& vertices)
+{
+    PolygonParameters params;
+    params.vertices = vertices;
+    params.center = calculateCentroid(vertices);
+    params.triangleIndices = triangulatePolygon(vertices);
+    params.area = calculatePolygonArea(params);
+    params.normal = calculatePolygonNormal(params);
+    return params;
+}
+
+float MathUtils::calculatePolygonArea(const PolygonParameters& params)
+{
+    if (params.vertices.size() < 3)
+        return 0.0f;
+    
+    // 使用三角形分解计算面积
+    float area = 0.0f;
+    for (size_t i = 0; i < params.triangleIndices.size(); i += 3)
+    {
+        if (i + 2 < params.triangleIndices.size())
+        {
+            glm::vec3 v1 = params.vertices[params.triangleIndices[i]];
+            glm::vec3 v2 = params.vertices[params.triangleIndices[i + 1]];
+            glm::vec3 v3 = params.vertices[params.triangleIndices[i + 2]];
+            
+            TriangleParameters triParams = calculateTriangleParameters(v1, v2, v3);
+            area += calculateTriangleArea(triParams);
+        }
+    }
+    return area;
+}
+
+glm::vec3 MathUtils::calculatePolygonCenter(const PolygonParameters& params)
+{
+    return params.center;
+}
+
+glm::vec3 MathUtils::calculatePolygonNormal(const PolygonParameters& params)
+{
+    if (params.vertices.size() < 3)
+        return glm::vec3(0, 0, 1);
+    
+    // 使用前三个点计算法向量
+    return calculateNormal(params.vertices[0], params.vertices[1], params.vertices[2]);
+}
+
+std::vector<unsigned int> MathUtils::triangulatePolygon(const std::vector<glm::vec3>& vertices)
+{
+    std::vector<unsigned int> indices;
+    if (vertices.size() < 3)
+        return indices;
+    
+    // 简单的扇形三角剖分
+    for (size_t i = 1; i < vertices.size() - 1; ++i)
+    {
+        indices.push_back(0);
+        indices.push_back(static_cast<unsigned int>(i));
+        indices.push_back(static_cast<unsigned int>(i + 1));
+    }
+    
+    return indices;
+}
+
+MathUtils::LineParameters MathUtils::calculateLineParameters(const glm::vec3& start, const glm::vec3& end)
+{
+    LineParameters params;
+    params.start = start;
+    params.end = end;
+    params.direction = normalize(end - start);
+    params.length = distance(start, end);
+    params.center = (start + end) * 0.5f;
+    return params;
+}
+
+float MathUtils::calculateLineLength(const LineParameters& params)
+{
+    return params.length;
+}
+
+glm::vec3 MathUtils::calculateLineCenter(const LineParameters& params)
+{
+    return params.center;
+}
+
+glm::vec3 MathUtils::calculateLineDirection(const LineParameters& params)
+{
+    return params.direction;
+}
+
+MathUtils::CubeParameters MathUtils::calculateCubeParameters(const glm::vec3& center, float size)
+{
+    CubeParameters params;
+    params.center = center;
+    params.size = size;
+    float halfSize = size * 0.5f;
+    params.min = center - glm::vec3(halfSize);
+    params.max = center + glm::vec3(halfSize);
+    return params;
+}
+
+float MathUtils::calculateCubeVolume(const CubeParameters& params)
+{
+    return params.size * params.size * params.size;
+}
+
+float MathUtils::calculateCubeSurfaceArea(const CubeParameters& params)
+{
+    return 6.0f * params.size * params.size;
+}
+
+glm::vec3 MathUtils::calculateCubeCenter(const CubeParameters& params)
+{
+    return params.center;
+}
+
+float MathUtils::calculateCubeSize(const CubeParameters& params)
+{
+    return params.size;
+}
+
 glm::vec3 MathUtils::evaluateBezier(const std::vector<glm::vec3>& controlPoints, float t)
 {
     if (controlPoints.empty())

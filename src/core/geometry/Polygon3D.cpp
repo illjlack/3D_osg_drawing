@@ -2,6 +2,7 @@
 #include <osg/Array>
 #include <osg/PrimitiveSet>
 #include <QKeyEvent>
+#include "../../util/MathUtils.h"
 
 Polygon3D_Geo::Polygon3D_Geo()
     : m_normal(0, 0, 1)
@@ -165,23 +166,7 @@ glm::vec3 Polygon3D_Geo::calculateNormal() const
     return glm::vec3(0, 0, 1); // 默认法向量
 }
 
-void Polygon3D_Geo::triangulatePolygon()
-{
-    m_triangleIndices.clear();
-    
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (controlPoints.size() < 3)
-        return;
-    
-    // 简单的耳切三角化算法
-    // 这里使用简单的扇形三角化，更复杂的多边形可能需要更高级的算法
-    for (size_t i = 1; i < controlPoints.size() - 1; ++i)
-    {
-        m_triangleIndices.push_back(0);
-        m_triangleIndices.push_back(i);
-        m_triangleIndices.push_back(i + 1);
-    }
-} 
+ 
 
 void Polygon3D_Geo::buildVertexGeometries()
 {
@@ -289,16 +274,32 @@ void Polygon3D_Geo::buildEdgeGeometries()
 
 void Polygon3D_Geo::buildFaceGeometries()
 {
-    clearFaceGeometries();
+    mm_node()->clearFaceGeometry();
     
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (controlPoints.size() < 3)
         return;
     
     // 获取现有的几何体
-    osg::ref_ptr<osg::Geometry> geometry = getFaceGeometry();
+    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getFaceGeometry();
     if (!geometry.valid())
         return;
+    
+    // 使用lambda表达式计算多边形参数
+    auto calculatePolygonParams = [&]() -> MathUtils::PolygonParameters {
+        std::vector<glm::vec3> vertices;
+        for (const auto& point : controlPoints)
+        {
+            vertices.push_back(point.position);
+        }
+        return MathUtils::calculatePolygonParameters(vertices);
+    };
+    
+    auto polygonParams = calculatePolygonParams();
+    
+    // 更新成员变量
+    m_normal = polygonParams.normal;
+    m_triangleIndices = polygonParams.triangleIndices;
     
     // 创建多边形面几何体
     osg::ref_ptr<osg::Geometry> newGeometry = createGeometry();

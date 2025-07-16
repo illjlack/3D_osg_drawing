@@ -2,6 +2,7 @@
 #include <osg/Array>
 #include <osg/PrimitiveSet>
 #include <QKeyEvent>
+#include "../../util/MathUtils.h"
 #include <cmath>
 
 #ifndef M_PI
@@ -70,22 +71,7 @@ void Line3D_Geo::completeDrawing()
     }
 }
 
-float Line3D_Geo::calculateLength() const
-{
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    
-    float totalLength = 0.0f;
-    if (controlPoints.size() < 2)
-        return totalLength;
-    
-    for (size_t i = 1; i < controlPoints.size(); ++i)
-    {
-        glm::vec3 diff = controlPoints[i].position - controlPoints[i-1].position;
-        totalLength += glm::length(diff);
-    }
-    
-    return totalLength;
-}
+
 
 void Line3D_Geo::updateGeometry()
 {
@@ -212,6 +198,26 @@ void Line3D_Geo::buildEdgeGeometries()
     if (!geometry.valid())
         return;
     
+    // 使用lambda表达式计算线段参数
+    auto calculateLineParams = [&]() -> MathUtils::LineParameters {
+        if (controlPoints.size() >= 2)
+        {
+            const auto& start = controlPoints[0].position;
+            const auto& end = controlPoints[controlPoints.size() - 1].position;
+            return MathUtils::calculateLineParameters(start, end);
+        }
+        else
+        {
+            // 默认参数
+            return MathUtils::LineParameters{};
+        }
+    };
+    
+    auto lineParams = calculateLineParams();
+    
+    // 更新成员变量
+    m_totalLength = lineParams.length;
+    
     // 创建边的几何体
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
@@ -245,85 +251,7 @@ void Line3D_Geo::buildFaceGeometries()
     // 线对象没有面
 }
 
-void Line3D_Geo::generatePolyline()
-{
-    m_generatedPoints.clear();
-    
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (controlPoints.empty())
-        return;
-    
-    // 直接使用控制点作为多段线点
-    for (const Point3D& point : controlPoints)
-    {
-        m_generatedPoints.push_back(point);
-    }
-}
-
-void Line3D_Geo::generateSpline()
-{
-    // 样条曲线生成（简化实现）
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    
-    m_generatedPoints.clear();
-    if (controlPoints.size() < 2)
-        return;
-    
-    // 简化的样条曲线：在控制点之间插值
-    int steps = m_parameters.steps;
-    for (size_t i = 0; i < controlPoints.size() - 1; ++i)
-    {
-        const Point3D& p0 = controlPoints[i];
-        const Point3D& p1 = controlPoints[i + 1];
-        
-        for (int j = 0; j < steps; ++j)
-        {
-            float t = static_cast<float>(j) / steps;
-            Point3D interpolated;
-            interpolated.position = p0.position + t * (p1.position - p0.position);
-            m_generatedPoints.push_back(interpolated);
-        }
-    }
-    
-    // 添加最后一个点
-    if (!controlPoints.empty())
-    {
-        m_generatedPoints.push_back(controlPoints.back());
-    }
-}
-
-void Line3D_Geo::generateBezierCurve()
-{
-    // 贝塞尔曲线生成（简化实现）
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    
-    m_generatedPoints.clear();
-    if (controlPoints.size() < 2)
-        return;
-    
-    // 简化的贝塞尔曲线：二次贝塞尔
-    if (controlPoints.size() == 3)
-    {
-        // 二次贝塞尔曲线
-        int steps = m_parameters.steps;
-        for (int i = 0; i <= steps; ++i)
-        {
-            float t = static_cast<float>(i) / steps;
-            float u = 1.0f - t;
-            
-            Point3D bezierPoint;
-            bezierPoint.position = u*u * controlPoints[0].position + 
-                                 2*u*t * controlPoints[1].position + 
-                                 t*t * controlPoints[2].position;
-            m_generatedPoints.push_back(bezierPoint);
-        }
-    }
-    else
-    {
-        // 回退到多段线
-        generatePolyline();
-    }
-} 
+ 
 
 bool Line3D_Geo::hitTest(const Ray3D& ray, PickResult3D& result) const
 {

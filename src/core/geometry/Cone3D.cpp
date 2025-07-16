@@ -2,6 +2,7 @@
 #include <osg/Array>
 #include <osg/PrimitiveSet>
 #include <cmath>
+#include "../../util/MathUtils.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -75,105 +76,6 @@ void Cone3D_Geo::updateGeometry()
     mm_node()->updateSpatialIndex();
 }
 
-osg::ref_ptr<osg::Geometry> Cone3D_Geo::createGeometry()
-{
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (controlPoints.empty())
-        return nullptr;
-    
-    float radius = m_radius;
-    float height = m_height;
-    glm::vec3 axis = m_axis;
-    glm::vec3 base = controlPoints[0].position;
-    
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry();
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
-    osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array();
-    
-    int segments = static_cast<int>(m_parameters.subdivisionLevel);
-    if (segments < 8) segments = 16; // 默认16段
-    
-    glm::vec3 apex = base + axis * height;
-    
-    // 计算垂直于轴的两个正交向量
-    glm::vec3 u, v;
-    if (abs(axis.z) < 0.9f)
-    {
-        u = glm::normalize(glm::cross(axis, glm::vec3(0, 0, 1)));
-    }
-    else
-    {
-        u = glm::normalize(glm::cross(axis, glm::vec3(1, 0, 0)));
-    }
-    v = glm::normalize(glm::cross(axis, u));
-    
-    Color3D color = isStateComplete() ? m_parameters.fillColor : 
-                   Color3D(m_parameters.fillColor.r, m_parameters.fillColor.g, 
-                          m_parameters.fillColor.b, m_parameters.fillColor.a * 0.5f);
-    
-    // 生成圆锥侧面
-    for (int i = 0; i < segments; ++i)
-    {
-        float angle1 = 2.0f * M_PI * i / segments;
-        float angle2 = 2.0f * M_PI * (i + 1) / segments;
-        
-        glm::vec3 dir1 = static_cast<float>(cos(angle1)) * u + static_cast<float>(sin(angle1)) * v;
-        glm::vec3 dir2 = static_cast<float>(cos(angle2)) * u + static_cast<float>(sin(angle2)) * v;
-        
-        glm::vec3 p1 = base + radius * dir1;
-        glm::vec3 p2 = base + radius * dir2;
-        
-        // 计算侧面法向量（朝外）
-        glm::vec3 edge1 = apex - p1;
-        glm::vec3 edge2 = p2 - p1;
-        glm::vec3 normal = glm::normalize(glm::cross(edge2, edge1));
-        
-        vertices->push_back(osg::Vec3(p1.x, p1.y, p1.z));
-        vertices->push_back(osg::Vec3(p2.x, p2.y, p2.z));
-        vertices->push_back(osg::Vec3(apex.x, apex.y, apex.z));
-        
-        for (int j = 0; j < 3; ++j)
-        {
-            normals->push_back(osg::Vec3(normal.x, normal.y, normal.z));
-            colors->push_back(osg::Vec4(color.r, color.g, color.b, color.a));
-        }
-    }
-    
-    // 生成底面
-    for (int i = 0; i < segments; ++i)
-    {
-        float angle1 = 2.0f * M_PI * i / segments;
-        float angle2 = 2.0f * M_PI * (i + 1) / segments;
-        
-        glm::vec3 dir1 = static_cast<float>(cos(angle1)) * u + static_cast<float>(sin(angle1)) * v;
-        glm::vec3 dir2 = static_cast<float>(cos(angle2)) * u + static_cast<float>(sin(angle2)) * v;
-        
-        glm::vec3 p1 = base + radius * dir1;
-        glm::vec3 p2 = base + radius * dir2;
-        
-        vertices->push_back(osg::Vec3(base.x, base.y, base.z));
-        vertices->push_back(osg::Vec3(p2.x, p2.y, p2.z));
-        vertices->push_back(osg::Vec3(p1.x, p1.y, p1.z));
-        
-        for (int j = 0; j < 3; ++j)
-        {
-            normals->push_back(osg::Vec3(-axis.x, -axis.y, -axis.z));
-            colors->push_back(osg::Vec4(color.r, color.g, color.b, color.a));
-        }
-    }
-    
-    geometry->setVertexArray(vertices.get());
-    geometry->setColorArray(colors.get());
-    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
-    geometry->setNormalArray(normals.get());
-    geometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
-    
-    geometry->addPrimitiveSet(new osg::DrawArrays(GL_TRIANGLES, 0, vertices->size()));
-    
-    return geometry;
-}
-
 // ============================================================================
 // 点线面几何体构建实现
 // ============================================================================
@@ -243,18 +145,14 @@ void Cone3D_Geo::buildEdgeGeometries()
     int segments = static_cast<int>(m_parameters.subdivisionLevel);
     if (segments < 8) segments = 16;
     
-    // 计算垂直于轴的两个正交向量
-    glm::vec3 axis = glm::normalize(apex - base);
-    glm::vec3 u, v;
-    if (abs(axis.z) < 0.9f)
-    {
-        u = glm::normalize(glm::cross(axis, glm::vec3(0, 0, 1)));
-    }
-    else
-    {
-        u = glm::normalize(glm::cross(axis, glm::vec3(1, 0, 0)));
-    }
-    v = glm::normalize(glm::cross(axis, u));
+    // 使用lambda表达式计算圆锥体参数
+    auto calculateConeParams = [&]() -> MathUtils::ConeParameters {
+        return MathUtils::calculateConeParameters(base, apex, radius);
+    };
+    
+    auto coneParams = calculateConeParams();
+    glm::vec3 u = coneParams.uAxis;
+    glm::vec3 v = coneParams.vAxis;
     
     // 生成底面边界线
     for (int i = 0; i < segments; ++i)
@@ -334,18 +232,15 @@ void Cone3D_Geo::buildFaceGeometries()
     int segments = static_cast<int>(m_parameters.subdivisionLevel);
     if (segments < 8) segments = 16;
     
-    // 计算垂直于轴的两个正交向量
-    glm::vec3 axis = glm::normalize(apex - base);
-    glm::vec3 u, v;
-    if (abs(axis.z) < 0.9f)
-    {
-        u = glm::normalize(glm::cross(axis, glm::vec3(0, 0, 1)));
-    }
-    else
-    {
-        u = glm::normalize(glm::cross(axis, glm::vec3(1, 0, 0)));
-    }
-    v = glm::normalize(glm::cross(axis, u));
+    // 使用lambda表达式计算圆锥体参数
+    auto calculateConeParams = [&]() -> MathUtils::ConeParameters {
+        return MathUtils::calculateConeParameters(base, apex, radius);
+    };
+    
+    auto coneParams = calculateConeParams();
+    glm::vec3 u = coneParams.uAxis;
+    glm::vec3 v = coneParams.vAxis;
+    glm::vec3 axis = coneParams.axis;
     
     // 生成底面三角形
     for (int i = 0; i < segments; ++i)
@@ -385,9 +280,21 @@ void Cone3D_Geo::buildFaceGeometries()
 bool Cone3D_Geo::hitTest(const Ray3D& ray, PickResult3D& result) const
 {
     // 获取圆锥体的参数
-    glm::vec3 center = getCenter();
-    float radius = getRadius();
-    float height = getHeight();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
+    if (controlPoints.size() < 2)
+        return false;
+        
+    // 使用lambda表达式计算圆锥体参数
+    auto calculateConeParams = [&]() -> MathUtils::ConeParameters {
+        glm::vec3 base = controlPoints[0].position;
+        glm::vec3 apex = controlPoints[1].position;
+        return MathUtils::calculateConeParameters(base, apex, m_radius);
+    };
+    
+    auto coneParams = calculateConeParams();
+    glm::vec3 center = MathUtils::calculateConeCenter(coneParams);
+    float radius = coneParams.radius;
+    float height = coneParams.height;
     
     // 射线-圆锥体相交测试（简化版本，使用包围盒）
     const BoundingBox3D& bbox = getBoundingBox();

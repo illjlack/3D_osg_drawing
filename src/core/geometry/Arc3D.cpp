@@ -2,6 +2,7 @@
 #include <osg/Array>
 #include <osg/PrimitiveSet>
 #include <cmath>
+#include "../../util/MathUtils.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -109,25 +110,39 @@ void Arc3D_Geo::buildEdgeGeometries()
     // 创建圆弧边界线几何体
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     
-    // 计算圆弧参数
-    calculateArcParameters();
+    // 使用lambda表达式计算圆弧参数
+    auto calculateArcParams = [&]() -> MathUtils::ArcParameters {
+        const auto& p1 = controlPoints[0].position;
+        const auto& p2 = controlPoints[1].position;
+        const auto& p3 = controlPoints[2].position;
+        return MathUtils::calculateArcFromThreePoints(p1, p2, p3);
+    };
+    
+    auto arcParams = calculateArcParams();
+    
+    // 更新成员变量
+    m_center = arcParams.center;
+    m_radius = arcParams.radius;
+    m_startAngle = arcParams.startAngle;
+    m_endAngle = arcParams.endAngle;
+    m_sweepAngle = arcParams.sweepAngle;
+    m_normal = arcParams.normal;
+    m_uAxis = arcParams.uAxis;
+    m_vAxis = arcParams.vAxis;
+    
+    // 使用lambda表达式生成圆弧点
+    auto generateArcVertices = [&](int segments) {
+        std::vector<glm::vec3> arcPoints = MathUtils::generateArcPoints(arcParams, segments);
+        for (const auto& point : arcPoints)
+        {
+            vertices->push_back(osg::Vec3(point.x, point.y, point.z));
+        }
+    };
     
     // 生成圆弧边界线点
     int segments = static_cast<int>(m_parameters.subdivisionLevel);
     if (segments < 8) segments = 16;
-    
-    for (int i = 0; i <= segments; ++i)
-    {
-        float t = static_cast<float>(i) / segments;
-        float angle = m_startAngle + t * m_sweepAngle;
-        
-        glm::vec3 point = m_center + m_radius * (
-            cosf(angle) * m_uAxis + 
-            sinf(angle) * m_vAxis
-        );
-        
-        vertices->push_back(osg::Vec3(point.x, point.y, point.z));
-    }
+    generateArcVertices(segments);
     
     geometry->setVertexArray(vertices);
     
@@ -151,107 +166,3 @@ void Arc3D_Geo::buildFaceGeometries()
     return;
 }
 
-void Arc3D_Geo::calculateArcFromThreePoints()
-{
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (controlPoints.size() < 3)
-        return;
-    
-    glm::vec3 p1 = controlPoints[0].position;
-    glm::vec3 p2 = controlPoints[1].position;
-    glm::vec3 p3 = controlPoints[2].position;
-    
-    // 计算圆心
-    glm::vec3 a = p2 - p1;
-    glm::vec3 b = p3 - p2;
-    
-    // 计算法向量
-    m_normal = glm::normalize(glm::cross(a, b));
-    
-    // 计算圆心
-    glm::vec3 midAB = (p1 + p2) * 0.5f;
-    glm::vec3 midBC = (p2 + p3) * 0.5f;
-    
-    glm::vec3 perpA = glm::cross(a, m_normal);
-    glm::vec3 perpB = glm::cross(b, m_normal);
-    
-    // 解线性方程组找圆心
-    float t = 0.0f;
-    if (glm::length(perpA) > 1e-6 && glm::length(perpB) > 1e-6)
-    {
-        glm::vec3 diff = midBC - midAB;
-        float denom = glm::dot(perpA, perpB);
-        if (abs(denom) > 1e-6)
-        {
-            t = glm::dot(diff, perpB) / denom;
-        }
-    }
-    
-    m_center = midAB + t * perpA;
-    m_radius = glm::length(p1 - m_center);
-    
-    // 计算起始和结束角度
-    glm::vec3 ref = glm::normalize(p1 - m_center);
-    glm::vec3 perpRef = glm::normalize(glm::cross(m_normal, ref));
-    
-    glm::vec3 v1 = glm::normalize(p1 - m_center);
-    glm::vec3 v3 = glm::normalize(p3 - m_center);
-    
-    m_startAngle = atan2(glm::dot(v1, perpRef), glm::dot(v1, ref));
-    m_endAngle = atan2(glm::dot(v3, perpRef), glm::dot(v3, ref));
-    
-    // 确保角度范围正确
-    if (m_endAngle < m_startAngle)
-        m_endAngle += 2.0f * static_cast<float>(M_PI);
-}
-
-void Arc3D_Geo::generateArcPoints()
-{
-    m_arcPoints.clear();
-    
-    if (m_radius <= 0)
-        return;
-    
-    int segments = 50;
-    float angleRange = m_endAngle - m_startAngle;
-    
-    for (int i = 0; i <= segments; ++i)
-    {
-        float t = static_cast<float>(i) / segments;
-        float angle = m_startAngle + t * angleRange;
-        
-        const auto& controlPoints = mm_controlPoint()->getControlPoints();
-        glm::vec3 ref = glm::normalize(controlPoints[0].position - m_center);
-        glm::vec3 perpRef = glm::normalize(glm::cross(m_normal, ref));
-        
-        glm::vec3 point = m_center + m_radius * (static_cast<float>(cos(angle)) * ref + static_cast<float>(sin(angle)) * perpRef);
-        m_arcPoints.push_back(point);
-    }
-}
-
-void Arc3D_Geo::calculateArcParameters()
-{
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (controlPoints.size() < 3)
-        return;
-    
-    // 使用三点计算圆弧
-    calculateArcFromThreePoints();
-    
-    // 计算扫掠角度
-    m_sweepAngle = m_endAngle - m_startAngle;
-    if (m_sweepAngle < 0)
-        m_sweepAngle += 2.0f * static_cast<float>(M_PI);
-    
-    // 计算坐标轴
-    const auto& p1 = controlPoints[0].position;
-    glm::vec3 ref = glm::normalize(p1 - m_center);
-    m_uAxis = ref;
-    m_vAxis = glm::normalize(glm::cross(m_normal, ref));
-    
-    // 生成圆弧点
-    generateArcPoints();
-    
-    // 通过状态管理器设置参数更新状态
-    mm_state()->setParametersUpdated();
-}

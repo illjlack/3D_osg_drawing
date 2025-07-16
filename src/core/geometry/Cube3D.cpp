@@ -2,6 +2,7 @@
 #include <osg/Array>
 #include <osg/PrimitiveSet>
 #include <cmath>
+#include "../../util/MathUtils.h"
 #include <algorithm>
 
 Cube3D_Geo::Cube3D_Geo()
@@ -276,15 +277,25 @@ void Cube3D_Geo::buildFaceGeometries()
     if (!geometry.valid())
         return;
     
+    // 使用lambda表达式计算立方体参数
+    auto calculateCubeParams = [&]() -> MathUtils::CubeParameters {
+        glm::vec3 center = (controlPoints[0].position + controlPoints[1].position) * 0.5f;
+        glm::vec3 diff = controlPoints[1].position - controlPoints[0].position;
+        float size = std::max(std::max(std::abs(diff.x), std::abs(diff.y)), std::abs(diff.z));
+        return MathUtils::calculateCubeParameters(center, size);
+    };
+    
+    auto cubeParams = calculateCubeParams();
+    
+    // 更新成员变量
+    m_size = cubeParams.size;
+    
     // 创建面的几何体
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
     // 计算正方体的8个顶点
-    glm::vec3 center = (controlPoints[0].position + controlPoints[1].position) * 0.5f;
-    glm::vec3 diff = controlPoints[1].position - controlPoints[0].position;
-    float size = std::max(std::max(std::abs(diff.x), std::abs(diff.y)), std::abs(diff.z));
-    float halfSize = size * 0.5f;
+    float halfSize = cubeParams.size * 0.5f;
     
     // 添加8个顶点
     vertices->push_back(osg::Vec3(center.x - halfSize, center.y - halfSize, center.z - halfSize));
@@ -346,36 +357,7 @@ void Cube3D_Geo::buildFaceGeometries()
     geometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
 }
 
-float Cube3D_Geo::calculateVolume() const
-{
-    return m_size * m_size * m_size;
-}
 
-float Cube3D_Geo::calculateSurfaceArea() const
-{
-    return 6.0f * m_size * m_size;
-}
-
-glm::vec3 Cube3D_Geo::getCenter() const
-{
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (controlPoints.size() == 2)
-    {
-        return (controlPoints[0].position + controlPoints[1].position) * 0.5f;
-    }
-    return controlPoints[0].position;
-}
-
-float Cube3D_Geo::getSize() const
-{
-    return m_size;
-}
-
-void Cube3D_Geo::setSize(float size)
-{
-    m_size = size;
-    updateGeometry();
-}
 
 bool Cube3D_Geo::hitTest(const Ray3D& ray, PickResult3D& result) const
 {

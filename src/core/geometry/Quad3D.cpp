@@ -2,6 +2,7 @@
 #include <osg/Array>
 #include <osg/PrimitiveSet>
 #include <cmath>
+#include "../../util/MathUtils.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -158,35 +159,7 @@ osg::ref_ptr<osg::Geometry> Quad3D_Geo::createGeometry()
     return geometry;
 }
 
-float Quad3D_Geo::calculateArea() const
-{
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (controlPoints.size() < 4)
-    {
-        return 0.0f;
-    }
-    
-    // 计算四边形面积（使用两个三角形）
-    glm::vec3 v1 = controlPoints[1].position - controlPoints[0].position;
-    glm::vec3 v2 = controlPoints[2].position - controlPoints[0].position;
-    glm::vec3 v3 = controlPoints[3].position - controlPoints[0].position;
-    
-    float area1 = glm::length(glm::cross(v1, v2)) * 0.5f;
-    float area2 = glm::length(glm::cross(v2, v3)) * 0.5f;
-    
-    return area1 + area2;
-}
-
-void Quad3D_Geo::calculateNormal()
-{
-    const auto& controlPoints = controlPoint()->getControlPoints();
-    if (controlPoints.size() >= 3)
-    {
-        glm::vec3 v1 = controlPoints[1].position - controlPoints[0].position;
-        glm::vec3 v2 = controlPoints[2].position - controlPoints[0].position;
-        m_normal = glm::normalize(glm::cross(v1, v2));
-    }
-} 
+ 
 
 void Quad3D_Geo::buildVertexGeometries()
 {
@@ -297,16 +270,48 @@ void Quad3D_Geo::buildEdgeGeometries()
 
 void Quad3D_Geo::buildFaceGeometries()
 {
-    clearFaceGeometries();
+    mm_node()->clearFaceGeometry();
     
-    const auto& controlPoints = getControlPoints();
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
     if (controlPoints.size() < 3)
         return;
     
     // 获取现有的几何体
-    osg::ref_ptr<osg::Geometry> geometry = getFaceGeometry();
+    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getFaceGeometry();
     if (!geometry.valid())
         return;
+    
+    // 使用lambda表达式计算四边形参数
+    auto calculateQuadParams = [&]() -> MathUtils::QuadParameters {
+        if (controlPoints.size() >= 4)
+        {
+            const auto& v1 = controlPoints[0].position;
+            const auto& v2 = controlPoints[1].position;
+            const auto& v3 = controlPoints[2].position;
+            const auto& v4 = controlPoints[3].position;
+            return MathUtils::calculateQuadParameters(v1, v2, v3, v4);
+        }
+        else if (controlPoints.size() >= 3)
+        {
+            // 如果只有3个点，用第3个点作为第4个点
+            const auto& v1 = controlPoints[0].position;
+            const auto& v2 = controlPoints[1].position;
+            const auto& v3 = controlPoints[2].position;
+            const auto& v4 = controlPoints[2].position;
+            return MathUtils::calculateQuadParameters(v1, v2, v3, v4);
+        }
+        else
+        {
+            // 默认参数
+            return MathUtils::QuadParameters{};
+        }
+    };
+    
+    auto quadParams = calculateQuadParams();
+    
+    // 更新成员变量
+    m_normal = quadParams.normal;
+    m_area = quadParams.area;
     
     // 创建四边形面几何体
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
@@ -322,7 +327,6 @@ void Quad3D_Geo::buildFaceGeometries()
     }
     
     // 计算法向量
-    calculateNormal();
     for (int i = 0; i < controlPoints.size(); ++i)
     {
         normals->push_back(osg::Vec3(m_normal.x, m_normal.y, m_normal.z));

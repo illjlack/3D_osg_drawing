@@ -2,6 +2,7 @@
 #include <osg/Array>
 #include <osg/PrimitiveSet>
 #include <cmath>
+#include "../../util/MathUtils.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -198,6 +199,20 @@ void Triangle3D_Geo::buildFaceGeometries()
     if (!geometry.valid())
         return;
     
+    // 使用lambda表达式计算三角形参数
+    auto calculateTriangleParams = [&]() -> MathUtils::TriangleParameters {
+        const auto& v1 = controlPoints[0].position;
+        const auto& v2 = controlPoints[1].position;
+        const auto& v3 = controlPoints[2].position;
+        return MathUtils::calculateTriangleParameters(v1, v2, v3);
+    };
+    
+    auto triangleParams = calculateTriangleParams();
+    
+    // 更新成员变量
+    m_normal = triangleParams.normal;
+    m_area = triangleParams.area;
+    
     // 创建面的几何体
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
@@ -227,34 +242,7 @@ void Triangle3D_Geo::buildFaceGeometries()
     geometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
 }
 
-float Triangle3D_Geo::calculateArea() const
-{
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (controlPoints.size() < 3)
-        return 0.0f;
-    
-    // 计算三角形面积
-    glm::vec3 v1 = controlPoints[1].position - controlPoints[0].position;
-    glm::vec3 v2 = controlPoints[2].position - controlPoints[0].position;
-    glm::vec3 cross = glm::cross(v1, v2);
-    
-    return 0.5f * glm::length(cross);
-}
 
-void Triangle3D_Geo::calculateNormal()
-{
-    const auto& controlPoints = controlPoint()->getControlPoints();
-    if (controlPoints.size() < 3)
-        return;
-    
-    // 计算法线
-    glm::vec3 v1 = controlPoints[1].position - controlPoints[0].position;
-    glm::vec3 v2 = controlPoints[2].position - controlPoints[0].position;
-    m_normal = glm::normalize(glm::cross(v1, v2));
-    
-    // 计算面积
-    m_area = calculateArea();
-}
 
 bool Triangle3D_Geo::hitTest(const Ray3D& ray, PickResult3D& result) const
 {

@@ -3,6 +3,7 @@
 #include <osg/PrimitiveSet>
 #include <cmath>
 #include <algorithm>
+#include "../../util/MathUtils.h"
 
 Box3D_Geo::Box3D_Geo()
     : m_size(1.0f, 1.0f, 1.0f)
@@ -65,86 +66,6 @@ void Box3D_Geo::updateGeometry()
     emit geometryUpdated(this);
 }
 
-osg::ref_ptr<osg::Geometry> Box3D_Geo::createGeometry()
-{
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (controlPoints.empty())
-    {
-        return nullptr;
-    }
-
-    glm::vec3 center = controlPoints[0].position;
-    glm::vec3 size = m_size;
-    
-    if (controlPoints.size() == 2)
-    {
-        center = (controlPoints[0].position + controlPoints[1].position) * 0.5f;
-        glm::vec3 diff = controlPoints[1].position - controlPoints[0].position;
-        size = glm::abs(diff);
-    }
-
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-
-    // 生成长方体的8个顶点
-    glm::vec3 halfSize = size * 0.5f;
-    
-    vertices->push_back(osg::Vec3(center.x - halfSize.x, center.y - halfSize.y, center.z - halfSize.z)); // 0
-    vertices->push_back(osg::Vec3(center.x + halfSize.x, center.y - halfSize.y, center.z - halfSize.z)); // 1
-    vertices->push_back(osg::Vec3(center.x + halfSize.x, center.y + halfSize.y, center.z - halfSize.z)); // 2
-    vertices->push_back(osg::Vec3(center.x - halfSize.x, center.y + halfSize.y, center.z - halfSize.z)); // 3
-    vertices->push_back(osg::Vec3(center.x - halfSize.x, center.y - halfSize.y, center.z + halfSize.z)); // 4
-    vertices->push_back(osg::Vec3(center.x + halfSize.x, center.y - halfSize.y, center.z + halfSize.z)); // 5
-    vertices->push_back(osg::Vec3(center.x + halfSize.x, center.y + halfSize.y, center.z + halfSize.z)); // 6
-    vertices->push_back(osg::Vec3(center.x - halfSize.x, center.y + halfSize.y, center.z + halfSize.z)); // 7
-
-    geometry->setVertexArray(vertices);
-
-    // 生成长方体的面
-    osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(osg::PrimitiveSet::TRIANGLES);
-    
-    // 前面
-    indices->push_back(0); indices->push_back(1); indices->push_back(2);
-    indices->push_back(0); indices->push_back(2); indices->push_back(3);
-    
-    // 右面
-    indices->push_back(1); indices->push_back(5); indices->push_back(6);
-    indices->push_back(1); indices->push_back(6); indices->push_back(2);
-    
-    // 后面
-    indices->push_back(5); indices->push_back(4); indices->push_back(7);
-    indices->push_back(5); indices->push_back(7); indices->push_back(6);
-    
-    // 左面
-    indices->push_back(4); indices->push_back(0); indices->push_back(3);
-    indices->push_back(4); indices->push_back(3); indices->push_back(7);
-    
-    // 顶面
-    indices->push_back(3); indices->push_back(2); indices->push_back(6);
-    indices->push_back(3); indices->push_back(6); indices->push_back(7);
-    
-    // 底面
-    indices->push_back(4); indices->push_back(5); indices->push_back(1);
-    indices->push_back(4); indices->push_back(1); indices->push_back(0);
-
-    geometry->addPrimitiveSet(indices);
-
-    // 计算法线
-    osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
-    normals->push_back(osg::Vec3(0, 0, -1)); // 前面
-    normals->push_back(osg::Vec3(0, 0, -1));
-    normals->push_back(osg::Vec3(0, 0, -1));
-    normals->push_back(osg::Vec3(0, 0, -1));
-    normals->push_back(osg::Vec3(0, 0, -1));
-    normals->push_back(osg::Vec3(0, 0, -1));
-    normals->push_back(osg::Vec3(0, 0, 1)); // 后面
-    normals->push_back(osg::Vec3(0, 0, 1));
-    geometry->setNormalArray(normals);
-    geometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
-
-    return geometry;
-}
-
 void Box3D_Geo::buildVertexGeometries()
 {
     mm_node()->clearVertexGeometry();
@@ -204,10 +125,16 @@ void Box3D_Geo::buildEdgeGeometries()
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
-    // 计算长方体的8个顶点
-    glm::vec3 center = (controlPoints[0].position + controlPoints[1].position) * 0.5f;
-    glm::vec3 diff = controlPoints[1].position - controlPoints[0].position;
-    glm::vec3 size = glm::abs(diff);
+    // 使用lambda表达式计算长方体参数
+    auto calculateBoxParams = [&]() -> MathUtils::BoxParameters {
+        glm::vec3 min = glm::min(controlPoints[0].position, controlPoints[1].position);
+        glm::vec3 max = glm::max(controlPoints[0].position, controlPoints[1].position);
+        return MathUtils::calculateBoxParameters(min, max);
+    };
+    
+    auto boxParams = calculateBoxParams();
+    glm::vec3 center = boxParams.center;
+    glm::vec3 size = boxParams.size;
     glm::vec3 halfSize = size * 0.5f;
     
     // 添加8个顶点
@@ -278,10 +205,16 @@ void Box3D_Geo::buildFaceGeometries()
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
-    // 计算长方体的8个顶点
-    glm::vec3 center = (controlPoints[0].position + controlPoints[1].position) * 0.5f;
-    glm::vec3 diff = controlPoints[1].position - controlPoints[0].position;
-    glm::vec3 size = glm::abs(diff);
+    // 使用lambda表达式计算长方体参数
+    auto calculateBoxParams = [&]() -> MathUtils::BoxParameters {
+        glm::vec3 min = glm::min(controlPoints[0].position, controlPoints[1].position);
+        glm::vec3 max = glm::max(controlPoints[0].position, controlPoints[1].position);
+        return MathUtils::calculateBoxParameters(min, max);
+    };
+    
+    auto boxParams = calculateBoxParams();
+    glm::vec3 center = boxParams.center;
+    glm::vec3 size = boxParams.size;
     glm::vec3 halfSize = size * 0.5f;
     
     // 添加8个顶点
@@ -344,85 +277,3 @@ void Box3D_Geo::buildFaceGeometries()
     geometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
 }
 
-// 计算长方体的体积
-float Box3D_Geo::calculateVolume() const
-{
-    return m_size.x * m_size.y * m_size.z;
-}
-
-// 计算长方体的表面积
-float Box3D_Geo::calculateSurfaceArea() const
-{
-    return 2.0f * (m_size.x * m_size.y + m_size.y * m_size.z + m_size.z * m_size.x);
-}
-
-// 获取长方体的中心点
-glm::vec3 Box3D_Geo::getCenter() const
-{
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (controlPoints.size() == 2)
-    {
-        return (controlPoints[0].position + controlPoints[1].position) * 0.5f;
-    }
-    else if (controlPoints.size() == 1)
-    {
-        return controlPoints[0].position;
-    }
-    return glm::vec3(0);
-}
-
-// 获取长方体的尺寸
-glm::vec3 Box3D_Geo::getSize() const
-{
-    return m_size;
-}
-
-// 设置长方体的尺寸
-void Box3D_Geo::setSize(const glm::vec3& size)
-{
-    m_size = size;
-    markGeometryDirty();
-    updateGeometry();
-} 
-
-bool Box3D_Geo::hitTest(const Ray3D& ray, PickResult3D& result) const
-{
-    // 获取包围盒
-    const BoundingBox3D& bbox = mm_boundingBox()->getBoundingBox();
-    if (!bbox.isValid())
-    {
-        return false;
-    }
-    
-    // 射线-包围盒相交测试
-    glm::vec3 rayDir = glm::normalize(ray.direction);
-    glm::vec3 invDir = 1.0f / rayDir;
-    
-    // 计算与包围盒各面的交点参数
-    float t1 = (bbox.min.x - ray.origin.x) * invDir.x;
-    float t2 = (bbox.max.x - ray.origin.x) * invDir.x;
-    float t3 = (bbox.min.y - ray.origin.y) * invDir.y;
-    float t4 = (bbox.max.y - ray.origin.y) * invDir.y;
-    float t5 = (bbox.min.z - ray.origin.z) * invDir.z;
-    float t6 = (bbox.max.z - ray.origin.z) * invDir.z;
-    
-    // 计算进入和退出参数
-    float tmin = glm::max(glm::max(glm::min(t1, t2), glm::min(t3, t4)), glm::min(t5, t6));
-    float tmax = glm::min(glm::min(glm::max(t1, t2), glm::max(t3, t4)), glm::max(t5, t6));
-    
-    // 检查是否相交
-    if (tmax >= 0 && tmin <= tmax)
-    {
-        float t = (tmin >= 0) ? tmin : tmax;
-        if (t >= 0)
-        {
-            result.hit = true;
-            result.distance = t;
-            result.userData = const_cast<Box3D_Geo*>(this);
-            result.point = ray.origin + t * rayDir;
-            return true;
-        }
-    }
-    
-    return false;
-} 

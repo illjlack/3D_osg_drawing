@@ -1,6 +1,7 @@
 ﻿#include "Point3D.h"
 #include <osg/Array>
 #include <osg/PrimitiveSet>
+#include "../../util/MathUtils.h"
 #include <cmath>
 
 #ifndef M_PI
