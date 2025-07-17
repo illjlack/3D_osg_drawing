@@ -7,6 +7,7 @@
 #include <osg/MatrixTransform>
 #include <osg/ref_ptr>
 #include <osg/KdTree>
+#include <osg/BoundingBox>
 #include <QObject>
 
 class Geo3D;
@@ -26,13 +27,17 @@ public:
     osg::ref_ptr<osg::Geometry> getVertexGeometry() const { return m_vertexGeometry; }
     osg::ref_ptr<osg::Geometry> getEdgeGeometry() const { return m_edgeGeometry; }
     osg::ref_ptr<osg::Geometry> getFaceGeometry() const { return m_faceGeometry; }
+    // 控制点，只是用来可视化和操作
     osg::ref_ptr<osg::Geometry> getControlPointsGeometry() const { return m_controlPointsGeometry; }
+    // 包围盒，用来可视化，是点、线、面的包围盒对应的立方体
+    osg::ref_ptr<osg::Geometry> getBoundingBoxGeometry() const { return m_boundingBoxGeometry; }
 
     // 几何体清理
     void clearVertexGeometry();
     void clearEdgeGeometry();
     void clearFaceGeometry();
     void clearControlPointsGeometry();
+    void clearBoundingBoxGeometry();
     void clearAllGeometries();
 
     // 变换管理
@@ -40,22 +45,26 @@ public:
     osg::Matrix getTransformMatrix() const;
     void resetTransform();
 
-    // 可见性管理 - 直接使用几何体节点的可见性
+    // 可见性管理
     void setVisible(bool visible);
     bool isVisible() const;
     void setVertexVisible(bool visible);
     void setEdgeVisible(bool visible);
     void setFaceVisible(bool visible);
     void setControlPointsVisible(bool visible);
+    void setBoundingBoxVisible(bool visible);
     bool isVertexVisible() const;
     bool isEdgeVisible() const;
     bool isFaceVisible() const;
     bool isControlPointsVisible() const;
+    bool isBoundingBoxVisible() const;
 
-    // 空间索引管理 - 直接在几何体上构建KdTree
+    // 空间索引管理
     void updateSpatialIndex();
     void clearSpatialIndex();
 
+    // 包围盒更新
+    void updateBoundingBoxGeometry();
 signals:
     void geometryChanged();
     void transformChanged();
@@ -64,6 +73,7 @@ signals:
 private:
     void initializeNodes();
     void buildKdTreeForGeometry(osg::Geometry* geometry);
+    
 
     Geo3D* m_parent;
     
@@ -76,6 +86,7 @@ private:
     osg::ref_ptr<osg::Geometry> m_edgeGeometry;
     osg::ref_ptr<osg::Geometry> m_faceGeometry;
     osg::ref_ptr<osg::Geometry> m_controlPointsGeometry;
+    osg::ref_ptr<osg::Geometry> m_boundingBoxGeometry;
     
     bool m_initialized;
 }; 

@@ -7,7 +7,6 @@
 #include "managers/GeoMaterialManager.h"
 
 #include "managers/GeoControlPointManager.h"
-#include "managers/GeoBoundingBoxManager.h"
 #include "managers/GeoRenderManager.h"
 #include <osg/Node>
 #include <osg/Group>
@@ -63,7 +62,6 @@ public:
     GeoMaterialManager* mm_material() const { return m_materialManager.get(); }
 
     GeoControlPointManager* mm_controlPoint() const { return m_controlPointManager.get(); }
-    GeoBoundingBoxManager* mm_boundingBox() const { return m_boundingBoxManager.get(); }
     GeoRenderManager* mm_render() const { return m_renderManager.get(); }
 
     // 参数设置
@@ -97,7 +95,6 @@ protected:
     std::unique_ptr<GeoMaterialManager> m_materialManager;
 
     std::unique_ptr<GeoControlPointManager> m_controlPointManager;
-    std::unique_ptr<GeoBoundingBoxManager> m_boundingBoxManager;
     std::unique_ptr<GeoRenderManager> m_renderManager;
 
     // 内部方法

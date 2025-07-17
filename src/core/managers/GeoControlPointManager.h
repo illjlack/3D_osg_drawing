@@ -10,7 +10,7 @@ class Geo3D;
 
 /**
  * @brief 控制点管理器
- * 负责管理几何对象的控制点，包括添加、删除、修改、查询等操作
+ * 负责管理几何对象的控制点，在绘制过程中临时点作为控制点的最后一个
  */
 class GeoControlPointManager : public QObject
 {
@@ -20,82 +20,36 @@ public:
     explicit GeoControlPointManager(Geo3D* parent);
     ~GeoControlPointManager() = default;
 
-    // 控制点访问
-    const std::vector<Point3D>& getControlPoints() const { return m_controlPoints; }
+    // 控制点访问 - 对外统一接口
+    const std::vector<Point3D>& getControlPoints() const;
     Point3D getControlPoint(int index) const;
-    int getControlPointCount() const { return static_cast<int>(m_controlPoints.size()); }
-    bool hasControlPoints() const { return !m_controlPoints.empty(); }
+    int getControlPointCount() const;
+    bool hasControlPoints() const;
 
     // 控制点操作
     void addControlPoint(const Point3D& point);
-    void insertControlPoint(int index, const Point3D& point);
     void setControlPoint(int index, const Point3D& point);
     void removeControlPoint(int index);
-    void removeLastControlPoint();
     void clearControlPoints();
 
     // 控制点查询
     int findNearestControlPoint(const Point3D& point, float threshold = 0.1f) const;
     bool isValidIndex(int index) const;
-    
-    // 控制点变换
-    void translateControlPoints(const glm::vec3& offset);
-    void rotateControlPoints(const glm::vec3& axis, float angle, const glm::vec3& center);
-    void scaleControlPoints(const glm::vec3& scale, const glm::vec3& center);
-    void transformControlPoints(const glm::mat4& matrix);
 
-    // 控制点验证
-    bool validateControlPoints() const;
-    bool isMinimumPointsMet() const;
-    int getMinimumPointsRequired() const;
-    void setMinimumPointsRequired(int count);
-
-    // 控制点预览
-    void startPreview();
-    void stopPreview();
-    bool isPreviewActive() const { return m_previewActive; }
-
-    // 控制点显示
-    void setControlPointsVisible(bool visible);
-    bool areControlPointsVisible() const { return m_controlPointsVisible; }
-
-    // 控制点样式
-    void setControlPointSize(float size);
-    float getControlPointSize() const { return m_controlPointSize; }
-    void setControlPointColor(const Color3D& color);
-    const Color3D& getControlPointColor() const { return m_controlPointColor; }
-
-    // 临时点管理
+    // 临时点管理 - 内部使用
     void setTempPoint(const Point3D& point);
     void clearTempPoint();
-    Point3D getTempPoint() const { return m_tempPoint; }
-    bool hasTempPoint() const { return m_tempPoint.position != glm::vec3(0); }
 
 signals:
-    void controlPointAdded(int index, const Point3D& point);
-    void controlPointRemoved(int index);
-    void controlPointChanged(int index, const Point3D& oldPoint, const Point3D& newPoint);
-    void controlPointsChanged();
-    void controlPointsCleared();
-    void controlPointsTransformed();
-    void previewStarted();
-    void previewStopped();
-    void visibilityChanged(bool visible);
+    void controlPointsChanged(); // 控制点改变信号
 
 private:
     void validateIndex(int index) const;
     void notifyGeometryChanged();
-    void updateControlPointVisualization();
+    bool isDrawingComplete() const; // 检查绘制是否完成
 
 private:
     Geo3D* m_parent;
     std::vector<Point3D> m_controlPoints;
-    
-    // 控制点属性
-    int m_minimumPointsRequired;
-    bool m_previewActive;
-    bool m_controlPointsVisible;
-    float m_controlPointSize;
-    Color3D m_controlPointColor;
-    Point3D m_tempPoint; // 新增临时点
+    Point3D m_tempPoint; // 临时点（内部使用）
 }; 

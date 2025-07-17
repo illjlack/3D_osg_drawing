@@ -2,92 +2,109 @@
 #include "../GeometryBase.h"
 #include <stdexcept>
 #include <algorithm>
-#include <glm/gtc/matrix_transform.hpp>
 
 GeoControlPointManager::GeoControlPointManager(Geo3D* parent)
     : QObject(parent)
     , m_parent(parent)
-    , m_minimumPointsRequired(1)
-    , m_previewActive(false)
-    , m_controlPointsVisible(true)
-    , m_controlPointSize(0.1f)
-    , m_controlPointColor(1.0f, 0.0f, 0.0f, 1.0f) // 默认红色
     , m_tempPoint(Point3D(glm::vec3(0))) // 初始化临时点
 {
+}
+
+// 控制点访问 - 对外统一接口
+const std::vector<Point3D>& GeoControlPointManager::getControlPoints() const
+{
+    // 如果绘制未完成且有临时点，返回包含临时点的控制点列表
+    if (!isDrawingComplete() && m_tempPoint.position != glm::vec3(0)) {
+        static std::vector<Point3D> tempControlPoints;
+        tempControlPoints = m_controlPoints;
+        tempControlPoints.push_back(m_tempPoint);
+        return tempControlPoints;
+    }
+    return m_controlPoints;
 }
 
 Point3D GeoControlPointManager::getControlPoint(int index) const
 {
     validateIndex(index);
+    
+    // 如果绘制未完成且有临时点，且索引是最后一个，返回临时点
+    if (!isDrawingComplete() && m_tempPoint.position != glm::vec3(0) && 
+        index == static_cast<int>(m_controlPoints.size())) {
+        return m_tempPoint;
+    }
+    
     return m_controlPoints[index];
+}
+
+int GeoControlPointManager::getControlPointCount() const
+{
+    int count = static_cast<int>(m_controlPoints.size());
+    
+    // 如果绘制未完成且有临时点，计数加1
+    if (!isDrawingComplete() && m_tempPoint.position != glm::vec3(0)) {
+        count++;
+    }
+    
+    return count;
+}
+
+bool GeoControlPointManager::hasControlPoints() const
+{
+    return !m_controlPoints.empty() || 
+           (!isDrawingComplete() && m_tempPoint.position != glm::vec3(0));
 }
 
 void GeoControlPointManager::addControlPoint(const Point3D& point)
 {
-    int index = static_cast<int>(m_controlPoints.size());
     m_controlPoints.push_back(point);
     
     notifyGeometryChanged();
-    updateControlPointVisualization();
-    
-    emit controlPointAdded(index, point);
-}
-
-void GeoControlPointManager::insertControlPoint(int index, const Point3D& point)
-{
-    if (index < 0 || index > static_cast<int>(m_controlPoints.size())) {
-        throw std::out_of_range("Control point index out of range");
-    }
-    
-    m_controlPoints.insert(m_controlPoints.begin() + index, point);
-    
-    notifyGeometryChanged();
-    updateControlPointVisualization();
-    
-    emit controlPointAdded(index, point);
+    emit controlPointsChanged();
 }
 
 void GeoControlPointManager::setControlPoint(int index, const Point3D& point)
 {
     validateIndex(index);
     
-    Point3D oldPoint = m_controlPoints[index];
+    // 如果绘制未完成且有临时点，且索引是最后一个，设置临时点
+    if (!isDrawingComplete() && m_tempPoint.position != glm::vec3(0) && 
+        index == static_cast<int>(m_controlPoints.size())) {
+        setTempPoint(point);
+        return;
+    }
+    
     m_controlPoints[index] = point;
     
     notifyGeometryChanged();
-    updateControlPointVisualization();
-    
-    emit controlPointChanged(index, oldPoint, point);
+    emit controlPointsChanged();
 }
 
 void GeoControlPointManager::removeControlPoint(int index)
 {
     validateIndex(index);
     
+    // 如果绘制未完成且有临时点，且索引是最后一个，清除临时点
+    if (!isDrawingComplete() && m_tempPoint.position != glm::vec3(0) && 
+        index == static_cast<int>(m_controlPoints.size())) {
+        clearTempPoint();
+        return;
+    }
+    
     m_controlPoints.erase(m_controlPoints.begin() + index);
     
     notifyGeometryChanged();
-    updateControlPointVisualization();
-    
-    emit controlPointRemoved(index);
-}
-
-void GeoControlPointManager::removeLastControlPoint()
-{
-    if (!m_controlPoints.empty()) {
-        removeControlPoint(static_cast<int>(m_controlPoints.size() - 1));
-    }
+    emit controlPointsChanged();
 }
 
 void GeoControlPointManager::clearControlPoints()
 {
-    if (!m_controlPoints.empty()) {
+    if (!m_controlPoints.empty() || 
+        (!isDrawingComplete() && m_tempPoint.position != glm::vec3(0))) {
         m_controlPoints.clear();
+        clearTempPoint();
         
         notifyGeometryChanged();
-        updateControlPointVisualization();
-        
-        emit controlPointsCleared();
+        emit controlPointsChanged();
     }
 }
 
@@ -96,6 +113,7 @@ int GeoControlPointManager::findNearestControlPoint(const Point3D& point, float 
     int nearestIndex = -1;
     float minDistance = threshold;
     
+    // 搜索实际控制点
     for (int i = 0; i < static_cast<int>(m_controlPoints.size()); ++i) {
         glm::vec3 diff = m_controlPoints[i].position - point.position;
         float distance = glm::length(diff);
@@ -106,136 +124,47 @@ int GeoControlPointManager::findNearestControlPoint(const Point3D& point, float 
         }
     }
     
+    // 如果绘制未完成且有临时点，也搜索临时点
+    if (!isDrawingComplete() && m_tempPoint.position != glm::vec3(0)) {
+        glm::vec3 diff = m_tempPoint.position - point.position;
+        float distance = glm::length(diff);
+        
+        if (distance < minDistance) {
+            minDistance = distance;
+            nearestIndex = static_cast<int>(m_controlPoints.size());
+        }
+    }
+    
     return nearestIndex;
 }
 
 bool GeoControlPointManager::isValidIndex(int index) const
 {
-    return index >= 0 && index < static_cast<int>(m_controlPoints.size());
-}
-
-void GeoControlPointManager::translateControlPoints(const glm::vec3& offset)
-{
-    for (auto& point : m_controlPoints) {
-        point.position += offset;
+    int maxIndex = static_cast<int>(m_controlPoints.size());
+    
+    // 如果绘制未完成且有临时点，最大索引加1
+    if (!isDrawingComplete() && m_tempPoint.position != glm::vec3(0)) {
+        maxIndex++;
     }
     
-    notifyGeometryChanged();
-    updateControlPointVisualization();
-    
-    emit controlPointsTransformed();
+    return index >= 0 && index < maxIndex;
 }
 
-void GeoControlPointManager::rotateControlPoints(const glm::vec3& axis, float angle, const glm::vec3& center)
+void GeoControlPointManager::setTempPoint(const Point3D& point)
 {
-    glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), angle, axis);
-    glm::mat4 translate1 = glm::translate(glm::mat4(1.0f), -center);
-    glm::mat4 translate2 = glm::translate(glm::mat4(1.0f), center);
-    glm::mat4 transform = translate2 * rotation * translate1;
-    
-    transformControlPoints(transform);
-}
-
-void GeoControlPointManager::scaleControlPoints(const glm::vec3& scale, const glm::vec3& center)
-{
-    glm::mat4 scaling = glm::scale(glm::mat4(1.0f), scale);
-    glm::mat4 translate1 = glm::translate(glm::mat4(1.0f), -center);
-    glm::mat4 translate2 = glm::translate(glm::mat4(1.0f), center);
-    glm::mat4 transform = translate2 * scaling * translate1;
-    
-    transformControlPoints(transform);
-}
-
-void GeoControlPointManager::transformControlPoints(const glm::mat4& matrix)
-{
-    for (auto& point : m_controlPoints) {
-        glm::vec4 pos = glm::vec4(point.position, 1.0f);
-        pos = matrix * pos;
-        point.position = glm::vec3(pos) / pos.w;
-    }
-    
-    notifyGeometryChanged();
-    updateControlPointVisualization();
-    
-    emit controlPointsTransformed();
-}
-
-bool GeoControlPointManager::validateControlPoints() const
-{
-    // 检查最小点数要求
-    if (!isMinimumPointsMet()) {
-        return false;
-    }
-    
-    // 检查是否有重复点
-    for (size_t i = 0; i < m_controlPoints.size(); ++i) {
-        for (size_t j = i + 1; j < m_controlPoints.size(); ++j) {
-            glm::vec3 diff = m_controlPoints[i].position - m_controlPoints[j].position;
-            if (glm::length(diff) < 1e-6f) {
-                return false; // 有重复点
-            }
-        }
-    }
-    
-    return true;
-}
-
-bool GeoControlPointManager::isMinimumPointsMet() const
-{
-    return static_cast<int>(m_controlPoints.size()) >= m_minimumPointsRequired;
-}
-
-int GeoControlPointManager::getMinimumPointsRequired() const
-{
-    return m_minimumPointsRequired;
-}
-
-void GeoControlPointManager::setMinimumPointsRequired(int count)
-{
-    m_minimumPointsRequired = std::max(0, count);
-}
-
-void GeoControlPointManager::startPreview()
-{
-    if (!m_previewActive) {
-        m_previewActive = true;
-        emit previewStarted();
+    if (m_tempPoint.position != point.position) {
+        m_tempPoint = point;
+        notifyGeometryChanged();
+        emit controlPointsChanged();
     }
 }
 
-void GeoControlPointManager::stopPreview()
+void GeoControlPointManager::clearTempPoint()
 {
-    if (m_previewActive) {
-        m_previewActive = false;
-        emit previewStopped();
-    }
-}
-
-void GeoControlPointManager::setControlPointsVisible(bool visible)
-{
-    if (m_controlPointsVisible != visible) {
-        m_controlPointsVisible = visible;
-        updateControlPointVisualization();
-        emit visibilityChanged(visible);
-    }
-}
-
-void GeoControlPointManager::setControlPointSize(float size)
-{
-    if (m_controlPointSize != size) {
-        m_controlPointSize = std::max(0.01f, size);
-        updateControlPointVisualization();
-    }
-}
-
-void GeoControlPointManager::setControlPointColor(const Color3D& color)
-{
-    if (m_controlPointColor.r != color.r || 
-        m_controlPointColor.g != color.g || 
-        m_controlPointColor.b != color.b || 
-        m_controlPointColor.a != color.a) {
-        m_controlPointColor = color;
-        updateControlPointVisualization();
+    if (m_tempPoint.position != glm::vec3(0)) {
+        m_tempPoint = Point3D(glm::vec3(0));
+        notifyGeometryChanged();
+        emit controlPointsChanged();
     }
 }
 
@@ -254,32 +183,8 @@ void GeoControlPointManager::notifyGeometryChanged()
     }
 }
 
-void GeoControlPointManager::updateControlPointVisualization()
+bool GeoControlPointManager::isDrawingComplete() const
 {
-    // 控制点可视化更新 - 通过状态管理器触发几何体更新
-    if (m_parent && m_parent->mm_state()) {
-        m_parent->mm_state()->setControlPointsUpdated();
-    }
-}
-
-// ==================== 临时点管理 ====================
-
-void GeoControlPointManager::setTempPoint(const Point3D& point)
-{
-    if (m_tempPoint.position != point.position) {
-        m_tempPoint = point;
-        notifyGeometryChanged();
-        updateControlPointVisualization();
-        emit controlPointsChanged();
-    }
-}
-
-void GeoControlPointManager::clearTempPoint()
-{
-    if (m_tempPoint.position != glm::vec3(0)) {
-        m_tempPoint = Point3D(glm::vec3(0));
-        notifyGeometryChanged();
-        updateControlPointVisualization();
-        emit controlPointsChanged();
-    }
+    // 检查绘制是否完成状态
+    return m_parent && m_parent->mm_state() && m_parent->mm_state()->isStateDrawComplete();
 } 

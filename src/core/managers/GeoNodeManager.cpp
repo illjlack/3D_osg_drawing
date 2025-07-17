@@ -7,6 +7,10 @@
 #include <osg/NodeVisitor>
 #include <osg/ComputeBoundsVisitor>
 #include <osg/KdTree>
+#include <osg/Geode>
+#include <osg/Geometry>
+#include <osg/Vec3Array>
+#include <osg/PrimitiveSet>
 #include "../../util/LogManager.h"
 
 GeoNodeManager::GeoNodeManager(Geo3D* parent)
@@ -30,11 +34,13 @@ void GeoNodeManager::initializeNodes()
         m_edgeGeometry = new osg::Geometry();
         m_faceGeometry = new osg::Geometry();
         m_controlPointsGeometry = new osg::Geometry();
+        m_boundingBoxGeometry = new osg::Geometry();
         
         m_transformNode->addChild(m_vertexGeometry.get());
         m_transformNode->addChild(m_edgeGeometry.get());
         m_transformNode->addChild(m_faceGeometry.get());
         m_transformNode->addChild(m_controlPointsGeometry.get());
+        m_transformNode->addChild(m_boundingBoxGeometry.get());
 
         m_initialized = true;
     }
@@ -83,12 +89,23 @@ void GeoNodeManager::clearControlPointsGeometry()
     }
 }
 
+void GeoNodeManager::clearBoundingBoxGeometry()
+{
+    if (m_boundingBoxGeometry.valid()) {
+        m_boundingBoxGeometry->removePrimitiveSet(0, m_boundingBoxGeometry->getNumPrimitiveSets());
+        m_boundingBoxGeometry->setVertexArray(nullptr);
+        m_boundingBoxGeometry->setColorArray(nullptr);
+        emit geometryChanged();
+    }
+}
+
 void GeoNodeManager::clearAllGeometries()
 {
     clearVertexGeometry();
     clearEdgeGeometry();
     clearFaceGeometry();
     clearControlPointsGeometry();
+    clearBoundingBoxGeometry();
     clearSpatialIndex();
 }
 
@@ -155,6 +172,14 @@ void GeoNodeManager::setControlPointsVisible(bool visible)
     }
 }
 
+void GeoNodeManager::setBoundingBoxVisible(bool visible)
+{
+    if (m_boundingBoxGeometry.valid()) {
+        m_boundingBoxGeometry->setNodeMask(visible ? 0xffffffff : 0x0);
+        emit visibilityChanged();
+    }
+}
+
 bool GeoNodeManager::isVertexVisible() const
 {
     return m_vertexGeometry.valid() ? m_vertexGeometry->getNodeMask() != 0x0 : false;
@@ -173,6 +198,11 @@ bool GeoNodeManager::isFaceVisible() const
 bool GeoNodeManager::isControlPointsVisible() const
 {
     return m_controlPointsGeometry.valid() ? m_controlPointsGeometry->getNodeMask() != 0x0 : false;
+}
+
+bool GeoNodeManager::isBoundingBoxVisible() const
+{
+    return m_boundingBoxGeometry.valid() ? m_boundingBoxGeometry->getNodeMask() != 0x0 : false;
 }
 
 void GeoNodeManager::updateSpatialIndex()
@@ -210,4 +240,96 @@ void GeoNodeManager::buildKdTreeForGeometry(osg::Geometry* geometry)
     {
         LOG_INFO("KdTree 构建失败", "GEO");
     }
+}
+
+void GeoNodeManager::updateBoundingBoxGeometry()
+{
+    if (!m_boundingBoxGeometry.valid()) return;
+
+    // 计算所有几何体的包围盒
+    osg::BoundingBox boundingBox;
+    
+    // 从顶点几何体计算包围盒
+    if (m_vertexGeometry.valid() && m_vertexGeometry->getVertexArray()) {
+        osg::ComputeBoundsVisitor boundsVisitor;
+        m_vertexGeometry->accept(boundsVisitor);
+        osg::BoundingBox vertexBounds = boundsVisitor.getBoundingBox();
+        boundingBox.expandBy(vertexBounds);
+    }
+    
+    // 从边几何体计算包围盒
+    if (m_edgeGeometry.valid() && m_edgeGeometry->getVertexArray()) {
+        osg::ComputeBoundsVisitor boundsVisitor;
+        m_edgeGeometry->accept(boundsVisitor);
+        osg::BoundingBox edgeBounds = boundsVisitor.getBoundingBox();
+        boundingBox.expandBy(edgeBounds);
+    }
+    
+    // 从面几何体计算包围盒
+    if (m_faceGeometry.valid() && m_faceGeometry->getVertexArray()) {
+        osg::ComputeBoundsVisitor boundsVisitor;
+        m_faceGeometry->accept(boundsVisitor);
+        osg::BoundingBox faceBounds = boundsVisitor.getBoundingBox();
+        boundingBox.expandBy(faceBounds);
+    }
+
+    // 如果包围盒有效，创建包围盒几何体
+    if (boundingBox.valid()) {
+        createBoundingBoxGeometry(boundingBox);
+    } else {
+        clearBoundingBoxGeometry();
+    }
+}
+
+void GeoNodeManager::createBoundingBoxGeometry(const osg::BoundingBox& boundingBox)
+{
+    if (!m_boundingBoxGeometry.valid()) return;
+
+    // 清除现有几何体
+    m_boundingBoxGeometry->removePrimitiveSet(0, m_boundingBoxGeometry->getNumPrimitiveSets());
+    m_boundingBoxGeometry->setVertexArray(nullptr);
+    m_boundingBoxGeometry->setColorArray(nullptr);
+
+    // 创建包围盒的8个顶点
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+    vertices->push_back(osg::Vec3(boundingBox.xMin(), boundingBox.yMin(), boundingBox.zMin()));
+    vertices->push_back(osg::Vec3(boundingBox.xMax(), boundingBox.yMin(), boundingBox.zMin()));
+    vertices->push_back(osg::Vec3(boundingBox.xMax(), boundingBox.yMax(), boundingBox.zMin()));
+    vertices->push_back(osg::Vec3(boundingBox.xMin(), boundingBox.yMax(), boundingBox.zMin()));
+    vertices->push_back(osg::Vec3(boundingBox.xMin(), boundingBox.yMin(), boundingBox.zMax()));
+    vertices->push_back(osg::Vec3(boundingBox.xMax(), boundingBox.yMin(), boundingBox.zMax()));
+    vertices->push_back(osg::Vec3(boundingBox.xMax(), boundingBox.yMax(), boundingBox.zMax()));
+    vertices->push_back(osg::Vec3(boundingBox.xMin(), boundingBox.yMax(), boundingBox.zMax()));
+
+    // 创建颜色数组（线框颜色）
+    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
+    colors->push_back(osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f)); // 黄色
+
+    // 创建线框索引
+    osg::ref_ptr<osg::DrawElementsUInt> lines = new osg::DrawElementsUInt(osg::PrimitiveSet::LINES, 0);
+    
+    // 底面的4条边
+    lines->push_back(0); lines->push_back(1);
+    lines->push_back(1); lines->push_back(2);
+    lines->push_back(2); lines->push_back(3);
+    lines->push_back(3); lines->push_back(0);
+    
+    // 顶面的4条边
+    lines->push_back(4); lines->push_back(5);
+    lines->push_back(5); lines->push_back(6);
+    lines->push_back(6); lines->push_back(7);
+    lines->push_back(7); lines->push_back(4);
+    
+    // 连接顶面和底面的4条边
+    lines->push_back(0); lines->push_back(4);
+    lines->push_back(1); lines->push_back(5);
+    lines->push_back(2); lines->push_back(6);
+    lines->push_back(3); lines->push_back(7);
+
+    // 设置几何体数据
+    m_boundingBoxGeometry->setVertexArray(vertices.get());
+    m_boundingBoxGeometry->setColorArray(colors.get(), osg::Array::BIND_OVERALL);
+    m_boundingBoxGeometry->addPrimitiveSet(lines.get());
+
+    emit geometryChanged();
 }

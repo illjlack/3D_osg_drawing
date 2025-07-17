@@ -62,7 +62,6 @@ void Geo3D::setupManagers()
     m_materialManager = std::make_unique<GeoMaterialManager>(this);
 
     m_controlPointManager = std::make_unique<GeoControlPointManager>(this);
-    m_boundingBoxManager = std::make_unique<GeoBoundingBoxManager>(this);
     m_renderManager = std::make_unique<GeoRenderManager>(this);
     
     // 连接管理器之间的信号
@@ -79,9 +78,7 @@ void Geo3D::connectManagerSignals()
     connect(m_controlPointManager.get(), &GeoControlPointManager::controlPointsChanged,
             this, [this]() { });
     
-    // 包围盒管理器信号连接
-    connect(m_boundingBoxManager.get(), &GeoBoundingBoxManager::boundingBoxChanged,
-            this, [this]() { });
+
     
     // 材质管理器信号连接
     connect(m_materialManager.get(), &GeoMaterialManager::materialChanged,
