@@ -19,15 +19,16 @@ Quad3D_Geo::Quad3D_Geo()
 
 void Quad3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!mm_state()->isStateDrawComplete())
+    if (!mm_state()->isStateComplete())
     {
         // 添加控制点
         mm_controlPoint()->addControlPoint(Point3D(worldPos));
         
-        const auto& controlPoints = mm_controlPoint()->getControlPoints();
-        if (controlPoints.size() == 4)
+        // 使用新的检查方法
+        if (isDrawingComplete() && areControlPointsValid())
         {
             // 直接计算法向量和面积
+            const auto& controlPoints = mm_controlPoint()->getControlPoints();
             const auto& v1 = controlPoints[0].position;
             const auto& v2 = controlPoints[1].position;
             const auto& v3 = controlPoints[2].position;
@@ -43,21 +44,18 @@ void Quad3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
             glm::vec3 cross2 = glm::cross(v3 - v1, v4 - v1);
             m_area = 0.5f * (glm::length(cross1) + glm::length(cross2));
             
-            mm_state()->setStateDrawComplete();
+            mm_state()->setStateComplete();
         }
-        
-        mm_state()->setControlPointsUpdated();
     }
 }
 
 void Quad3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
     const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (!mm_state()->isStateDrawComplete() && controlPoints.size() < 4)
+    if (!mm_state()->isStateComplete() && controlPoints.size() < 4)
     {
         // 设置临时点用于预览
         mm_controlPoint()->setTempPoint(Point3D(worldPos));
-        mm_state()->setTemporaryPointsUpdated();
     }
 }
 
@@ -118,12 +116,8 @@ void Quad3D_Geo::buildEdgeGeometries()
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
-    // 构建所有点（包括临时点）
+    // 构建所有点（控制点已包含临时点）
     std::vector<Point3D> allPoints = controlPoints;
-    if (!mm_state()->isStateDrawComplete() && mm_controlPoint()->getTempPoint().position != glm::vec3(0))
-    {
-        allPoints.push_back(mm_controlPoint()->getTempPoint());
-    }
     
     // 添加边线
     for (size_t i = 0; i < allPoints.size(); ++i)
@@ -244,4 +238,57 @@ void Quad3D_Geo::buildFaceGeometries()
     }
     
     // 几何体已经通过mm_node()->getFaceGeometry()获取，直接使用
+}
+
+// ==================== 绘制完成检查和控制点验证 ====================
+
+bool Quad3D_Geo::isDrawingComplete() const
+{
+    // 四边形需要4个控制点才能完成绘制
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
+    return controlPoints.size() >= 4;
+}
+
+bool Quad3D_Geo::areControlPointsValid() const
+{
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
+    
+    // 检查控制点数量
+    if (controlPoints.size() < 3) {
+        return false;
+    }
+    
+    // 检查控制点是否重合（允许一定的误差）
+    const float epsilon = 0.001f;
+    for (size_t i = 0; i < controlPoints.size() - 1; ++i) {
+        for (size_t j = i + 1; j < controlPoints.size(); ++j) {
+            glm::vec3 diff = controlPoints[j].position - controlPoints[i].position;
+            float distance = glm::length(diff);
+            if (distance < epsilon) {
+                return false; // 有重复点，无效
+            }
+        }
+    }
+    
+    // 检查控制点坐标是否有效（不是NaN或无穷大）
+    for (const auto& point : controlPoints) {
+        if (std::isnan(point.x()) || std::isnan(point.y()) || std::isnan(point.z()) ||
+            std::isinf(point.x()) || std::isinf(point.y()) || std::isinf(point.z())) {
+            return false;
+        }
+    }
+    
+    // 检查前三个点是否共线（如果共线则无法形成有效四边形）
+    if (controlPoints.size() >= 3) {
+        glm::vec3 v1 = controlPoints[1].position - controlPoints[0].position;
+        glm::vec3 v2 = controlPoints[2].position - controlPoints[0].position;
+        glm::vec3 cross = glm::cross(v1, v2);
+        float crossLength = glm::length(cross);
+        
+        if (crossLength < epsilon) {
+            return false; // 前三点共线，无法形成有效四边形
+        }
+    }
+    
+    return true;
 } 

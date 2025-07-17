@@ -21,25 +21,22 @@ Arc3D_Geo::Arc3D_Geo()
 
 void Arc3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!mm_state()->isStateDrawComplete())
+    if (!mm_state()->isStateComplete())
     {
         // 添加控制点
         mm_controlPoint()->addControlPoint(Point3D(worldPos));
         
-        const auto& controlPoints = mm_controlPoint()->getControlPoints();
-        
-        if (controlPoints.size() == 3)
+        // 使用新的检查方法
+        if (isDrawingComplete() && areControlPointsValid())
         {
-            mm_state()->setStateDrawComplete();
+            mm_state()->setStateComplete();
         }
-        
-        mm_state()->setControlPointsUpdated();
     }
 }
 
 void Arc3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!mm_state()->isStateDrawComplete())
+    if (!mm_state()->isStateComplete())
     {
         const auto& controlPoints = mm_controlPoint()->getControlPoints();
         
@@ -48,9 +45,6 @@ void Arc3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
         {
             mm_controlPoint()->setTempPoint(Point3D(worldPos));
         }
-        
-        // 通过状态管理器通知临时点更新
-        mm_state()->setTemporaryPointsUpdated();
     }
 }
 
@@ -88,8 +82,7 @@ void Arc3D_Geo::buildVertexGeometries()
     point->setSize(8.0f);  // 控制点大小
     stateSet->setAttribute(point);
     
-    // 通过状态管理器清除顶点几何体无效状态
-    mm_state()->clearVertexGeometryInvalid();
+    // 几何体构建完成
 }
 
 void Arc3D_Geo::buildEdgeGeometries()
@@ -154,13 +147,75 @@ void Arc3D_Geo::buildEdgeGeometries()
     lineWidth->setWidth(2.0f);  // 边界线宽度
     stateSet->setAttribute(lineWidth);
     
-    // 通过状态管理器清除边几何体无效状态
-    mm_state()->clearEdgeGeometryInvalid();
+    // 几何体构建完成
 }
 
 void Arc3D_Geo::buildFaceGeometries()
 {
     // 圆弧不需要画面
     return;
+}
+
+// ==================== 绘制完成检查和控制点验证 ====================
+
+bool Arc3D_Geo::isDrawingComplete() const
+{
+    // 圆弧需要3个控制点（起点、中点、终点）才能完成绘制
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
+    return controlPoints.size() >= 3;
+}
+
+bool Arc3D_Geo::areControlPointsValid() const
+{
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
+    
+    // 检查控制点数量
+    if (controlPoints.size() < 3) {
+        return false;
+    }
+    
+    // 检查控制点是否重合（允许一定的误差）
+    const float epsilon = 0.001f;
+    
+    // 检查前两个点是否重合
+    glm::vec3 diff1 = controlPoints[1].position - controlPoints[0].position;
+    float distance1 = glm::length(diff1);
+    if (distance1 < epsilon) {
+        return false;
+    }
+    
+    // 检查后两个点是否重合
+    glm::vec3 diff2 = controlPoints[2].position - controlPoints[1].position;
+    float distance2 = glm::length(diff2);
+    if (distance2 < epsilon) {
+        return false;
+    }
+    
+    // 检查第一个和第三个点是否重合
+    glm::vec3 diff3 = controlPoints[2].position - controlPoints[0].position;
+    float distance3 = glm::length(diff3);
+    if (distance3 < epsilon) {
+        return false;
+    }
+    
+    // 检查控制点坐标是否有效（不是NaN或无穷大）
+    for (const auto& point : controlPoints) {
+        if (std::isnan(point.x()) || std::isnan(point.y()) || std::isnan(point.z()) ||
+            std::isinf(point.x()) || std::isinf(point.y()) || std::isinf(point.z())) {
+            return false;
+        }
+    }
+    
+    // 检查三点是否共线（如果共线则无法形成圆弧）
+    glm::vec3 v1 = controlPoints[1].position - controlPoints[0].position;
+    glm::vec3 v2 = controlPoints[2].position - controlPoints[0].position;
+    glm::vec3 cross = glm::cross(v1, v2);
+    float crossLength = glm::length(cross);
+    
+    if (crossLength < epsilon) {
+        return false; // 三点共线，无法形成圆弧
+    }
+    
+    return true;
 }
 

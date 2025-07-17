@@ -9,7 +9,7 @@
 #include <osg/KdTree>
 #include <osg/Geode>
 #include <osg/Geometry>
-#include <osg/Vec3Array>
+#include <osg/Array>
 #include <osg/PrimitiveSet>
 #include "../../util/LogManager.h"
 
@@ -113,6 +113,13 @@ void GeoNodeManager::setTransformMatrix(const osg::Matrix& matrix)
 {
     if (m_transformNode.valid()) {
         m_transformNode->setMatrix(matrix);
+        
+        // 注意：变换矩阵改变时不需要重建空间索引
+        // 因为：
+        // 1. KdTree 存储的是几何体的局部坐标
+        // 2. OSG 的 CullVisitor 会自动应用变换矩阵进行视锥体剔除
+        // 3. 几何体的顶点数据本身没有改变
+        
         emit transformChanged();
     }
 }
@@ -279,6 +286,13 @@ void GeoNodeManager::updateBoundingBoxGeometry()
     } else {
         clearBoundingBoxGeometry();
     }
+}
+
+void GeoNodeManager::updateGeometries()
+{
+    m_parent->updateGeometries();
+    updateSpatialIndex();
+    updateBoundingBoxGeometry();
 }
 
 void GeoNodeManager::createBoundingBoxGeometry(const osg::BoundingBox& boundingBox)

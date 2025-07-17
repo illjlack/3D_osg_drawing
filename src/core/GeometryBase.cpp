@@ -70,23 +70,198 @@ void Geo3D::setupManagers()
 
 void Geo3D::connectManagerSignals()
 {
-    // 状态管理器信号连接
-    connect(m_stateManager.get(), &GeoStateManager::stateDrawCompleted, 
-            this, [this]() { });
+    // 确保所有管理器都已创建
+    if (!m_stateManager || !m_nodeManager || !m_materialManager || 
+        !m_controlPointManager || !m_renderManager) {
+        qWarning() << "Geo3D::connectManagerSignals: 某些管理器未初始化";
+        return;
+    }
     
-    // 控制点管理器信号连接
-    connect(m_controlPointManager.get(), &GeoControlPointManager::controlPointsChanged,
-            this, [this]() { });
+    // ==================== 状态管理器信号连接 ====================
     
-
+    // 状态完成时通知控制点管理器
+    connect(m_stateManager.get(), &GeoStateManager::stateCompleted,
+            this, [this]() {
+                if (m_controlPointManager) {
+                    // 绘制完成时清理临时点
+                    m_controlPointManager->clearTempPoint();
+                }
+            });
     
-    // 材质管理器信号连接
+    // 编辑状态变化时通知渲染管理器
+    connect(m_stateManager.get(), &GeoStateManager::editingStarted,
+            this, [this]() {
+                if (m_renderManager) {
+                    m_renderManager->setHighlighted(true);
+                }
+                // 编辑开始时显示控制点
+                if (m_nodeManager) {
+                    m_nodeManager->setControlPointsVisible(true);
+                }
+            });
+    
+    connect(m_stateManager.get(), &GeoStateManager::editingFinished,
+            this, [this]() {
+                if (m_renderManager) {
+                    m_renderManager->setHighlighted(false);
+                }
+                // 编辑结束时隐藏控制点
+                if (m_nodeManager) {
+                    m_nodeManager->setControlPointsVisible(false);
+                }
+            });
+    
+    // 选中状态变化时通知渲染管理器
+    connect(m_stateManager.get(), &GeoStateManager::stateSelected,
+            this, [this]() {
+                if (m_renderManager) {
+                    m_renderManager->setHighlighted(true);
+                }
+            });
+    
+    connect(m_stateManager.get(), &GeoStateManager::stateDeselected,
+            this, [this]() {
+                if (m_renderManager) {
+                    m_renderManager->setHighlighted(false);
+                }
+            });
+    
+    // ==================== 节点管理器信号连接 ====================
+    connect(m_nodeManager.get(), &GeoNodeManager::geometryChanged,
+            this, [this]() {
+                // 几何体变化时更新渲染
+                if (m_renderManager) {
+                    m_renderManager->forceRenderUpdate();
+                }
+                // 几何体变化时更新材质
+                if (m_materialManager) {
+                    m_materialManager->updateOSGMaterial();
+                }
+            });
+    
+    connect(m_nodeManager.get(), &GeoNodeManager::transformChanged,
+            this, [this]() {
+                // 变换变化时更新渲染
+                if (m_renderManager) {
+                    m_renderManager->updateRender();
+                }
+            });
+    
+    connect(m_nodeManager.get(), &GeoNodeManager::visibilityChanged,
+            this, [this]() {
+                // 可见性变化时更新渲染
+                if (m_renderManager) {
+                    m_renderManager->updateRender();
+                }
+            });
+    
+    // ==================== 材质管理器信号连接 ====================
     connect(m_materialManager.get(), &GeoMaterialManager::materialChanged,
-            this, [this]() { });
+            this, [this]() {
+                // 材质变化时更新渲染
+                if (m_renderManager) {
+                    m_renderManager->updateRender();
+                }
+            });
     
-    // 渲染管理器信号连接
+    connect(m_materialManager.get(), &GeoMaterialManager::colorChanged,
+            this, [this]() {
+                // 颜色变化时更新渲染
+                if (m_renderManager) {
+                    m_renderManager->updateRender();
+                }
+            });
+    
+    connect(m_materialManager.get(), &GeoMaterialManager::linePropertiesChanged,
+            this, [this]() {
+                // 线条属性变化时更新渲染
+                if (m_renderManager) {
+                    m_renderManager->updateRender();
+                }
+            });
+    
+    connect(m_materialManager.get(), &GeoMaterialManager::pointPropertiesChanged,
+            this, [this]() {
+                // 点属性变化时更新渲染
+                if (m_renderManager) {
+                    m_renderManager->updateRender();
+                }
+            });
+    
+    connect(m_materialManager.get(), &GeoMaterialManager::facePropertiesChanged,
+            this, [this]() {
+                // 面属性变化时更新渲染
+                if (m_renderManager) {
+                    m_renderManager->updateRender();
+                }
+            });
+    
+    connect(m_materialManager.get(), &GeoMaterialManager::blendingChanged,
+            this, [this]() {
+                // 混合模式变化时更新渲染
+                if (m_renderManager) {
+                    m_renderManager->updateRender();
+                }
+            });
+    
+    connect(m_materialManager.get(), &GeoMaterialManager::renderModeChanged,
+            this, [this]() {
+                // 渲染模式变化时通知渲染管理器
+                if (m_renderManager) {
+                    m_renderManager->applyRenderMode();
+                }
+            });
+    
+    // ==================== 渲染管理器信号连接 ====================
     connect(m_renderManager.get(), &GeoRenderManager::renderModeChanged,
-            this, [this](GeoRenderManager::RenderMode) { });
+            this, [this](GeoRenderManager::RenderMode mode) {
+                // 渲染模式变化时更新材质
+                if (m_materialManager) {
+                    m_materialManager->updateRenderingAttributes();
+                }
+            });
+    
+    connect(m_renderManager.get(), &GeoRenderManager::visibilityChanged,
+            this, [this](bool visible) {
+                // 可见性变化时更新节点管理器
+                if (m_nodeManager) {
+                    m_nodeManager->setVisible(visible);
+                }
+            });
+    
+    connect(m_renderManager.get(), &GeoRenderManager::highlightChanged,
+            this, [this](bool highlighted) {
+                // 高亮变化时更新材质
+                if (m_materialManager) {
+                    m_materialManager->updateOSGMaterial();
+                }
+            });
+    
+    connect(m_renderManager.get(), &GeoRenderManager::renderUpdateRequired,
+            this, [this]() {
+                // 渲染更新请求时强制更新
+                if (m_renderManager) {
+                    m_renderManager->forceRenderUpdate();
+                }
+            });
+    
+    connect(m_renderManager.get(), &GeoRenderManager::renderQualityChanged,
+            this, [this](int quality) {
+                // 渲染质量变化时更新材质
+                if (m_materialManager) {
+                    m_materialManager->updateRenderingAttributes();
+                }
+            });
+    
+    connect(m_renderManager.get(), &GeoRenderManager::renderOptimizationSuggested,
+            this, [this]() {
+                // 渲染优化建议时执行优化
+                if (m_renderManager) {
+                    m_renderManager->optimizeRendering();
+                }
+            });
+    
+    qDebug() << "Geo3D::connectManagerSignals: 所有管理器信号连接完成";
 }
 
 // ========================================= 参数管理 =========================================
@@ -100,12 +275,6 @@ void Geo3D::setParameters(const GeoParameters3D& params)
     m_renderManager->setShowPoints(params.showPoints);
     m_renderManager->setShowEdges(params.showEdges);
     m_renderManager->setShowFaces(params.showFaces);
-    
-    // 参数变化后重新构建KDTree
-    if (m_nodeManager) {
-        m_nodeManager->updateSpatialIndex();
-    }
-    
 }
 
 // ========================================= 初始化和更新 =========================================
@@ -114,28 +283,6 @@ void Geo3D::initialize()
     m_parameters.resetToGlobal();
     mm_state()->setStateInitialized();
 }
-
-// ========================================= 辅助函数 =========================================
-osg::Vec3 Geo3D::glmToOsgVec3(const glm::vec3& v) const
-{
-    return osg::Vec3(v.x, v.y, v.z);
-}
-
-osg::Vec4 Geo3D::glmToOsgVec4(const glm::vec4& v) const
-{
-    return osg::Vec4(v.x, v.y, v.z, v.w);
-}
-
-glm::vec3 Geo3D::osgToGlmVec3(const osg::Vec3& v) const
-{
-    return glm::vec3(v.x(), v.y(), v.z());
-}
-
-glm::vec4 Geo3D::osgToGlmVec4(const osg::Vec4& v) const
-{
-    return glm::vec4(v.x(), v.y(), v.z(), v.w());
-}
-
 
 // ========================================= 事件处理虚函数实现 =========================================
 void Geo3D::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
@@ -156,6 +303,33 @@ void Geo3D::keyPressEvent(QKeyEvent* event)
 void Geo3D::keyReleaseEvent(QKeyEvent* event)
 {
     // 默认实现
+}
+
+// ==================== 公共接口方法实现 ====================
+
+void Geo3D::checkAndEmitDrawingComplete()
+{
+    // 检查控制点是否有效
+    if (!mm_controlPoint()->hasControlPoints()) {
+        qWarning() << "Geo3D::checkAndEmitDrawingComplete: 控制点无效";
+        return;
+    }
+    
+    // 检查是否绘制完成
+    if (isDrawingComplete() && areControlPointsValid()) {
+        // 发送绘制完成信号
+        mm_state()->setStateComplete();
+        qDebug() << "Geo3D::checkAndEmitDrawingComplete: 绘制完成信号已发送";
+    } else {
+        qDebug() << "Geo3D::checkAndEmitDrawingComplete: 绘制尚未完成";
+    }
+}
+
+void Geo3D::updateGeometries()
+{
+    buildVertexGeometries();
+    buildEdgeGeometries();
+    buildFaceGeometries();
 }
 
 // ============================================================================

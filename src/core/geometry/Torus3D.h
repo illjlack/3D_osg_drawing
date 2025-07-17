@@ -17,6 +17,10 @@ protected:
     virtual void buildEdgeGeometries() override;
     virtual void buildFaceGeometries() override;
     
+    // 绘制完成检查和控制点验证
+    virtual bool isDrawingComplete() const override;
+    virtual bool areControlPointsValid() const override;
+    
 private:
     float m_majorRadius = 1.0f;
     float m_minorRadius = 0.3f;

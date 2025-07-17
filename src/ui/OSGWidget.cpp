@@ -83,6 +83,13 @@ OSGWidget::OSGWidget(QWidget* parent)
         update();
     });
     
+    int* a = new int[8];
+    assert(a);
+
+    assert(m_cameraController.get());
+
+    assert(qobject_cast<QObject*>(m_cameraController.get()));
+
     // 连接CameraController的信号
     connect(m_cameraController.get(), &CameraController::cameraMoveSpeedChanged, 
             this, &OSGWidget::cameraMoveSpeedChanged);
@@ -389,7 +396,7 @@ void OSGWidget::addGeo(Geo3D* geo)
         if (m_advancedPickingEnabled)
         {
             // 检查几何对象是否已经完成绘制
-            if (geo->mm_state()->isStateDrawComplete())
+            if (geo->mm_state()->isStateComplete())
             {
                 SimplifiedPickingSystemManager::getInstance().addGeometry(geo);
                 LOG_DEBUG(QString("Added completed geometry to simplified picking system: %1").arg(geo->getGeoType()), "拾取");
@@ -774,7 +781,7 @@ void OSGWidget::onSimplePickingResult(const SimplePickingResult& result)
         
 //         LOG_DEBUG(QString("测试几何体: 类型=%1, 状态=%2")
 //             .arg(geo->getGeoType())
-//             .arg(geo->isStateDrawComplete() ? "完成" : "未完成"), "拾取");
+//             .arg(geo->isStateComplete() ? "完成" : "未完成"), "拾取");
         
 //         PickResult3D geoResult;
 //         // 优先使用KDTree支持的hitTest，如果失败则使用传统方法
@@ -964,9 +971,6 @@ void OSGWidget::mouseMoveEvent(QMouseEvent* event)
             // 更新拖动起始位置
             m_dragStartPosition = m_lastMouseWorldPos;
             
-            // 强制更新几何体 - 通过状态管理器触发更新
-            m_draggingGeo->mm_state()->setControlPointsUpdated();
-            
             LOG_DEBUG(QString("拖动控制点: 对象=%1, 控制点=%2, 新位置=(%3,%4,%5)")
                 .arg(m_draggingGeo->getGeoType())
                 .arg(m_draggingControlPointIndex)
@@ -1117,7 +1121,7 @@ void OSGWidget::handleDrawingInput(QMouseEvent* event)
             m_currentDrawingGeo->mousePressEvent(event, clampedPos);
             
             // 检查是否完成绘制
-            if (m_currentDrawingGeo->mm_state()->isStateDrawComplete())
+            if (m_currentDrawingGeo->mm_state()->isStateComplete())
             {
                 completeCurrentDrawing();
             }
@@ -1143,7 +1147,7 @@ void OSGWidget::completeCurrentDrawing()
     if (m_currentDrawingGeo)
     {
         // 完成绘制 - 这会触发drawingCompleted信号
-        m_currentDrawingGeo->mm_state()->setStateDrawComplete();
+        m_currentDrawingGeo->mm_state()->setStateComplete();
         // 绘制完成后，对象保留在场景中，不需要删除
         m_currentDrawingGeo = nullptr;
         m_isDrawing = false;

@@ -17,13 +17,16 @@ Point3D_Geo::Point3D_Geo()
 
 void Point3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!mm_state()->isStateDrawComplete())
+    if (!mm_state()->isStateComplete())
     {
         // 添加控制点
         mm_controlPoint()->addControlPoint(Point3D(worldPos));
         
-        mm_state()->setStateDrawComplete();
-        mm_state()->setControlPointsUpdated();
+        // 使用新的检查方法
+        if (isDrawingComplete() && areControlPointsValid())
+        {
+            mm_state()->setStateComplete();
+        }
     }
 }
 
@@ -86,4 +89,33 @@ void Point3D_Geo::buildFaceGeometries()
 {
     mm_node()->clearFaceGeometry();
     // 点对象没有面
+}
+
+// ==================== 绘制完成检查和控制点验证 ====================
+
+bool Point3D_Geo::isDrawingComplete() const
+{
+    // 点几何体只需要1个控制点就能完成绘制
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
+    return controlPoints.size() >= 1;
+}
+
+bool Point3D_Geo::areControlPointsValid() const
+{
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
+    
+    // 检查控制点数量
+    if (controlPoints.empty()) {
+        return false;
+    }
+    
+    // 检查控制点坐标是否有效（不是NaN或无穷大）
+    for (const auto& point : controlPoints) {
+        if (std::isnan(point.x()) || std::isnan(point.y()) || std::isnan(point.z()) ||
+            std::isinf(point.x()) || std::isinf(point.y()) || std::isinf(point.z())) {
+            return false;
+        }
+    }
+    
+    return true;
 }

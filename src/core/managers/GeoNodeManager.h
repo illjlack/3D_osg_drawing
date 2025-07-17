@@ -59,12 +59,8 @@ public:
     bool isControlPointsVisible() const;
     bool isBoundingBoxVisible() const;
 
-    // 空间索引管理
-    void updateSpatialIndex();
-    void clearSpatialIndex();
-
-    // 包围盒更新
-    void updateBoundingBoxGeometry();
+    // 更新节点和包围盒、kdtree
+    void updateGeometries();
 signals:
     void geometryChanged();
     void transformChanged();
@@ -73,7 +69,13 @@ signals:
 private:
     void initializeNodes();
     void buildKdTreeForGeometry(osg::Geometry* geometry);
-    
+    void createBoundingBoxGeometry(const osg::BoundingBox& boundingBox);
+
+    // 空间索引管理
+    void updateSpatialIndex();
+    void clearSpatialIndex();
+    // 包围盒更新
+    void updateBoundingBoxGeometry();
 
     Geo3D* m_parent;
     

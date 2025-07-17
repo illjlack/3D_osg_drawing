@@ -14,34 +14,35 @@ Polygon3D_Geo::Polygon3D_Geo()
 
 void Polygon3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!mm_state()->isStateDrawComplete())
+    if (!mm_state()->isStateComplete())
     {
         // 添加控制点
         mm_controlPoint()->addControlPoint(Point3D(worldPos));
         
-        const auto& controlPoints = mm_controlPoint()->getControlPoints();
-        
-        if (controlPoints.size() >= 3)
+        // 使用新的检查方法
+        if (areControlPointsValid())
         {
-            // 检查是否是双击完成多边形
-            if (event && event->type() == QEvent::MouseButtonDblClick)
+            const auto& controlPoints = mm_controlPoint()->getControlPoints();
+            
+            if (controlPoints.size() >= 3)
             {
-                mm_state()->setStateDrawComplete();
+                // 检查是否是双击完成多边形
+                if (event && event->type() == QEvent::MouseButtonDblClick)
+                {
+                    mm_state()->setStateComplete();
+                }
             }
         }
-        
-        mm_state()->setControlPointsUpdated();
     }
 }
 
 void Polygon3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
     const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (!mm_state()->isStateDrawComplete() && !controlPoints.empty())
+    if (!mm_state()->isStateComplete() && !controlPoints.empty())
     {
         // 设置临时点用于预览
         mm_controlPoint()->setTempPoint(Point3D(worldPos));
-        mm_state()->setTemporaryPointsUpdated();
     }
 }
 
@@ -52,7 +53,7 @@ void Polygon3D_Geo::keyPressEvent(QKeyEvent* event)
     {
         if (controlPoints.size() >= 3)
         {
-            mm_state()->setStateDrawComplete();
+            mm_state()->setStateComplete();
         }
     }
     else if (event->key() == Qt::Key_Escape)
@@ -89,13 +90,7 @@ void Polygon3D_Geo::buildVertexGeometries()
                                    m_parameters.pointColor.b, m_parameters.pointColor.a));
     }
     
-    // 如果有临时点且几何体未完成，添加临时点
-    if (!mm_state()->isStateDrawComplete() && mm_controlPoint()->getTempPoint().position != glm::vec3(0))
-    {
-        vertices->push_back(osg::Vec3(mm_controlPoint()->getTempPoint().x(), mm_controlPoint()->getTempPoint().y(), mm_controlPoint()->getTempPoint().z()));
-        colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
-                                   m_parameters.pointColor.b, m_parameters.pointColor.a * 0.5f));
-    }
+    // 控制点已包含临时点，无需单独处理
     
     geometry->setVertexArray(vertices);
     geometry->setColorArray(colors);
@@ -131,12 +126,8 @@ void Polygon3D_Geo::buildEdgeGeometries()
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
-    // 构建所有点（包括临时点）
+    // 构建所有点（控制点已包含临时点）
     std::vector<Point3D> allPoints = controlPoints;
-    if (!mm_state()->isStateDrawComplete() && mm_controlPoint()->getTempPoint().position != glm::vec3(0))
-    {
-        allPoints.push_back(mm_controlPoint()->getTempPoint());
-    }
     
     // 添加边顶点
     for (size_t i = 0; i < allPoints.size(); ++i)
@@ -227,4 +218,59 @@ void Polygon3D_Geo::buildFaceGeometries()
         }
         geometry->addPrimitiveSet(indices);
     }
+}
+
+// ==================== 绘制完成检查和控制点验证 ====================
+
+bool Polygon3D_Geo::isDrawingComplete() const
+{
+    // 多边形需要至少3个控制点才能完成绘制
+    // 但多边形通常需要用户按回车键确认完成，所以这里返回false
+    // 让用户通过键盘事件来控制完成状态
+    return false;
+}
+
+bool Polygon3D_Geo::areControlPointsValid() const
+{
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
+    
+    // 检查控制点数量
+    if (controlPoints.size() < 3) {
+        return false;
+    }
+    
+    // 检查控制点是否重合（允许一定的误差）
+    const float epsilon = 0.001f;
+    for (size_t i = 0; i < controlPoints.size() - 1; ++i) {
+        for (size_t j = i + 1; j < controlPoints.size(); ++j) {
+            glm::vec3 diff = controlPoints[j].position - controlPoints[i].position;
+            float distance = glm::length(diff);
+            if (distance < epsilon) {
+                return false; // 有重复点，无效
+            }
+        }
+    }
+    
+    // 检查控制点坐标是否有效（不是NaN或无穷大）
+    for (const auto& point : controlPoints) {
+        if (std::isnan(point.x()) || std::isnan(point.y()) || std::isnan(point.z()) ||
+            std::isinf(point.x()) || std::isinf(point.y()) || std::isinf(point.z())) {
+            return false;
+        }
+    }
+    
+    // 检查多边形是否有效（至少3个点且不共线）
+    if (controlPoints.size() >= 3) {
+        // 计算前三个点形成的法向量
+        glm::vec3 v1 = controlPoints[1].position - controlPoints[0].position;
+        glm::vec3 v2 = controlPoints[2].position - controlPoints[0].position;
+        glm::vec3 cross = glm::cross(v1, v2);
+        float crossLength = glm::length(cross);
+        
+        if (crossLength < epsilon) {
+            return false; // 前三点共线，无法形成有效多边形
+        }
+    }
+    
+    return true;
 }

@@ -23,7 +23,7 @@ public:
     // 控制点访问 - 对外统一接口
     const std::vector<Point3D>& getControlPoints() const;
     Point3D getControlPoint(int index) const;
-    int getControlPointCount() const;
+    int getControlPointCountWithoutTempPoint() const;
     bool hasControlPoints() const;
 
     // 控制点操作
@@ -40,12 +40,14 @@ public:
     void setTempPoint(const Point3D& point);
     void clearTempPoint();
 
+    // 绘制相关通知方法
+    void notifyGeometryChanged();
+
 signals:
-    void controlPointsChanged(); // 控制点改变信号
 
 private:
     void validateIndex(int index) const;
-    void notifyGeometryChanged();
+    
     bool isDrawingComplete() const; // 检查绘制是否完成
 
 private:

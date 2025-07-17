@@ -116,10 +116,13 @@ signals:
     void blendingChanged();
     void renderModeChanged();
 
-private:
-    void initializeMaterial();
+public:
+    // 内部更新方法
     void updateOSGMaterial();
     void updateRenderingAttributes();
+
+private:
+    void initializeMaterial();
     void createDefaultStateSet();
     void applyMaterialPreset(MaterialType3D type);
 

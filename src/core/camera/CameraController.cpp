@@ -1146,4 +1146,4 @@ QString CameraController::getManipulatorTypeString(ManipulatorType type) const
     
     LOG_DEBUG(QString("获取操控器类型字符串: %1 -> %2").arg(static_cast<int>(type)).arg(result), "相机");
     return result;
-} 
+}

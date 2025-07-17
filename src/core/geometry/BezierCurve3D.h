@@ -18,6 +18,10 @@ protected:
     virtual void buildEdgeGeometries() override;
     virtual void buildFaceGeometries() override;
     
+    // 绘制完成检查和控制点验证
+    virtual bool isDrawingComplete() const override;
+    virtual bool areControlPointsValid() const override;
+    
 private:
     std::vector<glm::vec3> m_bezierPoints;
 };

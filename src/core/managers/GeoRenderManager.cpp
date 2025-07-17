@@ -546,12 +546,20 @@ void GeoRenderManager::updateLODSettings()
 
 void GeoRenderManager::applyRenderOptimizations()
 {
-    // 应用各种渲染优化
+    // OSG 已经自动处理了大部分渲染优化，包括：
+    // - 视锥体剔除 (CullVisitor 自动处理)
+    // - 背面剔除 (通过 StateSet 自动处理)
+    // - 包围体优化 (节点自动维护)
+    
+    // 只在真正需要时才更新空间索引
     if (m_parent && m_parent->mm_node()) {
         auto* nodeManager = m_parent->mm_node();
         
-        if (m_frustumCulling || m_backfaceCulling || m_occlusionCulling) {
-            nodeManager->updateSpatialIndex();
+        // 只在几何体发生重大变化时才重建空间索引
+        // 避免频繁的 KdTree 重建
+        if (m_needsRenderUpdate && m_statisticsDirty) {
+            // 这里可以添加更智能的判断逻辑
+            // 比如检查几何体是否真的发生了变化
         }
     }
 }

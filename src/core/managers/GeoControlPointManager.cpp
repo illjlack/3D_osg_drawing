@@ -36,14 +36,14 @@ Point3D GeoControlPointManager::getControlPoint(int index) const
     return m_controlPoints[index];
 }
 
-int GeoControlPointManager::getControlPointCount() const
+int GeoControlPointManager::getControlPointCountWithoutTempPoint() const
 {
     int count = static_cast<int>(m_controlPoints.size());
     
-    // 如果绘制未完成且有临时点，计数加1
-    if (!isDrawingComplete() && m_tempPoint.position != glm::vec3(0)) {
-        count++;
-    }
+    // 如果绘制未完成且有临时点，计数加1 （返回真正控制点个数）
+    //if (!isDrawingComplete() && m_tempPoint.position != glm::vec3(0)) {
+    //    count++;
+    //}
     
     return count;
 }
@@ -59,7 +59,6 @@ void GeoControlPointManager::addControlPoint(const Point3D& point)
     m_controlPoints.push_back(point);
     
     notifyGeometryChanged();
-    emit controlPointsChanged();
 }
 
 void GeoControlPointManager::setControlPoint(int index, const Point3D& point)
@@ -76,7 +75,6 @@ void GeoControlPointManager::setControlPoint(int index, const Point3D& point)
     m_controlPoints[index] = point;
     
     notifyGeometryChanged();
-    emit controlPointsChanged();
 }
 
 void GeoControlPointManager::removeControlPoint(int index)
@@ -93,7 +91,6 @@ void GeoControlPointManager::removeControlPoint(int index)
     m_controlPoints.erase(m_controlPoints.begin() + index);
     
     notifyGeometryChanged();
-    emit controlPointsChanged();
 }
 
 void GeoControlPointManager::clearControlPoints()
@@ -104,7 +101,6 @@ void GeoControlPointManager::clearControlPoints()
         clearTempPoint();
         
         notifyGeometryChanged();
-        emit controlPointsChanged();
     }
 }
 
@@ -155,7 +151,6 @@ void GeoControlPointManager::setTempPoint(const Point3D& point)
     if (m_tempPoint.position != point.position) {
         m_tempPoint = point;
         notifyGeometryChanged();
-        emit controlPointsChanged();
     }
 }
 
@@ -164,7 +159,14 @@ void GeoControlPointManager::clearTempPoint()
     if (m_tempPoint.position != glm::vec3(0)) {
         m_tempPoint = Point3D(glm::vec3(0));
         notifyGeometryChanged();
-        emit controlPointsChanged();
+    }
+}
+
+void GeoControlPointManager::notifyGeometryChanged()
+{
+    // 通知父对象几何体需要更新
+    if (m_parent && m_parent->mm_state()) {
+        m_parent->mm_node()->updateGeometries();
     }
 }
 
@@ -175,16 +177,8 @@ void GeoControlPointManager::validateIndex(int index) const
     }
 }
 
-void GeoControlPointManager::notifyGeometryChanged()
-{
-    // 通知父对象几何体需要更新
-    if (m_parent && m_parent->mm_state()) {
-        m_parent->mm_state()->setGeometryInvalid();
-    }
-}
-
 bool GeoControlPointManager::isDrawingComplete() const
 {
     // 检查绘制是否完成状态
-    return m_parent && m_parent->mm_state() && m_parent->mm_state()->isStateDrawComplete();
+    return m_parent && m_parent->mm_state() && m_parent->mm_state()->isStateComplete();
 } 

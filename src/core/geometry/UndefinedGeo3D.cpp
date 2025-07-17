@@ -33,17 +33,18 @@ UndefinedGeo3D::UndefinedGeo3D()
 
 void UndefinedGeo3D::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!mm_state()->isStateDrawComplete())
+    if (!mm_state()->isStateComplete())
     {
         // 添加控制点
         mm_controlPoint()->addControlPoint(Point3D(worldPos.x, worldPos.y, worldPos.z));
         
-        if (mm_controlPoint()->getControlPoints().size() >= 1)
+        // 对于未定义几何体，由于设置为永不完成，这里只检查控制点有效性
+        if (areControlPointsValid())
         {
-            mm_state()->setStateDrawComplete();
+            // 未定义几何体可以持续添加点，不设置绘制完成状态
+            // 或者可以根据需要设置其他状态
+            qDebug() << "UndefinedGeo3D: 添加控制点，当前点数:" << mm_controlPoint()->getControlPoints().size();
         }
-        
-        mm_state()->setControlPointsUpdated();
     }
 }
 
@@ -180,4 +181,49 @@ void UndefinedGeo3D::buildFaceGeometries()
     }
     
     // 几何体已经通过mm_node()->getFaceGeometry()获取，直接使用
+}
+
+// ==================== 绘制完成检查和控制点验证 ====================
+
+bool UndefinedGeo3D::isDrawingComplete() const
+{
+    // 永不完成（无限控制点）
+    return false;
+}
+
+bool UndefinedGeo3D::areControlPointsValid() const
+{
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
+    
+    // 检查控制点数量
+    if (controlPoints.empty()) {
+        return false;
+    }
+    
+    // 检查控制点坐标是否有效（不是NaN或无穷大）
+    for (const auto& point : controlPoints) {
+        if (std::isnan(point.x()) || std::isnan(point.y()) || std::isnan(point.z()) ||
+            std::isinf(point.x()) || std::isinf(point.y()) || std::isinf(point.z())) {
+            return false;
+        }
+    }
+    
+    // 对于未定义几何体，允许重复点（因为可能是自由绘制）
+    // 如果需要检查重复点，可以取消下面的注释
+    
+    /*
+    // 检查控制点是否重合（允许一定的误差）
+    const float epsilon = 0.001f;
+    for (size_t i = 0; i < controlPoints.size() - 1; ++i) {
+        for (size_t j = i + 1; j < controlPoints.size(); ++j) {
+            glm::vec3 diff = controlPoints[j].position - controlPoints[i].position;
+            float distance = glm::length(diff);
+            if (distance < epsilon) {
+                return false; // 有重复点，无效
+            }
+        }
+    }
+    */
+    
+    return true;
 }

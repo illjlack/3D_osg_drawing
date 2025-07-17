@@ -19,29 +19,26 @@ Line3D_Geo::Line3D_Geo()
 
 void Line3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!mm_state()->isStateDrawComplete())
+    if (!mm_state()->isStateComplete())
     {
         // 添加控制点
         mm_controlPoint()->addControlPoint(Point3D(worldPos));
         
-        const auto& controlPoints = mm_controlPoint()->getControlPoints();
-        if (controlPoints.size() >= 2)
+        // 使用新的检查方法
+        if (isDrawingComplete() && areControlPointsValid())
         {
-            mm_state()->setStateDrawComplete();
+            mm_state()->setStateComplete();
         }
-        
-        mm_state()->setControlPointsUpdated();
     }
 }
 
 void Line3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
     const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (!mm_state()->isStateDrawComplete() && controlPoints.size() == 1)
+    if (!mm_state()->isStateComplete() && controlPoints.size() == 1)
     {
         // 设置临时点用于预览
         mm_controlPoint()->setTempPoint(Point3D(worldPos));
-        mm_state()->setTemporaryPointsUpdated();
     }
 }
 
@@ -52,7 +49,7 @@ void Line3D_Geo::keyPressEvent(QKeyEvent* event)
     {
         if (controlPoints.size() >= 2)
         {
-            mm_state()->setStateDrawComplete();
+            mm_state()->setStateComplete();
         }
     }
     else if (event->key() == Qt::Key_Escape)
@@ -172,4 +169,45 @@ void Line3D_Geo::buildFaceGeometries()
 {
     mm_node()->clearFaceGeometry();
     // 线对象没有面
+}
+
+// ==================== 绘制完成检查和控制点验证 ====================
+
+bool Line3D_Geo::isDrawingComplete() const
+{
+    // 线几何体需要至少2个控制点才能完成绘制
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
+    return controlPoints.size() >= 2;
+}
+
+bool Line3D_Geo::areControlPointsValid() const
+{
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
+    
+    // 检查控制点数量
+    if (controlPoints.size() < 2) {
+        return false;
+    }
+    
+    // 检查控制点是否重合（允许一定的误差）
+    const float epsilon = 0.001f;
+    for (size_t i = 0; i < controlPoints.size() - 1; ++i) {
+        for (size_t j = i + 1; j < controlPoints.size(); ++j) {
+            glm::vec3 diff = controlPoints[j].position - controlPoints[i].position;
+            float distance = glm::length(diff);
+            if (distance < epsilon) {
+                return false; // 有重复点，无效
+            }
+        }
+    }
+    
+    // 检查控制点坐标是否有效（不是NaN或无穷大）
+    for (const auto& point : controlPoints) {
+        if (std::isnan(point.x()) || std::isnan(point.y()) || std::isnan(point.z()) ||
+            std::isinf(point.x()) || std::isinf(point.y()) || std::isinf(point.z())) {
+            return false;
+        }
+    }
+    
+    return true;
 }

@@ -57,12 +57,11 @@ public:
     void setGeoType(GeoType3D type) { m_geoType = type; }
 
     // 管理器直接访问接口(mm_开头：成员、管理器)
-    GeoStateManager* mm_state() const { return m_stateManager.get(); }
-    GeoNodeManager* mm_node() const { return m_nodeManager.get(); }
-    GeoMaterialManager* mm_material() const { return m_materialManager.get(); }
-
+    GeoStateManager*        mm_state() const { return m_stateManager.get(); }
+    GeoNodeManager*         mm_node() const { return m_nodeManager.get(); }
+    GeoMaterialManager*     mm_material() const { return m_materialManager.get(); }
     GeoControlPointManager* mm_controlPoint() const { return m_controlPointManager.get(); }
-    GeoRenderManager* mm_render() const { return m_renderManager.get(); }
+    GeoRenderManager*       mm_render() const { return m_renderManager.get(); }
 
     // 参数设置
     const GeoParameters3D& getParameters() const { return m_parameters; }
@@ -74,6 +73,15 @@ public:
     virtual void keyPressEvent(QKeyEvent* event);
     virtual void keyReleaseEvent(QKeyEvent* event);
 
+    // 绘制完成检查和控制点验证
+    virtual bool isDrawingComplete() const = 0;  // 检查是否绘制完成（检查控制点个数是否符合要求）
+    virtual bool areControlPointsValid() const = 0;  // 检查控制点是否合法
+    
+    // 绘制完成检查和信号发送
+    void checkAndEmitDrawingComplete();
+
+    void updateGeometries();
+
 protected:
     // 初始化
     virtual void initialize();
@@ -82,6 +90,8 @@ protected:
     virtual void buildVertexGeometries() = 0;  // 子类实现具体的顶点几何体构建
     virtual void buildEdgeGeometries() = 0;    // 子类实现具体的边几何体构建
     virtual void buildFaceGeometries() = 0;    // 子类实现具体的面几何体构建
+    
+
 
 protected:
     // 基本属性
@@ -93,17 +103,10 @@ protected:
     std::unique_ptr<GeoStateManager> m_stateManager;
     std::unique_ptr<GeoNodeManager> m_nodeManager;
     std::unique_ptr<GeoMaterialManager> m_materialManager;
-
     std::unique_ptr<GeoControlPointManager> m_controlPointManager;
     std::unique_ptr<GeoRenderManager> m_renderManager;
 
-    // 内部方法
+    // 创建管理器和连接信号
     void setupManagers();
     void connectManagerSignals();
-
-    // 辅助函数
-    osg::Vec3 glmToOsgVec3(const glm::vec3& v) const;
-    osg::Vec4 glmToOsgVec4(const glm::vec4& v) const;
-    glm::vec3 osgToGlmVec3(const osg::Vec3& v) const;
-    glm::vec4 osgToGlmVec4(const osg::Vec4& v) const;
 };

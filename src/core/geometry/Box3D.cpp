@@ -15,33 +15,29 @@ Box3D_Geo::Box3D_Geo()
 
 void Box3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!mm_state()->isStateDrawComplete())
+    if (!mm_state()->isStateComplete())
     {
         // 添加控制点
         mm_controlPoint()->addControlPoint(Point3D(worldPos));
         
-        const auto& controlPoints = mm_controlPoint()->getControlPoints();
-        
-        if (controlPoints.size() == 2)
+        // 使用新的检查方法
+        if (isDrawingComplete() && areControlPointsValid())
         {
             // 计算长方体尺寸
+            const auto& controlPoints = mm_controlPoint()->getControlPoints();
             glm::vec3 diff = controlPoints[1].position - controlPoints[0].position;
             m_size = glm::abs(diff);
-            mm_state()->setStateDrawComplete();
         }
-        
-        mm_state()->setControlPointsUpdated();
     }
 }
 
 void Box3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
     const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (!mm_state()->isStateDrawComplete() && controlPoints.size() < 2)
+    if (!mm_state()->isStateComplete() && controlPoints.size() < 2)
     {
         // 设置临时点用于预览
         mm_controlPoint()->setTempPoint(Point3D(worldPos));
-        mm_state()->setTemporaryPointsUpdated();
     }
 }
 
@@ -254,5 +250,43 @@ void Box3D_Geo::buildFaceGeometries()
     }
     geometry->setNormalArray(normals);
     geometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
+}
+
+// ==================== 绘制完成检查和控制点验证 ====================
+
+bool Box3D_Geo::isDrawingComplete() const
+{
+    // 长方体需要2个控制点（对角点）才能完成绘制
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
+    return controlPoints.size() >= 2;
+}
+
+bool Box3D_Geo::areControlPointsValid() const
+{
+    const auto& controlPoints = mm_controlPoint()->getControlPoints();
+    
+    // 检查控制点数量
+    if (controlPoints.size() < 2) {
+        return false;
+    }
+    
+    // 检查控制点是否重合（允许一定的误差）
+    const float epsilon = 0.001f;
+    glm::vec3 diff = controlPoints[1].position - controlPoints[0].position;
+    float distance = glm::length(diff);
+    
+    if (distance < epsilon) {
+        return false; // 两点重合，无效
+    }
+    
+    // 检查控制点坐标是否有效（不是NaN或无穷大）
+    for (const auto& point : controlPoints) {
+        if (std::isnan(point.x()) || std::isnan(point.y()) || std::isnan(point.z()) ||
+            std::isinf(point.x()) || std::isinf(point.y()) || std::isinf(point.z())) {
+            return false;
+        }
+    }
+    
+    return true;
 }
 
