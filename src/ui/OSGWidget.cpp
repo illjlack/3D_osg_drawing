@@ -389,7 +389,7 @@ void OSGWidget::addGeo(Geo3D* geo)
         if (m_advancedPickingEnabled)
         {
             // 检查几何对象是否已经完成绘制
-            if (geo->mm_state()->isStateComplete())
+            if (geo->mm_state()->isStateDrawComplete())
             {
                 SimplifiedPickingSystemManager::getInstance().addGeometry(geo);
                 LOG_DEBUG(QString("Added completed geometry to simplified picking system: %1").arg(geo->getGeoType()), "拾取");
@@ -774,7 +774,7 @@ void OSGWidget::onSimplePickingResult(const SimplePickingResult& result)
         
 //         LOG_DEBUG(QString("测试几何体: 类型=%1, 状态=%2")
 //             .arg(geo->getGeoType())
-//             .arg(geo->isStateComplete() ? "完成" : "未完成"), "拾取");
+//             .arg(geo->isStateDrawComplete() ? "完成" : "未完成"), "拾取");
         
 //         PickResult3D geoResult;
 //         // 优先使用KDTree支持的hitTest，如果失败则使用传统方法
@@ -897,19 +897,7 @@ void OSGWidget::mousePressEvent(QMouseEvent* event)
                 }
             }
             
-            // 检查包围盒控制点
-            auto* boundingBoxManager = geo->mm_boundingBox();
-            if (boundingBoxManager && boundingBoxManager->isValid())
-            {
-                int nearestCorner = boundingBoxManager->findNearestControlPoint(worldPos, 0.1f);
-                if (nearestCorner >= 0)
-                {
-                    // 使用包围盒角点作为控制点
-                    startDraggingControlPoint(geo, nearestCorner);
-                    event->accept();
-                    return;
-                }
-            }
+            // 包围盒控制点功能已移除，直接使用OSG的包围盒
         }
     }
     
@@ -988,25 +976,10 @@ void OSGWidget::mouseMoveEvent(QMouseEvent* event)
         }
         else
         {
-            // 处理包围盒控制点
-            auto* boundingBoxManager = m_draggingGeo->mm_boundingBox();
-            if (boundingBoxManager && boundingBoxManager->isValid())
-            {
-                // 获取当前包围盒角点
-                glm::vec3 currentCorner = boundingBoxManager->getControlPointPosition(m_draggingControlPointIndex);
-                glm::vec3 newCorner = currentCorner + dragOffset;
-                
-                // 更新包围盒（这里需要实现包围盒的更新逻辑）
-                // 暂时只更新控制点
-                m_dragStartPosition = m_lastMouseWorldPos;
-                
-                LOG_DEBUG(QString("拖动包围盒控制点: 对象=%1, 角点=%2, 新位置=(%3,%4,%5)")
-                    .arg(m_draggingGeo->getGeoType())
-                    .arg(m_draggingControlPointIndex)
-                    .arg(newCorner.x, 0, 'f', 3)
-                    .arg(newCorner.y, 0, 'f', 3)
-                    .arg(newCorner.z, 0, 'f', 3), "拖动");
-            }
+            // 包围盒控制点功能已移除，直接使用OSG的包围盒
+            m_dragStartPosition = m_lastMouseWorldPos;
+            
+            LOG_DEBUG(QString("拖动包围盒控制点功能已移除"), "拖动");
         }
     }
     
@@ -1144,7 +1117,7 @@ void OSGWidget::handleDrawingInput(QMouseEvent* event)
             m_currentDrawingGeo->mousePressEvent(event, clampedPos);
             
             // 检查是否完成绘制
-            if (m_currentDrawingGeo->mm_state()->isStateComplete())
+            if (m_currentDrawingGeo->mm_state()->isStateDrawComplete())
             {
                 completeCurrentDrawing();
             }
@@ -1170,7 +1143,7 @@ void OSGWidget::completeCurrentDrawing()
     if (m_currentDrawingGeo)
     {
         // 完成绘制 - 这会触发drawingCompleted信号
-        m_currentDrawingGeo->mm_state()->setStateComplete();
+        m_currentDrawingGeo->mm_state()->setStateDrawComplete();
         // 绘制完成后，对象保留在场景中，不需要删除
         m_currentDrawingGeo = nullptr;
         m_isDrawing = false;

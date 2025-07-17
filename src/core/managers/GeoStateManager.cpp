@@ -26,13 +26,13 @@ void GeoStateManager::setStateInitialized()
     }
 }
 
-void GeoStateManager::setStateComplete()
+void GeoStateManager::setStateDrawComplete()
 {
     int oldState = m_geoState;
     m_geoState |= GeoState_Complete3D;
     
     if (oldState != m_geoState) {
-        emit stateCompleted();
+        emit stateDrawCompleted();
         LOG_DEBUG("设置状态：绘制已完成", "状态管理");
     }
 }
@@ -215,7 +215,7 @@ void GeoStateManager::setTransformInvalid()
 
 // ==================== 基础状态清除接口 ====================
 
-void GeoStateManager::clearStateComplete()
+void GeoStateManager::clearStateDrawComplete()
 {
     int oldState = m_geoState;
     m_geoState &= ~GeoState_Complete3D;

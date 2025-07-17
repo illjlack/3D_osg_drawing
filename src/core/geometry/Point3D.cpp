@@ -17,12 +17,12 @@ Point3D_Geo::Point3D_Geo()
 
 void Point3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!mm_state()->isStateComplete())
+    if (!mm_state()->isStateDrawComplete())
     {
         // 添加控制点
         mm_controlPoint()->addControlPoint(Point3D(worldPos));
         
-        mm_state()->setStateComplete();
+        mm_state()->setStateDrawComplete();
         mm_state()->setControlPointsUpdated();
     }
 }

@@ -21,7 +21,7 @@ Cylinder3D_Geo::Cylinder3D_Geo()
 
 void Cylinder3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!mm_state()->isStateComplete())
+    if (!mm_state()->isStateDrawComplete())
     {
         // 添加控制点
         mm_controlPoint()->addControlPoint(Point3D(worldPos));
@@ -36,7 +36,7 @@ void Cylinder3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldP
             if (m_height > 0)
                 m_axis = glm::normalize(diff);
             m_radius = m_height * 0.3f; // 默认半径为高度的30%
-            mm_state()->setStateComplete();
+            mm_state()->setStateDrawComplete();
         }
         
         mm_state()->setControlPointsUpdated();
@@ -46,7 +46,7 @@ void Cylinder3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldP
 void Cylinder3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
     const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (!mm_state()->isStateComplete() && controlPoints.size() == 1)
+    if (!mm_state()->isStateDrawComplete() && controlPoints.size() == 1)
     {
         // 设置临时点用于预览
         mm_controlPoint()->setTempPoint(Point3D(worldPos));

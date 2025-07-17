@@ -31,18 +31,13 @@ void GeoNodeManager::initializeNodes()
         m_faceGeometry = new osg::Geometry();
         m_controlPointsGeometry = new osg::Geometry();
         
-        setupNodeHierarchy();
+        m_transformNode->addChild(m_vertexGeometry.get());
+        m_transformNode->addChild(m_edgeGeometry.get());
+        m_transformNode->addChild(m_faceGeometry.get());
+        m_transformNode->addChild(m_controlPointsGeometry.get());
+
         m_initialized = true;
     }
-}
-
-void GeoNodeManager::setupNodeHierarchy()
-{
-    // 将几何体节点添加到变换节点
-    m_transformNode->addChild(m_vertexGeometry.get());
-    m_transformNode->addChild(m_edgeGeometry.get());
-    m_transformNode->addChild(m_faceGeometry.get());
-    m_transformNode->addChild(m_controlPointsGeometry.get());
 }
 
 void GeoNodeManager::clearVertexGeometry()

@@ -287,7 +287,7 @@ osg::ref_ptr<osg::Geometry> SimplePickingIndicatorManager::createFaceIndicator(f
 
 void SimplePickingIndicatorManager::createHighlight(Geo3D* geo)
 {
-    if (!geo || !geo->node()->getOSGNode())
+    if (!geo || !geo->getOSGNode())
         return;
     
     m_currentHighlight = new osg::Group;
@@ -353,7 +353,7 @@ void SimplePickingIndicatorManager::createBoundingBoxHighlight(Geo3D* geo)
     if (!geo) return;
     
     auto* boundingBoxManager = geo->getBoundingBoxManager();
-    if (!boundingBoxManager || !boundingBoxManager->isValid())
+    if (!boundingBoxManager || !boundingBoxManager->getBoundingBox().valid())
         return;
     
     // 创建包围盒线框
@@ -361,13 +361,25 @@ void SimplePickingIndicatorManager::createBoundingBoxHighlight(Geo3D* geo)
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
-    // 获取包围盒的8个角点
-    std::vector<glm::vec3> corners = boundingBoxManager->getCorners();
+    // 获取OSG包围盒
+    const osg::BoundingBox& bbox = boundingBoxManager->getBoundingBox();
     
-    // 添加所有角点
-    for (const auto& corner : corners)
-    {
-        vertices->push_back(osg::Vec3(corner.x, corner.y, corner.z));
+    // 计算8个角点
+    osg::Vec3 min = bbox._min;
+    osg::Vec3 max = bbox._max;
+    
+    // 添加8个角点
+    vertices->push_back(osg::Vec3(min.x(), min.y(), min.z())); // 0
+    vertices->push_back(osg::Vec3(max.x(), min.y(), min.z())); // 1
+    vertices->push_back(osg::Vec3(min.x(), max.y(), min.z())); // 2
+    vertices->push_back(osg::Vec3(max.x(), max.y(), min.z())); // 3
+    vertices->push_back(osg::Vec3(min.x(), min.y(), max.z())); // 4
+    vertices->push_back(osg::Vec3(max.x(), min.y(), max.z())); // 5
+    vertices->push_back(osg::Vec3(min.x(), max.y(), max.z())); // 6
+    vertices->push_back(osg::Vec3(max.x(), max.y(), max.z())); // 7
+    
+    // 设置颜色
+    for (int i = 0; i < 8; ++i) {
         colors->push_back(osg::Vec4(0.0f, 1.0f, 1.0f, 1.0f)); // 青色包围盒
     }
     

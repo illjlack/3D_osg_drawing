@@ -185,9 +185,7 @@
     <ClCompile Include="src\core\managers\GeoMaterialManager.cpp">
       <Filter>Core\Managers</Filter>
     </ClCompile>
-    <ClCompile Include="src\core\managers\GeoSnapPointManager.cpp">
-      <Filter>Core\Managers</Filter>
-    </ClCompile>
+
     <ClCompile Include="src\core\managers\GeoBoundingBoxManager.cpp">
       <Filter>Core\Managers</Filter>
     </ClCompile>
@@ -281,9 +279,7 @@
     <QtMoc Include="src\core\managers\GeoMaterialManager.h">
       <Filter>Core\Managers</Filter>
     </QtMoc>
-    <QtMoc Include="src\core\managers\GeoSnapPointManager.h">
-      <Filter>Core\Managers</Filter>
-    </QtMoc>
+
     <QtMoc Include="src\core\managers\GeoBoundingBoxManager.h">
       <Filter>Core\Managers</Filter>
     </QtMoc>

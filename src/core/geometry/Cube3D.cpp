@@ -15,7 +15,7 @@ Cube3D_Geo::Cube3D_Geo()
 
 void Cube3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!mm_state()->isStateComplete())
+    if (!mm_state()->isStateDrawComplete())
     {
         // 添加控制点
         mm_controlPoint()->addControlPoint(Point3D(worldPos));
@@ -28,7 +28,7 @@ void Cube3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
             glm::vec3 diff = controlPoints[1].position - controlPoints[0].position;
             float maxDiff = std::max(std::max(std::abs(diff.x), std::abs(diff.y)), std::abs(diff.z));
             m_size = maxDiff;
-            mm_state()->setStateComplete();
+            mm_state()->setStateDrawComplete();
         }
         
         mm_state()->setControlPointsUpdated();
@@ -38,7 +38,7 @@ void Cube3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 void Cube3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
     const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (!mm_state()->isStateComplete() && controlPoints.size() < 2)
+    if (!mm_state()->isStateDrawComplete() && controlPoints.size() < 2)
     {
         // 设置临时点用于预览
         mm_controlPoint()->setTempPoint(Point3D(worldPos));

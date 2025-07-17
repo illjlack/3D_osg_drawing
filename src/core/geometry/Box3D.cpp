@@ -15,7 +15,7 @@ Box3D_Geo::Box3D_Geo()
 
 void Box3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!mm_state()->isStateComplete())
+    if (!mm_state()->isStateDrawComplete())
     {
         // 添加控制点
         mm_controlPoint()->addControlPoint(Point3D(worldPos));
@@ -27,7 +27,7 @@ void Box3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
             // 计算长方体尺寸
             glm::vec3 diff = controlPoints[1].position - controlPoints[0].position;
             m_size = glm::abs(diff);
-            mm_state()->setStateComplete();
+            mm_state()->setStateDrawComplete();
         }
         
         mm_state()->setControlPointsUpdated();
@@ -37,7 +37,7 @@ void Box3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 void Box3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
     const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (!mm_state()->isStateComplete() && controlPoints.size() < 2)
+    if (!mm_state()->isStateDrawComplete() && controlPoints.size() < 2)
     {
         // 设置临时点用于预览
         mm_controlPoint()->setTempPoint(Point3D(worldPos));

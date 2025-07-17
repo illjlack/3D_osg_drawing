@@ -5,7 +5,7 @@
 #include "managers/GeoStateManager.h"
 #include "managers/GeoNodeManager.h"
 #include "managers/GeoMaterialManager.h"
-#include "managers/GeoSnapPointManager.h"
+
 #include "managers/GeoControlPointManager.h"
 #include "managers/GeoBoundingBoxManager.h"
 #include "managers/GeoRenderManager.h"
@@ -61,16 +61,16 @@ public:
     GeoStateManager* mm_state() const { return m_stateManager.get(); }
     GeoNodeManager* mm_node() const { return m_nodeManager.get(); }
     GeoMaterialManager* mm_material() const { return m_materialManager.get(); }
-    GeoSnapPointManager* mm_snapPoint() const { return m_snapPointManager.get(); }
+
     GeoControlPointManager* mm_controlPoint() const { return m_controlPointManager.get(); }
     GeoBoundingBoxManager* mm_boundingBox() const { return m_boundingBoxManager.get(); }
     GeoRenderManager* mm_render() const { return m_renderManager.get(); }
 
-    // 参数管理
+    // 参数设置
     const GeoParameters3D& getParameters() const { return m_parameters; }
     void setParameters(const GeoParameters3D& params);
 
-    // 事件处理虚函数
+    // 事件处理
     virtual void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos);
     virtual void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos);
     virtual void keyPressEvent(QKeyEvent* event);
@@ -95,7 +95,7 @@ protected:
     std::unique_ptr<GeoStateManager> m_stateManager;
     std::unique_ptr<GeoNodeManager> m_nodeManager;
     std::unique_ptr<GeoMaterialManager> m_materialManager;
-    std::unique_ptr<GeoSnapPointManager> m_snapPointManager;
+
     std::unique_ptr<GeoControlPointManager> m_controlPointManager;
     std::unique_ptr<GeoBoundingBoxManager> m_boundingBoxManager;
     std::unique_ptr<GeoRenderManager> m_renderManager;

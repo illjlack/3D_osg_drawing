@@ -20,7 +20,7 @@ Torus3D_Geo::Torus3D_Geo()
 
 void Torus3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!mm_state()->isStateComplete())
+    if (!mm_state()->isStateDrawComplete())
     {
         // 添加控制点
         mm_controlPoint()->addControlPoint(Point3D(worldPos));
@@ -33,7 +33,7 @@ void Torus3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
             float distance = glm::length(controlPoints[1].position - controlPoints[0].position);
             m_majorRadius = distance * 0.7f; // 主半径
             m_minorRadius = distance * 0.3f; // 副半径
-            mm_state()->setStateComplete();
+            mm_state()->setStateDrawComplete();
         }
         
         mm_state()->setControlPointsUpdated();
@@ -43,7 +43,7 @@ void Torus3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 void Torus3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
     const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (!mm_state()->isStateComplete() && controlPoints.size() < 2)
+    if (!mm_state()->isStateDrawComplete() && controlPoints.size() < 2)
     {
         // 设置临时点用于预览
         mm_controlPoint()->setTempPoint(Point3D(worldPos));
@@ -77,7 +77,7 @@ void Torus3D_Geo::buildVertexGeometries()
     }
     
     // 如果有临时点且几何体未完成，添加临时点
-    if (!mm_state()->isStateComplete() && mm_controlPoint()->getTempPoint().position != glm::vec3(0))
+    if (!mm_state()->isStateDrawComplete() && mm_controlPoint()->getTempPoint().position != glm::vec3(0))
     {
         vertices->push_back(osg::Vec3(mm_controlPoint()->getTempPoint().x(), mm_controlPoint()->getTempPoint().y(), mm_controlPoint()->getTempPoint().z()));
         colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
@@ -208,7 +208,7 @@ void Torus3D_Geo::buildFaceGeometries()
     }
     v = glm::normalize(glm::cross(axis, u));
     
-    Color3D color = mm_state()->isStateComplete() ? m_parameters.fillColor : 
+    Color3D color = mm_state()->isStateDrawComplete() ? m_parameters.fillColor : 
                    Color3D(m_parameters.fillColor.r, m_parameters.fillColor.g, 
                           m_parameters.fillColor.b, m_parameters.fillColor.a * 0.5f);
     

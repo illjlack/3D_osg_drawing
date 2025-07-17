@@ -60,7 +60,7 @@ void Geo3D::setupManagers()
     m_stateManager = std::make_unique<GeoStateManager>(this);
     m_nodeManager = std::make_unique<GeoNodeManager>(this);
     m_materialManager = std::make_unique<GeoMaterialManager>(this);
-    m_snapPointManager = std::make_unique<GeoSnapPointManager>(this);
+
     m_controlPointManager = std::make_unique<GeoControlPointManager>(this);
     m_boundingBoxManager = std::make_unique<GeoBoundingBoxManager>(this);
     m_renderManager = std::make_unique<GeoRenderManager>(this);
@@ -72,7 +72,7 @@ void Geo3D::setupManagers()
 void Geo3D::connectManagerSignals()
 {
     // 状态管理器信号连接
-    connect(m_stateManager.get(), &GeoStateManager::stateCompleted, 
+    connect(m_stateManager.get(), &GeoStateManager::stateDrawCompleted, 
             this, [this]() { });
     
     // 控制点管理器信号连接

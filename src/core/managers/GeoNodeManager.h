@@ -63,7 +63,6 @@ signals:
 
 private:
     void initializeNodes();
-    void setupNodeHierarchy();
     void buildKdTreeForGeometry(osg::Geometry* geometry);
 
     Geo3D* m_parent;

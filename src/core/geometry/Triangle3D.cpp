@@ -17,7 +17,7 @@ Triangle3D_Geo::Triangle3D_Geo()
 
 void Triangle3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!mm_state()->isStateComplete())
+    if (!mm_state()->isStateDrawComplete())
     {
         // 添加控制点
         mm_controlPoint()->addControlPoint(Point3D(worldPos));
@@ -34,7 +34,7 @@ void Triangle3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldP
             glm::vec3 edge2 = v3 - v1;
             m_normal = glm::normalize(glm::cross(edge1, edge2));
             
-            mm_state()->setStateComplete();
+            mm_state()->setStateDrawComplete();
         }
         
         mm_state()->setControlPointsUpdated();
@@ -44,7 +44,7 @@ void Triangle3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldP
 void Triangle3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
     const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (!mm_state()->isStateComplete() && controlPoints.size() < 3)
+    if (!mm_state()->isStateDrawComplete() && controlPoints.size() < 3)
     {
         // 设置临时点用于预览
         mm_controlPoint()->setTempPoint(Point3D(worldPos));

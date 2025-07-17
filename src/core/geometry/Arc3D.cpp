@@ -21,7 +21,7 @@ Arc3D_Geo::Arc3D_Geo()
 
 void Arc3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!mm_state()->isStateComplete())
+    if (!mm_state()->isStateDrawComplete())
     {
         // 添加控制点
         mm_controlPoint()->addControlPoint(Point3D(worldPos));
@@ -30,7 +30,7 @@ void Arc3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
         
         if (controlPoints.size() == 3)
         {
-            mm_state()->setStateComplete();
+            mm_state()->setStateDrawComplete();
         }
         
         mm_state()->setControlPointsUpdated();
@@ -39,7 +39,7 @@ void Arc3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 
 void Arc3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!mm_state()->isStateComplete())
+    if (!mm_state()->isStateDrawComplete())
     {
         const auto& controlPoints = mm_controlPoint()->getControlPoints();
         

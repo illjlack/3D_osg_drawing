@@ -14,7 +14,7 @@ Polygon3D_Geo::Polygon3D_Geo()
 
 void Polygon3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!mm_state()->isStateComplete())
+    if (!mm_state()->isStateDrawComplete())
     {
         // 添加控制点
         mm_controlPoint()->addControlPoint(Point3D(worldPos));
@@ -26,7 +26,7 @@ void Polygon3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPo
             // 检查是否是双击完成多边形
             if (event && event->type() == QEvent::MouseButtonDblClick)
             {
-                mm_state()->setStateComplete();
+                mm_state()->setStateDrawComplete();
             }
         }
         
@@ -37,7 +37,7 @@ void Polygon3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPo
 void Polygon3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
     const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (!mm_state()->isStateComplete() && !controlPoints.empty())
+    if (!mm_state()->isStateDrawComplete() && !controlPoints.empty())
     {
         // 设置临时点用于预览
         mm_controlPoint()->setTempPoint(Point3D(worldPos));
@@ -52,7 +52,7 @@ void Polygon3D_Geo::keyPressEvent(QKeyEvent* event)
     {
         if (controlPoints.size() >= 3)
         {
-            mm_state()->setStateComplete();
+            mm_state()->setStateDrawComplete();
         }
     }
     else if (event->key() == Qt::Key_Escape)
@@ -90,7 +90,7 @@ void Polygon3D_Geo::buildVertexGeometries()
     }
     
     // 如果有临时点且几何体未完成，添加临时点
-    if (!mm_state()->isStateComplete() && mm_controlPoint()->getTempPoint().position != glm::vec3(0))
+    if (!mm_state()->isStateDrawComplete() && mm_controlPoint()->getTempPoint().position != glm::vec3(0))
     {
         vertices->push_back(osg::Vec3(mm_controlPoint()->getTempPoint().x(), mm_controlPoint()->getTempPoint().y(), mm_controlPoint()->getTempPoint().z()));
         colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
@@ -133,7 +133,7 @@ void Polygon3D_Geo::buildEdgeGeometries()
     
     // 构建所有点（包括临时点）
     std::vector<Point3D> allPoints = controlPoints;
-    if (!mm_state()->isStateComplete() && mm_controlPoint()->getTempPoint().position != glm::vec3(0))
+    if (!mm_state()->isStateDrawComplete() && mm_controlPoint()->getTempPoint().position != glm::vec3(0))
     {
         allPoints.push_back(mm_controlPoint()->getTempPoint());
     }

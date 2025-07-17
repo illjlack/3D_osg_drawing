@@ -19,7 +19,7 @@ Quad3D_Geo::Quad3D_Geo()
 
 void Quad3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!mm_state()->isStateComplete())
+    if (!mm_state()->isStateDrawComplete())
     {
         // 添加控制点
         mm_controlPoint()->addControlPoint(Point3D(worldPos));
@@ -43,7 +43,7 @@ void Quad3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
             glm::vec3 cross2 = glm::cross(v3 - v1, v4 - v1);
             m_area = 0.5f * (glm::length(cross1) + glm::length(cross2));
             
-            mm_state()->setStateComplete();
+            mm_state()->setStateDrawComplete();
         }
         
         mm_state()->setControlPointsUpdated();
@@ -53,7 +53,7 @@ void Quad3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 void Quad3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
     const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (!mm_state()->isStateComplete() && controlPoints.size() < 4)
+    if (!mm_state()->isStateDrawComplete() && controlPoints.size() < 4)
     {
         // 设置临时点用于预览
         mm_controlPoint()->setTempPoint(Point3D(worldPos));
@@ -120,7 +120,7 @@ void Quad3D_Geo::buildEdgeGeometries()
     
     // 构建所有点（包括临时点）
     std::vector<Point3D> allPoints = controlPoints;
-    if (!mm_state()->isStateComplete() && mm_controlPoint()->getTempPoint().position != glm::vec3(0))
+    if (!mm_state()->isStateDrawComplete() && mm_controlPoint()->getTempPoint().position != glm::vec3(0))
     {
         allPoints.push_back(mm_controlPoint()->getTempPoint());
     }

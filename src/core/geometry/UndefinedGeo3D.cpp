@@ -33,14 +33,14 @@ UndefinedGeo3D::UndefinedGeo3D()
 
 void UndefinedGeo3D::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!mm_state()->isStateComplete())
+    if (!mm_state()->isStateDrawComplete())
     {
         // 添加控制点
         mm_controlPoint()->addControlPoint(Point3D(worldPos.x, worldPos.y, worldPos.z));
         
         if (mm_controlPoint()->getControlPoints().size() >= 1)
         {
-            mm_state()->setStateComplete();
+            mm_state()->setStateDrawComplete();
         }
         
         mm_state()->setControlPointsUpdated();

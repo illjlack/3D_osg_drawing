@@ -42,7 +42,7 @@ public:
     
     // 基础状态查询
     bool isStateInitialized() const { return m_geoState & GeoState_Initialized3D; }
-    bool isStateComplete() const { return m_geoState & GeoState_Complete3D; }
+    bool isStateDrawComplete() const { return m_geoState & GeoState_Complete3D; }
     bool isStateInvalid() const { return m_geoState & GeoState_Invalid3D; }
     bool isStateSelected() const { return m_geoState & GeoState_Selected3D; }
     bool isStateEditing() const { return m_geoState & GeoState_Editing3D; }
@@ -68,7 +68,7 @@ public:
 
     // ==================== 基础状态设置 ====================
     void setStateInitialized();
-    void setStateComplete();
+    void setStateDrawComplete();
     void setStateInvalid();
     void setStateSelected();
     void setStateEditing();
@@ -93,7 +93,7 @@ public:
     void setTransformInvalid();
 
     // ==================== 基础状态清除 ====================
-    void clearStateComplete();
+    void clearStateDrawComplete();
     void clearStateInvalid();
     void clearStateSelected();
     void clearStateEditing();
@@ -142,7 +142,7 @@ public:
 
 signals:
     void stateInitialized();
-    void stateCompleted();
+    void stateDrawCompleted();
     void stateInvalidated();
     void stateSelected();
     void stateDeselected();
