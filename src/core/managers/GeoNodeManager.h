@@ -61,10 +61,15 @@ public:
 
     // 更新节点和包围盒、kdtree
     void updateGeometries();
+    
+    // 更新包围盒可见性状态
+    void updateBoundingBoxVisibility();
 signals:
+    // 用于更新材质和渲染
     void geometryChanged();
+
+    // 用于更新渲染
     void transformChanged();
-    void visibilityChanged();
 
 private:
     void initializeNodes();

@@ -42,7 +42,14 @@ void GeoNodeManager::initializeNodes()
         m_transformNode->addChild(m_controlPointsGeometry.get());
         m_transformNode->addChild(m_boundingBoxGeometry.get());
 
+        // 默认隐藏控制点和包围盒
+        m_controlPointsGeometry->setNodeMask(0x0);
+        m_boundingBoxGeometry->setNodeMask(0x0);
+
         m_initialized = true;
+        
+        // 确保包围盒可见性状态正确
+        updateBoundingBoxVisibility();
     }
 }
 
@@ -138,7 +145,6 @@ void GeoNodeManager::setVisible(bool visible)
 {
     if (m_transformNode.valid()) {
         m_transformNode->setNodeMask(visible ? 0xffffffff : 0x0);
-        emit visibilityChanged();
     }
 }
 
@@ -151,7 +157,6 @@ void GeoNodeManager::setVertexVisible(bool visible)
 {
     if (m_vertexGeometry.valid()) {
         m_vertexGeometry->setNodeMask(visible ? 0xffffffff : 0x0);
-        emit visibilityChanged();
     }
 }
 
@@ -159,7 +164,6 @@ void GeoNodeManager::setEdgeVisible(bool visible)
 {
     if (m_edgeGeometry.valid()) {
         m_edgeGeometry->setNodeMask(visible ? 0xffffffff : 0x0);
-        emit visibilityChanged();
     }
 }
 
@@ -167,7 +171,6 @@ void GeoNodeManager::setFaceVisible(bool visible)
 {
     if (m_faceGeometry.valid()) {
         m_faceGeometry->setNodeMask(visible ? 0xffffffff : 0x0);
-        emit visibilityChanged();
     }
 }
 
@@ -175,7 +178,6 @@ void GeoNodeManager::setControlPointsVisible(bool visible)
 {
     if (m_controlPointsGeometry.valid()) {
         m_controlPointsGeometry->setNodeMask(visible ? 0xffffffff : 0x0);
-        emit visibilityChanged();
     }
 }
 
@@ -183,7 +185,6 @@ void GeoNodeManager::setBoundingBoxVisible(bool visible)
 {
     if (m_boundingBoxGeometry.valid()) {
         m_boundingBoxGeometry->setNodeMask(visible ? 0xffffffff : 0x0);
-        emit visibilityChanged();
     }
 }
 
@@ -214,6 +215,7 @@ bool GeoNodeManager::isBoundingBoxVisible() const
 
 void GeoNodeManager::updateSpatialIndex()
 {
+    // 为所有几何体构建OSG的KdTree，让OSG内部拾取系统使用
     if (m_vertexGeometry.valid()) buildKdTreeForGeometry(m_vertexGeometry.get());
     if (m_edgeGeometry.valid()) buildKdTreeForGeometry(m_edgeGeometry.get());
     if (m_faceGeometry.valid()) buildKdTreeForGeometry(m_faceGeometry.get());
@@ -221,6 +223,7 @@ void GeoNodeManager::updateSpatialIndex()
 
 void GeoNodeManager::clearSpatialIndex()
 {
+    // 为所有几何体清除OSG的KdTree
     if (m_vertexGeometry.valid()) m_vertexGeometry->setShape(nullptr);
     if (m_edgeGeometry.valid()) m_edgeGeometry->setShape(nullptr);
     if (m_faceGeometry.valid()) m_faceGeometry->setShape(nullptr);
@@ -231,21 +234,39 @@ void GeoNodeManager::buildKdTreeForGeometry(osg::Geometry* geometry)
     if (!geometry
         || !geometry->getVertexArray()
         || geometry->getVertexArray()->getNumElements() == 0)
+    {
+        LOG_INFO("KdTree 构建跳过：几何体无效或顶点为空", "GEO");
         return;
+    }
 
     // 1) 创建一个 KdTree 实例
     osg::ref_ptr<osg::KdTree> kdTree = new osg::KdTree;
 
     // 2) 调用它自己的 build() 方法（注意签名要用 BuildOptions）
     osg::KdTree::BuildOptions opts;
+    opts._maxNumLevels = 16;  // 设置最大层级
+    opts._targetNumTrianglesPerLeaf = 10;  // 设置每个叶子节点的目标三角形数
+    
     if (kdTree->build(opts, geometry))
     {
         // 3) 挂到 geometry 上
         geometry->setShape(kdTree.get());
+        LOG_INFO("KdTree 构建成功", "GEO");
     }
     else
     {
-        LOG_INFO("KdTree 构建失败", "GEO");
+        // 尝试使用默认参数重新构建
+        osg::KdTree::BuildOptions defaultOpts;
+        if (kdTree->build(defaultOpts, geometry))
+        {
+            geometry->setShape(kdTree.get());
+            LOG_INFO("KdTree 使用默认参数构建成功", "GEO");
+        }
+        else
+        {
+            LOG_ERROR("KdTree 构建失败，几何体可能过于复杂或顶点数据有问题", "GEO");
+            // 不设置Shape，保持为nullptr
+        }
     }
 }
 
@@ -283,6 +304,9 @@ void GeoNodeManager::updateBoundingBoxGeometry()
     // 如果包围盒有效，创建包围盒几何体
     if (boundingBox.valid()) {
         createBoundingBoxGeometry(boundingBox);
+        
+        // 更新包围盒可见性状态
+        updateBoundingBoxVisibility();
     } else {
         clearBoundingBoxGeometry();
     }
@@ -293,6 +317,19 @@ void GeoNodeManager::updateGeometries()
     m_parent->updateGeometries();
     updateSpatialIndex();
     updateBoundingBoxGeometry();
+    updateBoundingBoxVisibility();
+}
+
+void GeoNodeManager::updateBoundingBoxVisibility()
+{
+    if (!m_boundingBoxGeometry.valid()) return;
+    
+    // 检查父对象是否被选中，如果是则显示包围盒
+    if (m_parent && m_parent->mm_state() && m_parent->mm_state()->isStateSelected()) {
+        setBoundingBoxVisible(true);
+    } else {
+        setBoundingBoxVisible(false);
+    }
 }
 
 void GeoNodeManager::createBoundingBoxGeometry(const osg::BoundingBox& boundingBox)

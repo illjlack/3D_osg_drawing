@@ -117,12 +117,20 @@ void Geo3D::connectManagerSignals()
                 if (m_renderManager) {
                     m_renderManager->setHighlighted(true);
                 }
+                // 选中时显示包围盒
+                if (m_nodeManager) {
+                    m_nodeManager->updateBoundingBoxVisibility();
+                }
             });
     
     connect(m_stateManager.get(), &GeoStateManager::stateDeselected,
             this, [this]() {
                 if (m_renderManager) {
                     m_renderManager->setHighlighted(false);
+                }
+                // 取消选中时隐藏包围盒
+                if (m_nodeManager) {
+                    m_nodeManager->updateBoundingBoxVisibility();
                 }
             });
     
@@ -137,6 +145,10 @@ void Geo3D::connectManagerSignals()
                 if (m_materialManager) {
                     m_materialManager->updateOSGMaterial();
                 }
+                // 几何体变化时更新包围盒可见性
+                if (m_nodeManager) {
+                    m_nodeManager->updateBoundingBoxVisibility();
+                }
             });
     
     connect(m_nodeManager.get(), &GeoNodeManager::transformChanged,
@@ -146,121 +158,6 @@ void Geo3D::connectManagerSignals()
                     m_renderManager->updateRender();
                 }
             });
-    
-    connect(m_nodeManager.get(), &GeoNodeManager::visibilityChanged,
-            this, [this]() {
-                // 可见性变化时更新渲染
-                if (m_renderManager) {
-                    m_renderManager->updateRender();
-                }
-            });
-    
-    // ==================== 材质管理器信号连接 ====================
-    connect(m_materialManager.get(), &GeoMaterialManager::materialChanged,
-            this, [this]() {
-                // 材质变化时更新渲染
-                if (m_renderManager) {
-                    m_renderManager->updateRender();
-                }
-            });
-    
-    connect(m_materialManager.get(), &GeoMaterialManager::colorChanged,
-            this, [this]() {
-                // 颜色变化时更新渲染
-                if (m_renderManager) {
-                    m_renderManager->updateRender();
-                }
-            });
-    
-    connect(m_materialManager.get(), &GeoMaterialManager::linePropertiesChanged,
-            this, [this]() {
-                // 线条属性变化时更新渲染
-                if (m_renderManager) {
-                    m_renderManager->updateRender();
-                }
-            });
-    
-    connect(m_materialManager.get(), &GeoMaterialManager::pointPropertiesChanged,
-            this, [this]() {
-                // 点属性变化时更新渲染
-                if (m_renderManager) {
-                    m_renderManager->updateRender();
-                }
-            });
-    
-    connect(m_materialManager.get(), &GeoMaterialManager::facePropertiesChanged,
-            this, [this]() {
-                // 面属性变化时更新渲染
-                if (m_renderManager) {
-                    m_renderManager->updateRender();
-                }
-            });
-    
-    connect(m_materialManager.get(), &GeoMaterialManager::blendingChanged,
-            this, [this]() {
-                // 混合模式变化时更新渲染
-                if (m_renderManager) {
-                    m_renderManager->updateRender();
-                }
-            });
-    
-    connect(m_materialManager.get(), &GeoMaterialManager::renderModeChanged,
-            this, [this]() {
-                // 渲染模式变化时通知渲染管理器
-                if (m_renderManager) {
-                    m_renderManager->applyRenderMode();
-                }
-            });
-    
-    // ==================== 渲染管理器信号连接 ====================
-    connect(m_renderManager.get(), &GeoRenderManager::renderModeChanged,
-            this, [this](GeoRenderManager::RenderMode mode) {
-                // 渲染模式变化时更新材质
-                if (m_materialManager) {
-                    m_materialManager->updateRenderingAttributes();
-                }
-            });
-    
-    connect(m_renderManager.get(), &GeoRenderManager::visibilityChanged,
-            this, [this](bool visible) {
-                // 可见性变化时更新节点管理器
-                if (m_nodeManager) {
-                    m_nodeManager->setVisible(visible);
-                }
-            });
-    
-    connect(m_renderManager.get(), &GeoRenderManager::highlightChanged,
-            this, [this](bool highlighted) {
-                // 高亮变化时更新材质
-                if (m_materialManager) {
-                    m_materialManager->updateOSGMaterial();
-                }
-            });
-    
-    connect(m_renderManager.get(), &GeoRenderManager::renderUpdateRequired,
-            this, [this]() {
-                // 渲染更新请求时强制更新
-                if (m_renderManager) {
-                    m_renderManager->forceRenderUpdate();
-                }
-            });
-    
-    connect(m_renderManager.get(), &GeoRenderManager::renderQualityChanged,
-            this, [this](int quality) {
-                // 渲染质量变化时更新材质
-                if (m_materialManager) {
-                    m_materialManager->updateRenderingAttributes();
-                }
-            });
-    
-    connect(m_renderManager.get(), &GeoRenderManager::renderOptimizationSuggested,
-            this, [this]() {
-                // 渲染优化建议时执行优化
-                if (m_renderManager) {
-                    m_renderManager->optimizeRendering();
-                }
-            });
-    
     qDebug() << "Geo3D::connectManagerSignals: 所有管理器信号连接完成";
 }
 

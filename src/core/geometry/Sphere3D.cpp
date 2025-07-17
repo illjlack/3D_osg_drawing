@@ -260,9 +260,8 @@ void Sphere3D_Geo::buildFaceGeometries()
 
 bool Sphere3D_Geo::isDrawingComplete() const
 {
-    // 球体只需要1个控制点（中心点）就能完成绘制
     const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    return controlPoints.size() >= 1;
+    return controlPoints.size() >= 2;
 }
 
 bool Sphere3D_Geo::areControlPointsValid() const

@@ -263,9 +263,8 @@ void Torus3D_Geo::buildFaceGeometries()
 
 bool Torus3D_Geo::isDrawingComplete() const
 {
-    // 圆环体需要1个控制点（中心点）就能完成绘制
     const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    return controlPoints.size() >= 1;
+    return controlPoints.size() >= 2;
 }
 
 bool Torus3D_Geo::areControlPointsValid() const

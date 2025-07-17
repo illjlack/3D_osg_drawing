@@ -196,7 +196,7 @@ void Cone3D_Geo::buildFaceGeometries()
     if (!geometry.valid())
         return;
     
-    // 创建圆锥底面几何体
+    // 创建圆锥底面和侧面几何体
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
@@ -236,6 +236,34 @@ void Cone3D_Geo::buildFaceGeometries()
         for (int j = 0; j < 3; ++j)
         {
             normals->push_back(osg::Vec3(-axis.x, -axis.y, -axis.z));  // 底面法向量
+            colors->push_back(osg::Vec4(m_parameters.fillColor.r, m_parameters.fillColor.g, 
+                                       m_parameters.fillColor.b, m_parameters.fillColor.a));
+        }
+    }
+    
+    // 生成侧面三角形
+    for (int i = 0; i < segments; ++i)
+    {
+        float angle1 = 2.0f * M_PI * i / segments;
+        float angle2 = 2.0f * M_PI * (i + 1) / segments;
+        
+        glm::vec3 dir1 = static_cast<float>(cos(angle1)) * u + static_cast<float>(sin(angle1)) * v;
+        glm::vec3 dir2 = static_cast<float>(cos(angle2)) * u + static_cast<float>(sin(angle2)) * v;
+        
+        glm::vec3 p1 = base + radius * dir1;
+        glm::vec3 p2 = base + radius * dir2;
+        
+        // 第一个三角形：底面点到顶点到下一个底面点
+        vertices->push_back(osg::Vec3(p1.x, p1.y, p1.z));
+        vertices->push_back(osg::Vec3(apex.x, apex.y, apex.z));
+        vertices->push_back(osg::Vec3(p2.x, p2.y, p2.z));
+        
+        // 计算侧面法向量（从底面指向顶点的方向）
+        glm::vec3 sideNormal = glm::normalize(glm::cross(p2 - p1, apex - p1));
+        
+        for (int j = 0; j < 3; ++j)
+        {
+            normals->push_back(osg::Vec3(sideNormal.x, sideNormal.y, sideNormal.z));
             colors->push_back(osg::Vec4(m_parameters.fillColor.r, m_parameters.fillColor.g, 
                                        m_parameters.fillColor.b, m_parameters.fillColor.a));
         }
