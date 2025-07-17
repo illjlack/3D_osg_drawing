@@ -50,7 +50,7 @@
 #include <osgQOpenGL/osgQOpenGLWidget>
 #include <QTimer>
 #include <QOpenGLWidget>
-#include "../core/picking/PickingIntegration.h"
+
 #include "OSGWidget.h"
 #include "CoordinateSystemDialog.h"
 #include "LogOutputWidget.h"
@@ -124,7 +124,7 @@ private slots:
     void onDrawModeChanged(DrawMode3D mode);
     void onGeoSelected(Geo3D* geo);
     void onGeoParametersChanged();
-    void onSimplePickingResult(const SimplePickingResult& result);
+    void onSimplePickingResult(const OSGIndexPickResult& result);
 
 private:
     void setupUI();

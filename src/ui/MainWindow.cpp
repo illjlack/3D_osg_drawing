@@ -1,6 +1,6 @@
 ﻿#include "MainWindow.h"
 #include "../core/GeometryBase.h"
-#include "../core/picking/SimplifiedPickingSystem.h"
+#include "../core/picking/OSGIndexPickingSystem.h"
 #include <QTimer>
 #include <QSplitter>
 #include <QVBoxLayout>
@@ -1120,7 +1120,7 @@ void MainWindow::onGeoParametersChanged()
     LOG_INFO("几何对象属性已修改", "属性");
 }
 
-void MainWindow::onSimplePickingResult(const SimplePickingResult& result)
+void MainWindow::onSimplePickingResult(const OSGIndexPickResult& result)
 {
     if (!result.hasResult)
         return;
@@ -1129,13 +1129,13 @@ void MainWindow::onSimplePickingResult(const SimplePickingResult& result)
     QString typeStr;
     switch (result.featureType)
     {
-    case SimplePickingResult::VERTEX:
+    case PickFeatureType::VERTEX:
         typeStr = tr("顶点");
         break;
-    case SimplePickingResult::EDGE:
+    case PickFeatureType::EDGE:
         typeStr = tr("边");
         break;
-    case SimplePickingResult::FACE:
+    case PickFeatureType::FACE:
         typeStr = tr("面");
         break;
     default:

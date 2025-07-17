@@ -135,14 +135,10 @@
     <ClCompile Include="src\core\managers\GeoMaterialManager.cpp">
       <Filter>Core\Managers</Filter>
     </ClCompile>
-
-    <ClCompile Include="src\core\managers\GeoBoundingBoxManager.cpp">
-      <Filter>Core\Managers</Filter>
-    </ClCompile>
     <ClCompile Include="src\core\managers\GeoRenderManager.cpp">
       <Filter>Core\Managers</Filter>
     </ClCompile>
-    <ClCompile Include="src\core\picking\SimplifiedPickingSystem.cpp">
+    <ClCompile Include="src\core\picking\OSGIndexPickingSystem.cpp">
       <Filter>Core\Picking</Filter>
     </ClCompile>
   </ItemGroup>
@@ -225,14 +221,10 @@
     <QtMoc Include="src\core\managers\GeoMaterialManager.h">
       <Filter>Core\Managers</Filter>
     </QtMoc>
-
-    <QtMoc Include="src\core\managers\GeoBoundingBoxManager.h">
-      <Filter>Core\Managers</Filter>
-    </QtMoc>
     <QtMoc Include="src\core\managers\GeoRenderManager.h">
       <Filter>Core\Managers</Filter>
     </QtMoc>
-    <ClInclude Include="src\core\picking\SimplifiedPickingSystem.h">
+    <ClInclude Include="src\core\picking\OSGIndexPickingSystem.h">
       <Filter>Core\Picking</Filter>
     </ClInclude>
   </ItemGroup>

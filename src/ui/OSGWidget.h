@@ -2,11 +2,11 @@
 #pragma execution_character_set("utf-8")
 
 #include "../core/Common3D.h"
-#include "../core/picking/SimplifiedPickingSystem.h"
 #include "../core/world/Skybox.h"
 #include "../core/world/CoordinateSystem3D.h"
 #include "../core/world/CoordinateSystemRenderer.h"
 #include "../core/camera/CameraController.h"
+#include "../core/picking/OSGIndexPickingSystem.h"
 #include <osgViewer/Viewer>
 #include <osgViewer/CompositeViewer>
 #include <osgViewer/ViewerEventHandlers>
@@ -94,7 +94,7 @@ public:
     void setPickingFrequency(double frequency);
     
     // 拾取系统配置
-    void setPickingConfig(const SimplePickingConfig& config);
+    void setPickingConfig(const OSGIndexPickConfig& config);
     QString getPickingSystemInfo() const;
     
     // 确保所有几何对象都在拾取系统中
@@ -166,7 +166,7 @@ public:
 signals:
     void geoSelected(Geo3D* geo);
     void mousePositionChanged(const glm::vec3& worldPos);
-    void simplePickingResult(const SimplePickingResult& result);
+    void simplePickingResult(const OSGIndexPickResult& result);
     void cameraMoveSpeedChanged(double speed);
     void wheelMoveSensitivityChanged(double sensitivity);
     void accelerationRateChanged(double rate);
@@ -202,7 +202,7 @@ private:
     QString formatScaleText(double worldUnits);
     
     // 拾取系统回调
-    void onSimplePickingResult(const SimplePickingResult& result);
+    void onSimplePickingResult(const OSGIndexPickResult& result);
 
 private:
     // OSG场景图相关成员
