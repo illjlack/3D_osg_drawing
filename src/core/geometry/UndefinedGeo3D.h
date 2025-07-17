@@ -20,4 +20,4 @@ protected:
 
 private:
     glm::vec3 m_normal = glm::vec3(0.0f);
-}; 
+};

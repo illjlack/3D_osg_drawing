@@ -14,10 +14,10 @@ public:
     virtual void keyPressEvent(QKeyEvent* event) override;
     
 protected:
-    virtual void buildVertexGeometries();
-    virtual void buildEdgeGeometries();
-    virtual void buildFaceGeometries();
+    virtual void buildVertexGeometries() override;
+    virtual void buildEdgeGeometries() override;
+    virtual void buildFaceGeometries() override;
     
 private:
     std::vector<glm::vec3> m_bezierPoints;
-}; 
+};

@@ -19,4 +19,4 @@ protected:
     virtual void buildFaceGeometries() override;
     
 private:
-}; 
+};

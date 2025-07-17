@@ -18,9 +18,9 @@ public:
     
 protected:
 
-    virtual void buildVertexGeometries();
-    virtual void buildEdgeGeometries();
-    virtual void buildFaceGeometries();
+    virtual void buildVertexGeometries() override;
+    virtual void buildEdgeGeometries() override;
+    virtual void buildFaceGeometries() override;
 
 private:
     float m_radius = 0.0f;
@@ -32,5 +32,4 @@ private:
     glm::vec3 m_uAxis = glm::vec3(0.0f);
     glm::vec3 m_vAxis = glm::vec3(0.0f);
     std::vector<glm::vec3> m_arcPoints;
-
-}; 
+};

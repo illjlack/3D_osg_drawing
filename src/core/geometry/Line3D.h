@@ -15,11 +15,11 @@ public:
     virtual void keyPressEvent(QKeyEvent* event) override;
 
 protected:
-    virtual void buildVertexGeometries();
-    virtual void buildEdgeGeometries();
-    virtual void buildFaceGeometries();
+    virtual void buildVertexGeometries() override;
+    virtual void buildEdgeGeometries() override;
+    virtual void buildFaceGeometries() override;
     
 private:
     std::vector<Point3D> m_generatedPoints;
     float m_totalLength;
-}; 
+};

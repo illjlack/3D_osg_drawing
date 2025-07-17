@@ -14,11 +14,11 @@ public:
     virtual void keyPressEvent(QKeyEvent* event) override;
 
 protected:
-    virtual void buildVertexGeometries();
-    virtual void buildEdgeGeometries();
-    virtual void buildFaceGeometries();
+    virtual void buildVertexGeometries() override;
+    virtual void buildEdgeGeometries() override;
+    virtual void buildFaceGeometries() override;
 
 private:
     glm::vec3 m_normal = glm::vec3(0.0f);
     std::vector<unsigned int> m_triangleIndices;
-}; 
+};

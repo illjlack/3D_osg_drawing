@@ -13,12 +13,12 @@ public:
     virtual void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
 
 protected:
-    virtual void buildVertexGeometries();
-    virtual void buildEdgeGeometries();
-    virtual void buildFaceGeometries();
+    virtual void buildVertexGeometries() override;
+    virtual void buildEdgeGeometries() override;
+    virtual void buildFaceGeometries() override;
     
 private:
     float m_majorRadius = 1.0f;
     float m_minorRadius = 0.3f;
     glm::vec3 m_axis = glm::vec3(0.0f, 0.0f, 1.0f);
-}; 
+};
