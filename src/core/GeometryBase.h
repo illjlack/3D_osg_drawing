@@ -4,7 +4,7 @@
 #include "Common3D.h"
 #include "managers/GeoStateManager.h"
 #include "managers/GeoNodeManager.h"
-#include "managers/GeoMaterialManager.h"
+#include "managers/GeoRenderManager.h"
 
 #include "managers/GeoControlPointManager.h"
 #include "managers/GeoRenderManager.h"
@@ -59,9 +59,8 @@ public:
     // 管理器直接访问接口(mm_开头：成员、管理器)
     GeoStateManager*        mm_state() const { return m_stateManager.get(); }
     GeoNodeManager*         mm_node() const { return m_nodeManager.get(); }
-    GeoMaterialManager*     mm_material() const { return m_materialManager.get(); }
-    GeoControlPointManager* mm_controlPoint() const { return m_controlPointManager.get(); }
     GeoRenderManager*       mm_render() const { return m_renderManager.get(); }
+    GeoControlPointManager* mm_controlPoint() const { return m_controlPointManager.get(); }
 
     // 参数设置
     const GeoParameters3D& getParameters() const { return m_parameters; }
@@ -102,7 +101,6 @@ protected:
     // 管理器组件
     std::unique_ptr<GeoStateManager> m_stateManager;
     std::unique_ptr<GeoNodeManager> m_nodeManager;
-    std::unique_ptr<GeoMaterialManager> m_materialManager;
     std::unique_ptr<GeoControlPointManager> m_controlPointManager;
     std::unique_ptr<GeoRenderManager> m_renderManager;
 

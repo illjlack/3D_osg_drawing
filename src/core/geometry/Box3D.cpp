@@ -23,10 +23,7 @@ void Box3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
         // 使用新的检查方法
         if (isDrawingComplete() && areControlPointsValid())
         {
-            // 计算长方体尺寸
-            const auto& controlPoints = mm_controlPoint()->getControlPoints();
-            glm::vec3 diff = controlPoints[1].position - controlPoints[0].position;
-            m_size = glm::abs(diff);
+            mm_state()->setStateComplete();
         }
     }
 }
@@ -95,6 +92,10 @@ void Box3D_Geo::buildEdgeGeometries()
     osg::ref_ptr<osg::Geometry> geometry = mm_node()->getEdgeGeometry();
     if (!geometry.valid())
         return;
+    
+    // 计算长方体尺寸（对角线两个顶端的差值）
+    glm::vec3 diff = controlPoints[1].position - controlPoints[0].position;
+    m_size = glm::abs(diff);
     
     // 创建边的几何体（长方体边界线）
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
@@ -256,9 +257,7 @@ void Box3D_Geo::buildFaceGeometries()
 
 bool Box3D_Geo::isDrawingComplete() const
 {
-    // 长方体需要2个控制点（对角点）才能完成绘制
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    return controlPoints.size() >= 2;
+    return mm_controlPoint()->getControlPointCountWithoutTempPoint() >= 2;
 }
 
 bool Box3D_Geo::areControlPointsValid() const

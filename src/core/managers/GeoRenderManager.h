@@ -2,17 +2,19 @@
 #pragma execution_character_set("utf-8")
 
 #include "../Common3D.h"
+#include <osg/Material>
+#include <osg/StateSet>
+#include <osg/BlendFunc>
+#include <osg/LineWidth>
+#include <osg/Point>
 #include <osg/ref_ptr>
-#include <osg/Group>
 
 // 前向声明
 class Geo3D;
-class GeoNodeManager;
-class GeoMaterialManager;
 
 /**
  * @brief 渲染管理器
- * 负责管理几何对象的渲染控制
+ * 直接设置几何对象的渲染状态和材质
  */
 class GeoRenderManager
 {
@@ -29,73 +31,55 @@ public:
     explicit GeoRenderManager(Geo3D* parent);
     ~GeoRenderManager() = default;
 
-    // 基本显示控制
+    // 渲染模式设置
+    void setRenderMode(RenderMode mode);
     void setShowPoints(bool show);
     void setShowEdges(bool show);
     void setShowFaces(bool show);
-    
-    // 获取显示状态
-    bool isShowPoints() const { return m_showPoints; }
-    bool isShowEdges() const { return m_showEdges; }
-    bool isShowFaces() const { return m_showFaces; }
-
-    // 渲染模式
-    void setRenderMode(RenderMode mode);
-    RenderMode getRenderMode() const { return m_renderMode; }
-    void applyRenderMode();
-
-    // 快速模式切换
-    void showPointsOnly();
-    void showWireframeOnly();
-    void showSolidOnly();
-    void showAll();
-    void hideAll();
-
-    // 可见性控制
     void setVisible(bool visible);
-    bool isVisible() const { return m_visible; }
-    void setAlpha(float alpha);
 
-    // 选择高亮
+    // 材质设置
+    void setMaterial(const Material3D& material);
+    void setMaterialType(MaterialType3D type);
+    void setColor(const Color3D& color);
+    void setTransparency(float transparency);
+
+    // 渲染属性设置
+    void setLineWidth(float width);
+    void setPointSize(float size);
+    void setWireframeMode(bool enable);
+
+    // 高亮设置
     void setHighlighted(bool highlighted);
-    bool isHighlighted() const { return m_highlighted; }
     void setHighlightColor(const Color3D& color);
 
-    // 渲染更新
-    void updateRender();
-    void forceRenderUpdate();
-
-    // 渲染状态
-    bool isRenderingEnabled() const;
-    bool needsRenderUpdate() const { return m_needsRenderUpdate; }
-
-public:
-    void updateFeatureVisibility();
-
 private:
-    void initializeRenderSettings();
-    void updateRenderSettings();
-    void updateHighlightEffect();
+    void initializeRender();
+    void updateRender();
+    void applyMaterialPreset(MaterialType3D type);
 
 private:
     Geo3D* m_parent;
     
-    // 基本显示控制
+    // 渲染状态
     bool m_showPoints;
     bool m_showEdges;
     bool m_showFaces;
     bool m_visible;
-    float m_alpha;
-    
-    // 渲染模式
-    RenderMode m_renderMode;
-    
-    // 选择高亮
+    bool m_wireframeMode;
     bool m_highlighted;
-    Color3D m_highlightColor;
-    float m_highlightWidth;
     
-    // 渲染状态
-    bool m_needsRenderUpdate;
-    bool m_renderDataValid;
+    // 材质属性
+    Material3D m_material;
+    
+    // OSG渲染状态
+    osg::ref_ptr<osg::StateSet> m_stateSet;
+    osg::ref_ptr<osg::Material> m_osgMaterial;
+    osg::ref_ptr<osg::BlendFunc> m_blendFunc;
+    osg::ref_ptr<osg::LineWidth> m_lineWidth;
+    osg::ref_ptr<osg::Point> m_pointSize;
+    
+    // 高亮
+    Color3D m_highlightColor;
+    bool m_blendingEnabled;
 }; 

@@ -1570,9 +1570,9 @@ void PropertyEditor3D::updateVolumeUI()
 
 void PropertyEditor3D::updateDisplayUI()
 {
-    bool showPoints = m_currentGeo ? m_currentGeo->mm_render()->isShowPoints() : GlobalShowPoints3D;
-    bool showEdges = m_currentGeo ? m_currentGeo->mm_render()->isShowEdges() : GlobalShowEdges3D;
-    bool showFaces = m_currentGeo ? m_currentGeo->mm_render()->isShowFaces() : GlobalShowFaces3D;
+    bool showPoints = m_currentGeo ? m_currentGeo->getParameters().showPoints : GlobalShowPoints3D;
+    bool showEdges = m_currentGeo ? m_currentGeo->getParameters().showEdges : GlobalShowEdges3D;
+    bool showFaces = m_currentGeo ? m_currentGeo->getParameters().showFaces : GlobalShowFaces3D;
     
     m_showPointsCheck->setChecked(showPoints);
     m_showEdgesCheck->setChecked(showEdges);

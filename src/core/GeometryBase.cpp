@@ -59,8 +59,6 @@ void Geo3D::setupManagers()
     // 创建各个管理器
     m_stateManager = std::make_unique<GeoStateManager>(this);
     m_nodeManager = std::make_unique<GeoNodeManager>(this);
-    m_materialManager = std::make_unique<GeoMaterialManager>(this);
-
     m_controlPointManager = std::make_unique<GeoControlPointManager>(this);
     m_renderManager = std::make_unique<GeoRenderManager>(this);
     
@@ -70,15 +68,6 @@ void Geo3D::setupManagers()
 
 void Geo3D::connectManagerSignals()
 {
-    // 确保所有管理器都已创建
-    if (!m_stateManager || !m_nodeManager || !m_materialManager || 
-        !m_controlPointManager || !m_renderManager) {
-        qWarning() << "Geo3D::connectManagerSignals: 某些管理器未初始化";
-        return;
-    }
-    
-    // ==================== 状态管理器信号连接 ====================
-    
     // 状态完成时通知控制点管理器
     connect(m_stateManager.get(), &GeoStateManager::stateCompleted,
             this, [this]() {
@@ -133,31 +122,6 @@ void Geo3D::connectManagerSignals()
                     m_nodeManager->updateBoundingBoxVisibility();
                 }
             });
-    
-    // ==================== 节点管理器信号连接 ====================
-    connect(m_nodeManager.get(), &GeoNodeManager::geometryChanged,
-            this, [this]() {
-                // 几何体变化时更新渲染
-                if (m_renderManager) {
-                    m_renderManager->forceRenderUpdate();
-                }
-                // 几何体变化时更新材质
-                if (m_materialManager) {
-                    m_materialManager->updateOSGMaterial();
-                }
-                // 几何体变化时更新包围盒可见性
-                if (m_nodeManager) {
-                    m_nodeManager->updateBoundingBoxVisibility();
-                }
-            });
-    
-    connect(m_nodeManager.get(), &GeoNodeManager::transformChanged,
-            this, [this]() {
-                // 变换变化时更新渲染
-                if (m_renderManager) {
-                    m_renderManager->updateRender();
-                }
-            });
     qDebug() << "Geo3D::connectManagerSignals: 所有管理器信号连接完成";
 }
 
@@ -168,7 +132,7 @@ void Geo3D::setParameters(const GeoParameters3D& params)
     m_parametersChanged = true;
     
     // 通知各个管理器参数变化
-    m_materialManager->setMaterial(params.material);
+    m_renderManager->setMaterial(params.material);
     m_renderManager->setShowPoints(params.showPoints);
     m_renderManager->setShowEdges(params.showEdges);
     m_renderManager->setShowFaces(params.showFaces);

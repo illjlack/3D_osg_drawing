@@ -181,9 +181,7 @@
     <ClCompile Include="src\core\managers\GeoNodeManager.cpp">
       <Filter>Core\Managers</Filter>
     </ClCompile>
-    <ClCompile Include="src\core\managers\GeoMaterialManager.cpp">
-      <Filter>Core\Managers</Filter>
-    </ClCompile>
+
     <ClCompile Include="src\core\managers\GeoRenderManager.cpp">
       <Filter>Core\Managers</Filter>
     </ClCompile>
@@ -270,9 +268,7 @@
     <QtMoc Include="src\core\managers\GeoNodeManager.h">
       <Filter>Core\Managers</Filter>
     </QtMoc>
-    <QtMoc Include="src\core\managers\GeoMaterialManager.h">
-      <Filter>Core\Managers</Filter>
-    </QtMoc>
+
     <QtMoc Include="src\core\managers\GeoRenderManager.h">
       <Filter>Core\Managers</Filter>
     </QtMoc>

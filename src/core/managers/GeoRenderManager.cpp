@@ -1,6 +1,8 @@
 ﻿#include "GeoRenderManager.h"
 #include "../GeometryBase.h"
-#include <algorithm>
+#include <osg/PolygonMode>
+#include <osg/Depth>
+#include <osg/CullFace>
 
 GeoRenderManager::GeoRenderManager(Geo3D* parent)
     : m_parent(parent)
@@ -8,57 +10,80 @@ GeoRenderManager::GeoRenderManager(Geo3D* parent)
     , m_showEdges(true)
     , m_showFaces(true)
     , m_visible(true)
-    , m_alpha(1.0f)
-    , m_renderMode(RENDER_ALL)
+    , m_wireframeMode(false)
     , m_highlighted(false)
-    , m_highlightColor(1.0f, 1.0f, 0.0f, 1.0f) // 黄色高亮
-    , m_highlightWidth(3.0f)
-    , m_needsRenderUpdate(true)
-    , m_renderDataValid(false)
+    , m_highlightColor(1.0f, 1.0f, 0.0f, 1.0f)
+    , m_blendingEnabled(false)
 {
-    initializeRenderSettings();
+    initializeRender();
 }
 
-void GeoRenderManager::initializeRenderSettings()
+void GeoRenderManager::initializeRender()
 {
-    updateRenderSettings();
-}
-
-void GeoRenderManager::setShowPoints(bool show)
-{
-    if (m_showPoints != show) {
-        m_showPoints = show;
-        updateFeatureVisibility();
+    // 初始化默认材质
+    m_material = Material3D();
+    
+    // 创建OSG渲染状态
+    m_stateSet = new osg::StateSet();
+    m_osgMaterial = new osg::Material();
+    m_blendFunc = new osg::BlendFunc();
+    m_lineWidth = new osg::LineWidth(2.0f);
+    m_pointSize = new osg::Point(5.0f);
+    
+    // 设置到几何节点
+    if (m_parent && m_parent->mm_node()) {
+        auto node = m_parent->mm_node()->getOSGNode();
+        if (node.valid()) {
+            node->setStateSet(m_stateSet.get());
+        }
     }
-}
-
-void GeoRenderManager::setShowEdges(bool show)
-{
-    if (m_showEdges != show) {
-        m_showEdges = show;
-        updateFeatureVisibility();
+    
+    if (!m_stateSet.valid()) return;
+    
+    if (m_osgMaterial.valid()) {
+        m_osgMaterial->setAmbient(osg::Material::FRONT_AND_BACK, 
+                                 osg::Vec4(m_material.ambient.r, m_material.ambient.g, 
+                                          m_material.ambient.b, m_material.ambient.a));
+        m_osgMaterial->setDiffuse(osg::Material::FRONT_AND_BACK, 
+                                 osg::Vec4(m_material.diffuse.r, m_material.diffuse.g, 
+                                          m_material.diffuse.b, m_material.diffuse.a));
+        m_osgMaterial->setSpecular(osg::Material::FRONT_AND_BACK, 
+                                  osg::Vec4(m_material.specular.r, m_material.specular.g, 
+                                           m_material.specular.b, m_material.specular.a));
+        m_osgMaterial->setShininess(osg::Material::FRONT_AND_BACK, m_material.shininess);
+        
+        m_stateSet->setAttributeAndModes(m_osgMaterial.get(), osg::StateAttribute::ON);
     }
-}
-
-void GeoRenderManager::setShowFaces(bool show)
-{
-    if (m_showFaces != show) {
-        m_showFaces = show;
-        updateFeatureVisibility();
+    
+    if (m_blendingEnabled) {
+        if (m_blendFunc.valid()) {
+            m_blendFunc->setSource(static_cast<osg::BlendFunc::BlendFuncMode>(GL_SRC_ALPHA));
+            m_blendFunc->setDestination(static_cast<osg::BlendFunc::BlendFuncMode>(GL_ONE_MINUS_SRC_ALPHA));
+            m_stateSet->setAttributeAndModes(m_blendFunc.get(), osg::StateAttribute::ON);
+            m_stateSet->setMode(GL_BLEND, osg::StateAttribute::ON);
+        }
+    } else {
+        m_stateSet->setMode(GL_BLEND, osg::StateAttribute::OFF);
+    }
+    
+    if (m_lineWidth.valid()) {
+        m_stateSet->setAttributeAndModes(m_lineWidth.get(), osg::StateAttribute::ON);
+    }
+    
+    if (m_pointSize.valid()) {
+        m_stateSet->setAttributeAndModes(m_pointSize.get(), osg::StateAttribute::ON);
+    }
+    
+    if (m_wireframeMode) {
+        osg::ref_ptr<osg::PolygonMode> polygonMode = new osg::PolygonMode();
+        polygonMode->setMode(osg::PolygonMode::FRONT_AND_BACK, osg::PolygonMode::LINE);
+        m_stateSet->setAttributeAndModes(polygonMode.get(), osg::StateAttribute::ON);
     }
 }
 
 void GeoRenderManager::setRenderMode(RenderMode mode)
 {
-    if (m_renderMode != mode) {
-        m_renderMode = mode;
-        applyRenderMode();
-    }
-}
-
-void GeoRenderManager::applyRenderMode()
-{
-    switch (m_renderMode) {
+    switch (mode) {
         case RENDER_POINTS:
             setShowPoints(true);
             setShowEdges(false);
@@ -82,59 +107,90 @@ void GeoRenderManager::applyRenderMode()
     }
 }
 
-void GeoRenderManager::showPointsOnly()
+void GeoRenderManager::setShowPoints(bool show)
 {
-    setRenderMode(RENDER_POINTS);
+    m_showPoints = show;
+    if (m_parent && m_parent->mm_node()) {
+        m_parent->mm_node()->setVertexVisible(show);
+    }
 }
 
-void GeoRenderManager::showWireframeOnly()
+void GeoRenderManager::setShowEdges(bool show)
 {
-    setRenderMode(RENDER_WIREFRAME);
+    m_showEdges = show;
+    if (m_parent && m_parent->mm_node()) {
+        m_parent->mm_node()->setEdgeVisible(show);
+    }
 }
 
-void GeoRenderManager::showSolidOnly()
+void GeoRenderManager::setShowFaces(bool show)
 {
-    setRenderMode(RENDER_SOLID);
-}
-
-void GeoRenderManager::showAll()
-{
-    setRenderMode(RENDER_ALL);
-}
-
-void GeoRenderManager::hideAll()
-{
-    setShowPoints(false);
-    setShowEdges(false);
-    setShowFaces(false);
+    m_showFaces = show;
+    if (m_parent && m_parent->mm_node()) {
+        m_parent->mm_node()->setFaceVisible(show);
+    }
 }
 
 void GeoRenderManager::setVisible(bool visible)
 {
-    if (m_visible != visible) {
-        m_visible = visible;
-        updateFeatureVisibility();
-    }
-}
-
-void GeoRenderManager::setAlpha(float alpha)
-{
-    alpha = std::max(0.0f, std::min(1.0f, alpha));
-    if (m_alpha != alpha) {
-        m_alpha = alpha;
-        
-        // 应用透明度到材质
-        if (m_parent && m_parent->mm_material()) {
-            m_parent->mm_material()->setTransparency(1.0f - alpha);
+    m_visible = visible;
+    if (m_parent && m_parent->mm_node()) {
+        auto node = m_parent->mm_node()->getOSGNode();
+        if (node.valid()) {
+            node->setNodeMask(visible ? 0xffffffff : 0x0);
         }
     }
 }
 
+void GeoRenderManager::setMaterial(const Material3D& material)
+{
+    m_material = material;
+}
+
+void GeoRenderManager::setMaterialType(MaterialType3D type)
+{
+    applyMaterialPreset(type);
+}
+
+void GeoRenderManager::setColor(const Color3D& color)
+{
+    m_material.diffuse = color;
+}
+
+void GeoRenderManager::setTransparency(float transparency)
+{
+    transparency = std::max(0.0f, std::min(1.0f, transparency));
+    m_material.transparency = transparency;
+    
+    if (transparency < 1.0f) {
+        m_blendingEnabled = true;
+    }
+}
+
+void GeoRenderManager::setLineWidth(float width)
+{
+    if (m_lineWidth.valid()) {
+        m_lineWidth->setWidth(width);
+    }
+}
+
+void GeoRenderManager::setPointSize(float size)
+{
+    if (m_pointSize.valid()) {
+        m_pointSize->setSize(size);
+    }
+}
+
+void GeoRenderManager::setWireframeMode(bool enable)
+{
+    m_wireframeMode = enable;
+}
+
 void GeoRenderManager::setHighlighted(bool highlighted)
 {
-    if (m_highlighted != highlighted) {
-        m_highlighted = highlighted;
-        updateHighlightEffect();
+    m_highlighted = highlighted;
+    if (highlighted) {
+        m_material.diffuse = m_highlightColor;
     }
 }
 
@@ -142,73 +198,46 @@ void GeoRenderManager::setHighlightColor(const Color3D& color)
 {
     m_highlightColor = color;
     if (m_highlighted) {
-        updateHighlightEffect();
+        m_material.diffuse = color;
     }
 }
 
-void GeoRenderManager::updateRender()
+void GeoRenderManager::applyMaterialPreset(MaterialType3D type)
 {
-    if (m_needsRenderUpdate) {
-        updateRenderSettings();
-        updateFeatureVisibility();
-        m_needsRenderUpdate = false;
-        m_renderDataValid = true;
-    }
-}
-
-void GeoRenderManager::forceRenderUpdate()
-{
-    m_needsRenderUpdate = true;
-    updateRender();
-}
-
-bool GeoRenderManager::isRenderingEnabled() const
-{
-    return m_visible && m_renderDataValid;
-}
-
-void GeoRenderManager::updateFeatureVisibility()
-{
-    if (!m_parent) return;
-    
-    // 获取节点管理器
-    auto nodeManager = m_parent->mm_node();
-    
-    // 更新点的可见性
-    nodeManager->setVertexVisible(m_showPoints);
-    
-    // 更新边的可见性
-    nodeManager->setEdgeVisible(m_showEdges);
-    
-    // 更新面的可见性
-    nodeManager->setFaceVisible(m_showFaces);
-}
-
-void GeoRenderManager::updateRenderSettings()
-{
-    // 应用透明度 - 避免递归调用
-    if (m_parent && m_parent->mm_material()) {
-        auto* materialManager = m_parent->mm_material();
-        if (materialManager) {
-            // 使用内部方法直接更新，避免触发updateMaterial
-            materialManager->updateMaterialInternal();
-        }
-    }
-}
-
-void GeoRenderManager::updateHighlightEffect()
-{
-    if (!m_parent) return;
-    
-    if (m_highlighted) {
-        // 应用高亮效果
-        if (auto* materialManager = m_parent->mm_material()) {
-            materialManager->setDiffuse(m_highlightColor);
-        }
-    } else {
-        // 移除高亮效果，恢复原始外观
-        if (auto* materialManager = m_parent->mm_material()) {
-            materialManager->resetMaterial();
-        }
+    switch (type) {
+        case Material_Basic3D:
+            m_material.ambient = Color3D(0.2f, 0.2f, 0.2f, 1.0f);
+            m_material.diffuse = Color3D(0.8f, 0.8f, 0.8f, 1.0f);
+            m_material.specular = Color3D(0.0f, 0.0f, 0.0f, 1.0f);
+            m_material.shininess = 0.0f;
+            break;
+            
+        case Material_Phong3D:
+            m_material.ambient = Color3D(0.2f, 0.2f, 0.2f, 1.0f);
+            m_material.diffuse = Color3D(0.8f, 0.8f, 0.8f, 1.0f);
+            m_material.specular = Color3D(1.0f, 1.0f, 1.0f, 1.0f);
+            m_material.shininess = 32.0f;
+            break;
+            
+        case Material_Blinn3D:
+            m_material.ambient = Color3D(0.1f, 0.1f, 0.1f, 1.0f);
+            m_material.diffuse = Color3D(0.7f, 0.7f, 0.7f, 1.0f);
+            m_material.specular = Color3D(0.8f, 0.8f, 0.8f, 1.0f);
+            m_material.shininess = 64.0f;
+            break;
+            
+        case Material_Lambert3D:
+            m_material.ambient = Color3D(0.3f, 0.3f, 0.3f, 1.0f);
+            m_material.diffuse = Color3D(0.9f, 0.9f, 0.9f, 1.0f);
+            m_material.specular = Color3D(0.0f, 0.0f, 0.0f, 1.0f);
+            m_material.shininess = 0.0f;
+            break;
+            
+        case Material_PBR3D:
+            m_material.ambient = Color3D(0.04f, 0.04f, 0.04f, 1.0f);
+            m_material.diffuse = Color3D(0.5f, 0.5f, 0.5f, 1.0f);
+            m_material.specular = Color3D(0.04f, 0.04f, 0.04f, 1.0f);
+            m_material.shininess = 128.0f;
+            break;
     }
 } 
