@@ -3,6 +3,7 @@
 #include <osg/PolygonMode>
 #include <osg/Depth>
 #include <osg/CullFace>
+#include <osg/BlendFunc>
 
 GeoRenderManager::GeoRenderManager(Geo3D* parent)
     : m_parent(parent)
@@ -23,8 +24,8 @@ void GeoRenderManager::initializeRender()
     m_stateSet = new osg::StateSet();
     m_osgMaterial = new osg::Material();
     m_blendFunc = new osg::BlendFunc();
-    m_lineWidth = new osg::LineWidth(2.0f);
-    m_pointSize = new osg::Point(5.0f);
+    m_lineWidth = new osg::LineWidth(1.0f);  // 与根节点保持一致
+    m_pointSize = new osg::Point(3.0f);      // 与根节点保持一致
     
     // 1. 三套材质
     m_pointMaterial = new osg::Material(*m_osgMaterial);
@@ -47,12 +48,18 @@ void GeoRenderManager::initializeRender()
         auto ss = geomPts->getOrCreateStateSet();
         ss->setAttributeAndModes(m_pointMaterial.get(),osg::StateAttribute::ON);
         ss->setAttributeAndModes(m_pointSize .get(),osg::StateAttribute::ON);
+        
+        // 点抗锯齿设置（继承根节点的混合函数）
+        ss->setMode(GL_POINT_SMOOTH, osg::StateAttribute::ON);
     }
     if (geomEdges)
     {
         auto ss = geomEdges->getOrCreateStateSet();
         ss->setAttributeAndModes(m_edgeMaterial.get(),osg::StateAttribute::ON);
         ss->setAttributeAndModes(m_lineWidth .get(),osg::StateAttribute::ON);
+        
+        // 线抗锯齿设置（继承根节点的混合函数）
+        ss->setMode(GL_LINE_SMOOTH, osg::StateAttribute::ON);
         // 要虚线、加 LineStipple
     }
     if (geomFaces)
@@ -64,6 +71,9 @@ void GeoRenderManager::initializeRender()
             auto pm = new osg::PolygonMode();
             pm->setMode(osg::PolygonMode::FRONT_AND_BACK, osg::PolygonMode::LINE);
             ss->setAttributeAndModes(pm,osg::StateAttribute::ON);
+            
+            // 线框模式下的抗锯齿（继承根节点的混合函数）
+            ss->setMode(GL_LINE_SMOOTH, osg::StateAttribute::ON);
         }
     }
 

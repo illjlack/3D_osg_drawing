@@ -14,6 +14,7 @@
 #include <osg/Vec4>
 #include <osg/StateSet>
 #include <osg/Material>
+#include <osg/Billboard>
 #include <osgViewer/Viewer>
 #include <osgGA/GUIEventAdapter>
 #include <osgUtil/IntersectionVisitor>
@@ -43,7 +44,7 @@ OSGIndexPickingSystem::OSGIndexPickingSystem()
     stateSet->setMode(GL_DEPTH_TEST, osg::StateAttribute::OFF);
     stateSet->setRenderingHint(osg::StateSet::TRANSPARENT_BIN);
     
-    LOG_DEBUG("OSGIndexPickingSystem创建完成", "拾取");
+    // OSGIndexPickingSystem创建完成（移除调试日志）
 }
 
 OSGIndexPickingSystem::~OSGIndexPickingSystem()
@@ -122,7 +123,7 @@ void OSGIndexPickingSystem::addGeometry(Geo3D* geometry)
         [geometry](const osg::ref_ptr<Geo3D>& ref) { return ref.get() == geometry; });
     
     if (it != m_geometries.end()) {
-        LOG_DEBUG("几何体已存在于拾取系统中", "拾取");
+        // 几何体已存在于拾取系统中（移除调试日志）
         return;
     }
     
@@ -132,7 +133,7 @@ void OSGIndexPickingSystem::addGeometry(Geo3D* geometry)
     std::vector<glm::vec3> snapPoints = extractSnapPoints(geometry);
     m_snapPointsCache[geometry] = snapPoints;
     
-    LOG_DEBUG(QString("添加几何体到OSG索引拾取系统 - 捕捉点数量: %1").arg(snapPoints.size()), "拾取");
+    // 添加几何体到OSG索引拾取系统（移除调试日志）
 }
 
 void OSGIndexPickingSystem::removeGeometry(Geo3D* geometry)
@@ -151,7 +152,7 @@ void OSGIndexPickingSystem::removeGeometry(Geo3D* geometry)
             hideHighlight();
         }
         
-        LOG_DEBUG("从OSG索引拾取系统移除几何体", "拾取");
+        // 从OSG索引拾取系统移除几何体（移除调试日志）
     }
 }
 
@@ -166,13 +167,13 @@ void OSGIndexPickingSystem::updateGeometry(Geo3D* geometry)
     if (it == m_geometries.end()) {
         // 如果几何体不在拾取系统中，先添加它
         addGeometry(geometry);
-        LOG_DEBUG(QString("几何体不在拾取系统中，已添加: %1").arg(geometry->getGeoType()), "拾取");
+        // 几何体不在拾取系统中，已添加（移除调试日志）
     } else {
         // 如果几何体已经在拾取系统中，更新捕捉点缓存
         std::vector<glm::vec3> snapPoints = extractSnapPoints(geometry);
         m_snapPointsCache[geometry] = snapPoints;
         
-        LOG_DEBUG(QString("更新几何体 - 捕捉点数量: %1").arg(snapPoints.size()), "拾取");
+        // 更新几何体（移除调试日志）
     }
 }
 
@@ -184,7 +185,7 @@ void OSGIndexPickingSystem::clearAllGeometries()
     hideIndicator();
     m_lastResult = OSGIndexPickResult();
     
-    LOG_DEBUG("清除所有几何体", "拾取");
+    // 清除所有几何体（移除调试日志）
 }
 
 OSGIndexPickResult OSGIndexPickingSystem::pick(int mouseX, int mouseY)
@@ -231,7 +232,7 @@ OSGIndexPickResult OSGIndexPickingSystem::pick(int mouseX, int mouseY)
     double elapsedTime = osg::Timer::instance()->delta_s(startTime, endTime);
     
     if (m_debugMode) {
-        LOG_DEBUG(QString("OSG索引拾取耗时: %1 ms").arg(elapsedTime * 1000.0, 0, 'f', 2), "拾取");
+        // OSG索引拾取耗时（移除调试日志）
     }
     
     return result;
@@ -247,7 +248,7 @@ OSGIndexPickResult OSGIndexPickingSystem::performOSGIndexPicking(int mouseX, int
     if (m_config.pickVertexFirst) {
         result = pickVertex(mouseX, mouseY);
         if (result.hasResult) {
-            LOG_DEBUG("拾取到顶点", "拾取");
+            // 拾取到顶点（移除调试日志）
             return result;
         }
     }
@@ -255,7 +256,7 @@ OSGIndexPickResult OSGIndexPickingSystem::performOSGIndexPicking(int mouseX, int
     if (m_config.pickEdgeSecond) {
         result = pickEdge(mouseX, mouseY);
         if (result.hasResult) {
-            LOG_DEBUG("拾取到边", "拾取");
+            // 拾取到边（移除调试日志）
             return result;
         }
     }
@@ -263,7 +264,7 @@ OSGIndexPickResult OSGIndexPickingSystem::performOSGIndexPicking(int mouseX, int
     if (m_config.pickFaceLast) {
         result = pickFace(mouseX, mouseY);
         if (result.hasResult) {
-            LOG_DEBUG("拾取到面", "拾取");
+            // 拾取到面（移除调试日志）
             return result;
         }
     }
@@ -583,7 +584,7 @@ OSGIndexPickResult OSGIndexPickingSystem::calculateSnapping(const OSGIndexPickRe
         snappedResult.screenY = static_cast<int>(screenPos.y);
         
         if (m_debugMode) {
-            LOG_DEBUG(QString("捕捉到点 - 距离: %1").arg(bestDistance), "拾取");
+            // 捕捉到点（移除调试日志）
         }
     }
     
@@ -622,46 +623,40 @@ void OSGIndexPickingSystem::showIndicator(const OSGIndexPickResult& result)
 {
     if (!m_indicator) return;
     
-    // 设置指示器位置
+    // 将世界坐标转换为屏幕坐标
+    glm::vec2 screenPos = worldToScreen(result.indicatorPosition);
+    
+    // 设置指示器位置（使用屏幕坐标）
     osg::Matrix matrix;
-    matrix.makeTranslate(osg::Vec3(
-        result.indicatorPosition.x, 
-        result.indicatorPosition.y, 
-        result.indicatorPosition.z
-    ));
+    matrix.makeTranslate(osg::Vec3(screenPos.x, screenPos.y, 0.0f));
     m_indicator->setMatrix(matrix);
     
     // 根据特征类型设置指示器几何体
     m_indicator->removeChildren(0, m_indicator->getNumChildren());
     
     osg::ref_ptr<osg::Geometry> indicatorGeometry = nullptr;
-    osg::Vec4 color;
     
     switch (result.featureType) {
         case PickFeatureType::VERTEX:
             indicatorGeometry = m_vertexIndicator;
-            color = osg::Vec4(1.0f, 0.0f, 0.0f, 1.0f); // 红色
             break;
         case PickFeatureType::EDGE:
             indicatorGeometry = m_edgeIndicator;
-            color = osg::Vec4(0.0f, 1.0f, 0.0f, 1.0f); // 绿色
             break;
         case PickFeatureType::FACE:
             indicatorGeometry = m_faceIndicator;
-            color = osg::Vec4(0.0f, 0.0f, 1.0f, 1.0f); // 蓝色
             break;
         default:
             return;
     }
     
     if (indicatorGeometry) {
-        // 设置颜色
-        osg::StateSet* stateSet = indicatorGeometry->getOrCreateStateSet();
-        osg::Material* material = new osg::Material;
-        material->setDiffuse(osg::Material::FRONT_AND_BACK, color);
-        stateSet->setAttributeAndModes(material);
+        // 创建Billboard节点，使2D指示器始终面向相机
+        osg::ref_ptr<osg::Billboard> billboard = new osg::Billboard;
+        billboard->setMode(osg::Billboard::POINT_ROT_EYE);
+        billboard->addDrawable(indicatorGeometry);
         
-        m_indicator->addChild(indicatorGeometry);
+        m_indicator->addChild(billboard);
     }
     
     // 显示指示器
@@ -679,42 +674,40 @@ void OSGIndexPickingSystem::updateIndicatorPosition(const glm::vec3& position, P
 {
     if (!m_indicator) return;
     
-    // 设置指示器位置
+    // 将世界坐标转换为屏幕坐标
+    glm::vec2 screenPos = worldToScreen(position);
+    
+    // 设置指示器位置（使用屏幕坐标）
     osg::Matrix matrix;
-    matrix.makeTranslate(osg::Vec3(position.x, position.y, position.z));
+    matrix.makeTranslate(osg::Vec3(screenPos.x, screenPos.y, 0.0f));
     m_indicator->setMatrix(matrix);
     
     // 根据特征类型设置指示器几何体
     m_indicator->removeChildren(0, m_indicator->getNumChildren());
     
     osg::ref_ptr<osg::Geometry> indicatorGeometry = nullptr;
-    osg::Vec4 color;
     
     switch (featureType) {
         case PickFeatureType::VERTEX:
             indicatorGeometry = m_vertexIndicator;
-            color = osg::Vec4(1.0f, 0.0f, 0.0f, 1.0f); // 红色
             break;
         case PickFeatureType::EDGE:
             indicatorGeometry = m_edgeIndicator;
-            color = osg::Vec4(0.0f, 1.0f, 0.0f, 1.0f); // 绿色
             break;
         case PickFeatureType::FACE:
             indicatorGeometry = m_faceIndicator;
-            color = osg::Vec4(0.0f, 0.0f, 1.0f, 1.0f); // 蓝色
             break;
         default:
             return;
     }
     
     if (indicatorGeometry) {
-        // 设置颜色
-        osg::StateSet* stateSet = indicatorGeometry->getOrCreateStateSet();
-        osg::Material* material = new osg::Material;
-        material->setDiffuse(osg::Material::FRONT_AND_BACK, color);
-        stateSet->setAttributeAndModes(material);
+        // 创建Billboard节点，使2D指示器始终面向相机
+        osg::ref_ptr<osg::Billboard> billboard = new osg::Billboard;
+        billboard->setMode(osg::Billboard::POINT_ROT_EYE);
+        billboard->addDrawable(indicatorGeometry);
         
-        m_indicator->addChild(indicatorGeometry);
+        m_indicator->addChild(billboard);
     }
     
     // 显示指示器
@@ -733,7 +726,7 @@ void OSGIndexPickingSystem::showHighlight(Geo3D* geometry)
         m_highlightNode->addChild(highlightGeometry);
         m_highlightedGeometry = geometry;
         
-        LOG_DEBUG("显示几何体高亮", "拾取");
+        // 显示几何体高亮（移除调试日志）
     }
 }
 
@@ -782,66 +775,128 @@ osg::ref_ptr<osg::Geometry> OSGIndexPickingSystem::createVertexIndicator(float s
 {
     osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
     
-    // 创建顶点指示器（小球体）
-    osg::ref_ptr<osg::ShapeDrawable> sphere = new osg::ShapeDrawable(
-        new osg::Sphere(osg::Vec3(0.0f, 0.0f, 0.0f), size * 0.5f)
-    );
+    // 创建2D圆形指示器（顶点）
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
-    // 设置材质
-    osg::StateSet* stateSet = sphere->getOrCreateStateSet();
-    osg::Material* material = new osg::Material;
-    material->setDiffuse(osg::Material::FRONT_AND_BACK, osg::Vec4(1.0f, 0.0f, 0.0f, 1.0f));
-    material->setAmbient(osg::Material::FRONT_AND_BACK, osg::Vec4(0.3f, 0.0f, 0.0f, 1.0f));
-    stateSet->setAttributeAndModes(material);
+    // 创建圆形
+    const int segments = 16;
+    for (int i = 0; i <= segments; ++i) {
+        float angle = (2.0f * M_PI * i) / segments;
+        float x = size * 0.5f * cos(angle);
+        float y = size * 0.5f * sin(angle);
+        vertices->push_back(osg::Vec3(x, y, 0.0f));
+        colors->push_back(osg::Vec4(1.0f, 0.0f, 0.0f, 1.0f)); // 红色
+    }
     
-    // 启用光照
-    stateSet->setMode(GL_LIGHTING, osg::StateAttribute::ON);
+    geometry->setVertexArray(vertices);
+    geometry->setColorArray(colors);
+    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     
-    return sphere;
+    // 创建三角形扇形
+    osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::TRIANGLE_FAN, 0, vertices->size());
+    geometry->addPrimitiveSet(drawArrays);
+    
+    // 设置渲染状态
+    osg::StateSet* stateSet = geometry->getOrCreateStateSet();
+    stateSet->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+    stateSet->setMode(GL_DEPTH_TEST, osg::StateAttribute::OFF);
+    stateSet->setMode(GL_BLEND, osg::StateAttribute::ON);
+    
+    // 设置混合函数
+    osg::BlendFunc* blendFunc = new osg::BlendFunc;
+    blendFunc->setSource(osg::BlendFunc::SRC_ALPHA);
+    blendFunc->setDestination(osg::BlendFunc::ONE_MINUS_SRC_ALPHA);
+    stateSet->setAttributeAndModes(blendFunc);
+    
+    return geometry;
 }
 
 osg::ref_ptr<osg::Geometry> OSGIndexPickingSystem::createEdgeIndicator(float size)
 {
     osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
     
-    // 创建边指示器（圆柱体）
-    osg::ref_ptr<osg::ShapeDrawable> cylinder = new osg::ShapeDrawable(
-        new osg::Cylinder(osg::Vec3(0.0f, 0.0f, 0.0f), size * 0.3f, size)
-    );
+    // 创建2D矩形指示器（边）
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
-    // 设置材质
-    osg::StateSet* stateSet = cylinder->getOrCreateStateSet();
-    osg::Material* material = new osg::Material;
-    material->setDiffuse(osg::Material::FRONT_AND_BACK, osg::Vec4(0.0f, 1.0f, 0.0f, 1.0f));
-    material->setAmbient(osg::Material::FRONT_AND_BACK, osg::Vec4(0.0f, 0.3f, 0.0f, 1.0f));
-    stateSet->setAttributeAndModes(material);
+    // 创建矩形
+    float halfWidth = size * 0.3f;
+    float halfHeight = size * 0.1f;
     
-    // 启用光照
-    stateSet->setMode(GL_LIGHTING, osg::StateAttribute::ON);
+    vertices->push_back(osg::Vec3(-halfWidth, -halfHeight, 0.0f));
+    vertices->push_back(osg::Vec3(halfWidth, -halfHeight, 0.0f));
+    vertices->push_back(osg::Vec3(halfWidth, halfHeight, 0.0f));
+    vertices->push_back(osg::Vec3(-halfWidth, halfHeight, 0.0f));
     
-    return cylinder;
+    for (int i = 0; i < 4; ++i) {
+        colors->push_back(osg::Vec4(0.0f, 1.0f, 0.0f, 1.0f)); // 绿色
+    }
+    
+    geometry->setVertexArray(vertices);
+    geometry->setColorArray(colors);
+    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+    
+    // 创建四边形
+    osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::QUADS, 0, vertices->size());
+    geometry->addPrimitiveSet(drawArrays);
+    
+    // 设置渲染状态
+    osg::StateSet* stateSet = geometry->getOrCreateStateSet();
+    stateSet->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+    stateSet->setMode(GL_DEPTH_TEST, osg::StateAttribute::OFF);
+    stateSet->setMode(GL_BLEND, osg::StateAttribute::ON);
+    
+    // 设置混合函数
+    osg::BlendFunc* blendFunc = new osg::BlendFunc;
+    blendFunc->setSource(osg::BlendFunc::SRC_ALPHA);
+    blendFunc->setDestination(osg::BlendFunc::ONE_MINUS_SRC_ALPHA);
+    stateSet->setAttributeAndModes(blendFunc);
+    
+    return geometry;
 }
 
 osg::ref_ptr<osg::Geometry> OSGIndexPickingSystem::createFaceIndicator(float size)
 {
     osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
     
-    // 创建面指示器（立方体）
-    osg::ref_ptr<osg::ShapeDrawable> box = new osg::ShapeDrawable(
-        new osg::Box(osg::Vec3(0.0f, 0.0f, 0.0f), size)
-    );
+    // 创建2D正方形指示器（面）
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
-    // 设置材质
-    osg::StateSet* stateSet = box->getOrCreateStateSet();
-    osg::Material* material = new osg::Material;
-    material->setDiffuse(osg::Material::FRONT_AND_BACK, osg::Vec4(0.0f, 0.0f, 1.0f, 1.0f));
-    material->setAmbient(osg::Material::FRONT_AND_BACK, osg::Vec4(0.0f, 0.0f, 0.3f, 1.0f));
-    stateSet->setAttributeAndModes(material);
+    // 创建正方形
+    float halfSize = size * 0.4f;
     
-    // 启用光照
-    stateSet->setMode(GL_LIGHTING, osg::StateAttribute::ON);
+    vertices->push_back(osg::Vec3(-halfSize, -halfSize, 0.0f));
+    vertices->push_back(osg::Vec3(halfSize, -halfSize, 0.0f));
+    vertices->push_back(osg::Vec3(halfSize, halfSize, 0.0f));
+    vertices->push_back(osg::Vec3(-halfSize, halfSize, 0.0f));
     
-    return box;
+    for (int i = 0; i < 4; ++i) {
+        colors->push_back(osg::Vec4(0.0f, 0.0f, 1.0f, 1.0f)); // 蓝色
+    }
+    
+    geometry->setVertexArray(vertices);
+    geometry->setColorArray(colors);
+    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+    
+    // 创建四边形
+    osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::QUADS, 0, vertices->size());
+    geometry->addPrimitiveSet(drawArrays);
+    
+    // 设置渲染状态
+    osg::StateSet* stateSet = geometry->getOrCreateStateSet();
+    stateSet->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+    stateSet->setMode(GL_DEPTH_TEST, osg::StateAttribute::OFF);
+    stateSet->setMode(GL_BLEND, osg::StateAttribute::ON);
+    
+    // 设置混合函数
+    osg::BlendFunc* blendFunc = new osg::BlendFunc;
+    blendFunc->setSource(osg::BlendFunc::SRC_ALPHA);
+    blendFunc->setDestination(osg::BlendFunc::ONE_MINUS_SRC_ALPHA);
+    stateSet->setAttributeAndModes(blendFunc);
+    
+    return geometry;
 }
 
 glm::vec2 OSGIndexPickingSystem::worldToScreen(const glm::vec3& worldPos)
@@ -901,7 +956,7 @@ void OSGIndexPickingSystem::showSelectionHighlight(Geo3D* geometry)
         m_highlightNode->addChild(highlightGeometry);
         m_highlightedGeometry = geometry;
         
-        LOG_DEBUG("显示选择高亮", "拾取");
+        // 显示选择高亮（移除调试日志）
     }
 }
 
@@ -911,7 +966,7 @@ void OSGIndexPickingSystem::hideSelectionHighlight()
         m_highlightNode->removeChildren(0, m_highlightNode->getNumChildren());
         m_highlightedGeometry = nullptr;
         
-        LOG_DEBUG("隐藏选择高亮", "拾取");
+        // 隐藏选择高亮（移除调试日志）
     }
 }
 

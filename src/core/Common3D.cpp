@@ -9,7 +9,7 @@ float GlobalPointSize3D = 5.0f;
 QColor GlobalPointColor3D = QColor(255, 0, 0);
 
 LineStyle3D GlobalLineStyle3D = Line_Solid3D;
-float GlobalLineWidth3D = 2.0f;
+float GlobalLineWidth3D = 1.0f;  // 与根节点保持一致，更好地展示抗锯齿效果
 QColor GlobalLineColor3D = QColor(0, 0, 255);
 float GlobalLineDashPattern3D = 1.0f;
 NodeLineStyle3D GlobalNodeLineStyle3D = NodeLine_Polyline3D;

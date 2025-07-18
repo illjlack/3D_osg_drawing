@@ -164,7 +164,7 @@ void Cone3D_Geo::buildEdgeGeometries()
     // 设置线的宽度
     osg::ref_ptr<osg::StateSet> stateSet = geometry->getOrCreateStateSet();
     osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth;
-    lineWidth->setWidth(2.0f);  // 边界线宽度
+    lineWidth->setWidth(m_parameters.lineWidth);  // 使用参数中的线宽
     stateSet->setAttribute(lineWidth);
     
     // 几何体已经通过mm_node()->getEdgeGeometry()获取，直接使用

@@ -40,6 +40,11 @@ MainWindow::MainWindow(QWidget* parent)
     createDockWidgets();
     connectSignals();
     
+    // 设置状态栏的OSG Widget引用
+    if (m_statusBar3D && m_osgWidget) {
+        m_statusBar3D->setOSGWidget(m_osgWidget);
+    }
+    
     // 设置初始大小和位置
     resize(1200, 800);
     
@@ -83,26 +88,18 @@ MainWindow::MainWindow(QWidget* parent)
     {
         connect(m_osgWidget, &OSGWidget::mousePositionChanged,
                 this, [this](const glm::vec3& pos) {
-                    m_positionLabel->setText(QString("位置: (%1, %2, %3)")
-                        .arg(pos.x, 0, 'f', 2)
-                        .arg(pos.y, 0, 'f', 2)
-                        .arg(pos.z, 0, 'f', 2));
+                    if (m_statusBar3D) {
+                        m_statusBar3D->updateWorldCoordinates(pos);
+                    }
                 });
         
         // 连接摄像机移动速度变化
         connect(m_osgWidget, &OSGWidget::cameraMoveSpeedChanged,
                 this, [this](double speed) {
-                    // 更新状态栏中的摄像机速度显示
-                    QList<QLabel*> labels = findChildren<QLabel*>();
-                    for (QLabel* label : labels)
-                    {
-                        if (label->text().startsWith("摄像机速度:"))
-                        {
-                            label->setText(QString("摄像机速度: %1").arg(speed, 0, 'f', 0));
-                            break;
-                        }
+                    if (m_statusBar3D) {
+                        m_statusBar3D->updateCameraSpeed(speed);
                     }
-                    LOG_DEBUG(tr("摄像机移动速度已更改为: %1").arg(speed, 0, 'f', 0), "摄像机");
+                    // 摄像机移动速度更改（移除调试日志）
                 });
     }
     
@@ -131,7 +128,7 @@ void MainWindow::setupUI()
     // 添加初始日志信息（在UI创建完成后）
     LOG_INFO("3D绘图板启动完成", "系统");
     LOG_INFO("日志系统已初始化", "系统");
-    LOG_DEBUG("调试模式已启用", "系统");
+    // 调试模式已启用（移除调试日志）
 }
 
 void MainWindow::createMenus()
@@ -425,32 +422,14 @@ void MainWindow::createToolBars()
 
 void MainWindow::createStatusBar()
 {
-    // 创建状态栏标签
-    m_positionLabel = new QLabel("位置: (0, 0, 0)");
-    m_positionLabel->setMinimumWidth(200);
-    statusBar()->addWidget(m_positionLabel);
+    // 创建自定义状态栏
+    m_statusBar3D = new StatusBar3D();
+    statusBar()->addWidget(m_statusBar3D);
     
-    // 添加摄像机移动速度显示
-    QLabel* cameraSpeedLabel = new QLabel("摄像机速度: 100");
-    cameraSpeedLabel->setMinimumWidth(150);
-    statusBar()->addWidget(cameraSpeedLabel);
-    
-    // 模式标签
-    m_modeLabel = new QLabel(tr("模式: 选择"));
-    m_modeLabel->setMinimumWidth(100);
-    statusBar()->addWidget(m_modeLabel);
-    
-    // 对象数量标签
-    m_objectCountLabel = new QLabel(tr("对象: 0"));
-    m_objectCountLabel->setMinimumWidth(80);
-    statusBar()->addWidget(m_objectCountLabel);
-    
-    // 坐标范围标签
-    m_coordinateRangeLabel = new QLabel(tr("范围: 地球"));
-    m_coordinateRangeLabel->setMinimumWidth(120);
-    statusBar()->addWidget(m_coordinateRangeLabel);
-    
-    statusBar()->addPermanentWidget(new QLabel(tr("就绪")));
+    // 设置OSG Widget引用
+    if (m_osgWidget) {
+        m_statusBar3D->setOSGWidget(m_osgWidget);
+    }
 }
 
 void MainWindow::createDockWidgets()
@@ -496,14 +475,18 @@ void MainWindow::connectSignals()
     {
         connect(m_osgWidget, &OSGWidget::geoSelected, this, &MainWindow::onGeoSelected);
         connect(m_osgWidget, &OSGWidget::mousePositionChanged, [this](const glm::vec3& pos) {
-            if (m_positionLabel)
+            if (m_statusBar3D)
             {
-                m_positionLabel->setText(tr("位置: (%1, %2, %3)")
-                    .arg(pos.x, 0, 'f', 2)
-                    .arg(pos.y, 0, 'f', 2)
-                    .arg(pos.z, 0, 'f', 2));
+                m_statusBar3D->updateWorldCoordinates(pos);
             }
             // 注意：鼠标位置变化太频繁，不输出到日志，避免日志过多
+        });
+        
+        connect(m_osgWidget, &OSGWidget::screenPositionChanged, [this](int x, int y) {
+            if (m_statusBar3D)
+            {
+                m_statusBar3D->updateScreenCoordinates(x, y);
+            }
         });
         connect(m_osgWidget, &OSGWidget::simplePickingResult, this, &MainWindow::onSimplePickingResult);
         connect(m_osgWidget, &OSGWidget::manipulatorTypeChanged, this, [this](ManipulatorType type) {
@@ -549,7 +532,9 @@ void MainWindow::connectSignals()
 
 void MainWindow::updateStatusBar(const QString& message)
 {
-    statusBar()->showMessage(message, 3000);
+    if (m_statusBar3D) {
+        m_statusBar3D->showTemporaryMessage(message, 3000);
+    }
     // 同时输出到日志系统
     LOG_INFO(message, "状态");
 }
@@ -561,15 +546,15 @@ void MainWindow::updateDrawModeUI()
         m_toolPanel->updateDrawMode(GlobalDrawMode3D);
     }
     
-    if (m_modeLabel)
+    if (m_statusBar3D)
     {
-        m_modeLabel->setText(tr("模式: %1").arg(drawMode3DToString(GlobalDrawMode3D)));
+        m_statusBar3D->updateMode(drawMode3DToString(GlobalDrawMode3D));
     }
 }
 
 void MainWindow::updateCoordinateRangeLabel()
 {
-    if (m_coordinateRangeLabel)
+    if (m_statusBar3D)
     {
         CoordinateSystem3D* coordSystem = CoordinateSystem3D::getInstance();
         const CoordinateSystem3D::CoordinateRange& range = coordSystem->getCoordinateRange();
@@ -587,17 +572,17 @@ void MainWindow::updateCoordinateRangeLabel()
         else if (maxRange <= 12742000) rangeName = "地球范围";
         else rangeName = "自定义范围";
         
-        m_coordinateRangeLabel->setText(tr("范围: %1").arg(rangeName));
+        m_statusBar3D->updateCoordinateRange(rangeName);
     }
 }
 
 void MainWindow::updateObjectCount()
 {
-    if (m_objectCountLabel && m_osgWidget)
+    if (m_statusBar3D && m_osgWidget)
     {
         const auto& allGeos = m_osgWidget->getAllGeos();
         int count = static_cast<int>(allGeos.size());
-        m_objectCountLabel->setText(tr("对象: %1").arg(count));
+        m_statusBar3D->updateObjectCount(count);
     }
 }
 
@@ -656,15 +641,14 @@ void MainWindow::onFileOpen()
                     if (geo)
                     {
                         m_osgWidget->addGeo(geo);
-                        LOG_DEBUG(QString("已添加几何对象到场景: 类型=%1").arg(geo->getGeoType()), "文件");
+                        // 已添加几何对象到场景（移除调试日志）
                     }
                 }
                 
                 // 确保所有从文件IO读入的几何对象都加入了拾取系统
                 m_osgWidget->ensureAllGeosInPickingSystem();
                 
-                // 记录拾取系统状态
-                LOG_INFO(m_osgWidget->getPickingSystemStatus(), "拾取");
+                // 记录拾取系统状态（移除频繁的日志）
                 
                 m_currentFilePath = fileName;
                 m_modified = false;
@@ -687,8 +671,7 @@ void MainWindow::onFileOpen()
                     // 确保从文件IO读入的几何对象加入了拾取系统
                     m_osgWidget->ensureAllGeosInPickingSystem();
                     
-                    // 记录拾取系统状态
-                    LOG_INFO(m_osgWidget->getPickingSystemStatus(), "拾取");
+                    // 记录拾取系统状态（移除频繁的日志）
                     
                     m_currentFilePath = fileName;
                     m_modified = false;
@@ -1145,26 +1128,14 @@ void MainWindow::onSimplePickingResult(const OSGIndexPickResult& result)
     
     QString snapInfo = result.isSnapped ? tr(" (已捕捉)") : "";
     
-    updateStatusBar(tr("拾取到 %1 - 几何体: %2%3")
-        .arg(typeStr)
-        .arg(result.geometry ? result.geometry->getGeoType() : -1)
-        .arg(snapInfo));
+    // 拾取结果（移除频繁的状态栏更新）
     
-    LOG_DEBUG(tr("拾取到 %1 - 几何体: %2, 位置: (%3, %4, %5)%6")
-        .arg(typeStr)
-        .arg(result.geometry ? result.geometry->getGeoType() : -1)
-        .arg(result.worldPosition.x, 0, 'f', 3)
-        .arg(result.worldPosition.y, 0, 'f', 3)
-        .arg(result.worldPosition.z, 0, 'f', 3)
-        .arg(snapInfo), "拾取");
+    // 拾取结果（移除调试日志）
     
-    // 更新坐标显示
-    if (m_positionLabel)
+    // 更新拾取后的坐标
+    if (m_statusBar3D)
     {
-        m_positionLabel->setText(tr("拾取点: (%1, %2, %3)")
-            .arg(result.worldPosition.x, 0, 'f', 3)
-            .arg(result.worldPosition.y, 0, 'f', 3)
-            .arg(result.worldPosition.z, 0, 'f', 3));
+        m_statusBar3D->updateWorldCoordinates(result.worldPosition);
     }
 }
 
@@ -2634,9 +2605,9 @@ void MainWindow::onClearScene()
         LOG_SUCCESS("场景已清空", "场景");
         
         // 更新对象数量显示
-        if (m_objectCountLabel)
+        if (m_statusBar3D)
         {
-            m_objectCountLabel->setText(tr("对象: 0"));
+            m_statusBar3D->updateObjectCount(0);
         }
     }
 }
@@ -2830,7 +2801,7 @@ void MainWindow::onOrthographicSizeChanged()
     m_osgWidget->setViewSize(-size, size, -size, size);
     
     updateStatusBar(tr("视图大小设置为: ±%1m").arg(size));
-    LOG_DEBUG(tr("视图大小设置为: ±%1m").arg(size), "投影");
+    // 视图大小设置（移除调试日志）
 }
 
 // ========================================= 相机操控器相关槽函数 =========================================

@@ -43,10 +43,7 @@ CameraController::CameraController()
     // 初始化所有操控器
     initializeManipulators();
     
-    LOG_DEBUG(QString("相机控制器初始化完成: 默认操控器=%1, 投影模式=%2, FOV=%3°")
-              .arg(getManipulatorTypeString(m_currentManipulatorType))
-              .arg(m_projectionMode == ProjectionMode::Perspective ? "透视" : "正交")
-              .arg(m_fov, 0, 'f', 1), "相机");
+    // 相机控制器初始化完成（移除调试日志）
 }
 
 CameraController::~CameraController()
@@ -78,7 +75,7 @@ void CameraController::initializeManipulators()
     m_currentManipulator = static_cast<osgGA::CameraManipulator*>(m_trackballManipulator.get());
     m_keySwitchManipulator->selectMatrixManipulator(0);
     
-    LOG_DEBUG("相机操控器初始化完成，默认使用轨道球操控器", "相机");
+    // 相机操控器初始化完成（移除调试日志）
 }
 
 void CameraController::setViewer(osgViewer::Viewer* viewer)
@@ -132,7 +129,7 @@ void CameraController::switchManipulator(ManipulatorType type)
             break;
     }
     
-    LOG_DEBUG(QString("已切换到%1操控器").arg(getManipulatorTypeString(type)), "相机");
+    // 切换到操控器（移除调试日志）
     invalidateDirectionCache();
 }
 
@@ -304,11 +301,7 @@ void CameraController::moveForward(double distance)
     osg::Matrix lookAtMatrix = osg::Matrix::lookAt(newEye, newCenter, up);
     m_currentManipulator->setByInverseMatrix(lookAtMatrix);
     
-    LOG_DEBUG(QString("相机向前移动: 距离=%1, 位置=(%2,%3,%4)")
-              .arg(distance, 0, 'f', 2)
-              .arg(newEye.x(), 0, 'f', 2)
-              .arg(newEye.y(), 0, 'f', 2)
-              .arg(newEye.z(), 0, 'f', 2), "相机");
+    // 相机向前移动（移除频繁的调试日志）
     
     invalidateDirectionCache();
 }
@@ -335,11 +328,7 @@ void CameraController::moveBackward(double distance)
     osg::Matrix lookAtMatrix = osg::Matrix::lookAt(newEye, newCenter, up);
     m_currentManipulator->setByInverseMatrix(lookAtMatrix);
     
-    LOG_DEBUG(QString("相机向后移动: 距离=%1, 位置=(%2,%3,%4)")
-              .arg(distance, 0, 'f', 2)
-              .arg(newEye.x(), 0, 'f', 2)
-              .arg(newEye.y(), 0, 'f', 2)
-              .arg(newEye.z(), 0, 'f', 2), "相机");
+    // 相机向后移动（移除频繁的调试日志）
     
     invalidateDirectionCache();
 }
@@ -368,11 +357,7 @@ void CameraController::moveLeft(double distance)
     osg::Matrix lookAtMatrix = osg::Matrix::lookAt(newEye, newCenter, up);
     m_currentManipulator->setByInverseMatrix(lookAtMatrix);
     
-    LOG_DEBUG(QString("相机向左移动: 距离=%1, 位置=(%2,%3,%4)")
-              .arg(distance, 0, 'f', 2)
-              .arg(newEye.x(), 0, 'f', 2)
-              .arg(newEye.y(), 0, 'f', 2)
-              .arg(newEye.z(), 0, 'f', 2), "相机");
+    // 相机向左移动（移除频繁的调试日志）
     
     invalidateDirectionCache();
 }
@@ -401,11 +386,7 @@ void CameraController::moveRight(double distance)
     osg::Matrix lookAtMatrix = osg::Matrix::lookAt(newEye, newCenter, up);
     m_currentManipulator->setByInverseMatrix(lookAtMatrix);
     
-    LOG_DEBUG(QString("相机向右移动: 距离=%1, 位置=(%2,%3,%4)")
-              .arg(distance, 0, 'f', 2)
-              .arg(newEye.x(), 0, 'f', 2)
-              .arg(newEye.y(), 0, 'f', 2)
-              .arg(newEye.z(), 0, 'f', 2), "相机");
+    // 相机向右移动（移除频繁的调试日志）
     
     invalidateDirectionCache();
 }
@@ -432,11 +413,7 @@ void CameraController::moveUp(double distance)
     osg::Matrix lookAtMatrix = osg::Matrix::lookAt(newEye, newCenter, up);
     m_currentManipulator->setByInverseMatrix(lookAtMatrix);
     
-    LOG_DEBUG(QString("相机向上移动: 距离=%1, 位置=(%2,%3,%4)")
-              .arg(distance, 0, 'f', 2)
-              .arg(newEye.x(), 0, 'f', 2)
-              .arg(newEye.y(), 0, 'f', 2)
-              .arg(newEye.z(), 0, 'f', 2), "相机");
+    // 相机向上移动（移除频繁的调试日志）
     
     invalidateDirectionCache();
 }
@@ -463,11 +440,7 @@ void CameraController::moveDown(double distance)
     osg::Matrix lookAtMatrix = osg::Matrix::lookAt(newEye, newCenter, up);
     m_currentManipulator->setByInverseMatrix(lookAtMatrix);
     
-    LOG_DEBUG(QString("相机向下移动: 距离=%1, 位置=(%2,%3,%4)")
-              .arg(distance, 0, 'f', 2)
-              .arg(newEye.x(), 0, 'f', 2)
-              .arg(newEye.y(), 0, 'f', 2)
-              .arg(newEye.z(), 0, 'f', 2), "相机");
+    // 相机向下移动（移除频繁的调试日志）
     
     invalidateDirectionCache();
 }
@@ -481,7 +454,7 @@ void CameraController::rotateHorizontal(double angle)
         return;
     }
     
-    LOG_DEBUG(QString("水平旋转: 角度=%1°").arg(angle, 0, 'f', 2), "相机");
+    // 水平旋转（移除调试日志）
     
     // 这里可以实现水平旋转，暂时使用OSG的默认旋转
     invalidateDirectionCache();
@@ -494,7 +467,7 @@ void CameraController::rotateVertical(double angle)
         return;
     }
     
-    LOG_DEBUG(QString("垂直旋转: 角度=%1°").arg(angle, 0, 'f', 2), "相机");
+    // 垂直旋转（移除调试日志）
     
     // 这里可以实现垂直旋转，暂时使用OSG的默认旋转
     m_directionCacheValid = false;
@@ -772,7 +745,7 @@ void CameraController::setProjectionModeSmooth(ProjectionMode mode)
 void CameraController::setFOV(double fov)
 {
     if (m_fov != fov) {
-        LOG_DEBUG(QString("设置FOV: %1° -> %2°").arg(m_fov, 0, 'f', 1).arg(fov, 0, 'f', 1), "相机");
+        // 设置FOV（移除调试日志）
         m_fov = fov;
         if (m_projectionMode == ProjectionMode::Perspective && m_viewer && m_viewer->getCamera())
         {
@@ -904,7 +877,7 @@ void CameraController::setWheelMoveSensitivity(double sensitivity)
 void CameraController::setAccelerationRate(double rate)
 {
     if (m_accelerationRate != rate) {
-        LOG_DEBUG(QString("设置加速度率: %1 -> %2").arg(m_accelerationRate, 0, 'f', 2).arg(rate, 0, 'f', 2), "相机");
+        // 设置加速度率（移除调试日志）
         m_accelerationRate = rate;
         emit accelerationRateChanged(rate);
     }
@@ -913,7 +886,7 @@ void CameraController::setAccelerationRate(double rate)
 void CameraController::setMaxAccelerationSpeed(double speed)
 {
     if (m_maxAccelerationSpeed != speed) {
-        LOG_DEBUG(QString("设置最大加速度速度: %1 -> %2").arg(m_maxAccelerationSpeed, 0, 'f', 2).arg(speed, 0, 'f', 2), "相机");
+        // 设置最大加速度速度（移除调试日志）
         m_maxAccelerationSpeed = speed;
         emit maxAccelerationSpeedChanged(speed);
     }
@@ -921,7 +894,7 @@ void CameraController::setMaxAccelerationSpeed(double speed)
 
 void CameraController::resetAllAcceleration()
 {
-    LOG_DEBUG("重置所有加速度", "相机");
+    // 重置所有加速度（移除调试日志）
     for (int i = 0; i < 6; ++i) {
         m_accelerationSpeeds[i] = 0.0;
     }
@@ -972,8 +945,7 @@ void CameraController::setKeyPressed(int key, bool pressed)
     }
     
     if (keyIndex >= 0) {
-        // 使用INFO级别，这样用户可以通过日志过滤控制显示
-        LOG_INFO(QString("键盘事件: %1键 %2").arg(keyName).arg(pressed ? "按下" : "释放"), "相机");
+        // 键盘事件（移除频繁的日志）
     }
     
     // 检查是否有任何按键按下
@@ -989,12 +961,10 @@ void CameraController::setKeyPressed(int key, bool pressed)
         // 开始移动
         m_isMoving = true;
         m_lastMoveTime = QDateTime::currentMSecsSinceEpoch();
-        LOG_DEBUG("开始相机移动", "相机");
     } else if (!anyKeyPressed && m_isMoving) {
         // 停止移动
         m_isMoving = false;
         resetAllAcceleration();
-        LOG_DEBUG("停止相机移动", "相机");
     }
     
     // 如果按键按下，立即执行一次移动
@@ -1069,12 +1039,9 @@ void CameraController::updateCameraPosition()
         moveDirections << QString("后(%1)").arg(m_accelerationSpeeds[5], 0, 'f', 2);
     }
     
-    // 使用DEBUG级别，用户可以通过日志过滤控制是否显示移动详情
+    // 相机移动（移除频繁的调试日志）
     if (moved) {
-        LOG_DEBUG(QString("相机移动 - 时间差: %1ms, 距离: %2, 方向: %3")
-                  .arg(timeDiff)
-                  .arg(moveDistance, 0, 'f', 3)
-                  .arg(moveDirections.join(", ")), "相机");
+        // 移动详情（移除调试日志）
     }
     
     // 更新上次移动时间
@@ -1088,7 +1055,7 @@ void CameraController::handleWheelZoom(int delta)
         return;
     }
     
-    LOG_DEBUG(QString("滚轮缩放事件: delta=%1").arg(delta), "相机");
+    // 滚轮缩放事件（移除调试日志）
     
     double zoomFactor = delta > 0 ? 0.9 : 1.1; // 滚轮向上缩小，向下放大
     zoomFactor *= m_wheelMoveSensitivity;
@@ -1100,7 +1067,7 @@ void CameraController::handleWheelZoom(int delta)
             if (m_trackballManipulator) {
                 double distance = m_trackballManipulator->getDistance();
                 m_trackballManipulator->setDistance(distance * zoomFactor);
-                LOG_DEBUG(QString("轨道球缩放: 距离 %1 -> %2").arg(distance, 0, 'f', 2).arg(distance * zoomFactor, 0, 'f', 2), "相机");
+                // 轨道球缩放（移除调试日志）
             } else {
                 LOG_WARNING("轨道球操控器为空，无法执行缩放", "相机");
             }
@@ -1118,7 +1085,7 @@ void CameraController::handleWheelZoom(int delta)
 
 void CameraController::onUpdateTimer()
 {
-    LOG_DEBUG("定时器更新相机位置", "相机");
+    // 定时器更新相机位置（移除调试日志）
     updateCameraPosition();
 } 
 
@@ -1144,6 +1111,6 @@ QString CameraController::getManipulatorTypeString(ManipulatorType type) const
         break;
     }
     
-    LOG_DEBUG(QString("获取操控器类型字符串: %1 -> %2").arg(static_cast<int>(type)).arg(result), "相机");
+    // 获取操控器类型字符串（移除调试日志）
     return result;
 }

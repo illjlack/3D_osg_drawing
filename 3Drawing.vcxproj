@@ -124,6 +124,9 @@
     <ClCompile Include="src\ui\LogOutputWidget.cpp">
       <Filter>UI</Filter>
     </ClCompile>
+    <ClCompile Include="src\ui\StatusBar3D.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
     <ClCompile Include="src\core\Common3D.cpp">
       <Filter>Core</Filter>
     </ClCompile>
@@ -181,7 +184,6 @@
     <ClCompile Include="src\core\managers\GeoNodeManager.cpp">
       <Filter>Core\Managers</Filter>
     </ClCompile>
-
     <ClCompile Include="src\core\managers\GeoRenderManager.cpp">
       <Filter>Core\Managers</Filter>
     </ClCompile>
@@ -311,6 +313,9 @@
       <Filter>UI</Filter>
     </QtMoc>
     <QtMoc Include="src\ui\LogOutputWidget.h">
+      <Filter>UI</Filter>
+    </QtMoc>
+    <QtMoc Include="src\ui\StatusBar3D.h">
       <Filter>UI</Filter>
     </QtMoc>
   </ItemGroup>

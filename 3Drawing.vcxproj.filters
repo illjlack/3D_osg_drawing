@@ -132,11 +132,14 @@
     <ClCompile Include="src\core\managers\GeoRenderManager.cpp">
       <Filter>Core\Managers</Filter>
     </ClCompile>
-    <ClCompile Include="src\core\picking\OSGIndexPickingSystem.cpp">
-      <Filter>Core\Picking</Filter>
-    </ClCompile>
     <ClCompile Include="src\core\GeometryBase.cpp">
       <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\picking\OSGIndexPickingSystem.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\StatusBar3D.cpp">
+      <Filter>UI</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -249,6 +252,9 @@
     </QtMoc>
     <QtMoc Include="src\core\GeometryBase.h">
       <Filter>Core</Filter>
+    </QtMoc>
+    <QtMoc Include="src\ui\StatusBar3D.h">
+      <Filter>UI</Filter>
     </QtMoc>
   </ItemGroup>
 </Project>

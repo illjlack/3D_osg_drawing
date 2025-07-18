@@ -26,6 +26,8 @@
 #include <osg/Light>
 #include <osg/PositionAttitudeTransform>
 #include <osg/Math>
+#include <osg/BlendFunc>
+#include <osg/Multisample>
 #include <osgDB/Registry>
 #include <osgQOpenGL/osgQOpenGLWidget>
 #include <QTimer>
@@ -43,6 +45,7 @@
 #include <cmath>
 #include <QDateTime> // Added for cache
 #include <QProcessEnvironment>
+#include <thread>
 
 // ========================================= OSGWidget 实现 =========================================
 OSGWidget::OSGWidget(QWidget* parent)
@@ -109,7 +112,7 @@ OSGWidget::OSGWidget(QWidget* parent)
     m_updateTimer->start(16);
     
     LOG_INFO("OSGWidget初始化完成", "系统");
-    LOG_DEBUG("渲染循环已启动，帧率: 60fps", "系统");
+    // 渲染循环已启动（移除调试日志）
 }
 
 OSGWidget::~OSGWidget()
@@ -124,6 +127,9 @@ void OSGWidget::initializeScene()
 {
     osgViewer::Viewer* viewer = getOsgViewer();
     if (!viewer) return;
+
+    // 单线程模式（单线程模式下，更方便调试）
+    //viewer->setThreadingModel(osgViewer::Viewer::SingleThreaded);
     
     // 设置场景图
     m_rootNode->addChild(m_sceneNode);
@@ -132,10 +138,36 @@ void OSGWidget::initializeScene()
     m_rootNode->addChild(m_skyboxNode);
     m_sceneNode->addChild(m_geoNode);
     
-    viewer->setSceneData(m_rootNode);
+    // 为根节点设置抗锯齿
+    osg::StateSet* rootStateSet = m_rootNode->getOrCreateStateSet();
+    rootStateSet->setMode(GL_LINE_SMOOTH, osg::StateAttribute::ON);
+    rootStateSet->setMode(GL_POINT_SMOOTH, osg::StateAttribute::ON);
+    rootStateSet->setMode(GL_MULTISAMPLE, osg::StateAttribute::ON);
     
-    // 设置线程模型
-    viewer->setThreadingModel(osgViewer::Viewer::SingleThreaded);
+    // 设置混合函数以支持线抗锯齿
+    osg::ref_ptr<osg::BlendFunc> rootBlendFunc = new osg::BlendFunc();
+    rootBlendFunc->setSource(GL_SRC_ALPHA);
+    rootBlendFunc->setDestination(GL_ONE_MINUS_SRC_ALPHA);
+    rootStateSet->setAttributeAndModes(rootBlendFunc.get(), osg::StateAttribute::ON);
+    
+    // 设置多重采样抗锯齿（如果硬件支持）
+    osg::ref_ptr<osg::Multisample> rootMultisample = new osg::Multisample();
+    rootMultisample->setCoverage(0.5f);
+    rootStateSet->setAttributeAndModes(rootMultisample.get(), osg::StateAttribute::ON);
+    
+    // 设置线宽和点大小
+    osg::ref_ptr<osg::LineWidth> rootLineWidth = new osg::LineWidth();
+    rootLineWidth->setWidth(1.0f);  // 设置更细的线宽以更好地展示抗锯齿
+    rootStateSet->setAttributeAndModes(rootLineWidth.get(), osg::StateAttribute::ON);
+    
+    osg::ref_ptr<osg::Point> rootPointSize = new osg::Point();
+    rootPointSize->setSize(3.0f);  // 设置更小的点大小
+    rootStateSet->setAttributeAndModes(rootPointSize.get(), osg::StateAttribute::ON);
+    
+    // 启用混合以支持抗锯齿
+    rootStateSet->setMode(GL_BLEND, osg::StateAttribute::ON);
+    
+    viewer->setSceneData(m_rootNode);
     
     // 设置摄像机控制器
     m_cameraController->setViewer(viewer);
@@ -155,15 +187,11 @@ void OSGWidget::setupCamera()
     
     osg::Camera* camera = viewer->getCamera();
     
-    // 设置渲染状态
+    // 设置基本的渲染状态
     osg::StateSet* stateSet = camera->getOrCreateStateSet();
     stateSet->setMode(GL_DEPTH_TEST, osg::StateAttribute::ON);
     stateSet->setMode(GL_LIGHTING, osg::StateAttribute::ON);
     stateSet->setMode(GL_BLEND, osg::StateAttribute::ON);
-    
-    // 启用反走样
-    stateSet->setMode(GL_LINE_SMOOTH, osg::StateAttribute::ON);
-    stateSet->setMode(GL_POINT_SMOOTH, osg::StateAttribute::ON);
     
     // 设置背景色
     camera->setClearColor(osg::Vec4(0.2f, 0.2f, 0.2f, 1.0f));
@@ -220,8 +248,8 @@ void OSGWidget::setupPickingSystem()
     // 设置拾取配置
     OSGIndexPickConfig config;
     config.pickingRadius = 15;       // 拾取半径
-    config.snapThreshold = 0.5f;     // 捕捉阈值
-    config.enableSnapping = true;
+    config.snapThreshold = 0.2f;     // 捕捉阈值（适中的值）
+    config.enableSnapping = true;    // 启用捕捉，但会优先使用拾取坐标
     config.enableIndicator = true;   // 确保指示器启用
     config.enableHighlight = true;   // 确保高亮启用
     config.indicatorSize = 0.3f;     // 设置指示器大小
@@ -232,6 +260,13 @@ void OSGWidget::setupPickingSystem()
     OSGIndexPickingSystemManager::getInstance().setPickingCallback(
         [this](const OSGIndexPickResult& result) {
             emit simplePickingResult(result);
+            
+            // 如果有拾取结果，立即更新状态栏坐标（覆盖普通坐标）
+            if (result.hasResult)
+            {
+                m_lastMouseWorldPos = result.worldPosition;
+                emit mousePositionChanged(result.worldPosition);
+            }
         });
     
     // 添加事件处理器
@@ -398,19 +433,19 @@ void OSGWidget::addGeo(Geo3D* geo)
             if (geo->mm_state()->isStateComplete())
             {
                 OSGIndexPickingSystemManager::getInstance().addGeometry(geo);
-                LOG_DEBUG(QString("Added completed geometry to OSG index picking system: %1").arg(geo->getGeoType()), "拾取");
+                // 添加完成的几何体到拾取系统（移除调试日志）
             }
             else
             {
                 // 对于未完成的几何对象（如从文件读入的），也强制添加到拾取系统
                 // 这样可以确保文件IO读入的几何对象能够被拾取
                 OSGIndexPickingSystemManager::getInstance().addGeometry(geo);
-                LOG_DEBUG(QString("Added incomplete geometry to OSG index picking system (from file IO): %1").arg(geo->getGeoType()), "拾取");
+                // 添加未完成的几何体到拾取系统（移除调试日志）
             }
         }
         else
         {
-            LOG_DEBUG("Advanced picking is disabled", "拾取");
+            // 高级拾取已禁用（移除调试日志）
         }
     }
 }
@@ -453,7 +488,7 @@ void OSGWidget::removeAllGeos()
         if (m_advancedPickingEnabled)
         {
             OSGIndexPickingSystemManager::getInstance().clearAllGeometries();
-            LOG_DEBUG("Cleared all geometries from OSG index picking system", "拾取");
+            // 清除所有几何体（移除调试日志）
         }
     }
 }
@@ -597,18 +632,14 @@ void OSGWidget::startDraggingControlPoint(Geo3D* geo, int controlPointIndex)
     m_draggingControlPointIndex = controlPointIndex;
     m_dragStartPosition = m_lastMouseWorldPos;
     
-    LOG_DEBUG(QString("开始拖动控制点: 对象=%1, 控制点索引=%2")
-        .arg(geo->getGeoType())
-        .arg(controlPointIndex), "拖动");
+            // 开始拖动控制点（移除调试日志）
 }
 
 void OSGWidget::stopDraggingControlPoint()
 {
     if (m_isDraggingControlPoint)
     {
-        LOG_DEBUG(QString("停止拖动控制点: 对象=%1, 控制点索引=%2")
-            .arg(m_draggingGeo ? m_draggingGeo->getGeoType() : -1)
-            .arg(m_draggingControlPointIndex), "拖动");
+        // 停止拖动控制点（移除调试日志）
     }
     
     m_isDraggingControlPoint = false;
@@ -694,7 +725,7 @@ void OSGWidget::ensureAllGeosInPickingSystem()
 {
     if (!m_advancedPickingEnabled) return;
     
-    LOG_INFO(QString("确保所有几何对象都在拾取系统中，总数量: %1").arg(m_geoList.size()), "拾取");
+    // 确保所有几何对象都在拾取系统中（移除频繁的日志）
     
             for (const auto& geoRef : m_geoList)
         {
@@ -705,7 +736,7 @@ void OSGWidget::ensureAllGeosInPickingSystem()
             }
         }
     
-    LOG_INFO("所有几何对象已确保在拾取系统中", "拾取");
+    // 所有几何对象已确保在拾取系统中（移除频繁的日志）
 }
 
 QString OSGWidget::getPickingSystemStatus() const
@@ -725,8 +756,10 @@ void OSGWidget::onSimplePickingResult(const OSGIndexPickResult& result)
 {
     // 发射OSG索引拾取结果信号
     emit simplePickingResult(result);
-    // 更新鼠标位置显示
+    
+    // 如果有拾取结果，立即更新状态栏坐标（覆盖普通坐标）
     if (result.hasResult) {
+        m_lastMouseWorldPos = result.worldPosition;
         emit mousePositionChanged(result.worldPosition);
     }
 }
@@ -905,42 +938,58 @@ void OSGWidget::mousePressEvent(QMouseEvent* event)
 
 void OSGWidget::mouseMoveEvent(QMouseEvent* event)
 {
-    // 如果是相机控制模式，添加日志
+    // 鼠标移动事件处理（移除频繁的调试日志）
     if (GlobalDrawMode3D == DrawSelect3D || (QApplication::keyboardModifiers() & Qt::ControlModifier))
     {
-        // 只在鼠标按下时输出移动日志，避免日志过多
-        if (event->buttons() != Qt::NoButton)
-        {
-            static int logCounter = 0;
-            if (++logCounter % 10 == 0) // 每10次移动输出一次日志
-            {
-                QString buttonName;
-                if (event->buttons() & Qt::LeftButton) buttonName = "左键拖拽";
-                else if (event->buttons() & Qt::RightButton) buttonName = "右键拖拽";
-                else if (event->buttons() & Qt::MiddleButton) buttonName = "中键拖拽";
-                else buttonName = "拖拽";
-                
-                LOG_DEBUG(QString("鼠标移动: %1 位置(%2,%3)").arg(buttonName).arg(event->x()).arg(event->y()), "相机");
-            }
-        }
+        // 相机控制模式，不输出调试日志
     }
     
     osgQOpenGLWidget::mouseMoveEvent(event);
+    
+    // 发送屏幕坐标信号
+    emit screenPositionChanged(event->x(), event->y());
     
     // 节流机制：每16ms（约60FPS）更新一次鼠标世界坐标
     static QDateTime lastMouseUpdate;
     QDateTime currentTime = QDateTime::currentDateTime();
     if (!lastMouseUpdate.isValid() || lastMouseUpdate.msecsTo(currentTime) >= MOUSE_CACHE_DURATION)
     {
-        // 更新鼠标世界坐标
-        glm::vec3 worldPos = screenToWorld(event->x(), event->y(), 0.5f);
-        
-        // 应用坐标范围限制
-        CoordinateSystem3D* coordSystem = CoordinateSystem3D::getInstance();
-        glm::vec3 clampedPos = coordSystem->clampPointToSkybox(worldPos);
-        
-        m_lastMouseWorldPos = clampedPos;
-        emit mousePositionChanged(clampedPos);
+        if (m_advancedPickingEnabled)
+        {
+            // 使用拾取系统获取世界坐标
+            OSGIndexPickResult pickResult = OSGIndexPickingSystemManager::getInstance().pick(event->x(), event->y());
+            
+            if (pickResult.hasResult)
+            {
+                // 使用拾取结果的世界坐标覆盖普通坐标
+                m_lastMouseWorldPos = pickResult.worldPosition;
+                emit mousePositionChanged(pickResult.worldPosition);
+            }
+            else
+            {
+                // 如果没有拾取到对象，使用屏幕坐标转换
+                glm::vec3 worldPos = screenToWorld(event->x(), event->y(), 0.5f);
+                
+                // 应用坐标范围限制
+                CoordinateSystem3D* coordSystem = CoordinateSystem3D::getInstance();
+                glm::vec3 clampedPos = coordSystem->clampPointToSkybox(worldPos);
+                
+                m_lastMouseWorldPos = clampedPos;
+                emit mousePositionChanged(clampedPos);
+            }
+        }
+        else
+        {
+            // 非拾取模式：使用传统的屏幕坐标转换
+            glm::vec3 worldPos = screenToWorld(event->x(), event->y(), 0.5f);
+            
+            // 应用坐标范围限制
+            CoordinateSystem3D* coordSystem = CoordinateSystem3D::getInstance();
+            glm::vec3 clampedPos = coordSystem->clampPointToSkybox(worldPos);
+            
+            m_lastMouseWorldPos = clampedPos;
+            emit mousePositionChanged(clampedPos);
+        }
         
         lastMouseUpdate = currentTime;
     }
@@ -963,19 +1012,14 @@ void OSGWidget::mouseMoveEvent(QMouseEvent* event)
             // 更新拖动起始位置
             m_dragStartPosition = m_lastMouseWorldPos;
             
-            LOG_DEBUG(QString("拖动控制点: 对象=%1, 控制点=%2, 新位置=(%3,%4,%5)")
-                .arg(m_draggingGeo->getGeoType())
-                .arg(m_draggingControlPointIndex)
-                .arg(newPoint.position.x, 0, 'f', 3)
-                .arg(newPoint.position.y, 0, 'f', 3)
-                .arg(newPoint.position.z, 0, 'f', 3), "拖动");
+            // 拖动控制点更新（移除频繁的调试日志）
         }
         else
         {
             // 包围盒控制点功能已移除，直接使用OSG的包围盒
             m_dragStartPosition = m_lastMouseWorldPos;
             
-            LOG_DEBUG(QString("拖动包围盒控制点功能已移除"), "拖动");
+            // 拖动包围盒控制点功能已移除
         }
     }
     
@@ -988,8 +1032,11 @@ void OSGWidget::mouseMoveEvent(QMouseEvent* event)
         
         if (pickResult.hasResult)
         {
-            // 使用拾取结果的世界坐标
+            // 使用拾取结果的世界坐标覆盖普通坐标
             drawingWorldPos = pickResult.worldPosition;
+            m_lastMouseWorldPos = pickResult.worldPosition;
+            // 更新状态栏坐标
+            emit mousePositionChanged(pickResult.worldPosition);
         }
         else
         {
@@ -1022,7 +1069,7 @@ void OSGWidget::wheelEvent(QWheelEvent* event)
         // Ctrl + 滚轮 = 快速前后移动
         int delta = event->angleDelta().y();
         
-        LOG_DEBUG(QString("Ctrl+滚轮缩放: delta=%1 位置(%2,%3)").arg(delta).arg(event->position().x()).arg(event->position().y()), "相机");
+        // Ctrl+滚轮缩放（移除调试日志）
         
         if (m_cameraController)
         {
@@ -1035,7 +1082,7 @@ void OSGWidget::wheelEvent(QWheelEvent* event)
     {
         // 正常的滚轮缩放（OSG默认行为）
         int delta = event->angleDelta().y();
-        LOG_DEBUG(QString("滚轮缩放: delta=%1 位置(%2,%3)").arg(delta).arg(event->position().x()).arg(event->position().y()), "相机");
+        // 滚轮缩放（移除调试日志）
         
         osgQOpenGLWidget::wheelEvent(event);
     }
@@ -1062,10 +1109,7 @@ void OSGWidget::handleDrawingInput(QMouseEvent* event)
         // 检查是否按下了Ctrl键（多选模式）
         bool isCtrlPressed = (QApplication::keyboardModifiers() & Qt::ControlModifier);
         
-        LOG_INFO(QString("选择模式点击: 位置(%1,%2), 拾取结果=%3, Ctrl=%4")
-            .arg(event->x()).arg(event->y())
-            .arg(pickResult.hasResult ? "命中" : "未命中")
-            .arg(isCtrlPressed ? "是" : "否"), "选择");
+        // 选择模式点击（移除频繁的日志）
         
         if (pickResult.hasResult && pickResult.geometry)
         {
@@ -1109,13 +1153,23 @@ void OSGWidget::handleDrawingInput(QMouseEvent* event)
         
         if (pickResult.hasResult)
         {
-            // 使用拾取结果的世界坐标
+            // 使用拾取结果的世界坐标覆盖普通坐标
             worldPos = pickResult.worldPosition;
+            m_lastMouseWorldPos = pickResult.worldPosition;
+            // 在绘制模式下也更新状态栏坐标
+            emit mousePositionChanged(pickResult.worldPosition);
         }
         else
         {
             // 如果没有拾取到对象，使用屏幕坐标转换
             worldPos = screenToWorld(event->x(), event->y(), 0.5f);
+            // 应用坐标范围限制
+            CoordinateSystem3D* coordSystem = CoordinateSystem3D::getInstance();
+            glm::vec3 clampedPos = coordSystem->clampPointToSkybox(worldPos);
+            worldPos = clampedPos;
+            m_lastMouseWorldPos = clampedPos;
+            // 更新状态栏坐标
+            emit mousePositionChanged(clampedPos);
         }
         
         if (!m_isDrawing)
@@ -1477,9 +1531,6 @@ void OSGWidget::resetAllAcceleration()
 
 void OSGWidget::keyPressEvent(QKeyEvent* event)
 {
-    // 添加测试日志，确认事件到达
-    LOG_DEBUG(QString("OSGWidget keyPressEvent: key=%1, text='%2'").arg(event->key()).arg(event->text()), "相机");
-    
     // 处理摄像机移动键
     switch (event->key())
     {
@@ -1496,7 +1547,6 @@ void OSGWidget::keyPressEvent(QKeyEvent* event)
         case Qt::Key_PageUp:
         case Qt::Key_PageDown:
             // 委托给CameraController处理
-            LOG_DEBUG(QString("OSGWidget收到键盘按下事件: key=%1").arg(event->key()), "相机");
             m_cameraController->setKeyPressed(event->key(), true);
             break;
         default:
@@ -1556,7 +1606,6 @@ void OSGWidget::keyReleaseEvent(QKeyEvent* event)
         case Qt::Key_PageUp:
         case Qt::Key_PageDown:
             // 委托给CameraController处理
-            LOG_DEBUG(QString("OSGWidget收到键盘释放事件: key=%1").arg(event->key()), "相机");
             m_cameraController->setKeyPressed(event->key(), false);
             break;
         default:
@@ -1817,14 +1866,14 @@ void OSGWidget::onGeoDrawingCompleted(Geo3D* geo)
     if (!geo || !m_advancedPickingEnabled)
         return;
     
-    LOG_DEBUG(QString("Geometry drawing completed: %1").arg(geo->getGeoType()), "拾取");
+            // 几何体绘制完成（移除调试日志）
     
     // 几何对象完成绘制后，更新OSG索引拾取系统
     // 注意：如果几何对象已经在拾取系统中，updateGeometry会更新它
     // 如果不在拾取系统中，addGeometry会添加它
     OSGIndexPickingSystemManager::getInstance().updateGeometry(geo);
     
-    LOG_INFO(QString("Updated completed geometry in OSG index picking system: %1").arg(geo->getGeoType()), "拾取");
+            // 更新完成的几何体（移除频繁的日志）
 }
 
 void OSGWidget::onGeoGeometryUpdated(Geo3D* geo)
@@ -1835,7 +1884,7 @@ void OSGWidget::onGeoGeometryUpdated(Geo3D* geo)
     // 几何对象更新时，更新OSG索引拾取系统中的Feature
     OSGIndexPickingSystemManager::getInstance().updateGeometry(geo);
     
-    LOG_DEBUG(QString("Updated geometry in OSG index picking system: %1").arg(geo->getGeoType()), "拾取");
+            // 更新几何体（移除调试日志）
 }
 
 void OSGWidget::onGeoParametersChanged(Geo3D* geo)
@@ -1846,8 +1895,5 @@ void OSGWidget::onGeoParametersChanged(Geo3D* geo)
     // 参数变化时，更新OSG索引拾取系统中的Feature
     OSGIndexPickingSystemManager::getInstance().updateGeometry(geo);
     
-    LOG_DEBUG(QString("Updated geometry parameters in OSG index picking system: %1").arg(geo->getGeoType()), "拾取");
+            // 更新几何体参数（移除调试日志）
 }
-
-
-

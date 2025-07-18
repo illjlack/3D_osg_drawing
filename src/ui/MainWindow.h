@@ -54,6 +54,7 @@
 #include "OSGWidget.h"
 #include "CoordinateSystemDialog.h"
 #include "LogOutputWidget.h"
+#include "StatusBar3D.h"
 #include "../util/GeoOsgbIO.h"
 #include <QDateTime>
 
@@ -161,11 +162,8 @@ private:
     QDockWidget* m_toolDock;
     QDockWidget* m_logDock;
     
-    // 状态栏标签
-    QLabel* m_positionLabel;
-    QLabel* m_modeLabel;
-    QLabel* m_objectCountLabel;
-    QLabel* m_coordinateRangeLabel;
+    // 状态栏
+    StatusBar3D* m_statusBar3D;
     
     // 日志输出栏
     LogOutputWidget* m_logOutputWidget;

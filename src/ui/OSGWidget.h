@@ -166,9 +166,10 @@ public:
 signals:
     void geoSelected(Geo3D* geo);
     void mousePositionChanged(const glm::vec3& worldPos);
+    void screenPositionChanged(int x, int y);
     void simplePickingResult(const OSGIndexPickResult& result);
     void cameraMoveSpeedChanged(double speed);
-    void wheelMoveSensitivityChanged(double sensitivity);
+    void wheelMoveSensitivityChanged(double speed);
     void accelerationRateChanged(double rate);
     void maxAccelerationSpeedChanged(double speed);
     void manipulatorTypeChanged(ManipulatorType type);
