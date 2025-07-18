@@ -54,29 +54,18 @@ void Point3D_Geo::buildVertexGeometries()
     
     // 创建顶点数组
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
     const auto& controlPoints = mm_controlPoint()->getControlPoints();
     const Point3D& point = controlPoints[0];
     
     // 添加控制点
     vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
-    colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
-                               m_parameters.pointColor.b, m_parameters.pointColor.a));
     
     geometry->setVertexArray(vertices);
-    geometry->setColorArray(colors);
-    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     
-    // 点绘制 - 控制点使用较大的点大小以便拾取
+    // 点绘制 - 控制点
     osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::POINTS, 0, vertices->size());
     geometry->addPrimitiveSet(drawArrays);
-    
-    // 设置点的大小
-    osg::ref_ptr<osg::StateSet> stateSet = geometry->getOrCreateStateSet();
-    osg::ref_ptr<osg::Point> pointAttr = new osg::Point;
-    pointAttr->setSize(8.0f);  // 控制点大小
-    stateSet->setAttribute(pointAttr);
 }
 
 void Point3D_Geo::buildEdgeGeometries()

@@ -80,33 +80,20 @@ void Polygon3D_Geo::buildVertexGeometries()
     
     // 创建顶点数组
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
     // 添加控制点
     for (const Point3D& point : controlPoints)
     {
         vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
-        colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
-                                   m_parameters.pointColor.b, m_parameters.pointColor.a));
     }
     
     // 控制点已包含临时点，无需单独处理
     
     geometry->setVertexArray(vertices);
-    geometry->setColorArray(colors);
-    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     
-    // 点绘制 - 控制点使用较大的点大小以便拾取
+    // 点绘制 - 控制点
     osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::POINTS, 0, vertices->size());
     geometry->addPrimitiveSet(drawArrays);
-    
-    // 设置点的大小
-    osg::ref_ptr<osg::StateSet> stateSet = geometry->getOrCreateStateSet();
-    osg::ref_ptr<osg::Point> point = new osg::Point;
-    point->setSize(8.0f);  // 控制点大小
-    stateSet->setAttribute(point);
-    
-    // 几何体已经通过mm_node()->getVertexGeometry()获取，直接使用
 }
 
 void Polygon3D_Geo::buildEdgeGeometries()
@@ -124,7 +111,6 @@ void Polygon3D_Geo::buildEdgeGeometries()
     
     // 创建多边形边界线几何体
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
     // 构建所有点（控制点已包含临时点）
     std::vector<Point3D> allPoints = controlPoints;
@@ -135,28 +121,13 @@ void Polygon3D_Geo::buildEdgeGeometries()
         size_t next = (i + 1) % allPoints.size();
         vertices->push_back(osg::Vec3(allPoints[i].x(), allPoints[i].y(), allPoints[i].z()));
         vertices->push_back(osg::Vec3(allPoints[next].x(), allPoints[next].y(), allPoints[next].z()));
-        
-        colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
-                                   m_parameters.lineColor.b, m_parameters.lineColor.a));
-        colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
-                                   m_parameters.lineColor.b, m_parameters.lineColor.a));
     }
     
     geometry->setVertexArray(vertices);
-    geometry->setColorArray(colors);
-    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     
     // 线绘制 - 边界线
     osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::LINES, 0, vertices->size());
     geometry->addPrimitiveSet(drawArrays);
-    
-    // 设置线的宽度
-    osg::ref_ptr<osg::StateSet> stateSet = geometry->getOrCreateStateSet();
-    osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth;
-    lineWidth->setWidth(2.0f);  // 边界线宽度
-    stateSet->setAttribute(lineWidth);
-    
-    // 几何体已经通过mm_node()->getEdgeGeometry()获取，直接使用
 }
 
 void Polygon3D_Geo::buildFaceGeometries()
@@ -190,21 +161,16 @@ void Polygon3D_Geo::buildFaceGeometries()
     
     // 直接创建多边形面几何体
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
     
     // 添加顶点
     for (const Point3D& point : controlPoints)
     {
         vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
-        colors->push_back(osg::Vec4(m_parameters.fillColor.r, m_parameters.fillColor.g, 
-                                   m_parameters.fillColor.b, m_parameters.fillColor.a));
         normals->push_back(osg::Vec3(m_normal.x, m_normal.y, m_normal.z));
     }
     
     geometry->setVertexArray(vertices);
-    geometry->setColorArray(colors);
-    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     geometry->setNormalArray(normals);
     geometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
     

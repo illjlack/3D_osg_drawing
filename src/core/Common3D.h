@@ -84,6 +84,14 @@ struct Color3D
     QColor toQColor() const { return QColor::fromRgbF(r, g, b, a); }
     glm::vec4 toGLM() const { return glm::vec4(r, g, b, a); }
     glm::vec3 toGLM3() const { return glm::vec3(r, g, b); }
+    
+    // 比较操作符
+    bool operator==(const Color3D& other) const {
+        return r == other.r && g == other.g && b == other.b && a == other.a;
+    }
+    bool operator!=(const Color3D& other) const {
+        return !(*this == other);
+    }
 };
 
 // 材质属性
@@ -106,6 +114,20 @@ struct Material3D
         , transparency(1.0f)
         , type(Material_Basic3D)
     {}
+    
+    // 比较操作符
+    bool operator==(const Material3D& other) const {
+        return ambient == other.ambient && 
+               diffuse == other.diffuse && 
+               specular == other.specular && 
+               emission == other.emission && 
+               shininess == other.shininess && 
+               transparency == other.transparency && 
+               type == other.type;
+    }
+    bool operator!=(const Material3D& other) const {
+        return !(*this == other);
+    }
 };
 
 // 几何对象参数

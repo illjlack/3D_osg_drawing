@@ -128,14 +128,66 @@ void Geo3D::connectManagerSignals()
 // ========================================= 参数管理 =========================================
 void Geo3D::setParameters(const GeoParameters3D& params)
 {
+    if (m_renderManager) {
+        if (m_parameters.pointColor != params.pointColor) {
+            m_renderManager->setPointColor(params.pointColor);
+        }
+        if (m_parameters.pointSize != params.pointSize) {
+            m_renderManager->setPointSize(params.pointSize);
+        }
+        if (m_parameters.pointShape != params.pointShape) {
+            
+        }
+        if (m_parameters.lineColor != params.lineColor) {
+            m_renderManager->setEdgeColor(params.lineColor);
+        }
+        if (m_parameters.lineWidth != params.lineWidth) {
+            m_renderManager->setLineWidth(params.lineWidth);
+        }
+        if (m_parameters.lineStyle != params.lineStyle) {
+            
+        }
+        if (m_parameters.lineDashPattern != params.lineDashPattern) {
+            
+        }
+        if (m_parameters.nodeLineStyle != params.nodeLineStyle) {
+            
+        }
+        if (m_parameters.fillColor != params.fillColor) {
+            m_renderManager->setFaceColor(params.fillColor);
+        }
+        if (m_parameters.fillType != params.fillType) {
+            
+        }
+        if (m_parameters.borderColor != params.borderColor) {
+            
+        }
+        if (m_parameters.showBorder != params.showBorder) {
+            
+        }
+        if (m_parameters.material!= params.material) {
+            m_renderManager->setMaterial(params.material);
+        }
+    }
+    
+    if (m_nodeManager) {
+        if (m_parameters.showPoints != params.showPoints) {
+            m_nodeManager->setVertexVisible(params.showPoints);
+        }
+        if (m_parameters.showEdges != params.showEdges) {
+            m_nodeManager->setEdgeVisible(params.showEdges);
+        }
+        if (m_parameters.showFaces != params.showFaces) {
+            m_nodeManager->setFaceVisible(params.showFaces);
+        }
+        // 细分等级变化需要重新计算
+        if (m_parameters.subdivisionLevel != params.subdivisionLevel) {
+            m_nodeManager->updateGeometries();
+        }
+    }
+
     m_parameters = params;
     m_parametersChanged = true;
-    
-    // 通知各个管理器参数变化
-    m_renderManager->setMaterial(params.material);
-    m_renderManager->setShowPoints(params.showPoints);
-    m_renderManager->setShowEdges(params.showEdges);
-    m_renderManager->setShowFaces(params.showFaces);
 }
 
 // ========================================= 初始化和更新 =========================================

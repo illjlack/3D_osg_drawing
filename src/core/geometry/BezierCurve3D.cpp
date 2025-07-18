@@ -70,29 +70,18 @@ void BezierCurve3D_Geo::buildVertexGeometries()
     
     // 创建顶点数组
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
     // 添加控制点
     for (const Point3D& point : controlPoints)
     {
         vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
-        colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
-                                   m_parameters.pointColor.b, m_parameters.pointColor.a));
     }
     
     geometry->setVertexArray(vertices);
-    geometry->setColorArray(colors);
-    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     
-    // 点绘制 - 控制点使用较大的点大小以便拾取
+    // 点绘制 - 控制点
     osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::POINTS, 0, vertices->size());
     geometry->addPrimitiveSet(drawArrays);
-    
-    // 设置点的大小
-    osg::ref_ptr<osg::StateSet> stateSet = geometry->getOrCreateStateSet();
-    osg::ref_ptr<osg::Point> point = new osg::Point;
-    point->setSize(8.0f);  // 控制点大小
-    stateSet->setAttribute(point);
 }
 
 void BezierCurve3D_Geo::buildEdgeGeometries()
@@ -110,7 +99,6 @@ void BezierCurve3D_Geo::buildEdgeGeometries()
     
     // 创建贝塞尔曲线边界线几何体
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
     // 使用lambda表达式生成贝塞尔曲线点
     auto generateBezierPoints = [&]() {
@@ -135,25 +123,15 @@ void BezierCurve3D_Geo::buildEdgeGeometries()
     for (const Point3D& point : m_bezierPoints)
     {
         vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
-        colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
-                                   m_parameters.lineColor.b, m_parameters.lineColor.a));
     }
     
     // 控制点已包含临时点，无需单独处理
     
     geometry->setVertexArray(vertices);
-    geometry->setColorArray(colors);
-    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     
     // 线绘制 - 贝塞尔曲线
     osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::LINE_STRIP, 0, vertices->size());
     geometry->addPrimitiveSet(drawArrays);
-    
-    // 设置线的宽度
-    osg::ref_ptr<osg::StateSet> stateSet = geometry->getOrCreateStateSet();
-    osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth;
-    lineWidth->setWidth(m_parameters.lineWidth);
-    stateSet->setAttribute(lineWidth);
 }
 
 void BezierCurve3D_Geo::buildFaceGeometries()

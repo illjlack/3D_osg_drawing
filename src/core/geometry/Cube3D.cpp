@@ -58,31 +58,18 @@ void Cube3D_Geo::buildVertexGeometries()
     
     // 创建顶点数组
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
     // 添加控制点
     for (const Point3D& point : controlPoints)
     {
         vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
-        colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
-                                   m_parameters.pointColor.b, m_parameters.pointColor.a));
     }
     
     geometry->setVertexArray(vertices);
-    geometry->setColorArray(colors);
-    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     
-    // 点绘制 - 控制点使用较大的点大小以便拾取
+    // 点绘制 - 控制点
     osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::POINTS, 0, vertices->size());
     geometry->addPrimitiveSet(drawArrays);
-    
-    // 设置点的大小
-    osg::ref_ptr<osg::StateSet> stateSet = geometry->getOrCreateStateSet();
-    osg::ref_ptr<osg::Point> point = new osg::Point;
-    point->setSize(8.0f);  // 控制点大小
-    stateSet->setAttribute(point);
-    
-    // 几何体已经通过mm_node()->getVertexGeometry()获取，直接使用
 }
 
 void Cube3D_Geo::buildEdgeGeometries()
@@ -100,7 +87,6 @@ void Cube3D_Geo::buildEdgeGeometries()
     
     // 创建边的几何体（正方体边界线）
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
     // 计算正方体的8个顶点
     glm::vec3 center = (controlPoints[0].position + controlPoints[1].position) * 0.5f;
@@ -118,16 +104,7 @@ void Cube3D_Geo::buildEdgeGeometries()
     vertices->push_back(osg::Vec3(center.x + halfSize, center.y + halfSize, center.z + halfSize));
     vertices->push_back(osg::Vec3(center.x - halfSize, center.y + halfSize, center.z + halfSize));
     
-    // 为每个顶点设置颜色
-    for (int i = 0; i < 8; ++i)
-    {
-        colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
-                                   m_parameters.lineColor.b, m_parameters.lineColor.a));
-    }
-    
     geometry->setVertexArray(vertices);
-    geometry->setColorArray(colors);
-    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     
     // 绘制边界线
     osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(osg::PrimitiveSet::LINES);
@@ -151,12 +128,6 @@ void Cube3D_Geo::buildEdgeGeometries()
     indices->push_back(3); indices->push_back(7);
     
     geometry->addPrimitiveSet(indices);
-    
-    // 设置线的宽度
-    osg::ref_ptr<osg::StateSet> stateSet = geometry->getOrCreateStateSet();
-    osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth;
-    lineWidth->setWidth(2.0f);  // 边界线宽度
-    stateSet->setAttribute(lineWidth);
 }
 
 void Cube3D_Geo::buildFaceGeometries()
@@ -187,7 +158,6 @@ void Cube3D_Geo::buildFaceGeometries()
     
     // 创建面的几何体
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
     // 计算正方体的8个顶点
     glm::vec3 center = (controlPoints[0].position + controlPoints[1].position) * 0.5f;
@@ -203,16 +173,7 @@ void Cube3D_Geo::buildFaceGeometries()
     vertices->push_back(osg::Vec3(center.x + halfSize, center.y + halfSize, center.z + halfSize));
     vertices->push_back(osg::Vec3(center.x - halfSize, center.y + halfSize, center.z + halfSize));
     
-    // 为每个顶点设置颜色
-    for (int i = 0; i < 8; ++i)
-    {
-                colors->push_back(osg::Vec4(m_parameters.fillColor.r, m_parameters.fillColor.g,
-                                   m_parameters.fillColor.b, m_parameters.fillColor.a));
-    }
-    
     geometry->setVertexArray(vertices);
-    geometry->setColorArray(colors);
-    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     
     // 绘制6个面（每个面2个三角形）
     osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(osg::PrimitiveSet::TRIANGLES);

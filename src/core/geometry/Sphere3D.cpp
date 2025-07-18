@@ -78,8 +78,6 @@ void Sphere3D_Geo::buildVertexGeometries()
     // 点绘制 - 控制点使用较大的点大小以便拾取
     osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::POINTS, 0, vertices->size());
     geometry->addPrimitiveSet(drawArrays);
-    
-
 }
 
 void Sphere3D_Geo::buildEdgeGeometries()
@@ -97,7 +95,6 @@ void Sphere3D_Geo::buildEdgeGeometries()
     
     // 创建边的几何体（球体网格线）
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
     float radius = m_radius;
     glm::vec3 center = controlPoints[0].position;
@@ -122,14 +119,10 @@ void Sphere3D_Geo::buildEdgeGeometries()
             glm::vec3 point = center + radius * normal;
             
             vertices->push_back(osg::Vec3(point.x, point.y, point.z));
-            colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
-                                       m_parameters.lineColor.b, m_parameters.lineColor.a));
         }
     }
     
     geometry->setVertexArray(vertices);
-    geometry->setColorArray(colors);
-    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     
     // 绘制网格线
     osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(osg::PrimitiveSet::LINES);
@@ -159,12 +152,6 @@ void Sphere3D_Geo::buildEdgeGeometries()
     }
     
     geometry->addPrimitiveSet(indices);
-    
-    // 设置线的宽度
-    osg::ref_ptr<osg::StateSet> stateSet = geometry->getOrCreateStateSet();
-    osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth;
-    lineWidth->setWidth(m_parameters.lineWidth);
-    stateSet->setAttribute(lineWidth);
 }
 
 void Sphere3D_Geo::buildFaceGeometries()
@@ -182,7 +169,6 @@ void Sphere3D_Geo::buildFaceGeometries()
     
     // 创建面的几何体
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
     
     float radius = m_radius;
@@ -209,14 +195,10 @@ void Sphere3D_Geo::buildFaceGeometries()
             
             vertices->push_back(osg::Vec3(point.x, point.y, point.z));
             normals->push_back(osg::Vec3(normal.x, normal.y, normal.z));
-            colors->push_back(osg::Vec4(m_parameters.fillColor.r, m_parameters.fillColor.g, 
-                            m_parameters.fillColor.b, m_parameters.fillColor.a));
         }
     }
     
     geometry->setVertexArray(vertices);
-    geometry->setColorArray(colors);
-    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     geometry->setNormalArray(normals);
     geometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
     

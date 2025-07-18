@@ -74,29 +74,18 @@ void Quad3D_Geo::buildVertexGeometries()
     
     // 创建顶点数组
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
     // 添加控制点
     for (const Point3D& point : controlPoints)
     {
         vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
-        colors->push_back(osg::Vec4(m_parameters.pointColor.r, m_parameters.pointColor.g, 
-                                   m_parameters.pointColor.b, m_parameters.pointColor.a));
     }
     
     geometry->setVertexArray(vertices);
-    geometry->setColorArray(colors);
-    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     
-    // 点绘制 - 控制点使用较大的点大小以便拾取
+    // 点绘制 - 控制点
     osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::POINTS, 0, vertices->size());
     geometry->addPrimitiveSet(drawArrays);
-    
-    // 设置点的大小
-    osg::ref_ptr<osg::StateSet> stateSet = geometry->getOrCreateStateSet();
-    osg::ref_ptr<osg::Point> point = new osg::Point;
-    point->setSize(8.0f);  // 控制点大小
-    stateSet->setAttribute(point);
 }
 
 void Quad3D_Geo::buildEdgeGeometries()
@@ -114,7 +103,6 @@ void Quad3D_Geo::buildEdgeGeometries()
     
     // 创建四边形边界线几何体
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
     // 构建所有点（控制点已包含临时点）
     std::vector<Point3D> allPoints = controlPoints;
@@ -123,33 +111,19 @@ void Quad3D_Geo::buildEdgeGeometries()
     for (size_t i = 0; i < allPoints.size(); ++i)
     {
         vertices->push_back(osg::Vec3(allPoints[i].x(), allPoints[i].y(), allPoints[i].z()));
-        colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
-                                   m_parameters.lineColor.b, m_parameters.lineColor.a));
     }
     
     // 如果有4个或更多点，形成闭合四边形
     if (allPoints.size() >= 4)
     {
         vertices->push_back(osg::Vec3(allPoints[0].x(), allPoints[0].y(), allPoints[0].z()));
-        colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
-                                   m_parameters.lineColor.b, m_parameters.lineColor.a));
     }
     
     geometry->setVertexArray(vertices);
-    geometry->setColorArray(colors);
-    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     
     // 线绘制 - 边界线
     osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::LINE_STRIP, 0, vertices->size());
     geometry->addPrimitiveSet(drawArrays);
-    
-    // 设置线的宽度
-    osg::ref_ptr<osg::StateSet> stateSet = geometry->getOrCreateStateSet();
-    osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth;
-    lineWidth->setWidth(2.0f);  // 边界线宽度
-    stateSet->setAttribute(lineWidth);
-    
-    // 几何体已经通过mm_node()->getEdgeGeometry()获取，直接使用
 }
 
 void Quad3D_Geo::buildFaceGeometries()
@@ -199,15 +173,12 @@ void Quad3D_Geo::buildFaceGeometries()
     
     // 创建四边形面几何体
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
     
     // 添加顶点
     for (const Point3D& point : controlPoints)
     {
         vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
-        colors->push_back(osg::Vec4(m_parameters.fillColor.r, m_parameters.fillColor.g, 
-                                   m_parameters.fillColor.b, m_parameters.fillColor.a));
     }
     
     // 计算法向量
@@ -217,8 +188,6 @@ void Quad3D_Geo::buildFaceGeometries()
     }
     
     geometry->setVertexArray(vertices);
-    geometry->setColorArray(colors);
-    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
     geometry->setNormalArray(normals);
     geometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
     
@@ -236,8 +205,6 @@ void Quad3D_Geo::buildFaceGeometries()
         osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, 3);
         geometry->addPrimitiveSet(drawArrays);
     }
-    
-    // 几何体已经通过mm_node()->getFaceGeometry()获取，直接使用
 }
 
 // ==================== 绘制完成检查和控制点验证 ====================

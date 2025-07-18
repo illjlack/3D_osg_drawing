@@ -56,7 +56,6 @@ public:
     bool canSelect() const;
 
 signals:
-    void stateChanged(int oldState, int newState);
     void stateInitialized();
     void stateCompleted();
     void stateInvalidated();

@@ -16,7 +16,6 @@ void GeoStateManager::setStateInitialized()
     m_geoState |= GeoState_Initialized3D;
     
     if (oldState != m_geoState) {
-        emit stateChanged(oldState, m_geoState);
         emit stateInitialized();
     }
 }
@@ -27,7 +26,6 @@ void GeoStateManager::setStateComplete()
     m_geoState |= GeoState_Complete3D;
     
     if (oldState != m_geoState) {
-        emit stateChanged(oldState, m_geoState);
         emit stateCompleted();
     }
 }
@@ -38,7 +36,6 @@ void GeoStateManager::setStateInvalid()
     m_geoState |= GeoState_Invalid3D;
     
     if (oldState != m_geoState) {
-        emit stateChanged(oldState, m_geoState);
         emit stateInvalidated();
     }
 }
@@ -49,7 +46,6 @@ void GeoStateManager::setStateSelected()
     m_geoState |= GeoState_Selected3D;
     
     if (oldState != m_geoState) {
-        emit stateChanged(oldState, m_geoState);
         emit stateSelected();
     }
 }
@@ -60,7 +56,7 @@ void GeoStateManager::setStateEditing()
     m_geoState |= GeoState_Editing3D;
     
     if (oldState != m_geoState) {
-        emit stateChanged(oldState, m_geoState);
+        
         emit editingStarted();
     }
 }
@@ -71,7 +67,7 @@ void GeoStateManager::clearStateComplete()
     m_geoState &= ~GeoState_Complete3D;
     
     if (oldState != m_geoState) {
-        emit stateChanged(oldState, m_geoState);
+        
     }
 }
 
@@ -81,7 +77,7 @@ void GeoStateManager::clearStateInvalid()
     m_geoState &= ~GeoState_Invalid3D;
     
     if (oldState != m_geoState) {
-        emit stateChanged(oldState, m_geoState);
+        
     }
 }
 
@@ -91,7 +87,7 @@ void GeoStateManager::clearStateSelected()
     m_geoState &= ~GeoState_Selected3D;
     
     if (oldState != m_geoState) {
-        emit stateChanged(oldState, m_geoState);
+        
         emit stateDeselected();
     }
 }
@@ -102,7 +98,7 @@ void GeoStateManager::clearStateEditing()
     m_geoState &= ~GeoState_Editing3D;
     
     if (oldState != m_geoState) {
-        emit stateChanged(oldState, m_geoState);
+        
         emit editingFinished();
     }
 }

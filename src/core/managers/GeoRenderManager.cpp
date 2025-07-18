@@ -6,10 +6,6 @@
 
 GeoRenderManager::GeoRenderManager(Geo3D* parent)
     : m_parent(parent)
-    , m_showPoints(true)
-    , m_showEdges(true)
-    , m_showFaces(true)
-    , m_visible(true)
     , m_wireframeMode(false)
     , m_highlighted(false)
     , m_highlightColor(1.0f, 1.0f, 0.0f, 1.0f)
@@ -30,6 +26,47 @@ void GeoRenderManager::initializeRender()
     m_lineWidth = new osg::LineWidth(2.0f);
     m_pointSize = new osg::Point(5.0f);
     
+    // 1. 三套材质
+    m_pointMaterial = new osg::Material(*m_osgMaterial);
+    m_edgeMaterial  = new osg::Material(*m_osgMaterial);
+    m_faceMaterial  = new osg::Material(*m_osgMaterial);
+
+    // 2. 设置默认颜色
+    m_pointMaterial->setDiffuse(osg::Material::FRONT_AND_BACK, osg::Vec4(1,0,0,1)); // 红点
+    m_edgeMaterial ->setDiffuse(osg::Material::FRONT_AND_BACK, osg::Vec4(0,1,0,1)); // 绿线
+    m_faceMaterial ->setDiffuse(osg::Material::FRONT_AND_BACK, osg::Vec4(0,0,1,1)); // 蓝面
+
+    // 3. 拿到三组几何
+    auto geomPts  = m_parent->mm_node()->getVertexGeometry();
+    auto geomEdges= m_parent->mm_node()->getEdgeGeometry();
+    auto geomFaces= m_parent->mm_node()->getFaceGeometry();
+
+    // 4. 分别挂到它们自己的 StateSet
+    if (geomPts)
+    {
+        auto ss = geomPts->getOrCreateStateSet();
+        ss->setAttributeAndModes(m_pointMaterial.get(),osg::StateAttribute::ON);
+        ss->setAttributeAndModes(m_pointSize .get(),osg::StateAttribute::ON);
+    }
+    if (geomEdges)
+    {
+        auto ss = geomEdges->getOrCreateStateSet();
+        ss->setAttributeAndModes(m_edgeMaterial.get(),osg::StateAttribute::ON);
+        ss->setAttributeAndModes(m_lineWidth .get(),osg::StateAttribute::ON);
+        // 要虚线、加 LineStipple
+    }
+    if (geomFaces)
+    {
+        auto ss = geomFaces->getOrCreateStateSet();
+        ss->setAttributeAndModes(m_faceMaterial.get(),osg::StateAttribute::ON);
+        if (m_wireframeMode)
+        {
+            auto pm = new osg::PolygonMode();
+            pm->setMode(osg::PolygonMode::FRONT_AND_BACK, osg::PolygonMode::LINE);
+            ss->setAttributeAndModes(pm,osg::StateAttribute::ON);
+        }
+    }
+
     // 设置到几何节点
     if (m_parent && m_parent->mm_node()) {
         auto node = m_parent->mm_node()->getOSGNode();
@@ -78,67 +115,6 @@ void GeoRenderManager::initializeRender()
         osg::ref_ptr<osg::PolygonMode> polygonMode = new osg::PolygonMode();
         polygonMode->setMode(osg::PolygonMode::FRONT_AND_BACK, osg::PolygonMode::LINE);
         m_stateSet->setAttributeAndModes(polygonMode.get(), osg::StateAttribute::ON);
-    }
-}
-
-void GeoRenderManager::setRenderMode(RenderMode mode)
-{
-    switch (mode) {
-        case RENDER_POINTS:
-            setShowPoints(true);
-            setShowEdges(false);
-            setShowFaces(false);
-            break;
-        case RENDER_WIREFRAME:
-            setShowPoints(false);
-            setShowEdges(true);
-            setShowFaces(false);
-            break;
-        case RENDER_SOLID:
-            setShowPoints(false);
-            setShowEdges(false);
-            setShowFaces(true);
-            break;
-        case RENDER_ALL:
-            setShowPoints(true);
-            setShowEdges(true);
-            setShowFaces(true);
-            break;
-    }
-}
-
-void GeoRenderManager::setShowPoints(bool show)
-{
-    m_showPoints = show;
-    if (m_parent && m_parent->mm_node()) {
-        m_parent->mm_node()->setVertexVisible(show);
-    }
-}
-
-void GeoRenderManager::setShowEdges(bool show)
-{
-    m_showEdges = show;
-    if (m_parent && m_parent->mm_node()) {
-        m_parent->mm_node()->setEdgeVisible(show);
-    }
-}
-
-void GeoRenderManager::setShowFaces(bool show)
-{
-    m_showFaces = show;
-    if (m_parent && m_parent->mm_node()) {
-        m_parent->mm_node()->setFaceVisible(show);
-    }
-}
-
-void GeoRenderManager::setVisible(bool visible)
-{
-    m_visible = visible;
-    if (m_parent && m_parent->mm_node()) {
-        auto node = m_parent->mm_node()->getOSGNode();
-        if (node.valid()) {
-            node->setNodeMask(visible ? 0xffffffff : 0x0);
-        }
     }
 }
 
@@ -241,3 +217,27 @@ void GeoRenderManager::applyMaterialPreset(MaterialType3D type)
             break;
     }
 } 
+
+void GeoRenderManager::setPointColor(const Color3D& color)
+{
+    if (m_pointMaterial.valid()) {
+        m_pointMaterial->setDiffuse(osg::Material::FRONT_AND_BACK, 
+                                   osg::Vec4(color.r, color.g, color.b, color.a));
+    }
+}
+
+void GeoRenderManager::setEdgeColor(const Color3D& color)
+{
+    if (m_edgeMaterial.valid()) {
+        m_edgeMaterial->setDiffuse(osg::Material::FRONT_AND_BACK, 
+                                  osg::Vec4(color.r, color.g, color.b, color.a));
+    }
+}
+
+void GeoRenderManager::setFaceColor(const Color3D& color)
+{
+    if (m_faceMaterial.valid()) {
+        m_faceMaterial->setDiffuse(osg::Material::FRONT_AND_BACK, 
+                                  osg::Vec4(color.r, color.g, color.b, color.a));
+    }
+}

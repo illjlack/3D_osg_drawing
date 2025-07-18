@@ -7,6 +7,7 @@
 #include <osg/BlendFunc>
 #include <osg/LineWidth>
 #include <osg/Point>
+#include <osg/PolygonMode>
 #include <osg/ref_ptr>
 
 // 前向声明
@@ -19,24 +20,9 @@ class Geo3D;
 class GeoRenderManager
 {
 public:
-    // 渲染模式
-    enum RenderMode
-    {
-        RENDER_POINTS,           // 仅显示点
-        RENDER_WIREFRAME,        // 线框模式
-        RENDER_SOLID,            // 实体模式
-        RENDER_ALL               // 点+线框+实体
-    };
 
     explicit GeoRenderManager(Geo3D* parent);
     ~GeoRenderManager() = default;
-
-    // 渲染模式设置
-    void setRenderMode(RenderMode mode);
-    void setShowPoints(bool show);
-    void setShowEdges(bool show);
-    void setShowFaces(bool show);
-    void setVisible(bool visible);
 
     // 材质设置
     void setMaterial(const Material3D& material);
@@ -53,24 +39,28 @@ public:
     void setHighlighted(bool highlighted);
     void setHighlightColor(const Color3D& color);
 
+    void setPointColor(const Color3D& color);
+    void setEdgeColor(const Color3D& color);
+    void setFaceColor(const Color3D& color);
+
 private:
     void initializeRender();
-    void updateRender();
     void applyMaterialPreset(MaterialType3D type);
 
 private:
     Geo3D* m_parent;
     
     // 渲染状态
-    bool m_showPoints;
-    bool m_showEdges;
-    bool m_showFaces;
-    bool m_visible;
     bool m_wireframeMode;
     bool m_highlighted;
     
     // 材质属性
     Material3D m_material;
+    
+    // 三套材质
+    osg::ref_ptr<osg::Material> m_pointMaterial;
+    osg::ref_ptr<osg::Material> m_edgeMaterial;
+    osg::ref_ptr<osg::Material> m_faceMaterial;
     
     // OSG渲染状态
     osg::ref_ptr<osg::StateSet> m_stateSet;

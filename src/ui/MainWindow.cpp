@@ -2019,12 +2019,29 @@ void PropertyEditor3D::onShowPointsChanged()
     
     bool show = m_showPointsCheck->isChecked();
     
-    if (m_currentGeo)
+    if (!m_selectedGeos.empty())
     {
-        m_currentGeo->mm_render()->setShowPoints(show);
+        // 多选情况：应用到所有选中的对象
+        for (auto* geo : m_selectedGeos)
+        {
+            if (geo)
+            {
+                GeoParameters3D params = geo->getParameters();
+                params.showPoints = show;
+                geo->setParameters(params);
+            }
+        }
+    }
+    else if (m_currentGeo)
+    {
+        // 单选情况
+        GeoParameters3D params = m_currentGeo->getParameters();
+        params.showPoints = show;
+        m_currentGeo->setParameters(params);
     }
     else
     {
+        // 全局设置
         GlobalShowPoints3D = show;
     }
     
@@ -2037,12 +2054,29 @@ void PropertyEditor3D::onShowEdgesChanged()
     
     bool show = m_showEdgesCheck->isChecked();
     
-    if (m_currentGeo)
+    if (!m_selectedGeos.empty())
     {
-        m_currentGeo->mm_render()->setShowEdges(show);
+        // 多选情况：应用到所有选中的对象
+        for (auto* geo : m_selectedGeos)
+        {
+            if (geo)
+            {
+                GeoParameters3D params = geo->getParameters();
+                params.showEdges = show;
+                geo->setParameters(params);
+            }
+        }
+    }
+    else if (m_currentGeo)
+    {
+        // 单选情况
+        GeoParameters3D params = m_currentGeo->getParameters();
+        params.showEdges = show;
+        m_currentGeo->setParameters(params);
     }
     else
     {
+        // 全局设置
         GlobalShowEdges3D = show;
     }
     
@@ -2055,12 +2089,29 @@ void PropertyEditor3D::onShowFacesChanged()
     
     bool show = m_showFacesCheck->isChecked();
     
-    if (m_currentGeo)
+    if (!m_selectedGeos.empty())
     {
-        m_currentGeo->mm_render()->setShowFaces(show);
+        // 多选情况：应用到所有选中的对象
+        for (auto* geo : m_selectedGeos)
+        {
+            if (geo)
+            {
+                GeoParameters3D params = geo->getParameters();
+                params.showFaces = show;
+                geo->setParameters(params);
+            }
+        }
+    }
+    else if (m_currentGeo)
+    {
+        // 单选情况
+        GeoParameters3D params = m_currentGeo->getParameters();
+        params.showFaces = show;
+        m_currentGeo->setParameters(params);
     }
     else
     {
+        // 全局设置
         GlobalShowFaces3D = show;
     }
     

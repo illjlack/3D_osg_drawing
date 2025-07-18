@@ -72,17 +72,9 @@ void Arc3D_Geo::buildVertexGeometries()
     
     geometry->setVertexArray(vertices);
     
-    // 点绘制 - 控制点使用较大的点大小以便拾取
+    // 点绘制 - 控制点
     osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::POINTS, 0, vertices->size());
     geometry->addPrimitiveSet(drawArrays);
-    
-    // 设置点的大小和颜色
-    osg::ref_ptr<osg::StateSet> stateSet = geometry->getOrCreateStateSet();
-    osg::ref_ptr<osg::Point> point = new osg::Point;
-    point->setSize(8.0f);  // 控制点大小
-    stateSet->setAttribute(point);
-    
-    // 几何体构建完成
 }
 
 void Arc3D_Geo::buildEdgeGeometries()
@@ -140,14 +132,6 @@ void Arc3D_Geo::buildEdgeGeometries()
     // 线绘制 - 边界线
     osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::LINE_STRIP, 0, vertices->size());
     geometry->addPrimitiveSet(drawArrays);
-    
-    // 设置线的宽度
-    osg::ref_ptr<osg::StateSet> stateSet = geometry->getOrCreateStateSet();
-    osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth;
-    lineWidth->setWidth(2.0f);  // 边界线宽度
-    stateSet->setAttribute(lineWidth);
-    
-    // 几何体构建完成
 }
 
 void Arc3D_Geo::buildFaceGeometries()
