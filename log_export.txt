@@ -1,23 +1,271 @@
-14:07:06.485 [INFO] [相机] (CameraController.cpp:31) __cdecl CameraController::CameraController(void) 创建相机控制器
-14:07:06.485 [INFO] [相机] (CameraController.cpp:62) void __cdecl CameraController::initializeManipulators(void) 初始化相机操控器
-14:07:06.485 [DEBUG] [相机] (CameraController.cpp:81) void __cdecl CameraController::initializeManipulators(void) 相机操控器初始化完成，默认使用轨道球操控器
-14:07:06.485 [DEBUG] [相机] (CameraController.cpp:1147) class QString __cdecl CameraController::getManipulatorTypeString(enum ManipulatorType) const 获取操控器类型字符串: 0 -> 轨道球
-14:07:06.485 [DEBUG] [相机] (CameraController.cpp:49) __cdecl CameraController::CameraController(void) 相机控制器初始化完成: 默认操控器=轨道球, 投影模式=透视, FOV=45.0°
-14:07:06.517 [INFO] [系统] (OSGWidget.cpp:97) __cdecl OSGWidget::OSGWidget(class QWidget *) OSGWidget初始化完成
-14:07:06.517 [DEBUG] [系统] (OSGWidget.cpp:98) __cdecl OSGWidget::OSGWidget(class QWidget *) 渲染循环已启动，帧率: 60fps
-14:07:06.558 [INFO] [系统] (MainWindow.cpp:126) void __cdecl MainWindow::setupUI(void) 3D绘图板启动完成
-14:07:06.558 [INFO] [系统] (MainWindow.cpp:127) void __cdecl MainWindow::setupUI(void) 日志系统已初始化
-14:07:06.558 [DEBUG] [系统] (MainWindow.cpp:128) void __cdecl MainWindow::setupUI(void) 调试模式已启用
-14:07:06.603 [INFO] [状态] (MainWindow.cpp:534) void __cdecl MainWindow::updateStatusBar(const class QString &) Ready
-14:07:11.014 [INFO] [系统] (OSGWidget.cpp:115) void __cdecl OSGWidget::initializeScene(void) 正在初始化OSG插件系统...
-14:07:11.014 [INFO] [系统] (OSGWidget.cpp:119) void __cdecl OSGWidget::initializeScene(void) OSG插件系统初始化完成
-14:07:11.025 [WARN] [系统] (OSGWidget.cpp:126) void __cdecl OSGWidget::initializeScene(void) 未找到OSGB文件读取插件
-14:07:11.109 [INFO] [系统] (OSGWidget.cpp:137) void __cdecl OSGWidget::initializeScene(void) 支持的常用格式: 
-14:07:11.109 [INFO] [相机] (CameraController.cpp:90) void __cdecl CameraController::setViewer(class osgViewer::Viewer *) 相机操控器已设置到OSG查看器
-14:07:11.109 [INFO] [相机] (CameraController.cpp:513) void __cdecl CameraController::setPosition(const class osg::Vec3d &,const class osg::Vec3d &,const class osg::Vec3d &) 设置相机位置: 眼睛(15000.00,1500.00,1500.00) 中心(0.00,0.00,0.00) 上方向(0.00,0.00,1.00)
-14:07:11.111 [SUCCESS] [拾取] (PickingSystem.cpp:129) bool __cdecl PickingSystem::initialize(int,int) Picking system initialized successfully (799x668)
-14:07:11.112 [SUCCESS] [拾取] (OSGWidget.cpp:255) void __cdecl OSGWidget::setupPickingSystem(void) Picking system initialized successfully
-14:07:39.767 [INFO] [文件IO] (GeoOsgbIO.cpp:49) class Geo3D *__cdecl GeoOsgbIO::loadFromOsgb(const class QString &) 尝试加载文件: D:/Program Files/feiq/Recv Files/moxing04/aaa.osgb
-14:07:39.767 [INFO] [文件IO] (GeoOsgbIO.cpp:60) class Geo3D *__cdecl GeoOsgbIO::loadFromOsgb(const class QString &) 文件扩展名: osgb
-14:07:39.783 [ERROR] [文件IO] (GeoOsgbIO.cpp:65) class Geo3D *__cdecl GeoOsgbIO::loadFromOsgb(const class QString &) 没有找到处理扩展名 'osgb' 的OSG插件
-14:07:41.170 [ERROR] [文件] (MainWindow.cpp:639) void __cdecl MainWindow::onFileOpen(void) 打开文档失败: D:/Program Files/feiq/Recv Files/moxing04/aaa.osgb
+12:43:12.887 [INFO] [相机] (CameraController.cpp:31) CameraController::CameraController 创建相机控制器
+12:43:12.888 [INFO] [相机] (CameraController.cpp:62) CameraController::initializeManipulators 初始化相机操控器
+12:43:12.888 [DEBUG] [相机] (CameraController.cpp:81) CameraController::initializeManipulators 相机操控器初始化完成，默认使用轨道球操控器
+12:43:12.888 [DEBUG] [相机] (CameraController.cpp:1147) CameraController::getManipulatorTypeString 获取操控器类型字符串: 0 -> 轨道球
+12:43:12.888 [DEBUG] [相机] (CameraController.cpp:49) CameraController::CameraController 相机控制器初始化完成: 默认操控器=轨道球, 投影模式=透视, FOV=45.0°
+12:43:12.933 [INFO] [系统] (OSGWidget.cpp:114) OSGWidget::OSGWidget OSGWidget初始化完成
+12:43:12.933 [DEBUG] [系统] (OSGWidget.cpp:115) OSGWidget::OSGWidget 渲染循环已启动，帧率: 60fps
+12:43:12.981 [INFO] [系统] (MainWindow.cpp:158) MainWindow::setupUI 3D绘图板启动完成
+12:43:12.981 [INFO] [系统] (MainWindow.cpp:159) MainWindow::setupUI 日志系统已初始化
+12:43:12.981 [DEBUG] [系统] (MainWindow.cpp:160) MainWindow::setupUI 调试模式已启用
+12:43:13.038 [INFO] [状态] (MainWindow.cpp:602) MainWindow::updateStatusBar Ready
+12:43:15.044 [INFO] [测试] (MainWindow.cpp:131) MainWindow::{ctor}::<lambda_540f50f46b91b3cf2c42a9ad253e2eae>::operator () 自动创建测试几何体用于拾取功能测试
+12:43:15.044 [INFO] [测试] (OSGWidget.cpp:1818) OSGWidget::createTestGeometry 开始创建测试几何体
+12:43:15.044 [WARN] [测试] (OSGWidget.cpp:1822) OSGWidget::createTestGeometry 拾取系统未启用，尝试重新初始化
+12:43:15.044 [ERROR] [拾取] (OSGWidget.cpp:219) OSGWidget::setupPickingSystem 无法获取OSG Viewer，拾取系统初始化失败
+12:43:15.045 [ERROR] [GEO] (GeoNodeManager.cpp:289) GeoNodeManager::buildKdTreeForGeometry KdTree 构建失败，几何体可能过于复杂或顶点数据有问题
+12:43:15.045 [INFO] [GEO] (GeoNodeManager.cpp:238) GeoNodeManager::buildKdTreeForGeometry KdTree 构建跳过：几何体无效或顶点为空
+12:43:15.045 [INFO] [GEO] (GeoNodeManager.cpp:238) GeoNodeManager::buildKdTreeForGeometry KdTree 构建跳过：几何体无效或顶点为空
+12:43:15.046 [ERROR] [GEO] (GeoNodeManager.cpp:289) GeoNodeManager::buildKdTreeForGeometry KdTree 构建失败，几何体可能过于复杂或顶点数据有问题
+12:43:15.046 [INFO] [GEO] (GeoNodeManager.cpp:285) GeoNodeManager::buildKdTreeForGeometry KdTree 使用默认参数构建成功
+12:43:15.046 [INFO] [GEO] (GeoNodeManager.cpp:285) GeoNodeManager::buildKdTreeForGeometry KdTree 使用默认参数构建成功
+12:43:15.047 [DEBUG] [拾取] (OSGWidget.cpp:444) OSGWidget::addGeo Advanced picking is disabled
+12:43:15.047 [SUCCESS] [测试] (OSGWidget.cpp:1857) OSGWidget::createTestGeometry 测试几何体创建成功 - 类型: 53
+12:43:15.047 [WARN] [测试] (OSGWidget.cpp:1864) OSGWidget::createTestGeometry 拾取系统未启用，无法添加几何体到拾取系统
+12:43:15.047 [WARN] [拾取] (OSGWidget.cpp:727) OSGWidget::ensureAllGeosInPickingSystem 拾取系统未启用，无法确保几何体在拾取系统中
+12:43:15.047 [INFO] [调试] (OSGWidget.cpp:1876) OSGWidget::debugPickingSystem === 拾取系统调试信息 ===
+12:43:15.047 [INFO] [调试] (OSGWidget.cpp:1879) OSGWidget::debugPickingSystem 高级拾取系统启用状态: 否
+12:43:15.047 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:46) OSGIndexPickingSystem::OSGIndexPickingSystem OSGIndexPickingSystem创建完成
+12:43:15.047 [INFO] [调试] (OSGWidget.cpp:1883) OSGWidget::debugPickingSystem 拾取系统初始化状态: 否
+12:43:15.047 [INFO] [调试] (OSGWidget.cpp:1886) OSGWidget::debugPickingSystem 场景中几何体数量: 1
+12:43:15.047 [INFO] [调试] (OSGWidget.cpp:1893) OSGWidget::debugPickingSystem 拾取系统未初始化，无法获取几何体数量
+12:43:15.047 [INFO] [调试] (OSGWidget.cpp:1898) OSGWidget::debugPickingSystem 拾取系统详细信息:
+OSG索引拾取系统状态:
+- 初始化状态: 未初始化
+- 几何体数量: 0
+- 调试模式: 禁用
+- 拾取半径: 5 像素
+- 捕捉阈值: 0.15
+- 指示器大小: 0.2
+- 拾取频率: 60 Hz
+
+12:43:15.047 [INFO] [调试] (OSGWidget.cpp:1905) OSGWidget::debugPickingSystem 拾取事件处理器启用状态: 是
+12:43:15.047 [ERROR] [调试] (OSGWidget.cpp:1931) OSGWidget::debugPickingSystem OSG Viewer不存在
+12:43:15.047 [INFO] [调试] (OSGWidget.cpp:1934) OSGWidget::debugPickingSystem === 拾取系统调试信息结束 ===
+12:43:17.353 [INFO] [相机] (CameraController.cpp:90) CameraController::setViewer 相机操控器已设置到OSG查看器
+12:43:17.353 [INFO] [相机] (CameraController.cpp:90) CameraController::setViewer 相机操控器已设置到OSG查看器
+12:43:19.937 [INFO] [模式] (OSGWidget.cpp:1238) OSGWidget::setDrawMode 切换到绘制模式: 圆锥
+12:43:19.937 [INFO] [状态] (MainWindow.cpp:602) MainWindow::updateStatusBar 切换到: 圆锥
+12:43:19.937 [INFO] [模式] (MainWindow.cpp:1121) MainWindow::onDrawModeChanged 切换到绘制模式: 圆锥
+12:43:20.352 [INFO] [拾取] (OSGWidget.cpp:223) OSGWidget::setupPickingSystem 开始初始化OSG索引拾取系统
+12:43:20.354 [SUCCESS] [拾取] (OSGIndexPickingSystem.cpp:88) OSGIndexPickingSystem::initialize OSGIndexPickingSystem初始化成功
+12:43:20.354 [SUCCESS] [拾取] (OSGIndexPickingSystem.cpp:1065) OSGIndexPickingSystemManager::initialize OSG索引拾取系统管理器初始化成功
+12:43:20.354 [INFO] [拾取] (OSGWidget.cpp:254) OSGWidget::setupPickingSystem 成功添加拾取事件处理器到OSG Viewer
+12:43:20.354 [INFO] [拾取] (OSGWidget.cpp:260) OSGWidget::setupPickingSystem 拾取事件处理器已启用
+12:43:20.354 [INFO] [拾取] (OSGWidget.cpp:271) OSGWidget::setupPickingSystem Added simplified picking indicator root to scene graph
+12:43:20.354 [SUCCESS] [拾取] (OSGWidget.cpp:278) OSGWidget::setupPickingSystem Simplified picking system initialized successfully
+12:43:20.354 [INFO] [拾取] (OSGWidget.cpp:283) OSGWidget::setupPickingSystem 拾取系统初始化完成 - 几何体数量: 1, 系统信息: OSG索引拾取系统状态:
+- 初始化状态: 已初始化
+- 几何体数量: 0
+- 调试模式: 禁用
+- 拾取半径: 15 像素
+- 捕捉阈值: 0.5
+- 指示器大小: 0.3
+- 拾取频率: 60 Hz
+
+12:43:20.379 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:135) OSGIndexPickingSystem::addGeometry 添加几何体到OSG索引拾取系统 - 捕捉点数量: 0
+12:43:20.379 [DEBUG] [拾取] (OSGWidget.cpp:439) OSGWidget::addGeo Added incomplete geometry to OSG index picking system (from file IO): 55
+12:43:20.379 [INFO] [绘制] (OSGWidget.cpp:1145) OSGWidget::handleDrawingInput 开始绘制...
+12:43:20.379 [ERROR] [GEO] (GeoNodeManager.cpp:289) GeoNodeManager::buildKdTreeForGeometry KdTree 构建失败，几何体可能过于复杂或顶点数据有问题
+12:43:20.379 [INFO] [GEO] (GeoNodeManager.cpp:238) GeoNodeManager::buildKdTreeForGeometry KdTree 构建跳过：几何体无效或顶点为空
+12:43:20.379 [INFO] [GEO] (GeoNodeManager.cpp:238) GeoNodeManager::buildKdTreeForGeometry KdTree 构建跳过：几何体无效或顶点为空
+12:43:20.543 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:981) OSGIndexPickingEventHandler::handle 处理鼠标点击事件: (475, 556)
+12:43:20.543 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1017) OSGIndexPickingEventHandler::processPicking processPicking: 开始拾取坐标 (475, 556)
+12:43:20.543 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:20.543 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:20.812 [ERROR] [GEO] (GeoNodeManager.cpp:289) GeoNodeManager::buildKdTreeForGeometry KdTree 构建失败，几何体可能过于复杂或顶点数据有问题
+12:43:20.812 [INFO] [GEO] (GeoNodeManager.cpp:276) GeoNodeManager::buildKdTreeForGeometry KdTree 构建成功
+12:43:20.812 [INFO] [GEO] (GeoNodeManager.cpp:276) GeoNodeManager::buildKdTreeForGeometry KdTree 构建成功
+12:43:20.824 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (379, 486)
+12:43:20.824 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1017) OSGIndexPickingEventHandler::processPicking processPicking: 开始拾取坐标 (379, 486)
+12:43:20.825 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:20.825 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:20.915 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (296, 390)
+12:43:20.915 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1017) OSGIndexPickingEventHandler::processPicking processPicking: 开始拾取坐标 (296, 390)
+12:43:20.915 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:20.915 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:20.915 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (289, 384)
+12:43:20.915 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1003) OSGIndexPickingEventHandler::processPicking processPicking: 频率限制，跳过本次拾取
+12:43:21.030 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (283, 377)
+12:43:21.030 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1017) OSGIndexPickingEventHandler::processPicking processPicking: 开始拾取坐标 (283, 377)
+12:43:21.030 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:21.031 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:21.031 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (211, 320)
+12:43:21.031 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1003) OSGIndexPickingEventHandler::processPicking processPicking: 频率限制，跳过本次拾取
+12:43:21.191 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (181, 303)
+12:43:21.191 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1017) OSGIndexPickingEventHandler::processPicking processPicking: 开始拾取坐标 (181, 303)
+12:43:21.191 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:21.191 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:21.191 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (179, 302)
+12:43:21.191 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1003) OSGIndexPickingEventHandler::processPicking processPicking: 频率限制，跳过本次拾取
+12:43:21.195 [ERROR] [GEO] (GeoNodeManager.cpp:289) GeoNodeManager::buildKdTreeForGeometry KdTree 构建失败，几何体可能过于复杂或顶点数据有问题
+12:43:21.195 [INFO] [GEO] (GeoNodeManager.cpp:276) GeoNodeManager::buildKdTreeForGeometry KdTree 构建成功
+12:43:21.195 [INFO] [GEO] (GeoNodeManager.cpp:276) GeoNodeManager::buildKdTreeForGeometry KdTree 构建成功
+12:43:21.195 [ERROR] [GEO] (GeoNodeManager.cpp:289) GeoNodeManager::buildKdTreeForGeometry KdTree 构建失败，几何体可能过于复杂或顶点数据有问题
+12:43:21.196 [INFO] [GEO] (GeoNodeManager.cpp:276) GeoNodeManager::buildKdTreeForGeometry KdTree 构建成功
+12:43:21.196 [INFO] [GEO] (GeoNodeManager.cpp:276) GeoNodeManager::buildKdTreeForGeometry KdTree 构建成功
+12:43:21.196 [SUCCESS] [绘制] (OSGWidget.cpp:1189) OSGWidget::completeCurrentDrawing 绘制完成
+12:43:21.360 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (178, 302)
+12:43:21.360 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1017) OSGIndexPickingEventHandler::processPicking processPicking: 开始拾取坐标 (178, 302)
+12:43:21.360 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:21.360 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:21.360 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:981) OSGIndexPickingEventHandler::handle 处理鼠标点击事件: (178, 302)
+12:43:21.360 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1003) OSGIndexPickingEventHandler::processPicking processPicking: 频率限制，跳过本次拾取
+12:43:22.339 [INFO] [状态] (MainWindow.cpp:602) MainWindow::updateStatusBar 取消选择
+12:43:22.339 [INFO] [选择] (MainWindow.cpp:1153) MainWindow::onGeoSelected 取消选择
+12:43:22.341 [INFO] [状态] (MainWindow.cpp:602) MainWindow::updateStatusBar 取消选择
+12:43:22.341 [INFO] [选择] (MainWindow.cpp:1153) MainWindow::onGeoSelected 取消选择
+12:43:22.341 [INFO] [模式] (OSGWidget.cpp:1234) OSGWidget::setDrawMode 切换到选择模式
+12:43:22.341 [INFO] [状态] (MainWindow.cpp:602) MainWindow::updateStatusBar 切换到: 选择
+12:43:22.341 [INFO] [模式] (MainWindow.cpp:1121) MainWindow::onDrawModeChanged 切换到绘制模式: 选择
+12:43:22.578 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (110, 652)
+12:43:22.578 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1017) OSGIndexPickingEventHandler::processPicking processPicking: 开始拾取坐标 (110, 652)
+12:43:22.578 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:22.578 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:22.713 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (134, 644)
+12:43:22.713 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1017) OSGIndexPickingEventHandler::processPicking processPicking: 开始拾取坐标 (134, 644)
+12:43:22.713 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:22.578 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:22.713 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:22.723 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (252, 603)
+12:43:22.723 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1003) OSGIndexPickingEventHandler::processPicking processPicking: 频率限制，跳过本次拾取
+12:43:22.723 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (437, 536)
+12:43:22.723 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1003) OSGIndexPickingEventHandler::processPicking processPicking: 频率限制，跳过本次拾取
+12:43:22.890 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (444, 534)
+12:43:22.890 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1017) OSGIndexPickingEventHandler::processPicking processPicking: 开始拾取坐标 (444, 534)
+12:43:22.890 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:22.890 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:23.025 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (450, 530)
+12:43:23.025 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1017) OSGIndexPickingEventHandler::processPicking processPicking: 开始拾取坐标 (450, 530)
+12:43:23.026 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:23.026 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:23.029 [INFO] [选择] (OSGWidget.cpp:1097) OSGWidget::handleDrawingInput 选择模式点击: 位置(450,229), 拾取结果=未命中, Ctrl=否
+12:43:23.029 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:887) OSGIndexPickingSystem::hideSelectionHighlight 隐藏选择高亮
+12:43:23.031 [INFO] [状态] (MainWindow.cpp:602) MainWindow::updateStatusBar 取消选择
+12:43:23.031 [INFO] [选择] (MainWindow.cpp:1153) MainWindow::onGeoSelected 取消选择
+12:43:23.033 [INFO] [状态] (MainWindow.cpp:602) MainWindow::updateStatusBar 取消选择
+12:43:23.033 [INFO] [选择] (MainWindow.cpp:1153) MainWindow::onGeoSelected 取消选择
+12:43:23.033 [INFO] [选择] (OSGWidget.cpp:602) OSGWidget::clearSelection 清除所有选择
+12:43:23.157 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:981) OSGIndexPickingEventHandler::handle 处理鼠标点击事件: (450, 530)
+12:43:23.157 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1009) OSGIndexPickingEventHandler::processPicking processPicking: 鼠标位置未变化，跳过本次拾取
+12:43:24.334 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (1293, 686)
+12:43:24.334 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1017) OSGIndexPickingEventHandler::processPicking processPicking: 开始拾取坐标 (1293, 686)
+12:43:24.334 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:24.334 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:24.334 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (1294, 686)
+12:43:24.334 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1003) OSGIndexPickingEventHandler::processPicking processPicking: 频率限制，跳过本次拾取
+12:43:24.612 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (1350, 753)
+12:43:24.612 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1017) OSGIndexPickingEventHandler::processPicking processPicking: 开始拾取坐标 (1350, 753)
+12:43:24.612 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:24.612 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:24.917 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (1046, 754)
+12:43:24.917 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1017) OSGIndexPickingEventHandler::processPicking processPicking: 开始拾取坐标 (1046, 754)
+12:43:24.918 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:24.918 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:24.934 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (1012, 741)
+12:43:24.934 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1017) OSGIndexPickingEventHandler::processPicking processPicking: 开始拾取坐标 (1012, 741)
+12:43:24.934 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:24.934 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:24.934 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (994, 733)
+12:43:24.934 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1003) OSGIndexPickingEventHandler::processPicking processPicking: 频率限制，跳过本次拾取
+12:43:25.132 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (960, 712)
+12:43:25.132 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1017) OSGIndexPickingEventHandler::processPicking processPicking: 开始拾取坐标 (960, 712)
+12:43:25.132 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:25.132 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:25.409 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (832, 570)
+12:43:25.409 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1017) OSGIndexPickingEventHandler::processPicking processPicking: 开始拾取坐标 (832, 570)
+12:43:25.409 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:25.409 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:25.409 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (826, 563)
+12:43:25.409 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1003) OSGIndexPickingEventHandler::processPicking processPicking: 频率限制，跳过本次拾取
+12:43:25.409 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (747, 520)
+12:43:25.409 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1003) OSGIndexPickingEventHandler::processPicking processPicking: 频率限制，跳过本次拾取
+12:43:25.414 [INFO] [选择] (OSGWidget.cpp:1097) OSGWidget::handleDrawingInput 选择模式点击: 位置(719,251), 拾取结果=未命中, Ctrl=否
+12:43:25.414 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:887) OSGIndexPickingSystem::hideSelectionHighlight 隐藏选择高亮
+12:43:25.416 [INFO] [状态] (MainWindow.cpp:602) MainWindow::updateStatusBar 取消选择
+12:43:25.416 [INFO] [选择] (MainWindow.cpp:1153) MainWindow::onGeoSelected 取消选择
+12:43:25.418 [INFO] [状态] (MainWindow.cpp:602) MainWindow::updateStatusBar 取消选择
+12:43:25.418 [INFO] [选择] (MainWindow.cpp:1153) MainWindow::onGeoSelected 取消选择
+12:43:25.418 [INFO] [选择] (OSGWidget.cpp:602) OSGWidget::clearSelection 清除所有选择
+12:43:25.595 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (719, 508)
+12:43:25.595 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1017) OSGIndexPickingEventHandler::processPicking processPicking: 开始拾取坐标 (719, 508)
+12:43:25.595 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:25.595 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:25.595 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:981) OSGIndexPickingEventHandler::handle 处理鼠标点击事件: (719, 508)
+12:43:25.595 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1003) OSGIndexPickingEventHandler::processPicking processPicking: 频率限制，跳过本次拾取
+12:43:26.575 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (787, 548)
+12:43:26.575 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1017) OSGIndexPickingEventHandler::processPicking processPicking: 开始拾取坐标 (787, 548)
+12:43:26.575 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:26.575 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:28.650 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (787, 545)
+12:43:28.650 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1017) OSGIndexPickingEventHandler::processPicking processPicking: 开始拾取坐标 (787, 545)
+12:43:28.651 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:28.651 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:28.668 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (787, 544)
+12:43:28.668 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1017) OSGIndexPickingEventHandler::processPicking processPicking: 开始拾取坐标 (787, 544)
+12:43:28.668 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:28.668 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:28.879 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (785, 541)
+12:43:28.879 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1017) OSGIndexPickingEventHandler::processPicking processPicking: 开始拾取坐标 (785, 541)
+12:43:28.879 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:28.879 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:29.085 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (774, 519)
+12:43:29.085 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1017) OSGIndexPickingEventHandler::processPicking processPicking: 开始拾取坐标 (774, 519)
+12:43:29.085 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:29.085 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:29.107 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (769, 514)
+12:43:29.107 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1017) OSGIndexPickingEventHandler::processPicking processPicking: 开始拾取坐标 (769, 514)
+12:43:29.108 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:29.108 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:29.668 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (767, 511)
+12:43:29.668 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1017) OSGIndexPickingEventHandler::processPicking processPicking: 开始拾取坐标 (767, 511)
+12:43:29.668 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:29.668 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:29.731 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (750, 497)
+12:43:29.731 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1017) OSGIndexPickingEventHandler::processPicking processPicking: 开始拾取坐标 (750, 497)
+12:43:29.731 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:29.731 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:29.752 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (732, 490)
+12:43:29.752 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1017) OSGIndexPickingEventHandler::processPicking processPicking: 开始拾取坐标 (732, 490)
+12:43:29.752 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:29.752 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:29.974 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (731, 490)
+12:43:29.974 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1017) OSGIndexPickingEventHandler::processPicking processPicking: 开始拾取坐标 (731, 490)
+12:43:29.974 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:29.974 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:30.390 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (715, 478)
+12:43:30.390 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1017) OSGIndexPickingEventHandler::processPicking processPicking: 开始拾取坐标 (715, 478)
+12:43:30.391 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:30.391 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:30.601 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (706, 449)
+12:43:30.601 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1017) OSGIndexPickingEventHandler::processPicking processPicking: 开始拾取坐标 (706, 449)
+12:43:30.601 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:30.601 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:30.628 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (706, 435)
+12:43:30.628 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1017) OSGIndexPickingEventHandler::processPicking processPicking: 开始拾取坐标 (706, 435)
+12:43:30.628 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:30.628 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:30.847 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (706, 433)
+12:43:30.847 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1017) OSGIndexPickingEventHandler::processPicking processPicking: 开始拾取坐标 (706, 433)
+12:43:30.847 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:30.847 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:31.077 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (706, 432)
+12:43:31.077 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1017) OSGIndexPickingEventHandler::processPicking processPicking: 开始拾取坐标 (706, 432)
+12:43:31.077 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:31.077 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:31.315 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (716, 432)
+12:43:31.315 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (716, 432)
+12:43:31.316 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:31.316 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:31.537 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (776, 441)
+12:43:31.537 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1017) OSGIndexPickingEventHandler::processPicking processPicking: 开始拾取坐标 (776, 441)
+12:43:31.537 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:31.537 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:31.770 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (799, 472)
+12:43:31.770 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1017) OSGIndexPickingEventHandler::processPicking processPicking: 开始拾取坐标 (799, 472)
+12:43:31.770 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:31.770 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用
+12:43:32.003 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:975) OSGIndexPickingEventHandler::handle 处理鼠标移动事件: (672, 365)
+12:43:32.003 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1017) OSGIndexPickingEventHandler::processPicking processPicking: 开始拾取坐标 (672, 365)
+12:43:32.003 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1024) OSGIndexPickingEventHandler::processPicking processPicking: 拾取结果 - 有结果: 否, 几何体: -1
+12:43:32.003 [DEBUG] [拾取] (OSGIndexPickingSystem.cpp:1029) OSGIndexPickingEventHandler::processPicking processPicking: 拾取回调已调用

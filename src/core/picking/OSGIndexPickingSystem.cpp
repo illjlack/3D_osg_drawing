@@ -281,29 +281,45 @@ OSGIndexPickResult OSGIndexPickingSystem::pickVertex(int mouseX, int mouseY)
     osg::Viewport* viewport = m_camera->getViewport();
     if (!viewport) return result;
     
+    // 修复问题1：鼠标Y坐标翻转
+    int winX = mouseX;
+    int winY = viewport->height() - mouseY;
+    
     // 使用OSG的射线拾取器
     osg::ref_ptr<osgUtil::LineSegmentIntersector> picker = 
-        new osgUtil::LineSegmentIntersector(osgUtil::Intersector::WINDOW, mouseX, mouseY);
+        new osgUtil::LineSegmentIntersector(osgUtil::Intersector::WINDOW, winX, winY);
     
-    // 执行拾取
+    // 修复问题2：使用Camera驱动IntersectionVisitor，获取正确的MVP矩阵
     osgUtil::IntersectionVisitor iv(picker.get());
-    m_sceneRoot->accept(iv);
+    m_camera->accept(iv);
     
-    // 处理拾取结果
+    // 处理拾取结果，但只保留geoNode下的物体
     osgUtil::LineSegmentIntersector::Intersections intersections = picker->getIntersections();
     
-    if (!intersections.empty()) {
-        // 获取最近的交点
-        const osgUtil::LineSegmentIntersector::Intersection& intersection = *intersections.begin();
-        
-        // 找到对应的几何体
-        Geo3D* pickedGeometry = nullptr;
-        for (const osg::ref_ptr<Geo3D>& geo : m_geometries) {
-            if (geo && geo->mm_node()->getOSGNode() == intersection.nodePath.back()) {
-                pickedGeometry = geo.get();
+    // 过滤出属于geoNode的最近交点
+    const osgUtil::LineSegmentIntersector::Intersection* validIntersection = nullptr;
+    for (const auto& intersection : intersections) {
+        // 检查nodePath是否包含m_sceneRoot
+        bool belongsToGeoNode = false;
+        for (const auto& node : intersection.nodePath) {
+            if (node == m_sceneRoot.get()) {
+                belongsToGeoNode = true;
                 break;
             }
         }
+        
+        if (belongsToGeoNode) {
+            validIntersection = &intersection;
+            break;  // 取第一个（最近的）属于geoNode的交点
+        }
+    }
+    
+    if (validIntersection) {
+        // 获取最近的交点
+        const osgUtil::LineSegmentIntersector::Intersection& intersection = *validIntersection;
+        
+        // 修复问题3：改进几何体匹配逻辑
+        Geo3D* pickedGeometry = findGeometryFromIntersection(intersection);
         
         if (pickedGeometry) {
             // 检查是否为顶点
@@ -356,29 +372,45 @@ OSGIndexPickResult OSGIndexPickingSystem::pickEdge(int mouseX, int mouseY)
     osg::Viewport* viewport = m_camera->getViewport();
     if (!viewport) return result;
     
+    // 修复问题1：鼠标Y坐标翻转
+    int winX = mouseX;
+    int winY = viewport->height() - mouseY;
+    
     // 使用OSG的射线拾取器
     osg::ref_ptr<osgUtil::LineSegmentIntersector> picker = 
-        new osgUtil::LineSegmentIntersector(osgUtil::Intersector::WINDOW, mouseX, mouseY);
+        new osgUtil::LineSegmentIntersector(osgUtil::Intersector::WINDOW, winX, winY);
     
-    // 执行拾取
+    // 修复问题2：使用Camera驱动IntersectionVisitor，获取正确的MVP矩阵
     osgUtil::IntersectionVisitor iv(picker.get());
-    m_sceneRoot->accept(iv);
+    m_camera->accept(iv);
     
-    // 处理拾取结果
+    // 处理拾取结果，但只保留geoNode下的物体
     osgUtil::LineSegmentIntersector::Intersections intersections = picker->getIntersections();
     
-    if (!intersections.empty()) {
-        // 获取最近的交点
-        const osgUtil::LineSegmentIntersector::Intersection& intersection = *intersections.begin();
-        
-        // 找到对应的几何体
-        Geo3D* pickedGeometry = nullptr;
-        for (const osg::ref_ptr<Geo3D>& geo : m_geometries) {
-            if (geo && geo->mm_node()->getOSGNode() == intersection.nodePath.back()) {
-                pickedGeometry = geo.get();
+    // 过滤出属于geoNode的最近交点
+    const osgUtil::LineSegmentIntersector::Intersection* validIntersection = nullptr;
+    for (const auto& intersection : intersections) {
+        // 检查nodePath是否包含m_sceneRoot
+        bool belongsToGeoNode = false;
+        for (const auto& node : intersection.nodePath) {
+            if (node == m_sceneRoot.get()) {
+                belongsToGeoNode = true;
                 break;
             }
         }
+        
+        if (belongsToGeoNode) {
+            validIntersection = &intersection;
+            break;  // 取第一个（最近的）属于geoNode的交点
+        }
+    }
+    
+    if (validIntersection) {
+        // 获取最近的交点
+        const osgUtil::LineSegmentIntersector::Intersection& intersection = *validIntersection;
+        
+        // 修复问题3：改进几何体匹配逻辑
+        Geo3D* pickedGeometry = findGeometryFromIntersection(intersection);
         
         if (pickedGeometry) {
             const auto& controlPoints = pickedGeometry->mm_controlPoint()->getControlPoints();
@@ -452,29 +484,45 @@ OSGIndexPickResult OSGIndexPickingSystem::pickFace(int mouseX, int mouseY)
     osg::Viewport* viewport = m_camera->getViewport();
     if (!viewport) return result;
     
+    // 修复问题1：鼠标Y坐标翻转
+    int winX = mouseX;
+    int winY = viewport->height() - mouseY;
+    
     // 使用OSG的射线拾取器
     osg::ref_ptr<osgUtil::LineSegmentIntersector> picker = 
-        new osgUtil::LineSegmentIntersector(osgUtil::Intersector::WINDOW, mouseX, mouseY);
+        new osgUtil::LineSegmentIntersector(osgUtil::Intersector::WINDOW, winX, winY);
     
-    // 执行拾取
+    // 修复问题2：使用Camera驱动IntersectionVisitor，获取正确的MVP矩阵
     osgUtil::IntersectionVisitor iv(picker.get());
-    m_sceneRoot->accept(iv);
+    m_camera->accept(iv);
     
-    // 处理拾取结果
+    // 处理拾取结果，但只保留geoNode下的物体
     osgUtil::LineSegmentIntersector::Intersections intersections = picker->getIntersections();
     
-    if (!intersections.empty()) {
-        // 获取最近的交点
-        const osgUtil::LineSegmentIntersector::Intersection& intersection = *intersections.begin();
-        
-        // 找到对应的几何体
-        Geo3D* pickedGeometry = nullptr;
-        for (const osg::ref_ptr<Geo3D>& geo : m_geometries) {
-            if (geo && geo->mm_node()->getOSGNode() == intersection.nodePath.back()) {
-                pickedGeometry = geo.get();
+    // 过滤出属于geoNode的最近交点
+    const osgUtil::LineSegmentIntersector::Intersection* validIntersection = nullptr;
+    for (const auto& intersection : intersections) {
+        // 检查nodePath是否包含m_sceneRoot
+        bool belongsToGeoNode = false;
+        for (const auto& node : intersection.nodePath) {
+            if (node == m_sceneRoot.get()) {
+                belongsToGeoNode = true;
                 break;
             }
         }
+        
+        if (belongsToGeoNode) {
+            validIntersection = &intersection;
+            break;  // 取第一个（最近的）属于geoNode的交点
+        }
+    }
+    
+    if (validIntersection) {
+        // 获取最近的交点
+        const osgUtil::LineSegmentIntersector::Intersection& intersection = *validIntersection;
+        
+        // 修复问题3：改进几何体匹配逻辑
+        Geo3D* pickedGeometry = findGeometryFromIntersection(intersection);
         
         if (pickedGeometry) {
             result.hasResult = true;
@@ -922,7 +970,63 @@ osg::ref_ptr<osg::Geometry> OSGIndexPickingSystem::createControlPointHighlightGe
     return highlightGeometry;
 }
 
-
+// 新增：改进的几何体匹配方法
+Geo3D* OSGIndexPickingSystem::findGeometryFromIntersection(const osgUtil::LineSegmentIntersector::Intersection& intersection)
+{
+    // 方法1：直接通过Drawable匹配
+    osg::Drawable* drawable = intersection.drawable.get();
+    if (drawable) {
+        for (const osg::ref_ptr<Geo3D>& geo : m_geometries) {
+            if (!geo) continue;
+            
+            // 检查是否匹配面几何体
+            if (geo->mm_node()->getFaceGeometry() == drawable) {
+                return geo.get();
+            }
+            // 检查是否匹配边几何体
+            if (geo->mm_node()->getEdgeGeometry() == drawable) {
+                return geo.get();
+            }
+            // 检查是否匹配顶点几何体
+            if (geo->mm_node()->getVertexGeometry() == drawable) {
+                return geo.get();
+            }
+        }
+    }
+    
+    // 方法2：通过节点路径匹配
+    for (const osg::ref_ptr<Geo3D>& geo : m_geometries) {
+        if (!geo) continue;
+        
+        osg::ref_ptr<osg::Group> geoNode = geo->mm_node()->getOSGNode();
+        if (!geoNode) continue;
+        
+        // 检查节点路径中是否包含几何体的节点
+        for (const auto& node : intersection.nodePath) {
+            if (node == geoNode || geoNode->containsNode(node)) {
+                return geo.get();
+            }
+        }
+    }
+    
+    // 方法3：通过节点名称匹配（备用方案）
+    for (const osg::ref_ptr<Geo3D>& geo : m_geometries) {
+        if (!geo) continue;
+        
+        osg::ref_ptr<osg::Group> geoNode = geo->mm_node()->getOSGNode();
+        if (!geoNode) continue;
+        
+        // 检查节点名称是否匹配
+        std::string geoNodeName = geoNode->getName();
+        for (const auto& node : intersection.nodePath) {
+            if (node->getName() == geoNodeName) {
+                return geo.get();
+            }
+        }
+    }
+    
+    return nullptr;
+}
 
 // ============================================================================
 // OSGIndexPickingEventHandler Implementation

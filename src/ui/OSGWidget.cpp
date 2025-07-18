@@ -210,9 +210,8 @@ void OSGWidget::setupPickingSystem()
     osgViewer::Viewer* viewer = getOsgViewer();
     if (!viewer) return;
     
-    // 初始化简化拾取系统
     if (!OSGIndexPickingSystemManager::getInstance().initialize(
-        viewer->getCamera(), m_sceneNode.get()))
+        viewer->getCamera(), m_geoNode.get()))
     {
         LOG_ERROR("Failed to initialize simplified picking system", "拾取");
         return;
@@ -878,33 +877,26 @@ void OSGWidget::mousePressEvent(QMouseEvent* event)
     // 处理绘制输入
     handleDrawingInput(event);
     
-    // 处理拖动控制点
+    // 处理拖动控制点 - 使用拾取系统
     if (GlobalDrawMode3D == DrawSelect3D && event->button() == Qt::LeftButton)
     {
-        // 检查是否点击了控制点
-        glm::vec3 worldPos = screenToWorld(event->x(), event->y(), 0.5f);
+        // 使用拾取系统进行拾取
+        OSGIndexPickResult pickResult = OSGIndexPickingSystemManager::getInstance().pick(event->x(), event->y());
         
-        // 检查选中的对象
-        for (auto* geo : m_selectedGeos)
+        if (pickResult.hasResult && pickResult.geometry)
         {
-            if (!geo) continue;
-            
-            // 检查控制点
-            const auto& controlPoints = geo->mm_controlPoint()->getControlPoints();
-            for (int i = 0; i < static_cast<int>(controlPoints.size()); ++i)
+            // 检查是否为顶点拾取（控制点）
+            if (pickResult.featureType == PickFeatureType::VERTEX && pickResult.vertexIndex >= 0)
             {
-                glm::vec3 diff = controlPoints[i].position - worldPos;
-                float distance = glm::length(diff);
-                
-                if (distance < 0.1f) // 控制点拾取阈值
+                // 检查该几何体是否在选中列表中
+                auto it = std::find(m_selectedGeos.begin(), m_selectedGeos.end(), pickResult.geometry);
+                if (it != m_selectedGeos.end())
                 {
-                    startDraggingControlPoint(geo, i);
+                    startDraggingControlPoint(pickResult.geometry, pickResult.vertexIndex);
                     event->accept();
                     return;
                 }
             }
-            
-            // 包围盒控制点功能已移除，直接使用OSG的包围盒
         }
     }
     
@@ -987,10 +979,25 @@ void OSGWidget::mouseMoveEvent(QMouseEvent* event)
         }
     }
     
-    // 处理绘制预览 - 使用缓存的位置
+    // 处理绘制预览 - 使用拾取系统获取更精确的世界坐标
     if (m_isDrawing && m_currentDrawingGeo)
     {
-        updateCurrentDrawing(m_lastMouseWorldPos);
+        // 使用拾取系统获取世界坐标
+        OSGIndexPickResult pickResult = OSGIndexPickingSystemManager::getInstance().pick(event->x(), event->y());
+        glm::vec3 drawingWorldPos;
+        
+        if (pickResult.hasResult)
+        {
+            // 使用拾取结果的世界坐标
+            drawingWorldPos = pickResult.worldPosition;
+        }
+        else
+        {
+            // 如果没有拾取到对象，使用缓存的位置
+            drawingWorldPos = m_lastMouseWorldPos;
+        }
+        
+        updateCurrentDrawing(drawingWorldPos);
     }
 }
 
@@ -1036,8 +1043,6 @@ void OSGWidget::wheelEvent(QWheelEvent* event)
 
 void OSGWidget::handleDrawingInput(QMouseEvent* event)
 {
-    glm::vec3 worldPos = screenToWorld(event->x(), event->y(), 0.5f);
-    
     // 右键取消绘制
     if (event->button() == Qt::RightButton && m_isDrawing)
     {
@@ -1051,7 +1056,7 @@ void OSGWidget::handleDrawingInput(QMouseEvent* event)
     
     if (GlobalDrawMode3D == DrawSelect3D)
     {
-        // 选择模式：直接使用OSGIndexPickingSystem进行射线选择
+        // 选择模式：使用拾取系统进行选择
         OSGIndexPickResult pickResult = OSGIndexPickingSystemManager::getInstance().pick(event->x(), event->y());
         
         // 检查是否按下了Ctrl键（多选模式）
@@ -1098,18 +1103,32 @@ void OSGWidget::handleDrawingInput(QMouseEvent* event)
     }
     else
     {
-        // 绘制模式
+        // 绘制模式：使用拾取系统获取世界坐标
+        OSGIndexPickResult pickResult = OSGIndexPickingSystemManager::getInstance().pick(event->x(), event->y());
+        glm::vec3 worldPos;
+        
+        if (pickResult.hasResult)
+        {
+            // 使用拾取结果的世界坐标
+            worldPos = pickResult.worldPosition;
+        }
+        else
+        {
+            // 如果没有拾取到对象，使用屏幕坐标转换
+            worldPos = screenToWorld(event->x(), event->y(), 0.5f);
+        }
+        
         if (!m_isDrawing)
         {
-        // 开始新的绘制
-        Geo3D* newGeo = createGeo3D(GlobalDrawMode3D);
-        if (newGeo)
-        {
-            m_currentDrawingGeo = newGeo;
-            m_isDrawing = true;
-            addGeo(newGeo);
-            LOG_INFO("开始绘制...", "绘制");
-        }
+            // 开始新的绘制
+            Geo3D* newGeo = createGeo3D(GlobalDrawMode3D);
+            if (newGeo)
+            {
+                m_currentDrawingGeo = newGeo;
+                m_isDrawing = true;
+                addGeo(newGeo);
+                LOG_INFO("开始绘制...", "绘制");
+            }
         }
         
         if (m_currentDrawingGeo)

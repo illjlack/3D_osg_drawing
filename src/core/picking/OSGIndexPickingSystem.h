@@ -156,6 +156,9 @@ private:
     osg::ref_ptr<osg::Geometry> createHighlightGeometry(Geo3D* geometry);
     osg::ref_ptr<osg::Geometry> createControlPointHighlightGeometry(Geo3D* geometry);
     
+    // 几何体匹配
+    Geo3D* findGeometryFromIntersection(const osgUtil::LineSegmentIntersector::Intersection& intersection);
+    
     // 内部状态
     bool m_initialized = false;
     bool m_debugMode = false;
