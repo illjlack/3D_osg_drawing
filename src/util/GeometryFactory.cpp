@@ -13,7 +13,16 @@
 #include "../core/geometry/Cone3D.h"
 #include "../core/geometry/Sphere3D.h"
 #include "../core/geometry/Torus3D.h"
+#include "../core/geometry/Prism3D.h"
+#include "../core/geometry/Hemisphere3D.h"
+#include "../core/geometry/Ellipsoid3D.h"
 #include "../core/geometry/UndefinedGeo3D.h"
+#include "../core/buildings/BuildingFactory.h"
+#include "../core/buildings/GableHouse3D.h"
+#include "../core/buildings/SpireHouse3D.h"
+#include "../core/buildings/DomeHouse3D.h"
+#include "../core/buildings/FlatHouse3D.h"
+#include "../core/buildings/LHouse3D.h"
 
 Geo3D* GeometryFactory::createGeometry(DrawMode3D mode)
 {
@@ -46,6 +55,22 @@ Geo3D* GeometryFactory::createGeometry(DrawMode3D mode)
         return createSphere();
     case DrawTorus3D:
         return createTorus();
+    case DrawPrism3D:
+        return createPrism();
+    case DrawHemisphere3D:
+        return createHemisphere();
+    case DrawEllipsoid3D:
+        return createEllipsoid();
+    case DrawGableHouse3D:
+        return BuildingFactory::createGableHouse();
+    case DrawSpireHouse3D:
+        return BuildingFactory::createSpireHouse();
+    case DrawDomeHouse3D:
+        return BuildingFactory::createDomeHouse();
+    case DrawFlatHouse3D:
+        return BuildingFactory::createFlatHouse();
+    case DrawLHouse3D:
+        return BuildingFactory::createLHouse();
     default:
         return createUndefinedGeo();
     }
@@ -121,6 +146,21 @@ Torus3D_Geo* GeometryFactory::createTorus()
     return new Torus3D_Geo();
 }
 
+Prism3D_Geo* GeometryFactory::createPrism()
+{
+    return new Prism3D_Geo();
+}
+
+Hemisphere3D_Geo* GeometryFactory::createHemisphere()
+{
+    return new Hemisphere3D_Geo();
+}
+
+Ellipsoid3D_Geo* GeometryFactory::createEllipsoid()
+{
+    return new Ellipsoid3D_Geo();
+}
+
 UndefinedGeo3D* GeometryFactory::createUndefinedGeo()
 {
     return new UndefinedGeo3D();
@@ -143,6 +183,9 @@ DrawMode3D GeometryFactory::geoTypeToDrawMode(GeoType3D type)
     case Geo_Cone3D: return DrawCone3D;
     case Geo_Sphere3D: return DrawSphere3D;
     case Geo_Torus3D: return DrawTorus3D;
+    case Geo_Prism3D: return DrawPrism3D;
+    case Geo_Hemisphere3D: return DrawHemisphere3D;
+    case Geo_Ellipsoid3D: return DrawEllipsoid3D;
     case Geo_UndefinedGeo3D: return DrawSelect3D;
     default: return DrawSelect3D;
     }
@@ -166,6 +209,15 @@ GeoType3D GeometryFactory::drawModeToGeoType(DrawMode3D mode)
     case DrawCone3D: return Geo_Cone3D;
     case DrawSphere3D: return Geo_Sphere3D;
     case DrawTorus3D: return Geo_Torus3D;
+    case DrawPrism3D: return Geo_Prism3D;
+    case DrawHemisphere3D: return Geo_Hemisphere3D;
+    case DrawEllipsoid3D: return Geo_Ellipsoid3D;
+    case DrawGableHouse3D:
+    case DrawSpireHouse3D:
+    case DrawDomeHouse3D:
+    case DrawFlatHouse3D:
+    case DrawLHouse3D:
+        return Geo_UndefinedGeo3D;
     default: return Geo_UndefinedGeo3D;
     }
 } 

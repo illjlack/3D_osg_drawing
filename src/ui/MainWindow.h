@@ -23,6 +23,7 @@
 #include <QMessageBox>
 #include <QSplitter>
 #include <QApplication>
+#include <QStackedWidget>
 
 #include <osgViewer/Viewer>
 #include <osgViewer/CompositeViewer>
@@ -339,10 +340,14 @@ private slots:
     void onExportImageClicked();
     void onCoordinateSystemClicked();
     void onDisplaySettingsClicked();
+    void onDrawingCategoryChanged(int index);
 
 private:
     void setupUI();
     void createDrawingGroup();
+    void createBasicGeometryPage();
+    void createBuildingPage();
+    void createAdvancedGeometryPage();
     void createViewGroup();
     void createUtilityGroup();
     void createSkyboxGroup();
@@ -367,6 +372,22 @@ private:
     QPushButton* m_sphereButton;
     QPushButton* m_torusButton;
     
+    // 建筑类型按钮
+    QPushButton* m_gableHouseButton;
+    QPushButton* m_spireHouseButton;
+    QPushButton* m_domeHouseButton;
+    QPushButton* m_flatHouseButton;
+    QPushButton* m_lHouseButton;
+    
+    // 高级几何体按钮
+    QPushButton* m_prismButton;
+    QPushButton* m_hemisphereButton;
+    QPushButton* m_ellipsoidButton;
+    
+    // 分类选择控件
+    QComboBox* m_drawingCategoryCombo;
+    QStackedWidget* m_drawingStackedWidget;
+    
     // 视图工具按钮
     QGroupBox* m_viewGroup;
     QPushButton* m_resetViewButton;
@@ -389,6 +410,4 @@ private:
     QPushButton* m_skyboxGradientButton;
     QPushButton* m_skyboxSolidButton;
     QPushButton* m_skyboxCustomButton;
-    
-    std::vector<QPushButton*> m_drawButtons;
 };

@@ -38,6 +38,13 @@ enum DrawMode3D
     DrawHemisphere3D,    // 半球
     DrawEllipsoid3D,     // 椭球
 
+    // 建筑类型
+    DrawGableHouse3D,    // 人字形房屋
+    DrawSpireHouse3D,    // 尖顶房屋
+    DrawDomeHouse3D,     // 穹顶房屋
+    DrawFlatHouse3D,     // 平顶房屋
+    DrawLHouse3D,        // L型房屋
+
     EndDrawMode3D
 };
 
@@ -261,4 +268,23 @@ enum FontSize3D
     FontSize_Custom3D,    // 自定义字体大小
     
     EndFontSize3D
+};
+
+// 建筑类型枚举
+enum BuildingType3D
+{
+    BeginBuildingType3D = EndFontSize3D,
+    
+    Building_GableHouse3D,      // 人字形房屋
+    Building_SpireHouse3D,      // 尖顶房屋
+    Building_DomeHouse3D,       // 穹顶房屋
+    Building_FlatHouse3D,       // 平顶房屋
+    Building_LHouse3D,          // L型房屋
+    Building_ParapetHouse3D,    // 带女儿墙的平顶房屋
+    Building_OverlapHouse3D,    // 搭边房屋
+    Building_CourtyardHouse3D,  // 回型房屋
+    Building_GableSpireHouse3D, // 人字尖点房屋
+    Building_ArcHouse3D,        // 弧顶房屋
+    
+    EndBuildingType3D
 };

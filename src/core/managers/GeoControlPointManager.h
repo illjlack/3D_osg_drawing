@@ -54,4 +54,4 @@ private:
     Geo3D* m_parent;
     std::vector<Point3D> m_controlPoints;
     Point3D m_tempPoint; // 临时点（内部使用）
-}; 
+};

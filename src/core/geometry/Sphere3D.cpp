@@ -255,4 +255,4 @@ bool Sphere3D_Geo::areControlPointsValid() const
     }
     
     return true;
-} 
+}

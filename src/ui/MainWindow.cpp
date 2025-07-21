@@ -2118,7 +2118,44 @@ void ToolPanel3D::setupUI()
 void ToolPanel3D::createDrawingGroup()
 {
     m_drawingGroup = new QGroupBox("绘制工具", this);
-    QGridLayout* layout = new QGridLayout(m_drawingGroup);
+    QVBoxLayout* mainLayout = new QVBoxLayout(m_drawingGroup);
+    
+    // 创建分类选择下拉框
+    m_drawingCategoryCombo = new QComboBox();
+    m_drawingCategoryCombo->addItem("基本几何体");
+    m_drawingCategoryCombo->addItem("建筑类型");
+    m_drawingCategoryCombo->addItem("高级几何体");
+    connect(m_drawingCategoryCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &ToolPanel3D::onDrawingCategoryChanged);
+    mainLayout->addWidget(m_drawingCategoryCombo);
+    
+    // 创建堆叠窗口来容纳不同类别的按钮
+    m_drawingStackedWidget = new QStackedWidget();
+    mainLayout->addWidget(m_drawingStackedWidget);
+    
+    // 创建基本几何体页面
+    createBasicGeometryPage();
+    
+    // 创建建筑类型页面
+    createBuildingPage();
+    
+    // 创建高级几何体页面
+    createAdvancedGeometryPage();
+    
+    // 创建基本几何体页面
+    createBasicGeometryPage();
+    
+    // 创建建筑类型页面
+    createBuildingPage();
+    
+    // 创建高级几何体页面
+    createAdvancedGeometryPage();
+}
+
+void ToolPanel3D::createBasicGeometryPage()
+{
+    QWidget* page = new QWidget();
+    QGridLayout* layout = new QGridLayout(page);
     
     // 选择工具
     m_selectButton = new QPushButton("选择");
@@ -2210,18 +2247,106 @@ void ToolPanel3D::createDrawingGroup()
     m_torusButton->setProperty("drawMode", DrawTorus3D);
     layout->addWidget(m_torusButton, 6, 1);
     
-    // 将所有按钮添加到列表
-    m_drawButtons = {
-        m_selectButton, m_pointButton, m_lineButton, m_arcButton, m_bezierButton,
-        m_triangleButton, m_quadButton, m_polygonButton, m_boxButton, m_cubeButton,
-        m_cylinderButton, m_coneButton, m_sphereButton, m_torusButton
-    };
+    // 连接信号
+    connect(m_selectButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
+    connect(m_pointButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
+    connect(m_lineButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
+    connect(m_arcButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
+    connect(m_bezierButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
+    connect(m_triangleButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
+    connect(m_quadButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
+    connect(m_polygonButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
+    connect(m_boxButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
+    connect(m_cubeButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
+    connect(m_cylinderButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
+    connect(m_coneButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
+    connect(m_sphereButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
+    connect(m_torusButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
+    
+    m_drawingStackedWidget->addWidget(page);
+}
+
+void ToolPanel3D::createBuildingPage()
+{
+    QWidget* page = new QWidget();
+    QGridLayout* layout = new QGridLayout(page);
+    
+    // 建筑类型按钮
+    m_gableHouseButton = new QPushButton("人字房");
+    m_gableHouseButton->setCheckable(true);
+    m_gableHouseButton->setToolTip("绘制人字形房屋");
+    m_gableHouseButton->setProperty("drawMode", DrawGableHouse3D);
+    layout->addWidget(m_gableHouseButton, 0, 0);
+    
+    m_spireHouseButton = new QPushButton("尖顶房");
+    m_spireHouseButton->setCheckable(true);
+    m_spireHouseButton->setToolTip("绘制尖顶房屋");
+    m_spireHouseButton->setProperty("drawMode", DrawSpireHouse3D);
+    layout->addWidget(m_spireHouseButton, 0, 1);
+    
+    m_domeHouseButton = new QPushButton("穹顶房");
+    m_domeHouseButton->setCheckable(true);
+    m_domeHouseButton->setToolTip("绘制穹顶房屋");
+    m_domeHouseButton->setProperty("drawMode", DrawDomeHouse3D);
+    layout->addWidget(m_domeHouseButton, 1, 0);
+    
+    m_flatHouseButton = new QPushButton("平顶房");
+    m_flatHouseButton->setCheckable(true);
+    m_flatHouseButton->setToolTip("绘制平顶房屋");
+    m_flatHouseButton->setProperty("drawMode", DrawFlatHouse3D);
+    layout->addWidget(m_flatHouseButton, 1, 1);
+    
+    m_lHouseButton = new QPushButton("L型房");
+    m_lHouseButton->setCheckable(true);
+    m_lHouseButton->setToolTip("绘制L型房屋");
+    m_lHouseButton->setProperty("drawMode", DrawLHouse3D);
+    layout->addWidget(m_lHouseButton, 2, 0);
     
     // 连接信号
-    for (QPushButton* button : m_drawButtons)
-    {
-        connect(button, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
-    }
+    connect(m_gableHouseButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
+    connect(m_spireHouseButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
+    connect(m_domeHouseButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
+    connect(m_flatHouseButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
+    connect(m_lHouseButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
+    
+    m_drawingStackedWidget->addWidget(page);
+}
+
+void ToolPanel3D::createAdvancedGeometryPage()
+{
+    QWidget* page = new QWidget();
+    QGridLayout* layout = new QGridLayout(page);
+    
+    // 高级几何体按钮
+    m_prismButton = new QPushButton("多棱柱");
+    m_prismButton->setCheckable(true);
+    m_prismButton->setToolTip("绘制多棱柱");
+    m_prismButton->setProperty("drawMode", DrawPrism3D);
+    layout->addWidget(m_prismButton, 0, 0);
+    
+    m_hemisphereButton = new QPushButton("半球");
+    m_hemisphereButton->setCheckable(true);
+    m_hemisphereButton->setToolTip("绘制半球");
+    m_hemisphereButton->setProperty("drawMode", DrawHemisphere3D);
+    layout->addWidget(m_hemisphereButton, 0, 1);
+    
+    m_ellipsoidButton = new QPushButton("椭球");
+    m_ellipsoidButton->setCheckable(true);
+    m_ellipsoidButton->setToolTip("绘制椭球");
+    m_ellipsoidButton->setProperty("drawMode", DrawEllipsoid3D);
+    layout->addWidget(m_ellipsoidButton, 1, 0);
+    
+    // 连接信号
+    connect(m_prismButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
+    connect(m_hemisphereButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
+    connect(m_ellipsoidButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
+    
+    m_drawingStackedWidget->addWidget(page);
+}
+
+void ToolPanel3D::onDrawingCategoryChanged(int index)
+{
+    m_drawingStackedWidget->setCurrentIndex(index);
 }
 
 void ToolPanel3D::createViewGroup()
@@ -2345,11 +2470,23 @@ void ToolPanel3D::updateDrawMode(DrawMode3D mode)
 {
     m_currentMode = mode;
     
+    // 创建所有按钮的列表
+    QList<QPushButton*> allButtons = {
+        m_selectButton, m_pointButton, m_lineButton, m_arcButton, m_bezierButton,
+        m_triangleButton, m_quadButton, m_polygonButton, m_boxButton, m_cubeButton,
+        m_cylinderButton, m_coneButton, m_sphereButton, m_torusButton,
+        m_gableHouseButton, m_spireHouseButton, m_domeHouseButton, m_flatHouseButton, m_lHouseButton,
+        m_prismButton, m_hemisphereButton, m_ellipsoidButton
+    };
+    
     // 更新按钮状态
-    for (QPushButton* button : m_drawButtons)
+    for (QPushButton* button : allButtons)
     {
-        DrawMode3D buttonMode = static_cast<DrawMode3D>(button->property("drawMode").toInt());
-        button->setChecked(buttonMode == mode);
+        if (button)
+        {
+            DrawMode3D buttonMode = static_cast<DrawMode3D>(button->property("drawMode").toInt());
+            button->setChecked(buttonMode == mode);
+        }
     }
 }
 
@@ -2360,10 +2497,19 @@ void ToolPanel3D::onDrawModeButtonClicked()
     
     DrawMode3D mode = static_cast<DrawMode3D>(button->property("drawMode").toInt());
     
+    // 创建所有按钮的列表
+    QList<QPushButton*> allButtons = {
+        m_selectButton, m_pointButton, m_lineButton, m_arcButton, m_bezierButton,
+        m_triangleButton, m_quadButton, m_polygonButton, m_boxButton, m_cubeButton,
+        m_cylinderButton, m_coneButton, m_sphereButton, m_torusButton,
+        m_gableHouseButton, m_spireHouseButton, m_domeHouseButton, m_flatHouseButton, m_lHouseButton,
+        m_prismButton, m_hemisphereButton, m_ellipsoidButton
+    };
+    
     // 取消其他按钮的选中状态
-    for (QPushButton* otherButton : m_drawButtons)
+    for (QPushButton* otherButton : allButtons)
     {
-        if (otherButton != button)
+        if (otherButton && otherButton != button)
         {
             otherButton->setChecked(false);
         }

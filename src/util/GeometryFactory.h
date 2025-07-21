@@ -18,6 +18,9 @@ class Cylinder3D_Geo;
 class Cone3D_Geo;
 class Sphere3D_Geo;
 class Torus3D_Geo;
+class Prism3D_Geo;
+class Hemisphere3D_Geo;
+class Ellipsoid3D_Geo;
 class UndefinedGeo3D;
 
 // 几何体工厂类
@@ -44,6 +47,9 @@ public:
     static Cone3D_Geo* createCone();
     static Sphere3D_Geo* createSphere();
     static Torus3D_Geo* createTorus();
+    static Prism3D_Geo* createPrism();
+    static Hemisphere3D_Geo* createHemisphere();
+    static Ellipsoid3D_Geo* createEllipsoid();
     static UndefinedGeo3D* createUndefinedGeo();
     
     // 辅助函数

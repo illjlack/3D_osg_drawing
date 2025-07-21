@@ -175,6 +175,15 @@
     <ClCompile Include="src\core\geometry\UndefinedGeo3D.cpp">
       <Filter>Core\Geometry</Filter>
     </ClCompile>
+    <ClCompile Include="src\core\geometry\Prism3D.cpp">
+      <Filter>Core\Geometry</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\geometry\Hemisphere3D.cpp">
+      <Filter>Core\Geometry</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\geometry\Ellipsoid3D.cpp">
+      <Filter>Core\Geometry</Filter>
+    </ClCompile>
     <ClCompile Include="src\core\managers\GeoStateManager.cpp">
       <Filter>Core\Managers</Filter>
     </ClCompile>
@@ -207,6 +216,24 @@
     </ClCompile>
     <ClCompile Include="src\util\GeoOsgbIO.cpp">
       <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\buildings\GableHouse3D.cpp">
+      <Filter>Core\Buildings</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\buildings\SpireHouse3D.cpp">
+      <Filter>Core\Buildings</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\buildings\DomeHouse3D.cpp">
+      <Filter>Core\Buildings</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\buildings\FlatHouse3D.cpp">
+      <Filter>Core\Buildings</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\buildings\LHouse3D.cpp">
+      <Filter>Core\Buildings</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\buildings\BuildingFactory.cpp">
+      <Filter>Core\Buildings</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -261,6 +288,15 @@
     <ClInclude Include="src\core\geometry\UndefinedGeo3D.h">
       <Filter>Core\Geometry</Filter>
     </ClInclude>
+    <ClInclude Include="src\core\geometry\Prism3D.h">
+      <Filter>Core\Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\geometry\Hemisphere3D.h">
+      <Filter>Core\Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\geometry\Ellipsoid3D.h">
+      <Filter>Core\Geometry</Filter>
+    </ClInclude>
     <QtMoc Include="src\core\managers\GeoStateManager.h">
       <Filter>Core\Managers</Filter>
     </QtMoc>
@@ -301,6 +337,24 @@
     <ClInclude Include="src\util\GeoOsgbIO.h">
       <Filter>Util</Filter>
     </ClInclude>
+    <ClInclude Include="src\core\buildings\GableHouse3D.h">
+      <Filter>Core\Buildings</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\buildings\SpireHouse3D.h">
+      <Filter>Core\Buildings</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\buildings\DomeHouse3D.h">
+      <Filter>Core\Buildings</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\buildings\FlatHouse3D.h">
+      <Filter>Core\Buildings</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\buildings\LHouse3D.h">
+      <Filter>Core\Buildings</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\buildings\BuildingFactory.h">
+      <Filter>Core\Buildings</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="src\ui\MainWindow.h">
@@ -340,6 +394,9 @@
     </Filter>
     <Filter Include="Core\Picking">
       <UniqueIdentifier>{core-picking-filter-guid}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core\Buildings">
+      <UniqueIdentifier>{core-buildings-filter-guid}</UniqueIdentifier>
     </Filter>
     <Filter Include="Util">
       <UniqueIdentifier>{util-filter-guid}</UniqueIdentifier>
