@@ -103,7 +103,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="src\core\picking\PickingIndicator.cpp" />
+    <ClCompile Include="src\core\picking\RayPickingSystem.cpp">
+      <Filter>Core\Picking</Filter>
+    </ClCompile>
     <ClCompile Include="src\core\world\CoordinateSystem3D.cpp" />
     <ClCompile Include="src\core\world\CoordinateSystemRenderer.cpp" />
     <ClCompile Include="src\core\world\Skybox.cpp" />
@@ -123,6 +125,9 @@
       <Filter>UI</Filter>
     </ClCompile>
     <ClCompile Include="src\ui\LogOutputWidget.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\PickingSystemDialog.cpp">
       <Filter>UI</Filter>
     </ClCompile>
     <ClCompile Include="src\ui\StatusBar3D.cpp">
@@ -196,9 +201,6 @@
     </ClCompile>
     <ClCompile Include="src\core\managers\GeoRenderManager.cpp">
       <Filter>Core\Managers</Filter>
-    </ClCompile>
-    <ClCompile Include="src\core\picking\OSGIndexPickingSystem.cpp">
-      <Filter>Core\Picking</Filter>
     </ClCompile>
     <ClCompile Include="src\util\OSGUtils.cpp">
       <Filter>Util</Filter>
@@ -309,12 +311,11 @@
     <QtMoc Include="src\core\managers\GeoRenderManager.h">
       <Filter>Core\Managers</Filter>
     </QtMoc>
-    <ClInclude Include="src\core\picking\OSGIndexPickingSystem.h">
-      <Filter>Core\Picking</Filter>
-    </ClInclude>
     <QtMoc Include="src\core\world\CoordinateSystem3D.h" />
     <QtMoc Include="src\core\world\CoordinateSystemRenderer.h" />
-    <ClInclude Include="src\core\picking\PickingIndicator.h" />
+    <ClInclude Include="src\core\picking\RayPickingSystem.h">
+      <Filter>Core\Picking</Filter>
+    </ClInclude>
     <ClInclude Include="src\core\world\Skybox.h" />
     <QtMoc Include="src\core\camera\CameraController.h">
       <Filter>Core\Camera</Filter>
@@ -363,6 +364,9 @@
       <Filter>UI</Filter>
     </QtMoc>
     <QtMoc Include="src\ui\CoordinateSystemDialog.h">
+      <Filter>UI</Filter>
+    </QtMoc>
+    <QtMoc Include="src\ui\PickingSystemDialog.h">
       <Filter>UI</Filter>
     </QtMoc>
     <QtMoc Include="src\ui\LogOutputWidget.h">

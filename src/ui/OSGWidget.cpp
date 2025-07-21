@@ -1,7 +1,7 @@
 ﻿#include "OSGWidget.h"
 #include "../core/Common3D.h"
 #include "../core/GeometryBase.h"
-#include "../core/picking/OSGIndexPickingSystem.h"
+#include "../core/picking/RayPickingSystem.h"
 
 #include "../util/LogManager.h"
 #include <osgViewer/Viewer>
@@ -138,6 +138,9 @@ void OSGWidget::initializeScene()
     m_rootNode->addChild(m_skyboxNode);
     m_sceneNode->addChild(m_geoNode);
     
+    // 确保拾取指示器节点不被拾取系统检测到
+    m_pickingIndicatorNode->setNodeMask(0x80000000); // 使用最高位，避免被拾取
+    
     // 为根节点设置抗锯齿
     osg::StateSet* rootStateSet = m_rootNode->getOrCreateStateSet();
     rootStateSet->setMode(GL_LINE_SMOOTH, osg::StateAttribute::ON);
@@ -238,7 +241,7 @@ void OSGWidget::setupPickingSystem()
     osgViewer::Viewer* viewer = getOsgViewer();
     if (!viewer) return;
     
-    if (!OSGIndexPickingSystemManager::getInstance().initialize(
+    if (!PickingSystemManager::getInstance().initialize(
         viewer->getCamera(), m_geoNode.get()))
     {
         LOG_ERROR("Failed to initialize simplified picking system", "拾取");
@@ -246,19 +249,18 @@ void OSGWidget::setupPickingSystem()
     }
     
     // 设置拾取配置
-    OSGIndexPickConfig config;
-    config.pickingRadius = 15;       // 拾取半径
+    PickConfig config;
+    config.pickRadius = 15.0f;       // 拾取半径
     config.snapThreshold = 0.2f;     // 捕捉阈值（适中的值）
     config.enableSnapping = true;    // 启用捕捉，但会优先使用拾取坐标
     config.enableIndicator = true;   // 确保指示器启用
     config.enableHighlight = true;   // 确保高亮启用
-    config.indicatorSize = 0.3f;     // 设置指示器大小
-    config.pickingFrequency = 60.0;  // 拾取频率
-    OSGIndexPickingSystemManager::getInstance().setConfig(config);
+    config.indicatorSize = 1.0f;     // 增大指示器基础大小，配合视距缩放
+    PickingSystemManager::getInstance().setConfig(config);
     
     // 设置拾取回调
-    OSGIndexPickingSystemManager::getInstance().setPickingCallback(
-        [this](const OSGIndexPickResult& result) {
+    PickingSystemManager::getInstance().setPickingCallback(
+        [this](const PickResult& result) {
             emit simplePickingResult(result);
             
             // 如果有拾取结果，立即更新状态栏坐标（覆盖普通坐标）
@@ -270,13 +272,13 @@ void OSGWidget::setupPickingSystem()
         });
     
     // 添加事件处理器
-    osgGA::GUIEventHandler* eventHandler = OSGIndexPickingSystemManager::getInstance().getEventHandler();
+    osgGA::GUIEventHandler* eventHandler = PickingSystemManager::getInstance().getEventHandler();
     if (eventHandler) {
         viewer->addEventHandler(eventHandler);
     }
     
     // 将指示器根节点添加到场景图
-    osg::Group* indicatorRoot = OSGIndexPickingSystemManager::getInstance().getIndicatorRoot();
+    osg::Group* indicatorRoot = PickingSystemManager::getInstance().getIndicatorRoot();
     if (indicatorRoot) {
         m_pickingIndicatorNode->addChild(indicatorRoot);
         LOG_INFO("Added simplified picking indicator root to scene graph", "拾取");
@@ -432,14 +434,14 @@ void OSGWidget::addGeo(Geo3D* geo)
             // 检查几何对象是否已经完成绘制
             if (geo->mm_state()->isStateComplete())
             {
-                OSGIndexPickingSystemManager::getInstance().addGeometry(geo);
+                PickingSystemManager::getInstance().addGeometry(geo);
                 // 添加完成的几何体到拾取系统（移除调试日志）
             }
             else
             {
                 // 对于未完成的几何对象（如从文件读入的），也强制添加到拾取系统
                 // 这样可以确保文件IO读入的几何对象能够被拾取
-                OSGIndexPickingSystemManager::getInstance().addGeometry(geo);
+                PickingSystemManager::getInstance().addGeometry(geo);
                 // 添加未完成的几何体到拾取系统（移除调试日志）
             }
         }
@@ -469,7 +471,7 @@ void OSGWidget::removeGeo(Geo3D* geo)
             // 从OSG索引拾取系统移除
             if (m_advancedPickingEnabled)
             {
-                OSGIndexPickingSystemManager::getInstance().removeGeometry(geo);
+                PickingSystemManager::getInstance().removeGeometry(geo);
             }
         }
     }
@@ -487,7 +489,7 @@ void OSGWidget::removeAllGeos()
         // 清除拾取系统中的所有几何对象
         if (m_advancedPickingEnabled)
         {
-            OSGIndexPickingSystemManager::getInstance().clearAllGeometries();
+            PickingSystemManager::getInstance().clearAllGeometries();
             // 清除所有几何体（移除调试日志）
         }
     }
@@ -530,11 +532,11 @@ void OSGWidget::addToSelection(Geo3D* geo)
         m_selectedGeos.push_back(geo);
         geo->mm_state()->setStateSelected(); // 这会自动显示包围盒
         
-        // 显示控制点高亮
-        if (m_advancedPickingEnabled)
-        {
-            OSGIndexPickingSystemManager::getInstance().showSelectionHighlight(geo);
-        }
+        // 不再使用控制点高亮功能
+        // if (m_advancedPickingEnabled)
+        // {
+        //     PickingSystemManager::getInstance().showHighlight(geo);
+        // }
         
         // 发送选择信号
         emit geoSelected(geo);
@@ -560,10 +562,10 @@ void OSGWidget::removeFromSelection(Geo3D* geo)
         geo->mm_state()->clearStateSelected(); // 这会自动隐藏包围盒
         
         // 清除控制点高亮
-        if (m_advancedPickingEnabled)
-        {
-            OSGIndexPickingSystemManager::getInstance().hideSelectionHighlight();
-        }
+        // if (m_advancedPickingEnabled)
+        // {
+        //     PickingSystemManager::getInstance().hideHighlight();
+        // }
         
         // 如果移除的是当前选中的对象，清空当前选中
         if (m_selectedGeo.get() == geo)
@@ -592,10 +594,10 @@ void OSGWidget::clearSelection()
     }
     
     // 清除控制点高亮
-    if (m_advancedPickingEnabled)
-    {
-        OSGIndexPickingSystemManager::getInstance().hideSelectionHighlight();
-    }
+    // if (m_advancedPickingEnabled)
+    // {
+    //     PickingSystemManager::getInstance().hideHighlight();
+    // }
     
     m_selectedGeos.clear();
     m_selectedGeo = nullptr;
@@ -655,31 +657,31 @@ void OSGWidget::updateSelectionHighlight()
     return;
     
     // 清除之前的高亮
-    if (m_advancedPickingEnabled)
-    {
-        // 暂时不调用高亮系统，因为SimplifiedPickingSystemManager没有直接的高亮清除方法
-        // 高亮会在下一次拾取时自动更新
-    }
+    // if (m_advancedPickingEnabled)
+    // {
+    //     // 暂时不调用高亮系统，因为SimplifiedPickingSystemManager没有直接的高亮清除方法
+    //     // 高亮会在下一次拾取时自动更新
+    // }
     
     // 为选中的对象创建高亮和显示包围盒
-    highlightSelectedObjects();
+    // highlightSelectedObjects();
 }
 
 void OSGWidget::highlightSelectedObjects()
 {
-    if (!m_advancedPickingEnabled || m_selectedGeos.empty())
-        return;
+    // if (!m_advancedPickingEnabled || m_selectedGeos.empty())
+    //     return;
     
     // 为每个选中的对象创建高亮和显示包围盒
-    for (auto* geo : m_selectedGeos)
-    {
-        if (geo)
-        {
-            // 注意：不要在这里再次调用setStateSelected，因为addToSelection已经调用了
-            // 这里只添加额外的高亮效果
-            // 暂时使用简化的方式
-        }
-    }
+    // for (auto* geo : m_selectedGeos)
+    // {
+    //     if (geo)
+    //     {
+    //         // 注意：不要在这里再次调用setStateSelected，因为addToSelection已经调用了
+    //         // 这里只添加额外的高亮效果
+    //         // 暂时使用简化的方式
+    //     }
+    // }
 }
 
 // 高级拾取系统接口
@@ -695,30 +697,34 @@ bool OSGWidget::isAdvancedPickingEnabled() const
 
 void OSGWidget::setPickingRadius(int radius)
 {
-    OSGIndexPickConfig config = OSGIndexPickingSystemManager::getInstance().getConfig();
-    config.pickingRadius = radius;
-    OSGIndexPickingSystemManager::getInstance().setConfig(config);
+    PickConfig config = PickingSystemManager::getInstance().getConfig();
+    config.pickRadius = static_cast<float>(radius);
+    PickingSystemManager::getInstance().setConfig(config);
 }
 
 void OSGWidget::setPickingFrequency(double frequency)
 {
-    OSGIndexPickConfig config = OSGIndexPickingSystemManager::getInstance().getConfig();
-    config.pickingFrequency = frequency;
-    OSGIndexPickingSystemManager::getInstance().setConfig(config);
+    // 新版本不支持pickingFrequency配置，这个方法将被忽略
+    LOG_INFO("setPickingFrequency is not supported in SimplifiedPickingSystem", "拾取");
 }
 
-void OSGWidget::setPickingConfig(const OSGIndexPickConfig& config)
+void OSGWidget::setPickingConfig(const PickConfig& config)
 {
-    OSGIndexPickingSystemManager::getInstance().setConfig(config);
+    PickingSystemManager::getInstance().setConfig(config);
     
     LOG_INFO(QString("Updated picking config - Radius: %1, Threshold: %2")
-        .arg(config.pickingRadius)
+        .arg(config.pickRadius)
         .arg(config.snapThreshold), "拾取");
 }
 
 QString OSGWidget::getPickingSystemInfo() const
 {
-    return OSGIndexPickingSystemManager::getInstance().getSystemInfo();
+    // 新版本不支持getSystemInfo，返回基本状态信息
+    if (PickingSystemManager::getInstance().isInitialized()) {
+        return "SimplifiedPickingSystem initialized";
+    } else {
+        return "SimplifiedPickingSystem not initialized";
+    }
 }
 
 void OSGWidget::ensureAllGeosInPickingSystem()
@@ -726,13 +732,14 @@ void OSGWidget::ensureAllGeosInPickingSystem()
     if (!m_advancedPickingEnabled) return;
     
     // 确保所有几何对象都在拾取系统中（移除频繁的日志）
+    // 新版本不支持updateGeometry，使用addGeometry代替
     
             for (const auto& geoRef : m_geoList)
         {
             if (geoRef)
             {
-                // 使用updateGeometry方法，它会自动检查几何对象是否已经在拾取系统中
-                OSGIndexPickingSystemManager::getInstance().updateGeometry(geoRef.get());
+                // 新版本直接添加几何体，系统内部会处理重复添加
+                PickingSystemManager::getInstance().addGeometry(geoRef.get());
             }
         }
     
@@ -752,7 +759,7 @@ QString OSGWidget::getPickingSystemStatus() const
     return status;
 }
 
-void OSGWidget::onSimplePickingResult(const OSGIndexPickResult& result)
+void OSGWidget::onSimplePickingResult(const PickResult& result)
 {
     // 发射OSG索引拾取结果信号
     emit simplePickingResult(result);
@@ -914,18 +921,18 @@ void OSGWidget::mousePressEvent(QMouseEvent* event)
     if (GlobalDrawMode3D == DrawSelect3D && event->button() == Qt::LeftButton)
     {
         // 使用拾取系统进行拾取
-        OSGIndexPickResult pickResult = OSGIndexPickingSystemManager::getInstance().pick(event->x(), event->y());
+        PickResult pickResult = PickingSystemManager::getInstance().pick(event->x(), height() - event->y());
         
         if (pickResult.hasResult && pickResult.geometry)
         {
             // 检查是否为顶点拾取（控制点）
-            if (pickResult.featureType == PickFeatureType::VERTEX && pickResult.vertexIndex >= 0)
+            if (pickResult.featureType == PickFeatureType::VERTEX && pickResult.primitiveIndex >= 0)
             {
                 // 检查该几何体是否在选中列表中
                 auto it = std::find(m_selectedGeos.begin(), m_selectedGeos.end(), pickResult.geometry);
                 if (it != m_selectedGeos.end())
                 {
-                    startDraggingControlPoint(pickResult.geometry, pickResult.vertexIndex);
+                    startDraggingControlPoint(pickResult.geometry, pickResult.primitiveIndex);
                     event->accept();
                     return;
                 }
@@ -956,7 +963,7 @@ void OSGWidget::mouseMoveEvent(QMouseEvent* event)
         if (m_advancedPickingEnabled)
         {
             // 使用拾取系统获取世界坐标
-            OSGIndexPickResult pickResult = OSGIndexPickingSystemManager::getInstance().pick(event->x(), event->y());
+            PickResult pickResult = PickingSystemManager::getInstance().pick(event->x(), height() - event->y());
             
             if (pickResult.hasResult)
             {
@@ -1026,7 +1033,7 @@ void OSGWidget::mouseMoveEvent(QMouseEvent* event)
     if (m_isDrawing && m_currentDrawingGeo)
     {
         // 使用拾取系统获取世界坐标
-        OSGIndexPickResult pickResult = OSGIndexPickingSystemManager::getInstance().pick(event->x(), event->y());
+        PickResult pickResult = PickingSystemManager::getInstance().pick(event->x(), height() - event->y());
         glm::vec3 drawingWorldPos;
         
         if (pickResult.hasResult)
@@ -1103,7 +1110,7 @@ void OSGWidget::handleDrawingInput(QMouseEvent* event)
     if (GlobalDrawMode3D == DrawSelect3D)
     {
         // 选择模式：使用拾取系统进行选择
-        OSGIndexPickResult pickResult = OSGIndexPickingSystemManager::getInstance().pick(event->x(), event->y());
+        PickResult pickResult = PickingSystemManager::getInstance().pick(event->x(), event->y());
         
         // 检查是否按下了Ctrl键（多选模式）
         bool isCtrlPressed = (QApplication::keyboardModifiers() & Qt::ControlModifier);
@@ -1147,7 +1154,7 @@ void OSGWidget::handleDrawingInput(QMouseEvent* event)
     else
     {
         // 绘制模式：使用拾取系统获取世界坐标
-        OSGIndexPickResult pickResult = OSGIndexPickingSystemManager::getInstance().pick(event->x(), event->y());
+        PickResult pickResult = PickingSystemManager::getInstance().pick(event->x(), event->y());
         glm::vec3 worldPos;
         
         if (pickResult.hasResult)
@@ -1859,40 +1866,23 @@ const std::vector<osg::ref_ptr<Geo3D>>& OSGWidget::getAllGeos() const
     return m_geoList;
 }
 
-// 几何对象信号响应槽函数
 void OSGWidget::onGeoDrawingCompleted(Geo3D* geo)
 {
     if (!geo || !m_advancedPickingEnabled)
         return;
-    
-            // 几何体绘制完成（移除调试日志）
-    
-    // 几何对象完成绘制后，更新OSG索引拾取系统
-    // 注意：如果几何对象已经在拾取系统中，updateGeometry会更新它
-    // 如果不在拾取系统中，addGeometry会添加它
-    OSGIndexPickingSystemManager::getInstance().updateGeometry(geo);
-    
-            // 更新完成的几何体（移除频繁的日志）
+    PickingSystemManager::getInstance().addGeometry(geo);
 }
 
 void OSGWidget::onGeoGeometryUpdated(Geo3D* geo)
 {
     if (!geo || !m_advancedPickingEnabled)
         return;
-    
-    // 几何对象更新时，更新OSG索引拾取系统中的Feature
-    OSGIndexPickingSystemManager::getInstance().updateGeometry(geo);
-    
-            // 更新几何体（移除调试日志）
+    PickingSystemManager::getInstance().addGeometry(geo);
 }
 
 void OSGWidget::onGeoParametersChanged(Geo3D* geo)
 {
     if (!geo || !m_advancedPickingEnabled)
         return;
-    
-    // 参数变化时，更新OSG索引拾取系统中的Feature
-    OSGIndexPickingSystemManager::getInstance().updateGeometry(geo);
-    
-            // 更新几何体参数（移除调试日志）
+    PickingSystemManager::getInstance().addGeometry(geo);
 }

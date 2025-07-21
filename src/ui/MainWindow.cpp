@@ -1,6 +1,6 @@
 ﻿#include "MainWindow.h"
 #include "../core/GeometryBase.h"
-#include "../core/picking/OSGIndexPickingSystem.h"
+#include "../core/picking/RayPickingSystem.h"
 #include <QTimer>
 #include <QSplitter>
 #include <QVBoxLayout>
@@ -263,6 +263,11 @@ void MainWindow::createMenus()
     coordSystemAction->setShortcut(Qt::CTRL + Qt::Key_C);
     connect(coordSystemAction, &QAction::triggered, this, &MainWindow::onCoordinateSystemSettings);
     
+    // 拾取系统设置
+    QAction* pickingSystemAction = m_viewMenu->addAction(tr("拾取系统设置(&P)"));
+    pickingSystemAction->setShortcut(Qt::CTRL + Qt::Key_P);
+    connect(pickingSystemAction, &QAction::triggered, this, &MainWindow::onPickingSystemSettings);
+    
     // 帮助菜单
     m_helpMenu = menuBar()->addMenu(tr("帮助(&H)"));
     
@@ -521,6 +526,7 @@ void MainWindow::connectSignals()
         connect(m_toolPanel, &ToolPanel3D::clearSceneRequested, this, &MainWindow::onClearScene);
         connect(m_toolPanel, &ToolPanel3D::exportImageRequested, this, &MainWindow::onExportImage);
         connect(m_toolPanel, &ToolPanel3D::coordinateSystemRequested, this, &MainWindow::onCoordinateSystemSettings);
+        connect(m_toolPanel, &ToolPanel3D::pickingSystemRequested, this, &MainWindow::onPickingSystemSettings);
         connect(m_toolPanel, &ToolPanel3D::displaySettingsRequested, this, &MainWindow::onDisplaySettings);
     }
     
@@ -1104,22 +1110,22 @@ void MainWindow::onGeoParametersChanged()
     LOG_INFO("几何对象属性已修改", "属性");
 }
 
-void MainWindow::onSimplePickingResult(const OSGIndexPickResult& result)
+void MainWindow::onSimplePickingResult(const PickResult& result)
 {
     if (!result.hasResult)
         return;
     
     // 更新状态栏信息
     QString typeStr;
-    switch (result.featureType)
+    switch (static_cast<int>(result.featureType))
     {
-    case PickFeatureType::VERTEX:
+    case static_cast<int>(PickFeatureType::VERTEX):
         typeStr = tr("顶点");
         break;
-    case PickFeatureType::EDGE:
+    case static_cast<int>(PickFeatureType::EDGE):
         typeStr = tr("边");
         break;
-    case PickFeatureType::FACE:
+    case static_cast<int>(PickFeatureType::FACE):
         typeStr = tr("面");
         break;
     default:
@@ -1277,6 +1283,16 @@ void MainWindow::onCoordinateSystemSettings()
         updateCoordinateRangeLabel();
         updateStatusBar("坐标系统设置已更新");
         LOG_SUCCESS("坐标系统设置已更新", "坐标系统");
+    }
+}
+
+void MainWindow::onPickingSystemSettings()
+{
+    PickingSystemDialog dialog(this);
+    if (dialog.exec() == QDialog::Accepted)
+    {
+        updateStatusBar("拾取系统设置已更新");
+        LOG_SUCCESS("拾取系统设置已更新", "拾取系统");
     }
 }
 

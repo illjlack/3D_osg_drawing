@@ -302,6 +302,12 @@ void ToolPanel3D::createUtilityGroup()
     m_coordinateSystemButton->setIcon(QIcon(":/icons/coordinate.png"));
     layout->addWidget(m_coordinateSystemButton);
     
+    // 拾取系统设置按钮
+    m_pickingSystemButton = new QPushButton("拾取系统设置");
+    m_pickingSystemButton->setToolTip("设置拾取系统参数");
+    m_pickingSystemButton->setIcon(QIcon(":/icons/picking.png"));
+    layout->addWidget(m_pickingSystemButton);
+    
     // 显示设置按钮
     m_displaySettingsButton = new QPushButton("显示设置");
     m_displaySettingsButton->setToolTip("设置显示参数");
@@ -312,6 +318,7 @@ void ToolPanel3D::createUtilityGroup()
     connect(m_clearSceneButton, &QPushButton::clicked, this, &ToolPanel3D::onClearSceneClicked);
     connect(m_exportImageButton, &QPushButton::clicked, this, &ToolPanel3D::onExportImageClicked);
     connect(m_coordinateSystemButton, &QPushButton::clicked, this, &ToolPanel3D::onCoordinateSystemClicked);
+    connect(m_pickingSystemButton, &QPushButton::clicked, this, &ToolPanel3D::onPickingSystemClicked);
     connect(m_displaySettingsButton, &QPushButton::clicked, this, &ToolPanel3D::onDisplaySettingsClicked);
 }
 
@@ -467,6 +474,11 @@ void ToolPanel3D::onExportImageClicked()
 void ToolPanel3D::onCoordinateSystemClicked()
 {
     emit coordinateSystemRequested();
+}
+
+void ToolPanel3D::onPickingSystemClicked()
+{
+    emit pickingSystemRequested();
 }
 
 void ToolPanel3D::onDisplaySettingsClicked()

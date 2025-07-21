@@ -54,6 +54,7 @@
 
 #include "OSGWidget.h"
 #include "CoordinateSystemDialog.h"
+#include "PickingSystemDialog.h"
 #include "LogOutputWidget.h"
 #include "StatusBar3D.h"
 #include "../util/GeoOsgbIO.h"
@@ -119,6 +120,9 @@ private slots:
     // 坐标系统相关
     void onCoordinateSystemSettings();
     
+    // 拾取系统相关
+    void onPickingSystemSettings();
+    
     // 实用工具相关
     void onClearScene();
     void onExportImage();
@@ -129,7 +133,7 @@ private slots:
     void onDrawModeChanged(DrawMode3D mode);
     void onGeoSelected(Geo3D* geo);
     void onGeoParametersChanged();
-    void onSimplePickingResult(const OSGIndexPickResult& result);
+    void onSimplePickingResult(const PickResult& result);
 
 private:
     void setupUI();

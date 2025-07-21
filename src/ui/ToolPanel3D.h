@@ -28,6 +28,7 @@ signals:
     void clearSceneRequested();
     void exportImageRequested();
     void coordinateSystemRequested();
+    void pickingSystemRequested();
     void displaySettingsRequested();
 public slots:
     void onDrawModeButtonClicked();
@@ -44,6 +45,7 @@ public slots:
     void onClearSceneClicked();
     void onExportImageClicked();
     void onCoordinateSystemClicked();
+    void onPickingSystemClicked();
     void onDisplaySettingsClicked();
     void onDrawingCategoryChanged(int index);
 private:
@@ -92,6 +94,7 @@ private:
     QPushButton* m_clearSceneButton;
     QPushButton* m_exportImageButton;
     QPushButton* m_coordinateSystemButton;
+    QPushButton* m_pickingSystemButton;
     QPushButton* m_displaySettingsButton;
     QGroupBox* m_skyboxGroup;
     QCheckBox* m_skyboxEnabledCheck;

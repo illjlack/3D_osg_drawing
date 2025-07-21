@@ -6,7 +6,7 @@
 #include "../core/world/CoordinateSystem3D.h"
 #include "../core/world/CoordinateSystemRenderer.h"
 #include "../core/camera/CameraController.h"
-#include "../core/picking/OSGIndexPickingSystem.h"
+#include "../core/picking/RayPickingSystem.h"
 #include <osgViewer/Viewer>
 #include <osgViewer/CompositeViewer>
 #include <osgViewer/ViewerEventHandlers>
@@ -94,7 +94,7 @@ public:
     void setPickingFrequency(double frequency);
     
     // 拾取系统配置
-    void setPickingConfig(const OSGIndexPickConfig& config);
+    void setPickingConfig(const PickConfig& config);
     QString getPickingSystemInfo() const;
     
     // 确保所有几何对象都在拾取系统中
@@ -167,7 +167,7 @@ signals:
     void geoSelected(Geo3D* geo);
     void mousePositionChanged(const glm::vec3& worldPos);
     void screenPositionChanged(int x, int y);
-    void simplePickingResult(const OSGIndexPickResult& result);
+    void simplePickingResult(const PickResult& result);
     void cameraMoveSpeedChanged(double speed);
     void wheelMoveSensitivityChanged(double speed);
     void accelerationRateChanged(double rate);
@@ -203,7 +203,7 @@ private:
     QString formatScaleText(double worldUnits);
     
     // 拾取系统回调
-    void onSimplePickingResult(const OSGIndexPickResult& result);
+    void onSimplePickingResult(const PickResult& result);
 
 private:
     // OSG场景图相关成员
