@@ -1,4 +1,4 @@
-#include "Ellipsoid3D.h"
+﻿#include "Ellipsoid3D.h"
 #include <osg/Array>
 #include <osg/PrimitiveSet>
 #include "../../util/MathUtils.h"

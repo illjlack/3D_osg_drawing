@@ -28,6 +28,9 @@
     <Filter Include="Core\Camera">
       <UniqueIdentifier>{ebe8fdc1-9f0a-4443-83ec-c66ddecf9a8f}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Core\buildings">
+      <UniqueIdentifier>{afd55f3e-8f11-4486-9c19-591410088d16}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">
@@ -87,9 +90,6 @@
     <ClCompile Include="src\util\GeometryFactory.cpp">
       <Filter>Util</Filter>
     </ClCompile>
-    <ClCompile Include="src\util\IndicatorFactory.cpp">
-      <Filter>Util</Filter>
-    </ClCompile>
     <ClCompile Include="src\util\MathUtils.cpp">
       <Filter>Util</Filter>
     </ClCompile>
@@ -135,11 +135,47 @@
     <ClCompile Include="src\core\GeometryBase.cpp">
       <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="src\core\picking\OSGIndexPickingSystem.cpp">
-      <Filter>UI</Filter>
-    </ClCompile>
     <ClCompile Include="src\ui\StatusBar3D.cpp">
       <Filter>UI</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\buildings\BuildingFactory.cpp">
+      <Filter>Core\buildings</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\buildings\DomeHouse3D.cpp">
+      <Filter>Core\buildings</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\geometry\Ellipsoid3D.cpp">
+      <Filter>Core\buildings</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\buildings\FlatHouse3D.cpp">
+      <Filter>Core\buildings</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\buildings\GableHouse3D.cpp">
+      <Filter>Core\buildings</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\geometry\Hemisphere3D.cpp">
+      <Filter>Core\buildings</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\buildings\LHouse3D.cpp">
+      <Filter>Core\buildings</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\geometry\Prism3D.cpp">
+      <Filter>Core\buildings</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\buildings\SpireHouse3D.cpp">
+      <Filter>Core\buildings</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\PropertyEditor3D.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\ToolPanel3D.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\picking\OSGIndexPickingSystem.cpp">
+      <Filter>Core\Picking</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\picking\PickingIndicator.cpp">
+      <Filter>Core\Picking</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -194,9 +230,6 @@
     <ClInclude Include="src\util\GeometryFactory.h">
       <Filter>Util</Filter>
     </ClInclude>
-    <ClInclude Include="src\util\IndicatorFactory.h">
-      <Filter>Util</Filter>
-    </ClInclude>
     <ClInclude Include="src\util\MathUtils.h">
       <Filter>Util</Filter>
     </ClInclude>
@@ -222,6 +255,36 @@
       <Filter>Core\Managers</Filter>
     </QtMoc>
     <ClInclude Include="src\core\picking\OSGIndexPickingSystem.h">
+      <Filter>Core\Picking</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\buildings\BuildingFactory.h">
+      <Filter>Core\buildings</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\buildings\DomeHouse3D.h">
+      <Filter>Core\buildings</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\geometry\Ellipsoid3D.h">
+      <Filter>Core\buildings</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\buildings\FlatHouse3D.h">
+      <Filter>Core\buildings</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\buildings\GableHouse3D.h">
+      <Filter>Core\buildings</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\geometry\Hemisphere3D.h">
+      <Filter>Core\buildings</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\buildings\LHouse3D.h">
+      <Filter>Core\buildings</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\geometry\Prism3D.h">
+      <Filter>Core\buildings</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\buildings\SpireHouse3D.h">
+      <Filter>Core\buildings</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\picking\PickingIndicator.h">
       <Filter>Core\Picking</Filter>
     </ClInclude>
   </ItemGroup>
@@ -254,6 +317,12 @@
       <Filter>Core</Filter>
     </QtMoc>
     <QtMoc Include="src\ui\StatusBar3D.h">
+      <Filter>UI</Filter>
+    </QtMoc>
+    <QtMoc Include="src\ui\PropertyEditor3D.h">
+      <Filter>UI</Filter>
+    </QtMoc>
+    <QtMoc Include="src\ui\ToolPanel3D.h">
       <Filter>UI</Filter>
     </QtMoc>
   </ItemGroup>

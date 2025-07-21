@@ -941,7 +941,6 @@ void OSGWidget::mouseMoveEvent(QMouseEvent* event)
     // 鼠标移动事件处理（移除频繁的调试日志）
     if (GlobalDrawMode3D == DrawSelect3D || (QApplication::keyboardModifiers() & Qt::ControlModifier))
     {
-        // 相机控制模式，不输出调试日志
     }
     
     osgQOpenGLWidget::mouseMoveEvent(event);

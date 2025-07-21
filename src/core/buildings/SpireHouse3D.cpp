@@ -1,4 +1,4 @@
-#include "SpireHouse3D.h"
+﻿#include "SpireHouse3D.h"
 #include <osg/Array>
 #include <osg/PrimitiveSet>
 #include "../../util/MathUtils.h"

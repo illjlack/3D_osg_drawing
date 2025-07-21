@@ -35,7 +35,7 @@ src/
 └── util/                   # 工具模块
     ├── OSGUtils.h/cpp      # OSG工具函数
     ├── GeometryFactory.h/cpp # 几何工厂
-    ├── IndicatorFactory.h/cpp # 指示器工厂
+    ├── PickingIndicator.h/cpp # 拾取指示器（现已移至 core/picking/）
     └── MathUtils.h/cpp     # 数学工具
 ```
 

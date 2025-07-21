@@ -1,4 +1,4 @@
-#include "DomeHouse3D.h"
+﻿#include "DomeHouse3D.h"
 #include <osg/Array>
 #include <osg/PrimitiveSet>
 #include "../../util/MathUtils.h"

@@ -1,4 +1,4 @@
-#include "BuildingFactory.h"
+﻿#include "BuildingFactory.h"
 #include "GableHouse3D.h"
 #include "SpireHouse3D.h"
 #include "DomeHouse3D.h"

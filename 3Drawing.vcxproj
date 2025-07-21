@@ -103,6 +103,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\core\picking\PickingIndicator.cpp" />
     <ClCompile Include="src\core\world\CoordinateSystem3D.cpp" />
     <ClCompile Include="src\core\world\CoordinateSystemRenderer.cpp" />
     <ClCompile Include="src\core\world\Skybox.cpp" />
@@ -205,9 +206,6 @@
     <ClCompile Include="src\util\GeometryFactory.cpp">
       <Filter>Util</Filter>
     </ClCompile>
-    <ClCompile Include="src\util\IndicatorFactory.cpp">
-      <Filter>Util</Filter>
-    </ClCompile>
     <ClCompile Include="src\util\MathUtils.cpp">
       <Filter>Util</Filter>
     </ClCompile>
@@ -235,6 +233,8 @@
     <ClCompile Include="src\core\buildings\BuildingFactory.cpp">
       <Filter>Core\Buildings</Filter>
     </ClCompile>
+    <ClCompile Include="src\ui\PropertyEditor3D.cpp" />
+    <ClCompile Include="src\ui\ToolPanel3D.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\core\Common3D.h">
@@ -306,7 +306,6 @@
     <QtMoc Include="src\core\managers\GeoNodeManager.h">
       <Filter>Core\Managers</Filter>
     </QtMoc>
-
     <QtMoc Include="src\core\managers\GeoRenderManager.h">
       <Filter>Core\Managers</Filter>
     </QtMoc>
@@ -315,6 +314,7 @@
     </ClInclude>
     <QtMoc Include="src\core\world\CoordinateSystem3D.h" />
     <QtMoc Include="src\core\world\CoordinateSystemRenderer.h" />
+    <ClInclude Include="src\core\picking\PickingIndicator.h" />
     <ClInclude Include="src\core\world\Skybox.h" />
     <QtMoc Include="src\core\camera\CameraController.h">
       <Filter>Core\Camera</Filter>
@@ -323,9 +323,6 @@
       <Filter>Util</Filter>
     </ClInclude>
     <ClInclude Include="src\util\GeometryFactory.h">
-      <Filter>Util</Filter>
-    </ClInclude>
-    <ClInclude Include="src\util\IndicatorFactory.h">
       <Filter>Util</Filter>
     </ClInclude>
     <ClInclude Include="src\util\MathUtils.h">
@@ -355,6 +352,8 @@
     <ClInclude Include="src\core\buildings\BuildingFactory.h">
       <Filter>Core\Buildings</Filter>
     </ClInclude>
+    <QtMoc Include="src\ui\PropertyEditor3D.h" />
+    <QtMoc Include="src\ui\ToolPanel3D.h" />
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="src\ui\MainWindow.h">

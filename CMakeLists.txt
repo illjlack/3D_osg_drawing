@@ -191,7 +191,7 @@ set(PICKING_HEADERS
 set(UTIL_SOURCES
     src/util/OSGUtils.cpp
     src/util/GeometryFactory.cpp
-    src/util/IndicatorFactory.cpp
+    src/core/picking/PickingIndicator.cpp
     src/util/MathUtils.cpp
     src/util/LogManager.cpp
     src/util/GeoOsgbIO.cpp
@@ -199,7 +199,7 @@ set(UTIL_SOURCES
 set(UTIL_HEADERS
     src/util/OSGUtils.h
     src/util/GeometryFactory.h
-    src/util/IndicatorFactory.h
+    src/core/picking/PickingIndicator.h
     src/util/MathUtils.h
     src/util/LogManager.h
     src/util/GeoOsgbIO.h

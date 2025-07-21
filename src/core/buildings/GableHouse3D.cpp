@@ -1,4 +1,4 @@
-#include "GableHouse3D.h"
+﻿#include "GableHouse3D.h"
 #include <osg/Array>
 #include <osg/PrimitiveSet>
 #include "../../util/MathUtils.h"

@@ -3,6 +3,7 @@
 
 #include "../Common3D.h"
 #include "../GeometryBase.h"
+#include "PickingIndicator.h"
 #include <osg/Camera>
 #include <osg/Group>
 #include <osg/MatrixTransform>
@@ -24,14 +25,6 @@
 
 // 前向声明
 class Geo3D;
-
-// 拾取特征类型
-enum class PickFeatureType {
-    NONE = 0,
-    VERTEX = 1,    // 顶点
-    EDGE = 2,       // 边
-    FACE = 3        // 面
-};
 
 // 拾取结果
 struct OSGIndexPickResult {
@@ -104,8 +97,8 @@ public:
     // 设置回调
     void setPickingCallback(std::function<void(const OSGIndexPickResult&)> callback);
     
-    // 获取根节点（用于添加到场景图）
-    osg::Group* getIndicatorRoot() const { return m_indicatorRoot.get(); }
+    // 获取根节点（用于添加到场景图） - 现在委托给指示器管理器
+    osg::Group* getIndicatorRoot() const;
     
     // 状态查询
     bool isInitialized() const { return m_initialized; }
@@ -119,7 +112,7 @@ public:
     const std::vector<osg::ref_ptr<Geo3D>>& getGeometries() const { return m_geometries; }
     OSGIndexPickResult getLastResult() const { return m_lastResult; }
 
-    // 高亮管理
+    // 高亮管理 - 委托给指示器管理器
     void showHighlight(Geo3D* geometry);
     void hideHighlight();
     void showSelectionHighlight(Geo3D* geometry);
@@ -138,26 +131,18 @@ private:
     OSGIndexPickResult calculateSnapping(const OSGIndexPickResult& result);
     std::vector<glm::vec3> extractSnapPoints(Geo3D* geometry);
     
-    // 指示器管理
-    void showIndicator(const OSGIndexPickResult& result);
-    void hideIndicator();
-    void updateIndicatorPosition(const glm::vec3& position, PickFeatureType featureType);
-    
-    // 创建指示器几何体
-    osg::ref_ptr<osg::Geometry> createVertexIndicator(float size);
-    osg::ref_ptr<osg::Geometry> createEdgeIndicator(float size);
-    osg::ref_ptr<osg::Geometry> createFaceIndicator(float size);
-    
-    // 坐标转换
-    glm::vec3 screenToWorld(int x, int y, float depth = 0.0f);
-    glm::vec2 worldToScreen(const glm::vec3& worldPos);
-    
-    // 几何体工具
-    osg::ref_ptr<osg::Geometry> createHighlightGeometry(Geo3D* geometry);
-    osg::ref_ptr<osg::Geometry> createControlPointHighlightGeometry(Geo3D* geometry);
-    
     // 几何体匹配
     Geo3D* findGeometryFromIntersection(const osgUtil::LineSegmentIntersector::Intersection& intersection);
+    
+    // 坐标转换
+    glm::vec2 worldToScreen(const glm::vec3& worldPos);
+    glm::vec3 screenToWorld(int screenX, int screenY, float depth = 0.0f);
+    
+    // 缓存机制辅助方法
+    bool isCacheValid(int mouseX, int mouseY);
+    void updateCameraState();
+    void invalidateCache();
+    void markSceneChanged();
     
     // 内部状态
     bool m_initialized = false;
@@ -167,21 +152,10 @@ private:
     // OSG组件
     osg::ref_ptr<osg::Camera> m_camera;
     osg::ref_ptr<osg::Group> m_sceneRoot;
-    osg::ref_ptr<osg::Group> m_indicatorRoot;
     
     // 几何体管理
     std::vector<osg::ref_ptr<Geo3D>> m_geometries;
     std::unordered_map<Geo3D*, std::vector<glm::vec3>> m_snapPointsCache;
-    
-    // 指示器和高亮
-    osg::ref_ptr<osg::MatrixTransform> m_indicator;
-    osg::ref_ptr<osg::Group> m_highlightNode;
-    Geo3D* m_highlightedGeometry = nullptr;
-    
-    // 指示器几何体缓存
-    osg::ref_ptr<osg::Geometry> m_vertexIndicator;
-    osg::ref_ptr<osg::Geometry> m_edgeIndicator;
-    osg::ref_ptr<osg::Geometry> m_faceIndicator;
     
     // 回调
     std::function<void(const OSGIndexPickResult&)> m_pickingCallback;
@@ -189,6 +163,18 @@ private:
     // 上次结果缓存
     OSGIndexPickResult m_lastResult;
     double m_lastPickTime = 0.0;
+    
+    // 增强缓存机制 - 相机状态和鼠标位置缓存
+    int m_lastMouseX = -1;
+    int m_lastMouseY = -1;
+    osg::Matrix m_lastViewMatrix;
+    osg::Matrix m_lastProjectionMatrix;
+    osg::Vec4 m_lastViewport;
+    bool m_cameraStateValid = false;
+    
+    // 场景内容变化标记
+    int m_sceneVersionNumber = 0;
+    int m_lastSceneVersion = -1;
 };
 
 // 拾取事件处理器

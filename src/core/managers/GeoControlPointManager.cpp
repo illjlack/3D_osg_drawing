@@ -15,10 +15,10 @@ const std::vector<Point3D>& GeoControlPointManager::getControlPoints() const
 {
     // 如果绘制未完成且有临时点，返回包含临时点的控制点列表
     if (!isDrawingComplete() && m_tempPoint.position != glm::vec3(0)) {
-        static std::vector<Point3D> tempControlPoints;
-        tempControlPoints = m_controlPoints;
-        tempControlPoints.push_back(m_tempPoint);
-        return tempControlPoints;
+        // 使用成员变量而不是static变量，避免多个几何体之间的冲突
+        m_tempControlPointsList = m_controlPoints;
+        m_tempControlPointsList.push_back(m_tempPoint);
+        return m_tempControlPointsList;
     }
     return m_controlPoints;
 }
