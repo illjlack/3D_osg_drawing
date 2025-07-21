@@ -1,9 +1,15 @@
 ﻿#include "ToolPanel3D.h"
 #include <QVBoxLayout>
+#include <QHBoxLayout>
 #include <QGridLayout>
 #include <QIcon>
-#include <QStackedWidget>
+#include <QTabWidget>
 #include <QMessageBox>
+#include <QScrollArea>
+#include <QFrame>
+#include <QLabel>
+#include <QSplitter>
+#include <QVariant>
 
 // ========================================= ToolPanel3D 实现 =========================================
 ToolPanel3D::ToolPanel3D(QWidget* parent)
@@ -11,266 +17,238 @@ ToolPanel3D::ToolPanel3D(QWidget* parent)
     , m_currentMode(DrawSelect3D)
 {
     setupUI();
+    setupStyles();
 }
 
 void ToolPanel3D::setupUI()
 {
+    // 主布局
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
-    mainLayout->setSpacing(5);
-    mainLayout->setContentsMargins(5, 5, 5, 5);
+    mainLayout->setSpacing(0);
+    mainLayout->setContentsMargins(0, 0, 0, 0);
     
-    createDrawingGroup();
-    createViewGroup();
-    createUtilityGroup();
-    createSkyboxGroup();
+    // 创建滚动区域
+    QScrollArea* scrollArea = new QScrollArea();
+    scrollArea->setWidgetResizable(true);
+    scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    scrollArea->setFrameStyle(QFrame::NoFrame);
     
-    mainLayout->addWidget(m_drawingGroup);
-    mainLayout->addWidget(m_viewGroup);
-    mainLayout->addWidget(m_utilityGroup);
-    mainLayout->addWidget(m_skyboxGroup);
-    mainLayout->addStretch();
+    // 内容widget
+    QWidget* contentWidget = new QWidget();
+    QVBoxLayout* contentLayout = new QVBoxLayout(contentWidget);
+    contentLayout->setSpacing(4);
+    contentLayout->setContentsMargins(6, 6, 6, 6);
+    
+    // 创建各个可折叠模块
+    createCollapsibleDrawingSection(contentLayout);
+    createCollapsibleViewSection(contentLayout);
+    createCollapsibleUtilitySection(contentLayout);
+    createCollapsibleSkyboxSection(contentLayout);
+    
+    contentLayout->addStretch();
+    
+    scrollArea->setWidget(contentWidget);
+    mainLayout->addWidget(scrollArea);
 }
 
-void ToolPanel3D::createDrawingGroup()
+void ToolPanel3D::createCollapsibleDrawingSection(QVBoxLayout* parentLayout)
 {
-    m_drawingGroup = new QGroupBox("绘制工具", this);
-    QVBoxLayout* mainLayout = new QVBoxLayout(m_drawingGroup);
+    // 绘制工具折叠组
+    QFrame* sectionFrame = new QFrame();
+    sectionFrame->setObjectName("collapsibleSection");
+    QVBoxLayout* sectionLayout = new QVBoxLayout(sectionFrame);
+    sectionLayout->setSpacing(2);
+    sectionLayout->setContentsMargins(4, 4, 4, 4);
     
-    // 创建分类选择下拉框
-    m_drawingCategoryCombo = new QComboBox();
-    m_drawingCategoryCombo->addItem("选择模式");
-    m_drawingCategoryCombo->addItem("基本几何体");
-    m_drawingCategoryCombo->addItem("建筑类型");
-    // m_drawingCategoryCombo->addItem("高级几何体"); // 移除高级几何体
-    connect(m_drawingCategoryCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
-            this, &ToolPanel3D::onDrawingCategoryChanged);
-    mainLayout->addWidget(m_drawingCategoryCombo);
+    // 标题
+    QLabel* titleLabel = new QLabel("🎨 绘制工具");
+    titleLabel->setObjectName("sectionTitle");
+    sectionLayout->addWidget(titleLabel);
     
-    // 创建堆叠窗口来容纳不同类别的按钮
-    m_drawingStackedWidget = new QStackedWidget();
-    mainLayout->addWidget(m_drawingStackedWidget);
-    
-    // 创建选择模式页面
-    createSelectPage();
-    // 创建基本几何体页面
-    createBasicGeometryPage();
-    // 创建建筑类型页面
-    createBuildingPage();
-    // createAdvancedGeometryPage(); // 移除高级几何体页面
-}
-
-void ToolPanel3D::createSelectPage()
-{
-    QWidget* page = new QWidget();
-    QVBoxLayout* layout = new QVBoxLayout(page);
-    m_selectButton = new QPushButton("选择");
-    m_selectButton->setCheckable(true);
+    // 选择工具单独放置
+    m_selectButton = createStyledButton("🔍", "选择", "选择和编辑对象", DrawSelect3D);
     m_selectButton->setChecked(true);
-    m_selectButton->setToolTip("选择和编辑对象");
-    m_selectButton->setProperty("drawMode", DrawSelect3D);
-    layout->addWidget(m_selectButton);
-    connect(m_selectButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
-    layout->addStretch();
-    m_drawingStackedWidget->addWidget(page);
+    sectionLayout->addWidget(m_selectButton);
+    
+    // 模式选择下拉框
+    m_drawingModeCombo = new QComboBox();
+    m_drawingModeCombo->setObjectName("modeCombo");
+    m_drawingModeCombo->addItem("📐 几何体");
+    m_drawingModeCombo->addItem("🏠 建筑");
+    m_drawingModeCombo->setCurrentIndex(0);
+    sectionLayout->addWidget(m_drawingModeCombo);
+    
+    // 创建堆叠区域
+    m_drawingStackedWidget = new QStackedWidget();
+    m_drawingStackedWidget->setObjectName("toolStack");
+    
+    createGeometryPage();
+    createBuildingPage();
+    
+    sectionLayout->addWidget(m_drawingStackedWidget);
+    parentLayout->addWidget(sectionFrame);
+    
+    connect(m_drawingModeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &ToolPanel3D::onDrawingModeChanged);
 }
 
-void ToolPanel3D::createBasicGeometryPage()
+
+
+void ToolPanel3D::createGeometryPage()
 {
-    QWidget* page = new QWidget();
-    QGridLayout* layout = new QGridLayout(page);
-    // 点绘制
-    m_pointButton = new QPushButton("点");
-    m_pointButton->setCheckable(true);
-    m_pointButton->setToolTip("绘制点");
-    m_pointButton->setProperty("drawMode", DrawPoint3D);
-    layout->addWidget(m_pointButton, 0, 0);
-    // 线绘制
-    m_lineButton = new QPushButton("线");
-    m_lineButton->setCheckable(true);
-    m_lineButton->setToolTip("绘制直线或折线");
-    m_lineButton->setProperty("drawMode", DrawLine3D);
-    layout->addWidget(m_lineButton, 1, 0);
-    m_arcButton = new QPushButton("圆弧");
-    m_arcButton->setCheckable(true);
-    m_arcButton->setToolTip("绘制圆弧");
-    m_arcButton->setProperty("drawMode", DrawArc3D);
-    layout->addWidget(m_arcButton, 1, 1);
-    m_bezierButton = new QPushButton("贝塞尔");
-    m_bezierButton->setCheckable(true);
-    m_bezierButton->setToolTip("绘制贝塞尔曲线");
-    m_bezierButton->setProperty("drawMode", DrawBezierCurve3D);
-    layout->addWidget(m_bezierButton, 2, 0);
-    // 面绘制
-    m_triangleButton = new QPushButton("三角形");
-    m_triangleButton->setCheckable(true);
-    m_triangleButton->setToolTip("绘制三角形");
-    m_triangleButton->setProperty("drawMode", DrawTriangle3D);
-    layout->addWidget(m_triangleButton, 2, 1);
-    m_quadButton = new QPushButton("四边形");
-    m_quadButton->setCheckable(true);
-    m_quadButton->setToolTip("绘制四边形");
-    m_quadButton->setProperty("drawMode", DrawQuad3D);
-    layout->addWidget(m_quadButton, 3, 0);
-    m_polygonButton = new QPushButton("多边形");
-    m_polygonButton->setCheckable(true);
-    m_polygonButton->setToolTip("绘制多边形");
-    m_polygonButton->setProperty("drawMode", DrawPolygon3D);
-    layout->addWidget(m_polygonButton, 3, 1);
-    // 体绘制
-    m_boxButton = new QPushButton("长方体");
-    m_boxButton->setCheckable(true);
-    m_boxButton->setToolTip("绘制长方体");
-    m_boxButton->setProperty("drawMode", DrawBox3D);
-    layout->addWidget(m_boxButton, 4, 0);
-    m_cubeButton = new QPushButton("正方体");
-    m_cubeButton->setCheckable(true);
-    m_cubeButton->setToolTip("绘制正方体");
-    m_cubeButton->setProperty("drawMode", DrawCube3D);
-    layout->addWidget(m_cubeButton, 4, 1);
-    m_cylinderButton = new QPushButton("圆柱");
-    m_cylinderButton->setCheckable(true);
-    m_cylinderButton->setToolTip("绘制圆柱");
-    m_cylinderButton->setProperty("drawMode", DrawCylinder3D);
-    layout->addWidget(m_cylinderButton, 5, 0);
-    m_coneButton = new QPushButton("圆锥");
-    m_coneButton->setCheckable(true);
-    m_coneButton->setToolTip("绘制圆锥");
-    m_coneButton->setProperty("drawMode", DrawCone3D);
-    layout->addWidget(m_coneButton, 5, 1);
-    m_sphereButton = new QPushButton("球");
-    m_sphereButton->setCheckable(true);
-    m_sphereButton->setToolTip("绘制球");
-    m_sphereButton->setProperty("drawMode", DrawSphere3D);
-    layout->addWidget(m_sphereButton, 6, 0);
-    m_torusButton = new QPushButton("圆环");
-    m_torusButton->setCheckable(true);
-    m_torusButton->setToolTip("绘制圆环");
-    m_torusButton->setProperty("drawMode", DrawTorus3D);
-    layout->addWidget(m_torusButton, 6, 1);
-    // 高级几何体
-    m_prismButton = new QPushButton("多棱柱");
-    m_prismButton->setCheckable(true);
-    m_prismButton->setToolTip("绘制多棱柱");
-    m_prismButton->setProperty("drawMode", DrawPrism3D);
-    layout->addWidget(m_prismButton, 7, 0);
-    m_hemisphereButton = new QPushButton("半球");
-    m_hemisphereButton->setCheckable(true);
-    m_hemisphereButton->setToolTip("绘制半球");
-    m_hemisphereButton->setProperty("drawMode", DrawHemisphere3D);
-    layout->addWidget(m_hemisphereButton, 7, 1);
-    m_ellipsoidButton = new QPushButton("椭球");
-    m_ellipsoidButton->setCheckable(true);
-    m_ellipsoidButton->setToolTip("绘制椭球");
-    m_ellipsoidButton->setProperty("drawMode", DrawEllipsoid3D);
-    layout->addWidget(m_ellipsoidButton, 8, 0);
-    // 连接信号
-    connect(m_pointButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
-    connect(m_lineButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
-    connect(m_arcButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
-    connect(m_bezierButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
-    connect(m_triangleButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
-    connect(m_quadButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
-    connect(m_polygonButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
-    connect(m_boxButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
-    connect(m_cubeButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
-    connect(m_cylinderButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
-    connect(m_coneButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
-    connect(m_sphereButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
-    connect(m_torusButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
-    connect(m_prismButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
-    connect(m_hemisphereButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
-    connect(m_ellipsoidButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
-    m_drawingStackedWidget->addWidget(page);
+    QWidget* geometryPage = new QWidget();
+    QVBoxLayout* layout = new QVBoxLayout(geometryPage);
+    layout->setSpacing(4);
+    layout->setContentsMargins(4, 4, 4, 4);
+    
+    // 基础绘制工具
+    QLabel* basicLabel = new QLabel("📏 基础绘制");
+    basicLabel->setObjectName("subGroupLabel");
+    layout->addWidget(basicLabel);
+    
+    m_pointButton = createStyledButton("📍", "点", "绘制点", DrawPoint3D);
+    m_lineButton = createStyledButton("📏", "线", "绘制直线", DrawLine3D);
+    m_arcButton = createStyledButton("🌙", "圆弧", "绘制圆弧", DrawArc3D);
+    m_bezierButton = createStyledButton("〰️", "贝塞尔", "绘制贝塞尔曲线", DrawBezierCurve3D);
+    
+    layout->addWidget(m_pointButton);
+    layout->addWidget(m_lineButton);
+    layout->addWidget(m_arcButton);
+    layout->addWidget(m_bezierButton);
+    
+    // 平面几何
+    QLabel* planeLabel = new QLabel("📐 平面图形");
+    planeLabel->setObjectName("subGroupLabel");
+    layout->addWidget(planeLabel);
+    
+    m_triangleButton = createStyledButton("🔺", "三角形", "绘制三角形", DrawTriangle3D);
+    m_quadButton = createStyledButton("🔸", "四边形", "绘制四边形", DrawQuad3D);
+    m_polygonButton = createStyledButton("⬟", "多边形", "绘制多边形", DrawPolygon3D);
+    
+    layout->addWidget(m_triangleButton);
+    layout->addWidget(m_quadButton);
+    layout->addWidget(m_polygonButton);
+    
+    // 基础立体图形
+    QLabel* basicSolidLabel = new QLabel("🧊 基础立体");
+    basicSolidLabel->setObjectName("subGroupLabel");
+    layout->addWidget(basicSolidLabel);
+    
+    m_cubeButton = createStyledButton("⬜", "正方体", "绘制正方体", DrawCube3D);
+    m_boxButton = createStyledButton("📦", "长方体", "绘制长方体", DrawBox3D);
+    m_sphereButton = createStyledButton("⚪", "球体", "绘制球体", DrawSphere3D);
+    m_cylinderButton = createStyledButton("🛢️", "圆柱", "绘制圆柱", DrawCylinder3D);
+    m_coneButton = createStyledButton("🍦", "圆锥", "绘制圆锥", DrawCone3D);
+    m_torusButton = createStyledButton("🍩", "圆环", "绘制圆环", DrawTorus3D);
+    
+    layout->addWidget(m_cubeButton);
+    layout->addWidget(m_boxButton);
+    layout->addWidget(m_sphereButton);
+    layout->addWidget(m_cylinderButton);
+    layout->addWidget(m_coneButton);
+    layout->addWidget(m_torusButton);
+    
+    // 高级立体图形
+    QLabel* advancedSolidLabel = new QLabel("🔮 高级立体");
+    advancedSolidLabel->setObjectName("subGroupLabel");
+    layout->addWidget(advancedSolidLabel);
+    
+    m_prismButton = createStyledButton("🔶", "多棱柱", "绘制多棱柱", DrawPrism3D);
+    m_hemisphereButton = createStyledButton("🌓", "半球", "绘制半球", DrawHemisphere3D);
+    m_ellipsoidButton = createStyledButton("🥚", "椭球", "绘制椭球", DrawEllipsoid3D);
+    
+    layout->addWidget(m_prismButton);
+    layout->addWidget(m_hemisphereButton);
+    layout->addWidget(m_ellipsoidButton);
+    
+    layout->addStretch();
+    
+    m_drawingStackedWidget->addWidget(geometryPage);
 }
 
 void ToolPanel3D::createBuildingPage()
 {
-    QWidget* page = new QWidget();
-    QGridLayout* layout = new QGridLayout(page);
+    QWidget* buildingPage = new QWidget();
+    QVBoxLayout* layout = new QVBoxLayout(buildingPage);
+    layout->setSpacing(4);
+    layout->setContentsMargins(4, 4, 4, 4);
     
-    // 建筑类型按钮
-    m_gableHouseButton = new QPushButton("人字房");
-    m_gableHouseButton->setCheckable(true);
-    m_gableHouseButton->setToolTip("绘制人字形房屋");
-    m_gableHouseButton->setProperty("drawMode", DrawGableHouse3D);
-    layout->addWidget(m_gableHouseButton, 0, 0);
+    // 建筑类型
+    QLabel* buildingLabel = new QLabel("🏠 建筑类型");
+    buildingLabel->setObjectName("subGroupLabel");
+    layout->addWidget(buildingLabel);
     
-    m_spireHouseButton = new QPushButton("尖顶房");
-    m_spireHouseButton->setCheckable(true);
-    m_spireHouseButton->setToolTip("绘制尖顶房屋");
-    m_spireHouseButton->setProperty("drawMode", DrawSpireHouse3D);
-    layout->addWidget(m_spireHouseButton, 0, 1);
+    m_flatHouseButton = createStyledButton("🏢", "平顶房", "绘制平顶房屋", DrawFlatHouse3D);
+    m_gableHouseButton = createStyledButton("🏘️", "人字房", "绘制人字形房屋", DrawGableHouse3D);
+    m_spireHouseButton = createStyledButton("⛪", "尖顶房", "绘制尖顶房屋", DrawSpireHouse3D);
+    m_domeHouseButton = createStyledButton("🕌", "穹顶房", "绘制穹顶房屋", DrawDomeHouse3D);
+    m_lHouseButton = createStyledButton("🏗️", "L型房", "绘制L型房屋", DrawLHouse3D);
     
-    m_domeHouseButton = new QPushButton("穹顶房");
-    m_domeHouseButton->setCheckable(true);
-    m_domeHouseButton->setToolTip("绘制穹顶房屋");
-    m_domeHouseButton->setProperty("drawMode", DrawDomeHouse3D);
-    layout->addWidget(m_domeHouseButton, 1, 0);
+    layout->addWidget(m_flatHouseButton);
+    layout->addWidget(m_gableHouseButton);
+    layout->addWidget(m_spireHouseButton);
+    layout->addWidget(m_domeHouseButton);
+    layout->addWidget(m_lHouseButton);
     
-    m_flatHouseButton = new QPushButton("平顶房");
-    m_flatHouseButton->setCheckable(true);
-    m_flatHouseButton->setToolTip("绘制平顶房屋");
-    m_flatHouseButton->setProperty("drawMode", DrawFlatHouse3D);
-    layout->addWidget(m_flatHouseButton, 1, 1);
+    layout->addStretch();
     
-    m_lHouseButton = new QPushButton("L型房");
-    m_lHouseButton->setCheckable(true);
-    m_lHouseButton->setToolTip("绘制L型房屋");
-    m_lHouseButton->setProperty("drawMode", DrawLHouse3D);
-    layout->addWidget(m_lHouseButton, 2, 0);
-    
-    // 连接信号
-    connect(m_gableHouseButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
-    connect(m_spireHouseButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
-    connect(m_domeHouseButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
-    connect(m_flatHouseButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
-    connect(m_lHouseButton, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
-    
-    m_drawingStackedWidget->addWidget(page);
+    m_drawingStackedWidget->addWidget(buildingPage);
 }
 
-void ToolPanel3D::createViewGroup()
+void ToolPanel3D::createCollapsibleViewSection(QVBoxLayout* parentLayout)
 {
-    m_viewGroup = new QGroupBox("视图工具", this);
-    QVBoxLayout* layout = new QVBoxLayout(m_viewGroup);
+    // 视图控制折叠组
+    QFrame* sectionFrame = new QFrame();
+    sectionFrame->setObjectName("collapsibleSection");
+    QVBoxLayout* sectionLayout = new QVBoxLayout(sectionFrame);
+    sectionLayout->setSpacing(2);
+    sectionLayout->setContentsMargins(4, 4, 4, 4);
     
-    // 重置视图按钮
-    m_resetViewButton = new QPushButton("重置视图");
-    m_resetViewButton->setToolTip("重置相机到默认位置");
-    m_resetViewButton->setIcon(QIcon(":/icons/reset.png"));
-    layout->addWidget(m_resetViewButton);
+    // 标题和展开/折叠按钮
+    QHBoxLayout* titleLayout = new QHBoxLayout();
+    QLabel* titleLabel = new QLabel("👁️ 视图控制");
+    titleLabel->setObjectName("sectionTitle");
     
-    // 适应窗口按钮
-    m_fitViewButton = new QPushButton("适应窗口");
-    m_fitViewButton->setToolTip("适应所有对象到窗口");
-    m_fitViewButton->setIcon(QIcon(":/icons/fit.png"));
-    layout->addWidget(m_fitViewButton);
+    m_viewToggleButton = new QPushButton("▼");
+    m_viewToggleButton->setObjectName("toggleButton");
+    m_viewToggleButton->setFixedSize(20, 20);
+    m_viewToggleButton->setCheckable(true);
+    m_viewToggleButton->setChecked(false);
     
-    // 俯视图按钮
-    m_topViewButton = new QPushButton("俯视图");
-    m_topViewButton->setToolTip("切换到俯视图 (T)");
-    m_topViewButton->setIcon(QIcon(":/icons/top.png"));
-    layout->addWidget(m_topViewButton);
+    titleLayout->addWidget(titleLabel);
+    titleLayout->addStretch();
+    titleLayout->addWidget(m_viewToggleButton);
     
-    // 前视图按钮
-    m_frontViewButton = new QPushButton("前视图");
-    m_frontViewButton->setToolTip("切换到前视图 (1)");
-    m_frontViewButton->setIcon(QIcon(":/icons/front.png"));
-    layout->addWidget(m_frontViewButton);
+    sectionLayout->addLayout(titleLayout);
     
-    // 右视图按钮
-    m_rightViewButton = new QPushButton("右视图");
-    m_rightViewButton->setToolTip("切换到右视图 (3)");
-    m_rightViewButton->setIcon(QIcon(":/icons/right.png"));
-    layout->addWidget(m_rightViewButton);
+    // 创建内容区域
+    m_viewContentWidget = new QWidget();
+    QVBoxLayout* viewLayout = new QVBoxLayout(m_viewContentWidget);
+    viewLayout->setSpacing(3);
+    viewLayout->setContentsMargins(0, 0, 0, 0);
     
-    // 等轴测图按钮
-    m_isometricViewButton = new QPushButton("等轴测图");
-    m_isometricViewButton->setToolTip("切换到等轴测图 (7)");
-    m_isometricViewButton->setIcon(QIcon(":/icons/isometric.png"));
-    layout->addWidget(m_isometricViewButton);
+    m_resetViewButton = createActionButton("🔄", "重置视图", "重置相机到默认位置");
+    m_fitViewButton = createActionButton("🔍", "适应窗口", "适应所有对象到窗口");
+    m_topViewButton = createActionButton("🔝", "俯视图", "切换到俯视图 (T)");
+    m_frontViewButton = createActionButton("⬅️", "前视图", "切换到前视图 (1)");
+    m_rightViewButton = createActionButton("➡️", "右视图", "切换到右视图 (3)");
+    m_isometricViewButton = createActionButton("📐", "等轴测", "切换到等轴测图 (7)");
+    
+    viewLayout->addWidget(m_resetViewButton);
+    viewLayout->addWidget(m_fitViewButton);
+    viewLayout->addWidget(m_topViewButton);
+    viewLayout->addWidget(m_frontViewButton);
+    viewLayout->addWidget(m_rightViewButton);
+    viewLayout->addWidget(m_isometricViewButton);
+    
+    m_viewContentWidget->setVisible(false); // 默认折叠
+    sectionLayout->addWidget(m_viewContentWidget);
+    
+    parentLayout->addWidget(sectionFrame);
     
     // 连接信号
+    connect(m_viewToggleButton, &QPushButton::clicked, this, &ToolPanel3D::onViewToggleClicked);
     connect(m_resetViewButton, &QPushButton::clicked, this, &ToolPanel3D::onResetViewClicked);
     connect(m_fitViewButton, &QPushButton::clicked, this, &ToolPanel3D::onFitViewClicked);
     connect(m_topViewButton, &QPushButton::clicked, this, &ToolPanel3D::onTopViewClicked);
@@ -279,42 +257,57 @@ void ToolPanel3D::createViewGroup()
     connect(m_isometricViewButton, &QPushButton::clicked, this, &ToolPanel3D::onIsometricViewClicked);
 }
 
-void ToolPanel3D::createUtilityGroup()
+void ToolPanel3D::createCollapsibleUtilitySection(QVBoxLayout* parentLayout)
 {
-    m_utilityGroup = new QGroupBox("实用工具", this);
-    QVBoxLayout* layout = new QVBoxLayout(m_utilityGroup);
+    // 实用工具折叠组
+    QFrame* sectionFrame = new QFrame();
+    sectionFrame->setObjectName("collapsibleSection");
+    QVBoxLayout* sectionLayout = new QVBoxLayout(sectionFrame);
+    sectionLayout->setSpacing(2);
+    sectionLayout->setContentsMargins(4, 4, 4, 4);
     
-    // 清空场景按钮
-    m_clearSceneButton = new QPushButton("清空场景");
-    m_clearSceneButton->setToolTip("删除所有对象");
-    m_clearSceneButton->setIcon(QIcon(":/icons/clear.png"));
-    layout->addWidget(m_clearSceneButton);
+    // 标题和展开/折叠按钮
+    QHBoxLayout* titleLayout = new QHBoxLayout();
+    QLabel* titleLabel = new QLabel("🛠️ 实用工具");
+    titleLabel->setObjectName("sectionTitle");
     
-    // 导出图像按钮
-    m_exportImageButton = new QPushButton("导出图像");
-    m_exportImageButton->setToolTip("导出当前视图为图像");
-    m_exportImageButton->setIcon(QIcon(":/icons/export.png"));
-    layout->addWidget(m_exportImageButton);
+    m_utilityToggleButton = new QPushButton("▼");
+    m_utilityToggleButton->setObjectName("toggleButton");
+    m_utilityToggleButton->setFixedSize(20, 20);
+    m_utilityToggleButton->setCheckable(true);
+    m_utilityToggleButton->setChecked(false);
     
-    // 坐标系统设置按钮
-    m_coordinateSystemButton = new QPushButton("坐标系统设置");
-    m_coordinateSystemButton->setToolTip("设置坐标系统参数");
-    m_coordinateSystemButton->setIcon(QIcon(":/icons/coordinate.png"));
-    layout->addWidget(m_coordinateSystemButton);
+    titleLayout->addWidget(titleLabel);
+    titleLayout->addStretch();
+    titleLayout->addWidget(m_utilityToggleButton);
     
-    // 拾取系统设置按钮
-    m_pickingSystemButton = new QPushButton("拾取系统设置");
-    m_pickingSystemButton->setToolTip("设置拾取系统参数");
-    m_pickingSystemButton->setIcon(QIcon(":/icons/picking.png"));
-    layout->addWidget(m_pickingSystemButton);
+    sectionLayout->addLayout(titleLayout);
     
-    // 显示设置按钮
-    m_displaySettingsButton = new QPushButton("显示设置");
-    m_displaySettingsButton->setToolTip("设置显示参数");
-    m_displaySettingsButton->setIcon(QIcon(":/icons/display.png"));
-    layout->addWidget(m_displaySettingsButton);
+    // 创建内容区域
+    m_utilityContentWidget = new QWidget();
+    QVBoxLayout* utilityLayout = new QVBoxLayout(m_utilityContentWidget);
+    utilityLayout->setSpacing(3);
+    utilityLayout->setContentsMargins(0, 0, 0, 0);
+    
+    m_clearSceneButton = createActionButton("🗑️", "清空场景", "删除所有对象");
+    m_exportImageButton = createActionButton("📸", "导出图像", "导出当前视图为图像");
+    m_coordinateSystemButton = createActionButton("📊", "坐标系统", "设置坐标系统参数");
+    m_pickingSystemButton = createActionButton("🎯", "拾取设置", "设置拾取系统参数");
+    m_displaySettingsButton = createActionButton("⚙️", "显示设置", "设置显示参数");
+    
+    utilityLayout->addWidget(m_clearSceneButton);
+    utilityLayout->addWidget(m_exportImageButton);
+    utilityLayout->addWidget(m_coordinateSystemButton);
+    utilityLayout->addWidget(m_pickingSystemButton);
+    utilityLayout->addWidget(m_displaySettingsButton);
+    
+    m_utilityContentWidget->setVisible(false); // 默认折叠
+    sectionLayout->addWidget(m_utilityContentWidget);
+    
+    parentLayout->addWidget(sectionFrame);
     
     // 连接信号
+    connect(m_utilityToggleButton, &QPushButton::clicked, this, &ToolPanel3D::onUtilityToggleClicked);
     connect(m_clearSceneButton, &QPushButton::clicked, this, &ToolPanel3D::onClearSceneClicked);
     connect(m_exportImageButton, &QPushButton::clicked, this, &ToolPanel3D::onExportImageClicked);
     connect(m_coordinateSystemButton, &QPushButton::clicked, this, &ToolPanel3D::onCoordinateSystemClicked);
@@ -322,35 +315,317 @@ void ToolPanel3D::createUtilityGroup()
     connect(m_displaySettingsButton, &QPushButton::clicked, this, &ToolPanel3D::onDisplaySettingsClicked);
 }
 
-void ToolPanel3D::createSkyboxGroup()
+void ToolPanel3D::createCollapsibleSkyboxSection(QVBoxLayout* parentLayout)
 {
-    m_skyboxGroup = new QGroupBox("天空盒设置", this);
-    QVBoxLayout* layout = new QVBoxLayout(m_skyboxGroup);
+    // 天空盒折叠组
+    QFrame* sectionFrame = new QFrame();
+    sectionFrame->setObjectName("collapsibleSection");
+    QVBoxLayout* sectionLayout = new QVBoxLayout(sectionFrame);
+    sectionLayout->setSpacing(2);
+    sectionLayout->setContentsMargins(4, 4, 4, 4);
     
-    // 天空盒启用开关
-    m_skyboxEnabledCheck = new QCheckBox("启用天空盒");
+    // 标题和展开/折叠按钮
+    QHBoxLayout* titleLayout = new QHBoxLayout();
+    QLabel* titleLabel = new QLabel("🌅 天空盒设置");
+    titleLabel->setObjectName("sectionTitle");
+    
+    m_skyboxToggleButton = new QPushButton("▼");
+    m_skyboxToggleButton->setObjectName("toggleButton");
+    m_skyboxToggleButton->setFixedSize(20, 20);
+    m_skyboxToggleButton->setCheckable(true);
+    m_skyboxToggleButton->setChecked(false);
+    
+    titleLayout->addWidget(titleLabel);
+    titleLayout->addStretch();
+    titleLayout->addWidget(m_skyboxToggleButton);
+    
+    sectionLayout->addLayout(titleLayout);
+    
+    // 创建内容区域
+    m_skyboxContentWidget = new QWidget();
+    QVBoxLayout* skyboxLayout = new QVBoxLayout(m_skyboxContentWidget);
+    skyboxLayout->setSpacing(3);
+    skyboxLayout->setContentsMargins(0, 0, 0, 0);
+    
+    // 启用开关
+    m_skyboxEnabledCheck = new QCheckBox("✅ 启用天空盒");
     m_skyboxEnabledCheck->setChecked(true);
-    m_skyboxEnabledCheck->setToolTip("启用或禁用天空盒");
-    layout->addWidget(m_skyboxEnabledCheck);
+    m_skyboxEnabledCheck->setObjectName("enableCheck");
+    skyboxLayout->addWidget(m_skyboxEnabledCheck);
     
-    // 天空盒样式按钮
-    m_skyboxGradientButton = new QPushButton("渐变天空盒");
-    m_skyboxGradientButton->setToolTip("设置渐变天空盒");
-    layout->addWidget(m_skyboxGradientButton);
+    // 样式按钮
+    m_skyboxGradientButton = createActionButton("🌈", "渐变天空", "设置渐变天空盒");
+    m_skyboxSolidButton = createActionButton("🎨", "纯色天空", "设置纯色天空盒");
+    m_skyboxCustomButton = createActionButton("🖼️", "自定义贴图", "设置自定义立方体贴图");
     
-    m_skyboxSolidButton = new QPushButton("纯色天空盒");
-    m_skyboxSolidButton->setToolTip("设置纯色天空盒");
-    layout->addWidget(m_skyboxSolidButton);
+    skyboxLayout->addWidget(m_skyboxGradientButton);
+    skyboxLayout->addWidget(m_skyboxSolidButton);
+    skyboxLayout->addWidget(m_skyboxCustomButton);
     
-    m_skyboxCustomButton = new QPushButton("自定义立方体贴图");
-    m_skyboxCustomButton->setToolTip("设置自定义立方体贴图天空盒");
-    layout->addWidget(m_skyboxCustomButton);
+    m_skyboxContentWidget->setVisible(false); // 默认折叠
+    sectionLayout->addWidget(m_skyboxContentWidget);
+    
+    parentLayout->addWidget(sectionFrame);
     
     // 连接信号
+    connect(m_skyboxToggleButton, &QPushButton::clicked, this, &ToolPanel3D::onSkyboxToggleClicked);
     connect(m_skyboxEnabledCheck, &QCheckBox::toggled, this, &ToolPanel3D::onSkyboxEnabledChanged);
     connect(m_skyboxGradientButton, &QPushButton::clicked, this, &ToolPanel3D::onSkyboxGradientClicked);
     connect(m_skyboxSolidButton, &QPushButton::clicked, this, &ToolPanel3D::onSkyboxSolidClicked);
     connect(m_skyboxCustomButton, &QPushButton::clicked, this, &ToolPanel3D::onSkyboxCustomClicked);
+}
+
+QPushButton* ToolPanel3D::createStyledButton(const QString& emoji, const QString& text, const QString& tooltip, DrawMode3D mode)
+{
+    QPushButton* button = new QPushButton();
+    button->setObjectName("geometryButton");
+    button->setText(QString("%1 %2").arg(emoji).arg(text));
+    button->setToolTip(tooltip);
+    button->setCheckable(true);
+    button->setProperty("drawMode", static_cast<int>(mode));
+    button->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    button->setMinimumHeight(50);
+    
+    connect(button, &QPushButton::clicked, this, &ToolPanel3D::onDrawModeButtonClicked);
+    
+    return button;
+}
+
+QPushButton* ToolPanel3D::createActionButton(const QString& emoji, const QString& text, const QString& tooltip)
+{
+    QPushButton* button = new QPushButton();
+    button->setObjectName("actionButton");
+    button->setText(QString("%1 %2").arg(emoji).arg(text));
+    button->setToolTip(tooltip);
+    button->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    button->setMinimumHeight(45);
+    
+    return button;
+}
+
+void ToolPanel3D::setupStyles()
+{
+    QString styleSheet = R"(
+        /* 整体面板样式 */
+        ToolPanel3D {
+            background-color: #f8f9fa;
+            border: none;
+            font-family: "Microsoft YaHei", "SimHei", "Arial", sans-serif;
+        }
+        
+        /* 滚动区域 */
+        QScrollArea {
+            border: none;
+            background-color: transparent;
+        }
+        
+        /* 标题样式 */
+        QLabel#sectionTitle {
+            font-family: "Microsoft YaHei", "SimHei", "Arial", sans-serif;
+            font-size: 18px;
+            font-weight: bold;
+            color: #2c3e50;
+            padding: 8px 4px 4px 4px;
+            margin-top: 4px;
+        }
+        
+        QLabel#subGroupLabel {
+            font-family: "Microsoft YaHei", "SimHei", "Arial", sans-serif;
+            font-size: 15px;
+            font-weight: bold;
+            color: #34495e;
+            padding: 6px 2px 2px 2px;
+            margin-top: 8px;
+        }
+        
+        /* 工具框架样式 */
+        QFrame#toolFrame {
+            background-color: white;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            margin: 2px;
+        }
+        
+        /* Tab Widget样式 */
+        QTabWidget#drawingTabs {
+            border: none;
+        }
+        
+        QTabWidget#drawingTabs::pane {
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            background-color: white;
+            margin-top: -1px;
+        }
+        
+        QTabWidget#drawingTabs::tab-bar {
+            alignment: center;
+        }
+        
+        QTabBar::tab {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-bottom: none;
+            border-top-left-radius: 6px;
+            border-top-right-radius: 6px;
+            padding: 8px 16px;
+            margin-right: 2px;
+            font-weight: 500;
+            color: #6c757d;
+        }
+        
+        QTabBar::tab:selected {
+            background-color: white;
+            color: #495057;
+            border-bottom: 2px solid #007bff;
+        }
+        
+        QTabBar::tab:hover:!selected {
+            background-color: #e9ecef;
+            color: #495057;
+        }
+        
+        /* 几何体按钮样式 */
+        QPushButton#geometryButton {
+            background-color: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 12px;
+            font-family: "Microsoft YaHei", "SimHei", "Arial", sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            color: #495057;
+            text-align: center;
+        }
+        
+        QPushButton#geometryButton:hover {
+            background-color: #f8f9fa;
+            border-color: #adb5bd;
+            transform: translateY(-1px);
+        }
+        
+        QPushButton#geometryButton:checked {
+            background-color: #007bff;
+            border-color: #007bff;
+            color: white;
+            font-weight: 600;
+        }
+        
+        QPushButton#geometryButton:pressed {
+            background-color: #0056b3;
+            border-color: #0056b3;
+        }
+        
+        /* 操作按钮样式 */
+        QPushButton#actionButton {
+            background-color: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px 14px;
+            font-family: "Microsoft YaHei", "SimHei", "Arial", sans-serif;
+            font-size: 15px;
+            font-weight: 600;
+            color: #495057;
+            text-align: left;
+        }
+        
+        QPushButton#actionButton:hover {
+            background-color: #f8f9fa;
+            border-color: #adb5bd;
+        }
+        
+        QPushButton#actionButton:pressed {
+            background-color: #e9ecef;
+            border-color: #adb5bd;
+        }
+        
+        /* 复选框样式 */
+        QCheckBox#enableCheck {
+            font-family: "Microsoft YaHei", "SimHei", "Arial", sans-serif;
+            font-size: 15px;
+            font-weight: 600;
+            color: #495057;
+            spacing: 8px;
+        }
+        
+        QCheckBox#enableCheck::indicator {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #dee2e6;
+            border-radius: 3px;
+            background-color: white;
+        }
+        
+        QCheckBox#enableCheck::indicator:checked {
+            background-color: #28a745;
+            border-color: #28a745;
+            image: url(:/icons/check.png);
+        }
+        
+        QCheckBox#enableCheck::indicator:hover {
+            border-color: #adb5bd;
+        }
+        
+        /* 下拉框样式 */
+        QComboBox#modeCombo {
+            background-color: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px 14px;
+            font-family: "Microsoft YaHei", "SimHei", "Arial", sans-serif;
+            font-size: 15px;
+            font-weight: 600;
+            color: #495057;
+            margin: 4px 0px;
+        }
+        
+        QComboBox#modeCombo:hover {
+            border-color: #adb5bd;
+        }
+        
+        QComboBox#modeCombo::drop-down {
+            border: none;
+            width: 20px;
+        }
+        
+        QComboBox#modeCombo QAbstractItemView {
+            background-color: #ffffff;
+            border: 1px solid #dee2e6;
+            font-family: "Microsoft YaHei", "SimHei", "Arial", sans-serif;
+            font-size: 15px;
+            font-weight: 600;
+            color: #495057;
+            selection-background-color: #007bff;
+            selection-color: white;
+        }
+        
+        QComboBox#modeCombo QAbstractItemView::item {
+            padding: 8px 12px;
+            margin: 1px;
+        }
+        
+        QComboBox#modeCombo QAbstractItemView::item:hover {
+            background-color: #f8f9fa;
+        }
+        
+        /* 折叠按钮样式 */
+        QPushButton#toggleButton {
+            background-color: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 3px;
+            font-family: "Microsoft YaHei", "SimHei", "Arial", sans-serif;
+            font-size: 14px;
+            font-weight: bold;
+            color: #495057;
+        }
+        
+        QPushButton#toggleButton:hover {
+            background-color: #f8f9fa;
+            border-color: #adb5bd;
+        }
+    )";
+    
+    this->setStyleSheet(styleSheet);
 }
 
 void ToolPanel3D::updateDrawMode(DrawMode3D mode)
@@ -362,8 +637,8 @@ void ToolPanel3D::updateDrawMode(DrawMode3D mode)
         m_selectButton, m_pointButton, m_lineButton, m_arcButton, m_bezierButton,
         m_triangleButton, m_quadButton, m_polygonButton, m_boxButton, m_cubeButton,
         m_cylinderButton, m_coneButton, m_sphereButton, m_torusButton,
+        m_prismButton, m_hemisphereButton, m_ellipsoidButton,
         m_gableHouseButton, m_spireHouseButton, m_domeHouseButton, m_flatHouseButton, m_lHouseButton
-        // , m_prismButton, m_hemisphereButton, m_ellipsoidButton // 移除高级几何体按钮
     };
     
     // 更新按钮状态
@@ -371,7 +646,8 @@ void ToolPanel3D::updateDrawMode(DrawMode3D mode)
     {
         if (button)
         {
-            DrawMode3D buttonMode = static_cast<DrawMode3D>(button->property("drawMode").toInt());
+            QVariant property = button->property("drawMode");
+            DrawMode3D buttonMode = static_cast<DrawMode3D>(property.toInt());
             button->setChecked(buttonMode == mode);
         }
     }
@@ -382,15 +658,16 @@ void ToolPanel3D::onDrawModeButtonClicked()
     QPushButton* button = qobject_cast<QPushButton*>(sender());
     if (!button) return;
     
-    DrawMode3D mode = static_cast<DrawMode3D>(button->property("drawMode").toInt());
+    QVariant property = button->property("drawMode");
+    DrawMode3D mode = static_cast<DrawMode3D>(property.toInt());
     
     // 创建所有按钮的列表
     QList<QPushButton*> allButtons = {
         m_selectButton, m_pointButton, m_lineButton, m_arcButton, m_bezierButton,
         m_triangleButton, m_quadButton, m_polygonButton, m_boxButton, m_cubeButton,
         m_cylinderButton, m_coneButton, m_sphereButton, m_torusButton,
+        m_prismButton, m_hemisphereButton, m_ellipsoidButton,
         m_gableHouseButton, m_spireHouseButton, m_domeHouseButton, m_flatHouseButton, m_lHouseButton
-        // , m_prismButton, m_hemisphereButton, m_ellipsoidButton // 移除高级几何体按钮
     };
     
     // 取消其他按钮的选中状态
@@ -408,7 +685,7 @@ void ToolPanel3D::onDrawModeButtonClicked()
     emit drawModeChanged(mode);
 }
 
-// ToolPanel3D 天空盒相关槽函数
+// 天空盒相关槽函数
 void ToolPanel3D::onSkyboxEnabledChanged(bool enabled)
 {
     emit skyboxEnabled(enabled);
@@ -429,7 +706,7 @@ void ToolPanel3D::onSkyboxCustomClicked()
     emit skyboxCustomRequested();
 }
 
-// ToolPanel3D 视图工具相关槽函数
+// 视图工具相关槽函数
 void ToolPanel3D::onResetViewClicked()
 {
     emit resetViewRequested();
@@ -460,7 +737,7 @@ void ToolPanel3D::onIsometricViewClicked()
     emit isometricViewRequested();
 }
 
-// ToolPanel3D 实用工具相关槽函数
+// 实用工具相关槽函数
 void ToolPanel3D::onClearSceneClicked()
 {
     emit clearSceneRequested();
@@ -486,9 +763,31 @@ void ToolPanel3D::onDisplaySettingsClicked()
     emit displaySettingsRequested();
 }
 
-void ToolPanel3D::onDrawingCategoryChanged(int index)
+void ToolPanel3D::onDrawingModeChanged(int index)
 {
     if (m_drawingStackedWidget) {
         m_drawingStackedWidget->setCurrentIndex(index);
     }
+}
+
+// 折叠/展开槽函数
+void ToolPanel3D::onViewToggleClicked()
+{
+    bool isExpanded = m_viewToggleButton->isChecked();
+    m_viewContentWidget->setVisible(isExpanded);
+    m_viewToggleButton->setText(isExpanded ? "▲" : "▼");
+}
+
+void ToolPanel3D::onUtilityToggleClicked()
+{
+    bool isExpanded = m_utilityToggleButton->isChecked();
+    m_utilityContentWidget->setVisible(isExpanded);
+    m_utilityToggleButton->setText(isExpanded ? "▲" : "▼");
+}
+
+void ToolPanel3D::onSkyboxToggleClicked()
+{
+    bool isExpanded = m_skyboxToggleButton->isChecked();
+    m_skyboxContentWidget->setVisible(isExpanded);
+    m_skyboxToggleButton->setText(isExpanded ? "▲" : "▼");
 }

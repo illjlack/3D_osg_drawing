@@ -66,6 +66,23 @@ public:
     const GeoParameters3D& getParameters() const { return m_parameters; }
     void setParameters(const GeoParameters3D& params);
 
+    // ==================== 多阶段绘制接口 ====================
+    
+    // 获取该几何图形的阶段描述符（由派生类实现）
+    virtual std::vector<StageDescriptor> getStageDescriptors() const = 0;
+    
+    // 当前阶段相关方法
+    int getCurrentStage() const;
+    bool nextStage(); // 进入下一阶段
+    bool canAdvanceToNextStage() const;
+    bool isCurrentStageComplete() const;
+    bool isAllStagesComplete() const;
+    const StageDescriptor* getCurrentStageDescriptor() const;
+    
+    // 阶段切换和验证
+    bool validateCurrentStage() const; // 验证当前阶段的控制点是否有效
+    void initializeStages(); // 初始化阶段描述符（在构造函数中调用）
+
     // 事件处理
     virtual void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos);
     virtual void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos);
@@ -90,13 +107,24 @@ protected:
     virtual void buildEdgeGeometries() = 0;    // 子类实现具体的边几何体构建
     virtual void buildFaceGeometries() = 0;    // 子类实现具体的面几何体构建
     
-
+    // ==================== 多阶段几何构建方法 ====================
+    
+    // 为不同阶段构建特定的几何体（由派生类重写以实现阶段特定的绘制逻辑）
+    virtual void buildStageVertexGeometries(int stage) {} // 可选：阶段特定的顶点几何体构建
+    virtual void buildStageEdgeGeometries(int stage) {}   // 可选：阶段特定的边几何体构建  
+    virtual void buildStageFaceGeometries(int stage) {}   // 可选：阶段特定的面几何体构建
+    
+    // ==================== 多阶段临时点跟踪绘制 ====================
+    
+    // 构建当前阶段的临时预览几何体（包含临时点的预览绘制）
+    virtual void buildCurrentStagePreviewGeometries() {} // 可选：当前阶段的预览绘制
 
 protected:
     // 基本属性
     GeoType3D m_geoType;
     GeoParameters3D m_parameters;
     bool m_parametersChanged;
+    bool m_stagesInitialized; // 阶段描述符是否已初始化
 
     // 管理器组件
     std::unique_ptr<GeoStateManager> m_stateManager;

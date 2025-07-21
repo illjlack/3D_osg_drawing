@@ -23,173 +23,143 @@
 #include <QDebug>
 #include <cmath>
 
-UndefinedGeo3D::UndefinedGeo3D()
+UndefinedGeo3D_Geo::UndefinedGeo3D_Geo()
 {
-    setGeoType(Geo_UndefinedGeo3D);
-    // 确保基类正确初始化
+    m_geoType = Geo_UndefinedGeo3D;
     initialize();
-    LOG_INFO("创建未定义几何体", "几何体");
 }
 
-void UndefinedGeo3D::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
+std::vector<StageDescriptor> UndefinedGeo3D_Geo::getStageDescriptors() const
 {
-    if (!mm_state()->isStateComplete())
-    {
-        // 添加控制点
-        mm_controlPoint()->addControlPoint(Point3D(worldPos.x, worldPos.y, worldPos.z));
-        
-        // 对于未定义几何体，由于设置为永不完成，这里只检查控制点有效性
-        if (areControlPointsValid())
-        {
-            // 未定义几何体可以持续添加点，不设置绘制完成状态
-            // 或者可以根据需要设置其他状态
-            qDebug() << "UndefinedGeo3D: 添加控制点，当前点数:" << mm_controlPoint()->getControlPoints().size();
+    std::vector<StageDescriptor> descriptors;
+    // 通用的单阶段点收集
+    descriptors.emplace_back("收集控制点", 1, -1);
+    return descriptors;
+}
+
+void UndefinedGeo3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
+{
+    if (mm_state()->isStateComplete()) return;
+    
+    if (event->button() == Qt::RightButton) {
+        if (isCurrentStageComplete()) {
+            if (areControlPointsValid()) {
+                mm_state()->setStateComplete();
+                qDebug() << "未定义几何体: 绘制完成";
+            }
+        }
+        return;
+    }
+    
+    if (event->button() == Qt::LeftButton) {
+        bool success = mm_controlPoint()->addControlPointToCurrentStage(Point3D(worldPos));
+        if (success) {
+            qDebug() << "未定义几何体: 添加控制点，当前数量:" << mm_controlPoint()->getCurrentStageControlPointCount();
         }
     }
 }
 
-void UndefinedGeo3D::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
+void UndefinedGeo3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    // 未定义几何体的鼠标移动事件 - 默认实现
-    // 未定义几何体不需要处理鼠标移动事件
+    if (mm_state()->isStateComplete()) return;
+    mm_controlPoint()->setCurrentStageTempPoint(Point3D(worldPos));
 }
 
-void UndefinedGeo3D::buildVertexGeometries()
+void UndefinedGeo3D_Geo::keyPressEvent(QKeyEvent* event)
+{
+    if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
+        if (isCurrentStageComplete() && areControlPointsValid()) {
+            mm_state()->setStateComplete();
+            qDebug() << "未定义几何体: 回车完成绘制";
+        }
+    }
+    else if (event->key() == Qt::Key_Escape) {
+        mm_controlPoint()->removeLastControlPointFromCurrentStage();
+    }
+}
+
+void UndefinedGeo3D_Geo::buildStageVertexGeometries(int stage)
+{
+    if (stage == 0) buildGenericGeometry();
+}
+
+void UndefinedGeo3D_Geo::buildStageEdgeGeometries(int stage)
+{
+    if (stage == 0) buildGenericGeometry();
+}
+
+void UndefinedGeo3D_Geo::buildStageFaceGeometries(int stage)
+{
+    // 未定义几何体默认不绘制面
+}
+
+void UndefinedGeo3D_Geo::buildCurrentStagePreviewGeometries()
+{
+    buildGenericGeometry();
+}
+
+void UndefinedGeo3D_Geo::buildGenericGeometry()
+{
+    const auto& allStages = mm_controlPoint()->getAllStageControlPoints();
+    if (allStages.empty() || allStages[0].empty()) return;
+    
+    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getVertexGeometry();
+    if (!geometry.valid()) return;
+    
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+    
+    // 添加所有控制点
+    for (const auto& point : allStages[0]) {
+        vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
+    }
+    
+    geometry->setVertexArray(vertices);
+    
+    // 绘制为点
+    osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::POINTS, 0, vertices->size());
+    geometry->addPrimitiveSet(drawArrays);
+}
+
+void UndefinedGeo3D_Geo::buildVertexGeometries()
 {
     mm_node()->clearVertexGeometry();
-    
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (controlPoints.empty())
-        return;
-    
-    // 获取现有的几何体
-    osg::ref_ptr<osg::Geometry> vertexGeometry = mm_node()->getVertexGeometry();
-    if (!vertexGeometry.valid())
-        return;
-    
-    // 创建未定义几何体顶点的几何体
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
-    
-    // 添加控制点作为顶点
-    for (const Point3D& point : controlPoints)
-    {
-        vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
-    }
-    
-    vertexGeometry->setVertexArray(vertices.get());
-    
-    // 使用点绘制
-    vertexGeometry->addPrimitiveSet(new osg::DrawArrays(GL_POINTS, 0, vertices->size()));
+    buildStageVertexGeometries(getCurrentStage());
 }
 
-void UndefinedGeo3D::buildEdgeGeometries()
+void UndefinedGeo3D_Geo::buildEdgeGeometries()
 {
     mm_node()->clearEdgeGeometry();
-    
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (controlPoints.size() < 2)
-        return;
-    
-    // 获取现有的几何体
-    osg::ref_ptr<osg::Geometry> edgeGeometry = mm_node()->getEdgeGeometry();
-    if (!edgeGeometry.valid())
-        return;
-    
-    // 创建未定义几何体边的几何体
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
-    
-    // 添加所有边
-    for (size_t i = 0; i < controlPoints.size() - 1; ++i)
-    {
-        vertices->push_back(osg::Vec3(controlPoints[i].x(), controlPoints[i].y(), controlPoints[i].z()));
-        vertices->push_back(osg::Vec3(controlPoints[i + 1].x(), controlPoints[i + 1].y(), controlPoints[i + 1].z()));
-    }
-    
-    edgeGeometry->setVertexArray(vertices.get());
-    
-    // 使用线绘制
-    edgeGeometry->addPrimitiveSet(new osg::DrawArrays(GL_LINES, 0, vertices->size()));
+    buildStageEdgeGeometries(getCurrentStage());
 }
 
-void UndefinedGeo3D::buildFaceGeometries()
+void UndefinedGeo3D_Geo::buildFaceGeometries()
 {
     mm_node()->clearFaceGeometry();
-    
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (controlPoints.size() < 3)
-        return;
-    
-    // 获取现有的几何体
-    osg::ref_ptr<osg::Geometry> faceGeometry = mm_node()->getFaceGeometry();
-    if (!faceGeometry.valid())
-        return;
-    
-    // 创建未定义几何体面的几何体
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
-    
-    // 添加所有顶点形成面
-    for (const Point3D& point : controlPoints)
-    {
-        vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
-    }
-    
-    faceGeometry->setVertexArray(vertices.get());
-    
-    // 使用三角形绘制（简单的扇形三角剖分）
-    if (controlPoints.size() >= 3)
-    {
-        osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(GL_TRIANGLES);
-        for (size_t i = 1; i < controlPoints.size() - 1; ++i)
-        {
-            indices->push_back(0);
-            indices->push_back(i);
-            indices->push_back(i + 1);
-        }
-        faceGeometry->addPrimitiveSet(indices.get());
-    }
+    buildStageFaceGeometries(getCurrentStage());
 }
 
-// ==================== 绘制完成检查和控制点验证 ====================
-
-bool UndefinedGeo3D::isDrawingComplete() const
+bool UndefinedGeo3D_Geo::isDrawingComplete() const
 {
-    // 永不完成（无限控制点）
-    return false;
+    return isCurrentStageComplete();
 }
 
-bool UndefinedGeo3D::areControlPointsValid() const
+bool UndefinedGeo3D_Geo::areControlPointsValid() const
 {
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
+    const auto& stagePoints = mm_controlPoint()->getCurrentStageControlPoints();
     
-    // 检查控制点数量
-    if (controlPoints.empty()) {
+    // 至少需要一个有效的控制点
+    if (stagePoints.empty()) {
         return false;
     }
     
-    // 检查控制点坐标是否有效（不是NaN或无穷大）
-    for (const auto& point : controlPoints) {
+    // 检查控制点坐标是否有效
+    for (const auto& point : stagePoints) {
         if (std::isnan(point.x()) || std::isnan(point.y()) || std::isnan(point.z()) ||
             std::isinf(point.x()) || std::isinf(point.y()) || std::isinf(point.z())) {
             return false;
         }
     }
     
-    // 对于未定义几何体，允许重复点（因为可能是自由绘制）
-    // 如果需要检查重复点，可以取消下面的注释
-    
-    /*
-    // 检查控制点是否重合（允许一定的误差）
-    const float epsilon = 0.001f;
-    for (size_t i = 0; i < controlPoints.size() - 1; ++i) {
-        for (size_t j = i + 1; j < controlPoints.size(); ++j) {
-            glm::vec3 diff = controlPoints[j].position - controlPoints[i].position;
-            float distance = glm::length(diff);
-            if (distance < epsilon) {
-                return false; // 有重复点，无效
-            }
-        }
-    }
-    */
-    
     return true;
 }
+

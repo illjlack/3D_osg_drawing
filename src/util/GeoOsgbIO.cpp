@@ -202,12 +202,12 @@ Geo3D* GeoOsgbIO::loadFromOsgb(const QString& path)
     // 创建对应类型的Geo3D对象
     Geo3D* geo = nullptr;
     if (type == Geo_UndefinedGeo3D) {
-        geo = new UndefinedGeo3D();
+        geo = new UndefinedGeo3D_Geo();
         LOG_INFO("创建未定义几何体对象", "文件IO");
     } else {
         geo = createGeo3D(static_cast<DrawMode3D>(type));
         if (!geo) {
-            geo = new UndefinedGeo3D();
+            geo = new UndefinedGeo3D_Geo();
             LOG_WARNING(QString("无法创建类型 %1 的几何体，使用默认类型").arg(type), "文件IO");
         } else {
             LOG_INFO(QString("创建几何体对象，类型: %1").arg(type), "文件IO");
@@ -290,11 +290,11 @@ SceneData GeoOsgbIO::loadSceneFromOsgb(const QString& path)
             // 创建几何对象
             Geo3D* geo = nullptr;
             if (type == Geo_UndefinedGeo3D) {
-                geo = new UndefinedGeo3D();
+                geo = new UndefinedGeo3D_Geo();
             } else {
                 geo = createGeo3D(static_cast<DrawMode3D>(type));
                 if (!geo) {
-                    geo = new UndefinedGeo3D();
+                    geo = new UndefinedGeo3D_Geo();
                 }
             }
             

@@ -21,7 +21,7 @@ class Torus3D_Geo;
 class Prism3D_Geo;
 class Hemisphere3D_Geo;
 class Ellipsoid3D_Geo;
-class UndefinedGeo3D;
+class UndefinedGeo3D_Geo;
 
 // 几何体工厂类
 class GeometryFactory
@@ -50,7 +50,7 @@ public:
     static Prism3D_Geo* createPrism();
     static Hemisphere3D_Geo* createHemisphere();
     static Ellipsoid3D_Geo* createEllipsoid();
-    static UndefinedGeo3D* createUndefinedGeo();
+    static UndefinedGeo3D_Geo* createUndefinedGeo();
     
     // 辅助函数
     static DrawMode3D geoTypeToDrawMode(GeoType3D type);

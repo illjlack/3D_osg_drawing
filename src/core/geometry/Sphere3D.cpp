@@ -3,6 +3,7 @@
 #include <osg/PrimitiveSet>
 #include <cmath>
 #include "../../util/MathUtils.h"
+#include <QKeyEvent>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -11,248 +12,222 @@
 Sphere3D_Geo::Sphere3D_Geo()
     : m_radius(1.0f)
     , m_segments(16)
+    , m_center(0.0f)
+    , m_calculatedRadius(0.0f)
 {
     m_geoType = Geo_Sphere3D;
-    // 确保基类正确初始化
     initialize();
+}
+
+std::vector<StageDescriptor> Sphere3D_Geo::getStageDescriptors() const
+{
+    std::vector<StageDescriptor> descriptors;
+    descriptors.emplace_back("选择球心", 1, 1);
+    descriptors.emplace_back("定义球体半径", 1, 1);
+    return descriptors;
 }
 
 void Sphere3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!mm_state()->isStateComplete())
-    {
-        // 添加控制点
-        mm_controlPoint()->addControlPoint(Point3D(worldPos));
-        
-        // 使用新的检查方法
-        if (isDrawingComplete() && areControlPointsValid())
-        {
-            // 计算球体半径
-            const auto& controlPoints = mm_controlPoint()->getControlPoints();
-            if (controlPoints.size() >= 2) {
-                m_radius = glm::length(controlPoints[1].position - controlPoints[0].position);
+    if (mm_state()->isStateComplete()) return;
+    
+    if (event->button() == Qt::RightButton) {
+        if (isCurrentStageComplete()) {
+            if (canAdvanceToNextStage()) {
+                if (nextStage()) {
+                    calculateSphereParameters();
+                    qDebug() << "球体: 进入阶段" << getCurrentStage() + 1;
+                }
             }
-            mm_state()->setStateComplete();
+            else if (isAllStagesComplete() && areControlPointsValid()) {
+                calculateSphereParameters();
+                mm_state()->setStateComplete();
+                qDebug() << "球体: 绘制完成";
+            }
+        }
+        return;
+    }
+    
+    if (event->button() == Qt::LeftButton) {
+        bool success = mm_controlPoint()->addControlPointToCurrentStage(Point3D(worldPos));
+        if (success) {
+            calculateSphereParameters();
+            if (isCurrentStageComplete() && canAdvanceToNextStage()) {
+                nextStage();
+            }
+            else if (isAllStagesComplete() && areControlPointsValid()) {
+                mm_state()->setStateComplete();
+            }
         }
     }
 }
 
 void Sphere3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (!mm_state()->isStateComplete() && controlPoints.size() == 1)
-    {
-        // 设置临时点用于预览
-        mm_controlPoint()->setTempPoint(Point3D(worldPos));
+    if (mm_state()->isStateComplete()) return;
+    mm_controlPoint()->setCurrentStageTempPoint(Point3D(worldPos));
+}
+
+void Sphere3D_Geo::keyPressEvent(QKeyEvent* event)
+{
+    if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
+        if (isCurrentStageComplete()) {
+            if (canAdvanceToNextStage()) {
+                if (nextStage()) calculateSphereParameters();
+            }
+            else if (isAllStagesComplete() && areControlPointsValid()) {
+                calculateSphereParameters();
+                mm_state()->setStateComplete();
+            }
+        }
+    }
+    else if (event->key() == Qt::Key_Escape) {
+        mm_controlPoint()->removeLastControlPointFromCurrentStage();
+        calculateSphereParameters();
     }
 }
 
-// ============================================================================
-// 点线面几何体构建实现
-// ============================================================================
-
-void Sphere3D_Geo::buildVertexGeometries()
+void Sphere3D_Geo::buildStageVertexGeometries(int stage)
 {
-    mm_node()->clearVertexGeometry();
+    if (stage == 0) buildCenterStageGeometry();
+}
+
+void Sphere3D_Geo::buildStageEdgeGeometries(int stage)
+{
+    if (stage == 1) buildSphereStageGeometry();
+}
+
+void Sphere3D_Geo::buildStageFaceGeometries(int stage)
+{
+    if (stage == 1 && isAllStagesComplete()) buildSphereStageGeometry();
+}
+
+void Sphere3D_Geo::buildCurrentStagePreviewGeometries()
+{
+    int currentStage = getCurrentStage();
+    if (currentStage == 0) buildCenterPreview();
+    else if (currentStage == 1) buildSpherePreview();
+}
+
+void Sphere3D_Geo::buildCenterStageGeometry()
+{
+    const auto& allStages = mm_controlPoint()->getAllStageControlPoints();
+    if (allStages.empty() || allStages[0].empty()) return;
     
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (controlPoints.empty())
-        return;
-    
-    // 获取现有的几何体
     osg::ref_ptr<osg::Geometry> geometry = mm_node()->getVertexGeometry();
-    if (!geometry.valid())
-        return;
+    if (!geometry.valid()) return;
     
-    // 创建顶点数组
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-    
-    // 添加控制点
-    for (const Point3D& point : controlPoints)
-    {
-        vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
-    }
+    const Point3D& center = allStages[0][0];
+    vertices->push_back(osg::Vec3(center.x(), center.y(), center.z()));
     
     geometry->setVertexArray(vertices);
-    
-    // 点绘制 - 控制点使用较大的点大小以便拾取
     osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::POINTS, 0, vertices->size());
     geometry->addPrimitiveSet(drawArrays);
 }
 
-void Sphere3D_Geo::buildEdgeGeometries()
+void Sphere3D_Geo::buildCenterPreview()
 {
-    mm_node()->clearEdgeGeometry();
-    
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (controlPoints.empty())
-        return;
-    
-    // 获取现有的几何体
-    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getEdgeGeometry();
-    if (!geometry.valid())
-        return;
-    
-    // 创建边的几何体（球体网格线）
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-    
-    float radius = m_radius;
-    glm::vec3 center = controlPoints[0].position;
-    
-    int latSegments = static_cast<int>(m_parameters.subdivisionLevel);
-    int lonSegments = latSegments * 2;
-    
-    // 生成网格线顶点
-    for (int lat = 0; lat <= latSegments; ++lat)
-    {
-        float theta = static_cast<float>(M_PI * lat / latSegments);
-        float sinTheta = sin(theta);
-        float cosTheta = cos(theta);
-        
-        for (int lon = 0; lon <= lonSegments; ++lon)
-        {
-            float phi = static_cast<float>(2.0 * M_PI * lon / lonSegments);
-            float sinPhi = sin(phi);
-            float cosPhi = cos(phi);
-            
-            glm::vec3 normal(sinTheta * cosPhi, sinTheta * sinPhi, cosTheta);
-            glm::vec3 point = center + radius * normal;
-            
-            vertices->push_back(osg::Vec3(point.x, point.y, point.z));
-        }
-    }
-    
-    geometry->setVertexArray(vertices);
-    
-    // 绘制网格线
-    osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(osg::PrimitiveSet::LINES);
-    
-    // 经线
-    for (int lat = 0; lat <= latSegments; ++lat)
-    {
-        for (int lon = 0; lon < lonSegments; ++lon)
-        {
-            int current = lat * (lonSegments + 1) + lon;
-            int next = current + 1;
-            indices->push_back(current);
-            indices->push_back(next);
-        }
-    }
-    
-    // 纬线
-    for (int lat = 0; lat < latSegments; ++lat)
-    {
-        for (int lon = 0; lon <= lonSegments; ++lon)
-        {
-            int current = lat * (lonSegments + 1) + lon;
-            int next = current + lonSegments + 1;
-            indices->push_back(current);
-            indices->push_back(next);
-        }
-    }
-    
-    geometry->addPrimitiveSet(indices);
+    buildCenterStageGeometry();
 }
 
-void Sphere3D_Geo::buildFaceGeometries()
+void Sphere3D_Geo::buildSphereStageGeometry()
 {
-    mm_node()->clearFaceGeometry();
+    if (m_calculatedRadius <= 0.0f) return;
     
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (controlPoints.empty())
-        return;
+    osg::ref_ptr<osg::Geometry> faceGeometry = mm_node()->getFaceGeometry();
+    if (!faceGeometry.valid()) return;
     
-    // 获取现有的几何体
-    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getFaceGeometry();
-    if (!geometry.valid())
-        return;
-    
-    // 创建面的几何体
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
+    osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(GL_TRIANGLES);
     
-    float radius = m_radius;
-    glm::vec3 center = controlPoints[0].position;
-    
-    int latSegments = static_cast<int>(m_parameters.subdivisionLevel);
-    int lonSegments = latSegments * 2;
-    
-    // 生成球面顶点
-    for (int lat = 0; lat <= latSegments; ++lat)
-    {
-        float theta = static_cast<float>(M_PI * lat / latSegments);
-        float sinTheta = sin(theta);
-        float cosTheta = cos(theta);
-        
-        for (int lon = 0; lon <= lonSegments; ++lon)
-        {
-            float phi = static_cast<float>(2.0 * M_PI * lon / lonSegments);
-            float sinPhi = sin(phi);
-            float cosPhi = cos(phi);
+    // 生成球体顶点
+    for (int i = 0; i <= m_segments; ++i) {
+        float lat = M_PI * i / m_segments - M_PI / 2;
+        for (int j = 0; j <= m_segments; ++j) {
+            float lon = 2 * M_PI * j / m_segments;
             
-            glm::vec3 normal(sinTheta * cosPhi, sinTheta * sinPhi, cosTheta);
-            glm::vec3 point = center + radius * normal;
+            float x = cos(lat) * cos(lon);
+            float y = cos(lat) * sin(lon);
+            float z = sin(lat);
             
-            vertices->push_back(osg::Vec3(point.x, point.y, point.z));
-            normals->push_back(osg::Vec3(normal.x, normal.y, normal.z));
+            glm::vec3 position = m_center + m_calculatedRadius * glm::vec3(x, y, z);
+            vertices->push_back(osg::Vec3(position.x, position.y, position.z));
+            normals->push_back(osg::Vec3(x, y, z));
         }
     }
     
-    geometry->setVertexArray(vertices);
-    geometry->setNormalArray(normals);
-    geometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
-    
-    // 生成三角形索引
-    osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(GL_TRIANGLES);
-    
-    for (int lat = 0; lat < latSegments; ++lat)
-    {
-        for (int lon = 0; lon < lonSegments; ++lon)
-        {
-            int current = lat * (lonSegments + 1) + lon;
-            int next = current + lonSegments + 1;
+    // 生成球体索引
+    for (int i = 0; i < m_segments; ++i) {
+        for (int j = 0; j < m_segments; ++j) {
+            int curr = i * (m_segments + 1) + j;
+            int next = curr + m_segments + 1;
             
-            // 第一个三角形
-            indices->push_back(current);
+            indices->push_back(curr);
             indices->push_back(next);
-            indices->push_back(current + 1);
+            indices->push_back(curr + 1);
             
-            // 第二个三角形
-            indices->push_back(current + 1);
+            indices->push_back(curr + 1);
             indices->push_back(next);
             indices->push_back(next + 1);
         }
     }
     
-    geometry->addPrimitiveSet(indices);
+    faceGeometry->setVertexArray(vertices);
+    faceGeometry->setNormalArray(normals);
+    faceGeometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
+    faceGeometry->addPrimitiveSet(indices);
 }
 
-// hitTest方法已移除，使用OSG内置拾取系统 
+void Sphere3D_Geo::buildSpherePreview()
+{
+    buildSphereStageGeometry();
+}
 
-// ==================== 绘制完成检查和控制点验证 ====================
+void Sphere3D_Geo::calculateSphereParameters()
+{
+    const auto& allStages = mm_controlPoint()->getAllStageControlPoints();
+    
+    if (!allStages.empty() && !allStages[0].empty()) {
+        m_center = allStages[0][0].position;
+    }
+    
+    if (allStages.size() >= 2 && !allStages[1].empty()) {
+        const Point3D& radiusPoint = allStages[1][0];
+        m_calculatedRadius = glm::length(radiusPoint.position - m_center);
+    }
+}
+
+bool Sphere3D_Geo::isValidSphereConfiguration() const
+{
+    return m_calculatedRadius > 0.001f;
+}
+
+void Sphere3D_Geo::buildVertexGeometries()
+{
+    mm_node()->clearVertexGeometry();
+    buildStageVertexGeometries(getCurrentStage());
+}
+
+void Sphere3D_Geo::buildEdgeGeometries()
+{
+    mm_node()->clearEdgeGeometry();
+    buildStageEdgeGeometries(getCurrentStage());
+}
+
+void Sphere3D_Geo::buildFaceGeometries()
+{
+    mm_node()->clearFaceGeometry();
+    buildStageFaceGeometries(getCurrentStage());
+}
 
 bool Sphere3D_Geo::isDrawingComplete() const
 {
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    return controlPoints.size() >= 2;
+    return isAllStagesComplete();
 }
 
 bool Sphere3D_Geo::areControlPointsValid() const
 {
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    
-    // 检查控制点数量
-    if (controlPoints.empty()) {
-        return false;
-    }
-    
-    // 检查控制点坐标是否有效（不是NaN或无穷大）
-    for (const auto& point : controlPoints) {
-        if (std::isnan(point.x()) || std::isnan(point.y()) || std::isnan(point.z()) ||
-            std::isinf(point.x()) || std::isinf(point.y()) || std::isinf(point.z())) {
-            return false;
-        }
-    }
-    
-    return true;
+    return isValidSphereConfiguration();
 }

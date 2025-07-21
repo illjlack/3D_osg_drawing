@@ -1,387 +1,275 @@
 ﻿#include "DomeHouse3D.h"
 #include <osg/Array>
 #include <osg/PrimitiveSet>
-#include "../../util/MathUtils.h"
 #include <cmath>
+#include "../../util/MathUtils.h"
+#include <QKeyEvent>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
 
 DomeHouse3D_Geo::DomeHouse3D_Geo()
+    : m_radius(3.0f)
+    , m_height(4.0f)
+    , m_domeHeight(2.0f)
+    , m_segments(16)
+    , m_center(0.0f)
+    , m_calculatedRadius(0.0f)
+    , m_calculatedHeight(0.0f)
+    , m_calculatedDomeHeight(0.0f)
 {
-    m_geoType = Geo_UndefinedGeo3D;  // 使用未定义类型，因为这是特殊建筑
-    m_size = glm::vec3(1.0f, 1.0f, 1.0f);
-    m_domeHeight = 0.6f;
-    m_domeRadius = 0.5f;
-    m_segments = 16;  // 穹顶细分段数
+    m_geoType = Geo_DomeHouse3D;
     initialize();
+}
+
+std::vector<StageDescriptor> DomeHouse3D_Geo::getStageDescriptors() const
+{
+    std::vector<StageDescriptor> descriptors;
+    descriptors.emplace_back("绘制房屋底面圆", 2, 2);
+    descriptors.emplace_back("定义房屋和圆顶高度", 1, 1);
+    return descriptors;
 }
 
 void DomeHouse3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!mm_state()->isStateComplete())
-    {
-        // 添加控制点
-        mm_controlPoint()->addControlPoint(Point3D(worldPos));
-        
-        // 使用新的检查方法
-        if (isDrawingComplete() && areControlPointsValid())
-        {
-            mm_state()->setStateComplete();
+    if (mm_state()->isStateComplete()) return;
+    
+    if (event->button() == Qt::RightButton) {
+        if (isCurrentStageComplete()) {
+            if (canAdvanceToNextStage()) {
+                if (nextStage()) {
+                    calculateDomeHouseParameters();
+                    qDebug() << "圆顶房屋: 进入阶段" << getCurrentStage() + 1;
+                }
+            }
+            else if (isAllStagesComplete() && areControlPointsValid()) {
+                calculateDomeHouseParameters();
+                mm_state()->setStateComplete();
+                qDebug() << "圆顶房屋: 绘制完成";
+            }
+        }
+        return;
+    }
+    
+    if (event->button() == Qt::LeftButton) {
+        bool success = mm_controlPoint()->addControlPointToCurrentStage(Point3D(worldPos));
+        if (success) {
+            calculateDomeHouseParameters();
+            if (isCurrentStageComplete() && canAdvanceToNextStage()) {
+                nextStage();
+            }
+            else if (isAllStagesComplete() && areControlPointsValid()) {
+                mm_state()->setStateComplete();
+            }
         }
     }
 }
 
 void DomeHouse3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    // 穹顶房屋的鼠标移动事件处理
-    if (!mm_state()->isStateComplete() && mm_controlPoint()->hasControlPoints())
-    {
-        // 可以在这里实现实时预览
+    if (mm_state()->isStateComplete()) return;
+    mm_controlPoint()->setCurrentStageTempPoint(Point3D(worldPos));
+}
+
+void DomeHouse3D_Geo::keyPressEvent(QKeyEvent* event)
+{
+    if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
+        if (isCurrentStageComplete()) {
+            if (canAdvanceToNextStage()) {
+                if (nextStage()) calculateDomeHouseParameters();
+            }
+            else if (isAllStagesComplete() && areControlPointsValid()) {
+                calculateDomeHouseParameters();
+                mm_state()->setStateComplete();
+            }
+        }
+    }
+    else if (event->key() == Qt::Key_Escape) {
+        mm_controlPoint()->removeLastControlPointFromCurrentStage();
+        calculateDomeHouseParameters();
     }
 }
 
-// ============================================================================
-// 点线面几何体构建实现
-// ============================================================================
+void DomeHouse3D_Geo::buildStageVertexGeometries(int stage)
+{
+    if (stage == 0) buildBaseStageGeometry();
+}
+
+void DomeHouse3D_Geo::buildStageEdgeGeometries(int stage)
+{
+    if (stage == 0) buildBaseStageGeometry();
+    else if (stage == 1) buildDomeHouseStageGeometry();
+}
+
+void DomeHouse3D_Geo::buildStageFaceGeometries(int stage)
+{
+    if (stage == 1 && isAllStagesComplete()) buildDomeHouseStageGeometry();
+}
+
+void DomeHouse3D_Geo::buildCurrentStagePreviewGeometries()
+{
+    int currentStage = getCurrentStage();
+    if (currentStage == 0) buildBaseStageGeometry();
+    else if (currentStage == 1) buildDomeHouseStageGeometry();
+}
+
+void DomeHouse3D_Geo::buildBaseStageGeometry()
+{
+    const auto& allStages = mm_controlPoint()->getAllStageControlPoints();
+    if (allStages.empty() || allStages[0].size() < 2) return;
+    
+    osg::ref_ptr<osg::Geometry> edgeGeometry = mm_node()->getEdgeGeometry();
+    if (!edgeGeometry.valid()) return;
+    
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+    
+    const auto& stage0Points = allStages[0];
+    const Point3D& center = stage0Points[0];
+    const Point3D& radiusPoint = stage0Points[1];
+    
+    // 绘制半径线
+    vertices->push_back(osg::Vec3(center.x(), center.y(), center.z()));
+    vertices->push_back(osg::Vec3(radiusPoint.x(), radiusPoint.y(), radiusPoint.z()));
+    
+    // 绘制底面圆
+    if (m_calculatedRadius > 0.0f) {
+        for (int i = 0; i <= m_segments; ++i) {
+            float angle = 2.0f * M_PI * i / m_segments;
+            float x = center.x() + m_calculatedRadius * cos(angle);
+            float y = center.y() + m_calculatedRadius * sin(angle);
+            float z = center.z();
+            vertices->push_back(osg::Vec3(x, y, z));
+        }
+    }
+    
+    edgeGeometry->setVertexArray(vertices);
+    
+    // 半径线
+    osg::ref_ptr<osg::DrawArrays> radiusLine = new osg::DrawArrays(osg::PrimitiveSet::LINES, 0, 2);
+    edgeGeometry->addPrimitiveSet(radiusLine);
+    
+    // 底面圆
+    if (vertices->size() > 2) {
+        osg::ref_ptr<osg::DrawArrays> circle = new osg::DrawArrays(osg::PrimitiveSet::LINE_STRIP, 2, vertices->size() - 2);
+        edgeGeometry->addPrimitiveSet(circle);
+    }
+}
+
+void DomeHouse3D_Geo::buildDomeHouseStageGeometry()
+{
+    if (m_calculatedRadius <= 0.0f || m_calculatedHeight <= 0.0f) return;
+    
+    osg::ref_ptr<osg::Geometry> faceGeometry = mm_node()->getFaceGeometry();
+    if (!faceGeometry.valid()) return;
+    
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+    osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
+    osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(GL_TRIANGLES);
+    
+    // 生成圆柱形房屋主体
+    for (int i = 0; i <= m_segments; ++i) {
+        float angle = 2.0f * M_PI * i / m_segments;
+        float x = cos(angle);
+        float y = sin(angle);
+        
+        // 底面顶点
+        glm::vec3 bottomPos = m_center + m_calculatedRadius * glm::vec3(x, y, 0);
+        vertices->push_back(osg::Vec3(bottomPos.x, bottomPos.y, bottomPos.z));
+        normals->push_back(osg::Vec3(x, y, 0));
+        
+        // 主体顶部顶点
+        glm::vec3 topPos = m_center + m_calculatedRadius * glm::vec3(x, y, 0) + glm::vec3(0, 0, m_calculatedHeight);
+        vertices->push_back(osg::Vec3(topPos.x, topPos.y, topPos.z));
+        normals->push_back(osg::Vec3(x, y, 0));
+    }
+    
+    // 添加圆顶顶点
+    for (int i = 0; i <= m_segments/2; ++i) {
+        float phi = M_PI * i / (m_segments/2); // 从0到π/2
+        for (int j = 0; j <= m_segments; ++j) {
+            float theta = 2.0f * M_PI * j / m_segments;
+            
+            float x = m_calculatedRadius * sin(phi) * cos(theta);
+            float y = m_calculatedRadius * sin(phi) * sin(theta);
+            float z = m_calculatedHeight + m_calculatedDomeHeight * cos(phi);
+            
+            glm::vec3 pos = m_center + glm::vec3(x, y, z);
+            vertices->push_back(osg::Vec3(pos.x, pos.y, pos.z));
+            
+            glm::vec3 normal = glm::normalize(glm::vec3(sin(phi) * cos(theta), sin(phi) * sin(theta), cos(phi)));
+            normals->push_back(osg::Vec3(normal.x, normal.y, normal.z));
+        }
+    }
+    
+    // 生成房屋主体侧面索引
+    for (int i = 0; i < m_segments; ++i) {
+        int bottom1 = i * 2;
+        int top1 = i * 2 + 1;
+        int bottom2 = (i + 1) * 2;
+        int top2 = (i + 1) * 2 + 1;
+        
+        indices->push_back(bottom1); indices->push_back(top1); indices->push_back(bottom2);
+        indices->push_back(bottom2); indices->push_back(top1); indices->push_back(top2);
+    }
+    
+    faceGeometry->setVertexArray(vertices);
+    faceGeometry->setNormalArray(normals);
+    faceGeometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
+    faceGeometry->addPrimitiveSet(indices);
+}
+
+void DomeHouse3D_Geo::calculateDomeHouseParameters()
+{
+    const auto& allStages = mm_controlPoint()->getAllStageControlPoints();
+    
+    // 第一阶段：计算底面中心和半径
+    if (!allStages.empty() && allStages[0].size() >= 2) {
+        m_center = allStages[0][0].position;
+        const Point3D& radiusPoint = allStages[0][1];
+        m_calculatedRadius = glm::length(radiusPoint.position - m_center);
+    }
+    
+    // 第二阶段：计算高度
+    if (allStages.size() >= 2 && !allStages[1].empty()) {
+        const Point3D& heightPoint = allStages[1][0];
+        float totalHeight = heightPoint.z() - m_center.z;
+        if (totalHeight < 0) totalHeight = -totalHeight;
+        
+        m_calculatedHeight = totalHeight * 0.7f; // 主体高度占70%
+        m_calculatedDomeHeight = totalHeight * 0.3f; // 圆顶高度占30%
+    }
+}
+
+bool DomeHouse3D_Geo::isValidDomeHouseConfiguration() const
+{
+    return m_calculatedRadius > 0.001f && m_calculatedHeight > 0.001f && m_calculatedDomeHeight > 0.001f;
+}
 
 void DomeHouse3D_Geo::buildVertexGeometries()
 {
     mm_node()->clearVertexGeometry();
-    
-    if (!mm_controlPoint()->hasControlPoints())
-        return;
-    
-    // 获取现有的几何体
-    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getVertexGeometry();
-    if (!geometry.valid())
-        return;
-    
-    // 创建顶点数组
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-    
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (controlPoints.size() >= 3)
-    {
-        const Point3D& basePoint = controlPoints[0];
-        const Point3D& sizePoint = controlPoints[1];
-        const Point3D& heightPoint = controlPoints[2];
-        
-        // 计算房屋尺寸
-        m_size.x = abs(sizePoint.x() - basePoint.x());
-        m_size.y = abs(sizePoint.y() - basePoint.y());
-        m_size.z = abs(heightPoint.z() - basePoint.z());
-        m_domeHeight = m_size.z * 0.5f;  // 穹顶高度为房屋高度的50%
-        m_domeRadius = std::min(m_size.x, m_size.y) * 0.5f;  // 穹顶半径为较小边长的50%
-        
-        // 生成房屋顶点
-        float x = basePoint.x();
-        float y = basePoint.y();
-        float z = basePoint.z();
-        
-        // 底面四个顶点
-        vertices->push_back(osg::Vec3(x, y, z));
-        vertices->push_back(osg::Vec3(x + m_size.x, y, z));
-        vertices->push_back(osg::Vec3(x + m_size.x, y + m_size.y, z));
-        vertices->push_back(osg::Vec3(x, y + m_size.y, z));
-        
-        // 顶面四个顶点
-        vertices->push_back(osg::Vec3(x, y, z + m_size.z));
-        vertices->push_back(osg::Vec3(x + m_size.x, y, z + m_size.z));
-        vertices->push_back(osg::Vec3(x + m_size.x, y + m_size.y, z + m_size.z));
-        vertices->push_back(osg::Vec3(x, y + m_size.y, z + m_size.z));
-        
-        // 穹顶顶点
-        float domeCenterX = x + m_size.x * 0.5f;
-        float domeCenterY = y + m_size.y * 0.5f;
-        float domeCenterZ = z + m_size.z;
-        
-        // 生成穹顶顶点
-        for (int i = 0; i <= m_segments; ++i)
-        {
-            float phi = M_PI * i / (2 * m_segments);  // 从0到π/2
-            for (int j = 0; j <= m_segments; ++j)
-            {
-                float theta = 2 * M_PI * j / m_segments;  // 从0到2π
-                
-                float domeX = domeCenterX + m_domeRadius * sin(phi) * cos(theta);
-                float domeY = domeCenterY + m_domeRadius * sin(phi) * sin(theta);
-                float domeZ = domeCenterZ + m_domeRadius * cos(phi);
-                
-                vertices->push_back(osg::Vec3(domeX, domeY, domeZ));
-            }
-        }
-    }
-    
-    geometry->setVertexArray(vertices);
-    
-    // 点绘制
-    osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::POINTS, 0, vertices->size());
-    geometry->addPrimitiveSet(drawArrays);
+    buildStageVertexGeometries(getCurrentStage());
 }
 
 void DomeHouse3D_Geo::buildEdgeGeometries()
 {
     mm_node()->clearEdgeGeometry();
-    
-    if (!mm_controlPoint()->hasControlPoints())
-        return;
-    
-    // 获取现有的几何体
-    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getEdgeGeometry();
-    if (!geometry.valid())
-        return;
-    
-    // 创建顶点数组
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-    
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (controlPoints.size() >= 3)
-    {
-        const Point3D& basePoint = controlPoints[0];
-        float x = basePoint.x();
-        float y = basePoint.y();
-        float z = basePoint.z();
-        
-        // 生成房屋顶点
-        // 底面四个顶点
-        vertices->push_back(osg::Vec3(x, y, z));
-        vertices->push_back(osg::Vec3(x + m_size.x, y, z));
-        vertices->push_back(osg::Vec3(x + m_size.x, y + m_size.y, z));
-        vertices->push_back(osg::Vec3(x, y + m_size.y, z));
-        
-        // 顶面四个顶点
-        vertices->push_back(osg::Vec3(x, y, z + m_size.z));
-        vertices->push_back(osg::Vec3(x + m_size.x, y, z + m_size.z));
-        vertices->push_back(osg::Vec3(x + m_size.x, y + m_size.y, z + m_size.z));
-        vertices->push_back(osg::Vec3(x, y + m_size.y, z + m_size.z));
-        
-        // 穹顶顶点
-        float domeCenterX = x + m_size.x * 0.5f;
-        float domeCenterY = y + m_size.y * 0.5f;
-        float domeCenterZ = z + m_size.z;
-        
-        // 生成穹顶顶点
-        for (int i = 0; i <= m_segments; ++i)
-        {
-            float phi = M_PI * i / (2 * m_segments);
-            for (int j = 0; j <= m_segments; ++j)
-            {
-                float theta = 2 * M_PI * j / m_segments;
-                
-                float domeX = domeCenterX + m_domeRadius * sin(phi) * cos(theta);
-                float domeY = domeCenterY + m_domeRadius * sin(phi) * sin(theta);
-                float domeZ = domeCenterZ + m_domeRadius * cos(phi);
-                
-                vertices->push_back(osg::Vec3(domeX, domeY, domeZ));
-            }
-        }
-        
-        geometry->setVertexArray(vertices);
-        
-        // 绘制底面边
-        for (int i = 0; i < 4; ++i)
-        {
-            int next = (i + 1) % 4;
-            osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::LINES, i, 2);
-            geometry->addPrimitiveSet(drawArrays);
-        }
-        
-        // 绘制顶面边
-        for (int i = 0; i < 4; ++i)
-        {
-            int next = (i + 1) % 4;
-            osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::LINES, 4 + i, 2);
-            geometry->addPrimitiveSet(drawArrays);
-        }
-        
-        // 绘制连接边
-        for (int i = 0; i < 4; ++i)
-        {
-            osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::LINES, i, 2);
-            geometry->addPrimitiveSet(drawArrays);
-        }
-        
-        // 绘制穹顶边
-        int domeStartIndex = 8;
-        // 绘制经线
-        for (int j = 0; j <= m_segments; ++j)
-        {
-            for (int i = 0; i < m_segments; ++i)
-            {
-                int index1 = domeStartIndex + i * (m_segments + 1) + j;
-                int index2 = domeStartIndex + (i + 1) * (m_segments + 1) + j;
-                osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::LINES, index1, 2);
-                geometry->addPrimitiveSet(drawArrays);
-            }
-        }
-        
-        // 绘制纬线
-        for (int i = 0; i <= m_segments; ++i)
-        {
-            for (int j = 0; j < m_segments; ++j)
-            {
-                int index1 = domeStartIndex + i * (m_segments + 1) + j;
-                int index2 = domeStartIndex + i * (m_segments + 1) + j + 1;
-                osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::LINES, index1, 2);
-                geometry->addPrimitiveSet(drawArrays);
-            }
-        }
-    }
+    buildStageEdgeGeometries(getCurrentStage());
 }
 
 void DomeHouse3D_Geo::buildFaceGeometries()
 {
     mm_node()->clearFaceGeometry();
-    
-    if (!mm_controlPoint()->hasControlPoints())
-        return;
-    
-    // 获取现有的几何体
-    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getFaceGeometry();
-    if (!geometry.valid())
-        return;
-    
-    // 创建顶点数组和法向量数组
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-    osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
-    
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (controlPoints.size() >= 3)
-    {
-        const Point3D& basePoint = controlPoints[0];
-        float x = basePoint.x();
-        float y = basePoint.y();
-        float z = basePoint.z();
-        
-        // 生成房屋顶点和法向量
-        // 底面四个顶点
-        vertices->push_back(osg::Vec3(x, y, z));
-        vertices->push_back(osg::Vec3(x + m_size.x, y, z));
-        vertices->push_back(osg::Vec3(x + m_size.x, y + m_size.y, z));
-        vertices->push_back(osg::Vec3(x, y + m_size.y, z));
-        
-        // 顶面四个顶点
-        vertices->push_back(osg::Vec3(x, y, z + m_size.z));
-        vertices->push_back(osg::Vec3(x + m_size.x, y, z + m_size.z));
-        vertices->push_back(osg::Vec3(x + m_size.x, y + m_size.y, z + m_size.z));
-        vertices->push_back(osg::Vec3(x, y + m_size.y, z + m_size.z));
-        
-        // 穹顶顶点
-        float domeCenterX = x + m_size.x * 0.5f;
-        float domeCenterY = y + m_size.y * 0.5f;
-        float domeCenterZ = z + m_size.z;
-        
-        // 生成穹顶顶点和法向量
-        for (int i = 0; i <= m_segments; ++i)
-        {
-            float phi = M_PI * i / (2 * m_segments);
-            for (int j = 0; j <= m_segments; ++j)
-            {
-                float theta = 2 * M_PI * j / m_segments;
-                
-                float domeX = domeCenterX + m_domeRadius * sin(phi) * cos(theta);
-                float domeY = domeCenterY + m_domeRadius * sin(phi) * sin(theta);
-                float domeZ = domeCenterZ + m_domeRadius * cos(phi);
-                
-                vertices->push_back(osg::Vec3(domeX, domeY, domeZ));
-                
-                // 计算法向量（指向穹顶中心）
-                float nx = (domeX - domeCenterX) / m_domeRadius;
-                float ny = (domeY - domeCenterY) / m_domeRadius;
-                float nz = (domeZ - domeCenterZ) / m_domeRadius;
-                normals->push_back(osg::Vec3(nx, ny, nz));
-            }
-        }
-        
-        // 添加房屋部分的法向量
-        for (int i = 0; i < 8; ++i)
-        {
-            normals->push_back(osg::Vec3(0, 0, 1));
-        }
-        
-        geometry->setVertexArray(vertices);
-        geometry->setNormalArray(normals);
-        geometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
-        
-        // 绘制底面
-        osg::ref_ptr<osg::DrawArrays> bottomFace = new osg::DrawArrays(osg::PrimitiveSet::QUADS, 0, 4);
-        geometry->addPrimitiveSet(bottomFace);
-        
-        // 绘制侧面
-        for (int i = 0; i < 4; ++i)
-        {
-            int next = (i + 1) % 4;
-            osg::ref_ptr<osg::DrawArrays> sideFace = new osg::DrawArrays(osg::PrimitiveSet::QUADS, i, 4);
-            geometry->addPrimitiveSet(sideFace);
-        }
-        
-        // 绘制穹顶面
-        int domeStartIndex = 8;
-        for (int i = 0; i < m_segments; ++i)
-        {
-            for (int j = 0; j < m_segments; ++j)
-            {
-                int index1 = domeStartIndex + i * (m_segments + 1) + j;
-                int index2 = domeStartIndex + (i + 1) * (m_segments + 1) + j;
-                int index3 = domeStartIndex + (i + 1) * (m_segments + 1) + j + 1;
-                int index4 = domeStartIndex + i * (m_segments + 1) + j + 1;
-                
-                // 第一个三角形
-                osg::ref_ptr<osg::DrawArrays> triangle1 = new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, index1, 3);
-                geometry->addPrimitiveSet(triangle1);
-                
-                // 第二个三角形
-                osg::ref_ptr<osg::DrawArrays> triangle2 = new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, index1, 3);
-                geometry->addPrimitiveSet(triangle2);
-            }
-        }
-    }
+    buildStageFaceGeometries(getCurrentStage());
 }
-
-// ==================== 绘制完成检查和控制点验证 ====================
 
 bool DomeHouse3D_Geo::isDrawingComplete() const
 {
-    // 穹顶房屋需要3个控制点：基点、尺寸点、高度点
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    return controlPoints.size() >= 3;
+    return isAllStagesComplete();
 }
 
 bool DomeHouse3D_Geo::areControlPointsValid() const
 {
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    
-    // 检查控制点数量
-    if (controlPoints.size() < 3) {
-        return false;
-    }
-    
-    // 检查控制点坐标是否有效
-    for (const auto& point : controlPoints) {
-        if (std::isnan(point.x()) || std::isnan(point.y()) || std::isnan(point.z()) ||
-            std::isinf(point.x()) || std::isinf(point.y()) || std::isinf(point.z())) {
-            return false;
-        }
-    }
-    
-    // 检查尺寸是否有效
-    if (controlPoints.size() >= 3) {
-        const Point3D& basePoint = controlPoints[0];
-        const Point3D& sizePoint = controlPoints[1];
-        const Point3D& heightPoint = controlPoints[2];
-        
-        float width = abs(sizePoint.x() - basePoint.x());
-        float length = abs(sizePoint.y() - basePoint.y());
-        float height = abs(heightPoint.z() - basePoint.z());
-        
-        if (width <= 0.0f || length <= 0.0f || height <= 0.0f ||
-            std::isnan(width) || std::isnan(length) || std::isnan(height) ||
-            std::isinf(width) || std::isinf(length) || std::isinf(height)) {
-            return false;
-        }
-    }
-    
-    return true;
+    return isValidDomeHouseConfiguration();
 } 

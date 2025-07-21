@@ -3,27 +3,41 @@
 
 #include "../GeometryBase.h"
 
-// 多棱柱几何体类
+// 棱柱几何体类
 class Prism3D_Geo : public Geo3D
 {
 public:
     Prism3D_Geo();
     virtual ~Prism3D_Geo() = default;
     
+    // ==================== 多阶段绘制支持 ====================
+    virtual std::vector<StageDescriptor> getStageDescriptors() const override;
     virtual void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
     virtual void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
+    virtual void keyPressEvent(QKeyEvent* event) override;
 
 protected:
     virtual void buildVertexGeometries() override;
     virtual void buildEdgeGeometries() override;
     virtual void buildFaceGeometries() override;
-    
-    // 绘制完成检查和控制点验证
+    virtual void buildStageVertexGeometries(int stage) override;
+    virtual void buildStageEdgeGeometries(int stage) override;
+    virtual void buildStageFaceGeometries(int stage) override;
+    virtual void buildCurrentStagePreviewGeometries() override;
     virtual bool isDrawingComplete() const override;
     virtual bool areControlPointsValid() const override;
+
+private:
+    void buildBaseStageGeometry();
+    void buildPrismStageGeometry();
+    void calculatePrismParameters();
+    bool isValidPrismConfiguration() const;
     
 private:
-    int m_sides;  // 棱柱的边数
-    float m_height;  // 棱柱的高度
-    float m_radius;  // 底面半径
+    float m_height = 2.0f;
+    std::vector<glm::vec3> m_baseVertices;
+    std::vector<glm::vec3> m_topVertices;
+    glm::vec3 m_baseCenter = glm::vec3(0.0f);
+    glm::vec3 m_normal = glm::vec3(0.0f, 0.0f, 1.0f);
+    float m_calculatedHeight = 0.0f;
 }; 

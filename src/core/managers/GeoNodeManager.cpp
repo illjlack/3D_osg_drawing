@@ -59,7 +59,7 @@ void GeoNodeManager::clearVertexGeometry()
         m_vertexGeometry->removePrimitiveSet(0, m_vertexGeometry->getNumPrimitiveSets());
         m_vertexGeometry->setVertexArray(nullptr);
         m_vertexGeometry->setColorArray(nullptr);
-        m_vertexGeometry->setShape(nullptr);  // 清除KdTree
+        // m_vertexGeometry->setShape(nullptr);  // 清除KdTree (点几何不构建KdTree)
         emit geometryChanged();
     }
 }
@@ -70,7 +70,7 @@ void GeoNodeManager::clearEdgeGeometry()
         m_edgeGeometry->removePrimitiveSet(0, m_edgeGeometry->getNumPrimitiveSets());
         m_edgeGeometry->setVertexArray(nullptr);
         m_edgeGeometry->setColorArray(nullptr);
-        m_edgeGeometry->setShape(nullptr);  // 清除KdTree
+        // m_edgeGeometry->setShape(nullptr);  // 清除KdTree (线几何不构建KdTree)
         emit geometryChanged();
     }
 }
@@ -215,17 +215,24 @@ bool GeoNodeManager::isBoundingBoxVisible() const
 
 void GeoNodeManager::updateSpatialIndex()
 {
-    // 为所有几何体构建OSG的KdTree，让OSG内部拾取系统使用
-    if (m_vertexGeometry.valid()) buildKdTreeForGeometry(m_vertexGeometry.get());
-    if (m_edgeGeometry.valid()) buildKdTreeForGeometry(m_edgeGeometry.get());
+    // 只在绘制完成时才构建KdTree，提高性能
+    if (!m_parent->isDrawingComplete()) {
+        return;
+    }
+    
+    // 为几何体构建OSG的KdTree，让OSG内部拾取系统使用
+    // 注释掉点和线的KdTree构建，只构建面的KdTree
+    // if (m_vertexGeometry.valid()) buildKdTreeForGeometry(m_vertexGeometry.get());
+    // if (m_edgeGeometry.valid()) buildKdTreeForGeometry(m_edgeGeometry.get());
     if (m_faceGeometry.valid()) buildKdTreeForGeometry(m_faceGeometry.get());
 }
 
 void GeoNodeManager::clearSpatialIndex()
 {
-    // 为所有几何体清除OSG的KdTree
-    if (m_vertexGeometry.valid()) m_vertexGeometry->setShape(nullptr);
-    if (m_edgeGeometry.valid()) m_edgeGeometry->setShape(nullptr);
+    // 为几何体清除OSG的KdTree
+    // 注释掉点和线的KdTree清除，只清除面的KdTree
+    // if (m_vertexGeometry.valid()) m_vertexGeometry->setShape(nullptr);
+    // if (m_edgeGeometry.valid()) m_edgeGeometry->setShape(nullptr);
     if (m_faceGeometry.valid()) m_faceGeometry->setShape(nullptr);
 }
 

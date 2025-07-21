@@ -1096,10 +1096,10 @@ void OSGWidget::wheelEvent(QWheelEvent* event)
 
 void OSGWidget::handleDrawingInput(QMouseEvent* event)
 {
-    // 右键取消绘制
+    // 右键完成绘制
     if (event->button() == Qt::RightButton && m_isDrawing)
     {
-        cancelCurrentDrawing();
+        completeCurrentDrawing();
         return;
     }
     

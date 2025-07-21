@@ -44,6 +44,7 @@
 Geo3D::Geo3D()
     : m_geoType(Geo_Undefined3D)
     , m_parametersChanged(false)
+    , m_stagesInitialized(false)
 {
     setupManagers();
     initialize();
@@ -195,6 +196,93 @@ void Geo3D::initialize()
 {
     m_parameters.resetToGlobal();
     mm_state()->setStateInitialized();
+    
+    // 注意：不在这里初始化多阶段描述符，因为会调用纯虚函数
+    // 延迟到实际需要时再初始化
+}
+
+// ==================== 多阶段绘制接口实现 ====================
+
+void Geo3D::initializeStages()
+{
+    // 如果已经初始化过，则不重复初始化
+    if (m_stagesInitialized) {
+        return;
+    }
+    
+    // 获取该几何图形的阶段描述符
+    auto descriptors = getStageDescriptors();
+    
+    // 设置到控制点管理器中
+    mm_controlPoint()->setStageDescriptors(descriptors);
+    
+    // 标记为已初始化
+    m_stagesInitialized = true;
+    
+    qDebug() << "Geo3D::initializeStages: 已初始化" << descriptors.size() << "个绘制阶段";
+}
+
+int Geo3D::getCurrentStage() const
+{
+    // 确保阶段描述符已初始化（破除const约束进行懒加载）
+    const_cast<Geo3D*>(this)->initializeStages();
+    return mm_controlPoint()->getCurrentStage();
+}
+
+bool Geo3D::nextStage()
+{
+    initializeStages();
+    return mm_controlPoint()->nextStage();
+}
+
+bool Geo3D::canAdvanceToNextStage() const
+{
+    const_cast<Geo3D*>(this)->initializeStages();
+    return mm_controlPoint()->canAdvanceToNextStage();
+}
+
+bool Geo3D::isCurrentStageComplete() const
+{
+    const_cast<Geo3D*>(this)->initializeStages();
+    return mm_controlPoint()->isCurrentStageComplete();
+}
+
+bool Geo3D::isAllStagesComplete() const
+{
+    const_cast<Geo3D*>(this)->initializeStages();
+    return mm_controlPoint()->isAllStagesComplete();
+}
+
+const StageDescriptor* Geo3D::getCurrentStageDescriptor() const
+{
+    const_cast<Geo3D*>(this)->initializeStages();
+    return mm_controlPoint()->getCurrentStageDescriptor();
+}
+
+bool Geo3D::validateCurrentStage() const
+{
+    const_cast<Geo3D*>(this)->initializeStages();
+    
+    // 获取当前阶段描述符
+    const StageDescriptor* desc = getCurrentStageDescriptor();
+    if (!desc) {
+        return false;
+    }
+    
+    // 获取当前阶段的控制点数量
+    int currentCount = mm_controlPoint()->getCurrentStageControlPointCount();
+    
+    // 检查是否满足最小要求
+    if (currentCount < desc->minControlPoints) {
+        return false;
+    }
+    
+    // 检查是否超过最大限制
+    if (desc->maxControlPoints > 0 && currentCount > desc->maxControlPoints) {
+        return false;
+    }
+    
+    return true;
 }
 
 // ========================================= 事件处理虚函数实现 =========================================
@@ -243,6 +331,15 @@ void Geo3D::updateGeometries()
     buildVertexGeometries();
     buildEdgeGeometries();
     buildFaceGeometries();
+    
+    // 构建当前阶段的预览几何体
+    buildCurrentStagePreviewGeometries();
+    
+    // 如果支持阶段特定的几何体构建，调用相应方法
+    int currentStage = getCurrentStage();
+    buildStageVertexGeometries(currentStage);
+    buildStageEdgeGeometries(currentStage);
+    buildStageFaceGeometries(currentStage);
 }
 
 // ============================================================================

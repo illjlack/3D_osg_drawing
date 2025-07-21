@@ -126,6 +126,13 @@ enum GeoType3D
     Geo_Hemisphere3D,
     Geo_Ellipsoid3D,
     
+    // 建筑类型
+    Geo_FlatHouse3D,
+    Geo_DomeHouse3D,
+    Geo_SpireHouse3D,
+    Geo_GableHouse3D,
+    Geo_LHouse3D,
+    
     // 未定义几何体类型
     Geo_UndefinedGeo3D,
     

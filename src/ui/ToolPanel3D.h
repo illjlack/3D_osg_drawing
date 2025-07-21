@@ -1,9 +1,12 @@
 ﻿#pragma once
 #include <QWidget>
-#include <QGroupBox>
 #include <QPushButton>
 #include <QComboBox>
 #include <QStackedWidget>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QFrame>
+#include <QLabel>
 #include "../core/Enums3D.h"
 #include <QCheckBox>
 
@@ -13,6 +16,7 @@ class ToolPanel3D : public QWidget
 public:
     explicit ToolPanel3D(QWidget* parent = nullptr);
     void updateDrawMode(DrawMode3D mode);
+
 signals:
     void drawModeChanged(DrawMode3D mode);
     void skyboxEnabled(bool enabled);
@@ -30,6 +34,7 @@ signals:
     void coordinateSystemRequested();
     void pickingSystemRequested();
     void displaySettingsRequested();
+
 public slots:
     void onDrawModeButtonClicked();
     void onSkyboxEnabledChanged(bool enabled);
@@ -47,19 +52,34 @@ public slots:
     void onCoordinateSystemClicked();
     void onPickingSystemClicked();
     void onDisplaySettingsClicked();
-    void onDrawingCategoryChanged(int index);
+    void onDrawingModeChanged(int index);
+    void onViewToggleClicked();
+    void onUtilityToggleClicked();
+    void onSkyboxToggleClicked();
+
 private:
     void setupUI();
-    void createDrawingGroup();
-    void createSelectPage();
-    void createBasicGeometryPage();
+    void setupStyles();
+    
+    // 创建各个可折叠模块
+    void createCollapsibleDrawingSection(QVBoxLayout* parentLayout);
+    void createCollapsibleViewSection(QVBoxLayout* parentLayout);
+    void createCollapsibleUtilitySection(QVBoxLayout* parentLayout);
+    void createCollapsibleSkyboxSection(QVBoxLayout* parentLayout);
+    void createBasicToolsPage();
+    void createGeometryPage();
     void createBuildingPage();
-    void createViewGroup();
-    void createUtilityGroup();
-    void createSkyboxGroup();
+    
+    // 辅助方法
+    QPushButton* createStyledButton(const QString& emoji, const QString& text, const QString& tooltip, DrawMode3D mode);
+    QPushButton* createActionButton(const QString& emoji, const QString& text, const QString& tooltip);
+
+private:
     DrawMode3D m_currentMode;
-    QGroupBox* m_drawingGroup;
-    QComboBox* m_drawingCategoryCombo;
+    
+    // 绘制工具相关
+    QComboBox* m_drawingModeCombo;
+    QStackedWidget* m_drawingStackedWidget;
     QPushButton* m_selectButton;
     QPushButton* m_pointButton;
     QPushButton* m_lineButton;
@@ -74,29 +94,37 @@ private:
     QPushButton* m_coneButton;
     QPushButton* m_sphereButton;
     QPushButton* m_torusButton;
+    QPushButton* m_prismButton;
+    QPushButton* m_hemisphereButton;
+    QPushButton* m_ellipsoidButton;
     QPushButton* m_gableHouseButton;
     QPushButton* m_spireHouseButton;
     QPushButton* m_domeHouseButton;
     QPushButton* m_flatHouseButton;
     QPushButton* m_lHouseButton;
-    QPushButton* m_prismButton;
-    QPushButton* m_hemisphereButton;
-    QPushButton* m_ellipsoidButton;
-    QStackedWidget* m_drawingStackedWidget;
-    QGroupBox* m_viewGroup;
+    
+    // 视图工具相关
+    QPushButton* m_viewToggleButton;
+    QWidget* m_viewContentWidget;
     QPushButton* m_resetViewButton;
     QPushButton* m_fitViewButton;
     QPushButton* m_topViewButton;
     QPushButton* m_frontViewButton;
     QPushButton* m_rightViewButton;
     QPushButton* m_isometricViewButton;
-    QGroupBox* m_utilityGroup;
+    
+    // 实用工具相关
+    QPushButton* m_utilityToggleButton;
+    QWidget* m_utilityContentWidget;
     QPushButton* m_clearSceneButton;
     QPushButton* m_exportImageButton;
     QPushButton* m_coordinateSystemButton;
     QPushButton* m_pickingSystemButton;
     QPushButton* m_displaySettingsButton;
-    QGroupBox* m_skyboxGroup;
+    
+    // 天空盒相关
+    QPushButton* m_skyboxToggleButton;
+    QWidget* m_skyboxContentWidget;
     QCheckBox* m_skyboxEnabledCheck;
     QPushButton* m_skyboxGradientButton;
     QPushButton* m_skyboxSolidButton;

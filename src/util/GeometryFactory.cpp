@@ -161,9 +161,9 @@ Ellipsoid3D_Geo* GeometryFactory::createEllipsoid()
     return new Ellipsoid3D_Geo();
 }
 
-UndefinedGeo3D* GeometryFactory::createUndefinedGeo()
+UndefinedGeo3D_Geo* GeometryFactory::createUndefinedGeo()
 {
-    return new UndefinedGeo3D();
+    return new UndefinedGeo3D_Geo();
 }
 
 DrawMode3D GeometryFactory::geoTypeToDrawMode(GeoType3D type)
@@ -186,6 +186,11 @@ DrawMode3D GeometryFactory::geoTypeToDrawMode(GeoType3D type)
     case Geo_Prism3D: return DrawPrism3D;
     case Geo_Hemisphere3D: return DrawHemisphere3D;
     case Geo_Ellipsoid3D: return DrawEllipsoid3D;
+    case Geo_FlatHouse3D: return DrawFlatHouse3D;
+    case Geo_DomeHouse3D: return DrawDomeHouse3D;
+    case Geo_SpireHouse3D: return DrawSpireHouse3D;
+    case Geo_GableHouse3D: return DrawGableHouse3D;
+    case Geo_LHouse3D: return DrawLHouse3D;
     case Geo_UndefinedGeo3D: return DrawSelect3D;
     default: return DrawSelect3D;
     }
@@ -213,11 +218,15 @@ GeoType3D GeometryFactory::drawModeToGeoType(DrawMode3D mode)
     case DrawHemisphere3D: return Geo_Hemisphere3D;
     case DrawEllipsoid3D: return Geo_Ellipsoid3D;
     case DrawGableHouse3D:
+        return Geo_GableHouse3D;
     case DrawSpireHouse3D:
+        return Geo_SpireHouse3D;
     case DrawDomeHouse3D:
+        return Geo_DomeHouse3D;
     case DrawFlatHouse3D:
+        return Geo_FlatHouse3D;
     case DrawLHouse3D:
-        return Geo_UndefinedGeo3D;
+        return Geo_LHouse3D;
     default: return Geo_UndefinedGeo3D;
     }
 } 

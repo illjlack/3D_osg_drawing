@@ -2,6 +2,7 @@
 #include <osg/Array>
 #include <osg/PrimitiveSet>
 #include <cmath>
+#include <QKeyEvent>
 #include "../../util/MathUtils.h"
 
 #ifndef M_PI
@@ -11,64 +12,262 @@
 Triangle3D_Geo::Triangle3D_Geo()
 {
     m_geoType = Geo_Triangle3D;
+    m_area = 0.0f;
+    m_normal = glm::vec3(0.0f);
     // 确保基类正确初始化
     initialize();
 }
 
+// ==================== 多阶段绘制支持实现 ====================
+
+std::vector<StageDescriptor> Triangle3D_Geo::getStageDescriptors() const
+{
+    std::vector<StageDescriptor> descriptors;
+    
+    // 三角形只有一个阶段：选择三个顶点（需要3个点）
+    descriptors.emplace_back("绘制三角形顶点", 3, 3);
+    
+    return descriptors;
+}
+
 void Triangle3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!mm_state()->isStateComplete())
-    {
-        // 添加控制点
-        mm_controlPoint()->addControlPoint(Point3D(worldPos));
+    if (mm_state()->isStateComplete()) {
+        return;
+    }
+    
+    const StageDescriptor* desc = getCurrentStageDescriptor();
+    if (!desc) {
+        return;
+    }
+    
+    // 处理左键添加控制点
+    if (event->button() == Qt::LeftButton) {
+        bool success = mm_controlPoint()->addControlPointToCurrentStage(Point3D(worldPos));
         
-        // 使用新的检查方法
-        if (isDrawingComplete() && areControlPointsValid())
-        {
-            // 直接计算法向量
-            const auto& controlPoints = mm_controlPoint()->getControlPoints();
-            const auto& v1 = controlPoints[0].position;
-            const auto& v2 = controlPoints[1].position;
-            const auto& v3 = controlPoints[2].position;
-            
-            glm::vec3 edge1 = v2 - v1;
-            glm::vec3 edge2 = v3 - v1;
-            m_normal = glm::normalize(glm::cross(edge1, edge2));
-            
-            mm_state()->setStateComplete();
+        if (success) {
+            // 检查是否所有阶段都完成
+            if (isAllStagesComplete() && areControlPointsValid()) {
+                calculateTriangleParameters();
+                mm_state()->setStateComplete();
+                qDebug() << "三角形: 绘制完成";
+            }
         }
     }
 }
 
 void Triangle3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (!mm_state()->isStateComplete() && controlPoints.size() < 3)
-    {
-        // 设置临时点用于预览
-        mm_controlPoint()->setTempPoint(Point3D(worldPos));
+    if (mm_state()->isStateComplete()) {
+        return;
+    }
+    
+    // 设置临时点用于预览
+    mm_controlPoint()->setCurrentStageTempPoint(Point3D(worldPos));
+}
+
+void Triangle3D_Geo::keyPressEvent(QKeyEvent* event)
+{
+    if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
+        // 回车键完成绘制
+        if (isCurrentStageComplete() && areControlPointsValid()) {
+            calculateTriangleParameters();
+            mm_state()->setStateComplete();
+            qDebug() << "三角形: 回车键完成绘制";
+        }
+    }
+    else if (event->key() == Qt::Key_Escape) {
+        // ESC键撤销最后一个控制点
+        mm_controlPoint()->removeLastControlPointFromCurrentStage();
     }
 }
+
+// ==================== 多阶段几何构建方法实现 ====================
+
+void Triangle3D_Geo::buildStageVertexGeometries(int stage)
+{
+    if (stage == 0) {
+        buildTriangleStageGeometry();
+    }
+}
+
+void Triangle3D_Geo::buildStageEdgeGeometries(int stage)
+{
+    if (stage == 0) {
+        buildTriangleStageGeometry();
+    }
+}
+
+void Triangle3D_Geo::buildStageFaceGeometries(int stage)
+{
+    if (stage == 0 && isAllStagesComplete()) {
+        buildTriangleStageGeometry();
+    }
+}
+
+void Triangle3D_Geo::buildCurrentStagePreviewGeometries()
+{
+    buildTrianglePreview();
+}
+
+// ==================== 阶段特定的辅助方法实现 ====================
+
+void Triangle3D_Geo::buildTriangleStageGeometry()
+{
+    const auto& stagePoints = mm_controlPoint()->getCurrentStageControlPoints();
+    if (stagePoints.size() < 2) {
+        return;
+    }
+    
+    // 获取边几何体
+    osg::ref_ptr<osg::Geometry> edgeGeometry = mm_node()->getEdgeGeometry();
+    if (edgeGeometry.valid()) {
+        // 创建顶点数组
+        osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+        
+        // 添加三角形的边
+        if (stagePoints.size() >= 2) {
+            // 添加已有的边
+            for (size_t i = 0; i < stagePoints.size(); ++i) {
+                vertices->push_back(osg::Vec3(stagePoints[i].x(), stagePoints[i].y(), stagePoints[i].z()));
+                if (i > 0) {
+                    vertices->push_back(osg::Vec3(stagePoints[i].x(), stagePoints[i].y(), stagePoints[i].z()));
+                }
+            }
+            
+            // 如果有三个点，闭合三角形
+            if (stagePoints.size() >= 3) {
+                vertices->push_back(osg::Vec3(stagePoints[0].x(), stagePoints[0].y(), stagePoints[0].z()));
+            }
+        }
+        
+        edgeGeometry->setVertexArray(vertices);
+        
+        // 线绘制
+        if (vertices->size() >= 2) {
+            osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::LINES, 0, vertices->size());
+            edgeGeometry->addPrimitiveSet(drawArrays);
+        }
+    }
+    
+    // 如果三角形完成，绘制面
+    if (stagePoints.size() >= 3 && isAllStagesComplete()) {
+        osg::ref_ptr<osg::Geometry> faceGeometry = mm_node()->getFaceGeometry();
+        if (faceGeometry.valid()) {
+            // 创建面的顶点数组
+            osg::ref_ptr<osg::Vec3Array> faceVertices = new osg::Vec3Array;
+            osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
+            
+            // 添加三角形顶点
+            for (const Point3D& point : stagePoints) {
+                faceVertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
+                normals->push_back(osg::Vec3(m_normal.x, m_normal.y, m_normal.z));
+            }
+            
+            faceGeometry->setVertexArray(faceVertices);
+            faceGeometry->setNormalArray(normals);
+            faceGeometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
+            
+            // 三角形面绘制
+            osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, 3);
+            faceGeometry->addPrimitiveSet(drawArrays);
+        }
+    }
+}
+
+void Triangle3D_Geo::buildTrianglePreview()
+{
+    const auto& stagePoints = mm_controlPoint()->getCurrentStageControlPoints();
+    if (stagePoints.size() < 2) {
+        return;
+    }
+    
+    // 如果有临时点，绘制预览三角形
+    buildTriangleStageGeometry();
+}
+
+void Triangle3D_Geo::calculateTriangleParameters()
+{
+    const auto& allStages = mm_controlPoint()->getAllStageControlPoints();
+    if (allStages.empty() || allStages[0].size() < 3) {
+        return;
+    }
+    
+    const Point3D& p1 = allStages[0][0];
+    const Point3D& p2 = allStages[0][1];
+    const Point3D& p3 = allStages[0][2];
+    
+    // 计算三角形法向量
+    glm::vec3 edge1 = p2.position - p1.position;
+    glm::vec3 edge2 = p3.position - p1.position;
+    m_normal = glm::normalize(glm::cross(edge1, edge2));
+    
+    // 计算三角形面积
+    glm::vec3 crossProduct = glm::cross(edge1, edge2);
+    m_area = 0.5f * glm::length(crossProduct);
+    
+    qDebug() << "三角形参数: 面积:" << m_area << " 法向量:(" << m_normal.x << "," << m_normal.y << "," << m_normal.z << ")";
+}
+
+bool Triangle3D_Geo::isValidTriangleConfiguration() const
+{
+    const auto& stagePoints = mm_controlPoint()->getCurrentStageControlPoints();
+    
+    if (stagePoints.size() < 3) {
+        return false;
+    }
+    
+    // 检查三点是否共线
+    const Point3D& p1 = stagePoints[0];
+    const Point3D& p2 = stagePoints[1];
+    const Point3D& p3 = stagePoints[2];
+    
+    glm::vec3 edge1 = p2.position - p1.position;
+    glm::vec3 edge2 = p3.position - p1.position;
+    glm::vec3 crossProduct = glm::cross(edge1, edge2);
+    
+    // 如果叉积长度接近0，说明三点共线
+    const float epsilon = 0.001f;
+    if (glm::length(crossProduct) < epsilon) {
+        return false; // 三点共线，无法构成三角形
+    }
+    
+    // 检查控制点坐标是否有效
+    for (const auto& point : stagePoints) {
+        if (std::isnan(point.x()) || std::isnan(point.y()) || std::isnan(point.z()) ||
+            std::isinf(point.x()) || std::isinf(point.y()) || std::isinf(point.z())) {
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+// ============================================================================
+// 传统几何体构建实现（保持兼容性）
+// ============================================================================
 
 void Triangle3D_Geo::buildVertexGeometries()
 {
     mm_node()->clearVertexGeometry();
     
+    // 获取所有控制点用于绘制
     const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (controlPoints.empty())
+    if (controlPoints.empty()) {
         return;
+    }
     
     // 获取现有的几何体
     osg::ref_ptr<osg::Geometry> geometry = mm_node()->getVertexGeometry();
-    if (!geometry.valid())
+    if (!geometry.valid()) {
         return;
+    }
     
     // 创建顶点数组
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     
-    // 添加控制点
-    for (const Point3D& point : controlPoints)
-    {
+    // 添加所有控制点
+    for (const Point3D& point : controlPoints) {
         vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
     }
     
@@ -83,137 +282,37 @@ void Triangle3D_Geo::buildEdgeGeometries()
 {
     mm_node()->clearEdgeGeometry();
     
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (controlPoints.size() < 3)
-        return;
-    
-    // 获取现有的几何体
-    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getEdgeGeometry();
-    if (!geometry.valid())
-        return;
-    
-    // 创建边的几何体
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-    
-    // 添加三个顶点
-    for (const Point3D& point : controlPoints)
-    {
-        vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
-    }
-    
-    geometry->setVertexArray(vertices);
-    
-    // 绘制三条边
-    osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(osg::PrimitiveSet::LINES);
-    indices->push_back(0); indices->push_back(1);  // 边1
-    indices->push_back(1); indices->push_back(2);  // 边2
-    indices->push_back(2); indices->push_back(0);  // 边3
-    
-    geometry->addPrimitiveSet(indices);
+    // 调用阶段特定的绘制方法
+    buildStageEdgeGeometries(getCurrentStage());
 }
 
 void Triangle3D_Geo::buildFaceGeometries()
 {
     mm_node()->clearFaceGeometry();
     
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (controlPoints.size() < 3)
-        return;
-    
-    // 获取现有的几何体
-    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getFaceGeometry();
-    if (!geometry.valid())
-        return;
-    
-    // 使用lambda表达式计算三角形参数
-    auto calculateTriangleParams = [&]() -> MathUtils::TriangleParameters {
-        const auto& v1 = controlPoints[0].position;
-        const auto& v2 = controlPoints[1].position;
-        const auto& v3 = controlPoints[2].position;
-        return MathUtils::calculateTriangleParameters(v1, v2, v3);
-    };
-    
-    auto triangleParams = calculateTriangleParams();
-    
-    // 更新成员变量
-    m_normal = triangleParams.normal;
-    m_area = triangleParams.area;
-    
-    // 创建面的几何体
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-    
-    // 添加三个顶点
-    for (const Point3D& point : controlPoints)
-    {
-        vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
-    }
-    
-    geometry->setVertexArray(vertices);
-    
-    // 绘制三角形面
-    geometry->addPrimitiveSet(new osg::DrawArrays(GL_TRIANGLES, 0, 3));
-    
-    // 计算法线
-    osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
-    for (int i = 0; i < 3; ++i)
-    {
-        normals->push_back(osg::Vec3(m_normal.x, m_normal.y, m_normal.z));
-    }
-    geometry->setNormalArray(normals);
-    geometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
+    // 调用阶段特定的绘制方法
+    buildStageFaceGeometries(getCurrentStage());
 }
-
-// hitTest方法已移除，使用OSG内置拾取系统
 
 // ==================== 绘制完成检查和控制点验证 ====================
 
 bool Triangle3D_Geo::isDrawingComplete() const
 {
-    // 三角形需要3个控制点才能完成绘制
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    return controlPoints.size() >= 3;
+    // 三角形需要所有阶段都完成
+    return isAllStagesComplete();
 }
 
 bool Triangle3D_Geo::areControlPointsValid() const
 {
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    
-    // 检查控制点数量
-    if (controlPoints.size() < 3) {
+    if (!isAllStagesComplete()) {
         return false;
     }
     
-    // 检查控制点是否重合（允许一定的误差）
-    const float epsilon = 0.001f;
-    for (size_t i = 0; i < controlPoints.size() - 1; ++i) {
-        for (size_t j = i + 1; j < controlPoints.size(); ++j) {
-            glm::vec3 diff = controlPoints[j].position - controlPoints[i].position;
-            float distance = glm::length(diff);
-            if (distance < epsilon) {
-                return false; // 有重复点，无效
-            }
-        }
+    const auto& allStages = mm_controlPoint()->getAllStageControlPoints();
+    if (allStages.size() < 1 || allStages[0].size() < 3) {
+        return false;
     }
     
-    // 检查控制点坐标是否有效（不是NaN或无穷大）
-    for (const auto& point : controlPoints) {
-        if (std::isnan(point.x()) || std::isnan(point.y()) || std::isnan(point.z()) ||
-            std::isinf(point.x()) || std::isinf(point.y()) || std::isinf(point.z())) {
-            return false;
-        }
-    }
-    
-    // 检查三点是否共线（如果共线则无法形成三角形）
-    if (controlPoints.size() >= 3) {
-        glm::vec3 v1 = controlPoints[1].position - controlPoints[0].position;
-        glm::vec3 v2 = controlPoints[2].position - controlPoints[0].position;
-        glm::vec3 cross = glm::cross(v1, v2);
-        float crossLength = glm::length(cross);
-        
-        if (crossLength < epsilon) {
-            return false; // 三点共线，无法形成三角形
-        }
-    }
-    
-    return true;
+    // 检查三角形配置是否有效
+    return isValidTriangleConfiguration();
 }

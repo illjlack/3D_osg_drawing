@@ -10,18 +10,36 @@ public:
     FlatHouse3D_Geo();
     virtual ~FlatHouse3D_Geo() = default;
     
+    // ==================== 多阶段绘制支持 ====================
+    virtual std::vector<StageDescriptor> getStageDescriptors() const override;
     virtual void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
     virtual void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
+    virtual void keyPressEvent(QKeyEvent* event) override;
 
 protected:
     virtual void buildVertexGeometries() override;
     virtual void buildEdgeGeometries() override;
     virtual void buildFaceGeometries() override;
-    
-    // 绘制完成检查和控制点验证
+    virtual void buildStageVertexGeometries(int stage) override;
+    virtual void buildStageEdgeGeometries(int stage) override;
+    virtual void buildStageFaceGeometries(int stage) override;
+    virtual void buildCurrentStagePreviewGeometries() override;
     virtual bool isDrawingComplete() const override;
     virtual bool areControlPointsValid() const override;
     
 private:
-    glm::vec3 m_size;      // 房屋尺寸
+    void buildBaseStageGeometry();
+    void buildFlatHouseStageGeometry();
+    void calculateFlatHouseParameters();
+    bool isValidFlatHouseConfiguration() const;
+    
+private:
+    float m_width = 4.0f;
+    float m_length = 6.0f; 
+    float m_height = 3.0f;
+    glm::vec3 m_baseCorner1 = glm::vec3(0.0f);
+    glm::vec3 m_baseCorner2 = glm::vec3(0.0f);
+    float m_calculatedWidth = 0.0f;
+    float m_calculatedLength = 0.0f;
+    float m_calculatedHeight = 0.0f;
 }; 

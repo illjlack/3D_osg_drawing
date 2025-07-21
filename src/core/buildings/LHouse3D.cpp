@@ -1,355 +1,375 @@
 ﻿#include "LHouse3D.h"
 #include <osg/Array>
 #include <osg/PrimitiveSet>
-#include "../../util/MathUtils.h"
 #include <cmath>
+#include "../../util/MathUtils.h"
+#include <QKeyEvent>
 
 LHouse3D_Geo::LHouse3D_Geo()
+    : m_mainWidth(4.0f)
+    , m_mainLength(6.0f)
+    , m_extensionWidth(3.0f)
+    , m_extensionLength(4.0f)
+    , m_height(3.0f)
+    , m_baseCorner1(0.0f)
+    , m_baseCorner2(0.0f)
+    , m_extensionCorner(0.0f)
+    , m_calculatedMainWidth(0.0f)
+    , m_calculatedMainLength(0.0f)
+    , m_calculatedExtensionWidth(0.0f)
+    , m_calculatedExtensionLength(0.0f)
+    , m_calculatedHeight(0.0f)
 {
-    m_geoType = Geo_UndefinedGeo3D;  // 使用未定义类型，因为这是特殊建筑
-    m_mainSize = glm::vec3(1.0f, 1.0f, 1.0f);
-    m_wingSize = glm::vec3(0.6f, 0.6f, 1.0f);
-    m_height = 1.0f;
+    m_geoType = Geo_LHouse3D;
     initialize();
+}
+
+std::vector<StageDescriptor> LHouse3D_Geo::getStageDescriptors() const
+{
+    std::vector<StageDescriptor> descriptors;
+    descriptors.emplace_back("绘制主体底面", 2, 2);
+    descriptors.emplace_back("定义L型扩展部分", 1, 1);
+    descriptors.emplace_back("定义房屋高度", 1, 1);
+    return descriptors;
 }
 
 void LHouse3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!mm_state()->isStateComplete())
-    {
-        // 添加控制点
-        mm_controlPoint()->addControlPoint(Point3D(worldPos));
-        
-        // 使用新的检查方法
-        if (isDrawingComplete() && areControlPointsValid())
-        {
+    if (mm_state()->isStateComplete()) return;
+    
+    if (event->button() == Qt::RightButton) {
+        if (isCurrentStageComplete()) {
+            if (canAdvanceToNextStage()) {
+                if (nextStage()) {
+                    calculateLHouseParameters();
+                    qDebug() << "L型房屋: 进入阶段" << getCurrentStage() + 1;
+                }
+            }
+            else if (isAllStagesComplete() && areControlPointsValid()) {
+                calculateLHouseParameters();
+                mm_state()->setStateComplete();
+                qDebug() << "L型房屋: 绘制完成";
+            }
+        }
+        return;
+    }
+    
+    if (event->button() == Qt::LeftButton) {
+        bool success = mm_controlPoint()->addControlPointToCurrentStage(Point3D(worldPos));
+        if (success) {
+            calculateLHouseParameters();
+            if (isCurrentStageComplete() && canAdvanceToNextStage()) {
+                nextStage();
+            }
+            else if (isAllStagesComplete() && areControlPointsValid()) {
             mm_state()->setStateComplete();
+            }
         }
     }
 }
 
 void LHouse3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    // L型房屋的鼠标移动事件处理
-    if (!mm_state()->isStateComplete() && mm_controlPoint()->hasControlPoints())
-    {
-        // 可以在这里实现实时预览
+    if (mm_state()->isStateComplete()) return;
+    mm_controlPoint()->setCurrentStageTempPoint(Point3D(worldPos));
+}
+
+void LHouse3D_Geo::keyPressEvent(QKeyEvent* event)
+{
+    if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
+        if (isCurrentStageComplete()) {
+            if (canAdvanceToNextStage()) {
+                if (nextStage()) calculateLHouseParameters();
+            }
+            else if (isAllStagesComplete() && areControlPointsValid()) {
+                calculateLHouseParameters();
+                mm_state()->setStateComplete();
+            }
+        }
+    }
+    else if (event->key() == Qt::Key_Escape) {
+        mm_controlPoint()->removeLastControlPointFromCurrentStage();
+        calculateLHouseParameters();
     }
 }
 
-// ============================================================================
-// 点线面几何体构建实现
-// ============================================================================
+void LHouse3D_Geo::buildStageVertexGeometries(int stage)
+{
+    if (stage == 0) buildBaseStageGeometry();
+    else if (stage == 1) buildExtensionStageGeometry();
+}
+
+void LHouse3D_Geo::buildStageEdgeGeometries(int stage)
+{
+    if (stage == 0) buildBaseStageGeometry();
+    else if (stage == 1) buildExtensionStageGeometry();
+    else if (stage == 2) buildLHouseStageGeometry();
+}
+
+void LHouse3D_Geo::buildStageFaceGeometries(int stage)
+{
+    if (stage == 2 && isAllStagesComplete()) buildLHouseStageGeometry();
+}
+
+void LHouse3D_Geo::buildCurrentStagePreviewGeometries()
+{
+    int currentStage = getCurrentStage();
+    if (currentStage == 0) buildBaseStageGeometry();
+    else if (currentStage == 1) buildExtensionStageGeometry();
+    else if (currentStage == 2) buildLHouseStageGeometry();
+}
+
+void LHouse3D_Geo::buildBaseStageGeometry()
+{
+    const auto& allStages = mm_controlPoint()->getAllStageControlPoints();
+    if (allStages.empty() || allStages[0].size() < 2) return;
+    
+    osg::ref_ptr<osg::Geometry> edgeGeometry = mm_node()->getEdgeGeometry();
+    if (!edgeGeometry.valid()) return;
+    
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+    
+    const auto& stage0Points = allStages[0];
+    const Point3D& corner1 = stage0Points[0];
+    const Point3D& corner2 = stage0Points[1];
+    
+    // 绘制主体底面矩形对角线
+    vertices->push_back(osg::Vec3(corner1.x(), corner1.y(), corner1.z()));
+    vertices->push_back(osg::Vec3(corner2.x(), corner2.y(), corner2.z()));
+    
+    // 计算矩形的四个角点并绘制边框
+    if (m_calculatedMainWidth > 0.0f && m_calculatedMainLength > 0.0f) {
+        glm::vec3 dir = corner2.position - corner1.position;
+        glm::vec3 perpDir = glm::normalize(glm::cross(dir, glm::vec3(0, 0, 1)));
+        
+        glm::vec3 corner3 = corner1.position + perpDir * m_calculatedMainWidth;
+        glm::vec3 corner4 = corner2.position + perpDir * m_calculatedMainWidth;
+        
+        // 添加矩形边界
+        vertices->push_back(osg::Vec3(corner1.x(), corner1.y(), corner1.z()));
+        vertices->push_back(osg::Vec3(corner3.x, corner3.y, corner3.z));
+        
+        vertices->push_back(osg::Vec3(corner3.x, corner3.y, corner3.z));
+        vertices->push_back(osg::Vec3(corner4.x, corner4.y, corner4.z));
+        
+        vertices->push_back(osg::Vec3(corner4.x, corner4.y, corner4.z));
+        vertices->push_back(osg::Vec3(corner2.x(), corner2.y(), corner2.z()));
+        
+        vertices->push_back(osg::Vec3(corner2.x(), corner2.y(), corner2.z()));
+        vertices->push_back(osg::Vec3(corner1.x(), corner1.y(), corner1.z()));
+    }
+    
+    edgeGeometry->setVertexArray(vertices);
+    
+    if (vertices->size() >= 2) {
+        osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::LINES, 0, vertices->size());
+        edgeGeometry->addPrimitiveSet(drawArrays);
+    }
+}
+
+void LHouse3D_Geo::buildExtensionStageGeometry()
+{
+    const auto& allStages = mm_controlPoint()->getAllStageControlPoints();
+    if (allStages.size() < 2 || allStages[1].empty()) return;
+    
+    // 先绘制主体
+    buildBaseStageGeometry();
+    
+    osg::ref_ptr<osg::Geometry> edgeGeometry = mm_node()->getEdgeGeometry();
+    if (!edgeGeometry.valid()) return;
+    
+    osg::ref_ptr<osg::Vec3Array> vertices = dynamic_cast<osg::Vec3Array*>(edgeGeometry->getVertexArray());
+    if (!vertices) return;
+    
+    // 添加扩展部分
+    if (m_calculatedExtensionWidth > 0.0f && m_calculatedExtensionLength > 0.0f) {
+        glm::vec3 extensionCorner1 = m_extensionCorner;
+        glm::vec3 extensionCorner2 = m_extensionCorner + glm::vec3(m_calculatedExtensionLength, 0, 0);
+        glm::vec3 extensionCorner3 = m_extensionCorner + glm::vec3(m_calculatedExtensionLength, m_calculatedExtensionWidth, 0);
+        glm::vec3 extensionCorner4 = m_extensionCorner + glm::vec3(0, m_calculatedExtensionWidth, 0);
+        
+        // 添加扩展部分边界
+        int startIndex = vertices->size();
+        vertices->push_back(osg::Vec3(extensionCorner1.x, extensionCorner1.y, extensionCorner1.z));
+        vertices->push_back(osg::Vec3(extensionCorner2.x, extensionCorner2.y, extensionCorner2.z));
+        
+        vertices->push_back(osg::Vec3(extensionCorner2.x, extensionCorner2.y, extensionCorner2.z));
+        vertices->push_back(osg::Vec3(extensionCorner3.x, extensionCorner3.y, extensionCorner3.z));
+        
+        vertices->push_back(osg::Vec3(extensionCorner3.x, extensionCorner3.y, extensionCorner3.z));
+        vertices->push_back(osg::Vec3(extensionCorner4.x, extensionCorner4.y, extensionCorner4.z));
+        
+        vertices->push_back(osg::Vec3(extensionCorner4.x, extensionCorner4.y, extensionCorner4.z));
+        vertices->push_back(osg::Vec3(extensionCorner1.x, extensionCorner1.y, extensionCorner1.z));
+        
+        edgeGeometry->removePrimitiveSet(0, edgeGeometry->getNumPrimitiveSets());
+        osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::LINES, 0, vertices->size());
+        edgeGeometry->addPrimitiveSet(drawArrays);
+    }
+}
+
+void LHouse3D_Geo::buildLHouseStageGeometry()
+{
+    if (m_calculatedHeight <= 0.0f) return;
+    
+    osg::ref_ptr<osg::Geometry> faceGeometry = mm_node()->getFaceGeometry();
+    if (!faceGeometry.valid()) return;
+    
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+    osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
+    osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(GL_TRIANGLES);
+    
+    // 计算主体部分的顶点
+    glm::vec3 dir = m_baseCorner2 - m_baseCorner1;
+    glm::vec3 perpDir = glm::normalize(glm::cross(dir, glm::vec3(0, 0, 1))) * m_calculatedMainWidth;
+    
+    // 主体底面4个顶点
+    glm::vec3 mainBottomVerts[4] = {
+        m_baseCorner1,
+        m_baseCorner2,
+        m_baseCorner2 + perpDir,
+        m_baseCorner1 + perpDir
+    };
+    
+    // 主体顶部4个顶点
+    glm::vec3 mainTopVerts[4];
+    for (int i = 0; i < 4; ++i) {
+        mainTopVerts[i] = mainBottomVerts[i] + glm::vec3(0, 0, m_calculatedHeight);
+    }
+    
+    // 扩展部分顶点
+    glm::vec3 extBottomVerts[4] = {
+        m_extensionCorner,
+        m_extensionCorner + glm::vec3(m_calculatedExtensionLength, 0, 0),
+        m_extensionCorner + glm::vec3(m_calculatedExtensionLength, m_calculatedExtensionWidth, 0),
+        m_extensionCorner + glm::vec3(0, m_calculatedExtensionWidth, 0)
+    };
+    
+    glm::vec3 extTopVerts[4];
+    for (int i = 0; i < 4; ++i) {
+        extTopVerts[i] = extBottomVerts[i] + glm::vec3(0, 0, m_calculatedHeight);
+    }
+    
+    // 添加主体顶点
+    for (int i = 0; i < 4; ++i) {
+        vertices->push_back(osg::Vec3(mainBottomVerts[i].x, mainBottomVerts[i].y, mainBottomVerts[i].z));
+        normals->push_back(osg::Vec3(0, 0, -1));
+    }
+    for (int i = 0; i < 4; ++i) {
+        vertices->push_back(osg::Vec3(mainTopVerts[i].x, mainTopVerts[i].y, mainTopVerts[i].z));
+        normals->push_back(osg::Vec3(0, 0, 1));
+    }
+    
+    // 添加扩展部分顶点
+    for (int i = 0; i < 4; ++i) {
+        vertices->push_back(osg::Vec3(extBottomVerts[i].x, extBottomVerts[i].y, extBottomVerts[i].z));
+        normals->push_back(osg::Vec3(0, 0, -1));
+    }
+    for (int i = 0; i < 4; ++i) {
+        vertices->push_back(osg::Vec3(extTopVerts[i].x, extTopVerts[i].y, extTopVerts[i].z));
+            normals->push_back(osg::Vec3(0, 0, 1));
+        }
+        
+    // 主体部分索引
+    // 底面
+    indices->push_back(0); indices->push_back(1); indices->push_back(2);
+    indices->push_back(0); indices->push_back(2); indices->push_back(3);
+    
+    // 顶面
+    indices->push_back(4); indices->push_back(6); indices->push_back(5);
+    indices->push_back(4); indices->push_back(7); indices->push_back(6);
+    
+    // 侧面
+    for (int i = 0; i < 4; ++i) {
+        int next = (i + 1) % 4;
+        indices->push_back(i); indices->push_back(i + 4); indices->push_back(next);
+        indices->push_back(next); indices->push_back(i + 4); indices->push_back(next + 4);
+    }
+    
+    // 扩展部分索引
+    // 底面
+    indices->push_back(8); indices->push_back(9); indices->push_back(10);
+    indices->push_back(8); indices->push_back(10); indices->push_back(11);
+    
+    // 顶面
+    indices->push_back(12); indices->push_back(14); indices->push_back(13);
+    indices->push_back(12); indices->push_back(15); indices->push_back(14);
+    
+    // 侧面
+    for (int i = 0; i < 4; ++i) {
+            int next = (i + 1) % 4;
+        indices->push_back(8 + i); indices->push_back(8 + i + 4); indices->push_back(8 + next);
+        indices->push_back(8 + next); indices->push_back(8 + i + 4); indices->push_back(8 + next + 4);
+    }
+    
+    faceGeometry->setVertexArray(vertices);
+    faceGeometry->setNormalArray(normals);
+    faceGeometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
+    faceGeometry->addPrimitiveSet(indices);
+}
+
+void LHouse3D_Geo::calculateLHouseParameters()
+{
+    const auto& allStages = mm_controlPoint()->getAllStageControlPoints();
+    
+    // 第一阶段：计算主体底面参数
+    if (!allStages.empty() && allStages[0].size() >= 2) {
+        m_baseCorner1 = allStages[0][0].position;
+        m_baseCorner2 = allStages[0][1].position;
+        
+        glm::vec3 diagonal = m_baseCorner2 - m_baseCorner1;
+        m_calculatedMainLength = glm::length(diagonal);
+        m_calculatedMainWidth = m_calculatedMainLength * 0.6f; // 默认宽高比
+    }
+    
+    // 第二阶段：计算扩展部分参数
+    if (allStages.size() >= 2 && !allStages[1].empty()) {
+        m_extensionCorner = allStages[1][0].position;
+        
+        // 扩展部分尺寸基于主体尺寸
+        m_calculatedExtensionLength = m_calculatedMainLength * 0.6f;
+        m_calculatedExtensionWidth = m_calculatedMainWidth * 0.8f;
+    }
+    
+    // 第三阶段：计算房屋高度
+    if (allStages.size() >= 3 && !allStages[2].empty()) {
+        const Point3D& heightPoint = allStages[2][0];
+        m_calculatedHeight = heightPoint.z() - m_baseCorner1.z;
+        if (m_calculatedHeight < 0) m_calculatedHeight = -m_calculatedHeight;
+    }
+}
+
+bool LHouse3D_Geo::isValidLHouseConfiguration() const
+{
+    return m_calculatedMainWidth > 0.001f && m_calculatedMainLength > 0.001f && 
+           m_calculatedExtensionWidth > 0.001f && m_calculatedExtensionLength > 0.001f &&
+           m_calculatedHeight > 0.001f;
+}
 
 void LHouse3D_Geo::buildVertexGeometries()
 {
     mm_node()->clearVertexGeometry();
-    
-    if (!mm_controlPoint()->hasControlPoints())
-        return;
-    
-    // 获取现有的几何体
-    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getVertexGeometry();
-    if (!geometry.valid())
-        return;
-    
-    // 创建顶点数组
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-    
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (controlPoints.size() >= 4)
-    {
-        const Point3D& basePoint = controlPoints[0];
-        const Point3D& mainSizePoint = controlPoints[1];
-        const Point3D& wingSizePoint = controlPoints[2];
-        const Point3D& heightPoint = controlPoints[3];
-        
-        // 计算房屋尺寸
-        m_mainSize.x = abs(mainSizePoint.x() - basePoint.x());
-        m_mainSize.y = abs(mainSizePoint.y() - basePoint.y());
-        m_wingSize.x = abs(wingSizePoint.x() - basePoint.x());
-        m_wingSize.y = abs(wingSizePoint.y() - basePoint.y());
-        m_height = abs(heightPoint.z() - basePoint.z());
-        
-        // 生成L型房屋顶点
-        float x = basePoint.x();
-        float y = basePoint.y();
-        float z = basePoint.z();
-        
-        // 主体部分顶点
-        // 底面四个顶点
-        vertices->push_back(osg::Vec3(x, y, z));
-        vertices->push_back(osg::Vec3(x + m_mainSize.x, y, z));
-        vertices->push_back(osg::Vec3(x + m_mainSize.x, y + m_mainSize.y, z));
-        vertices->push_back(osg::Vec3(x, y + m_mainSize.y, z));
-        
-        // 顶面四个顶点
-        vertices->push_back(osg::Vec3(x, y, z + m_height));
-        vertices->push_back(osg::Vec3(x + m_mainSize.x, y, z + m_height));
-        vertices->push_back(osg::Vec3(x + m_mainSize.x, y + m_mainSize.y, z + m_height));
-        vertices->push_back(osg::Vec3(x, y + m_mainSize.y, z + m_height));
-        
-        // 翼部顶点
-        // 翼部底面四个顶点
-        vertices->push_back(osg::Vec3(x, y, z));
-        vertices->push_back(osg::Vec3(x + m_wingSize.x, y, z));
-        vertices->push_back(osg::Vec3(x + m_wingSize.x, y + m_wingSize.y, z));
-        vertices->push_back(osg::Vec3(x, y + m_wingSize.y, z));
-        
-        // 翼部顶面四个顶点
-        vertices->push_back(osg::Vec3(x, y, z + m_height));
-        vertices->push_back(osg::Vec3(x + m_wingSize.x, y, z + m_height));
-        vertices->push_back(osg::Vec3(x + m_wingSize.x, y + m_wingSize.y, z + m_height));
-        vertices->push_back(osg::Vec3(x, y + m_wingSize.y, z + m_height));
-    }
-    
-    geometry->setVertexArray(vertices);
-    
-    // 点绘制
-    osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::POINTS, 0, vertices->size());
-    geometry->addPrimitiveSet(drawArrays);
+    buildStageVertexGeometries(getCurrentStage());
 }
 
 void LHouse3D_Geo::buildEdgeGeometries()
 {
     mm_node()->clearEdgeGeometry();
-    
-    if (!mm_controlPoint()->hasControlPoints())
-        return;
-    
-    // 获取现有的几何体
-    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getEdgeGeometry();
-    if (!geometry.valid())
-        return;
-    
-    // 创建顶点数组
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-    
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (controlPoints.size() >= 4)
-    {
-        const Point3D& basePoint = controlPoints[0];
-        float x = basePoint.x();
-        float y = basePoint.y();
-        float z = basePoint.z();
-        
-        // 生成L型房屋顶点
-        // 主体部分顶点
-        // 底面四个顶点
-        vertices->push_back(osg::Vec3(x, y, z));
-        vertices->push_back(osg::Vec3(x + m_mainSize.x, y, z));
-        vertices->push_back(osg::Vec3(x + m_mainSize.x, y + m_mainSize.y, z));
-        vertices->push_back(osg::Vec3(x, y + m_mainSize.y, z));
-        
-        // 顶面四个顶点
-        vertices->push_back(osg::Vec3(x, y, z + m_height));
-        vertices->push_back(osg::Vec3(x + m_mainSize.x, y, z + m_height));
-        vertices->push_back(osg::Vec3(x + m_mainSize.x, y + m_mainSize.y, z + m_height));
-        vertices->push_back(osg::Vec3(x, y + m_mainSize.y, z + m_height));
-        
-        // 翼部顶点
-        // 翼部底面四个顶点
-        vertices->push_back(osg::Vec3(x, y, z));
-        vertices->push_back(osg::Vec3(x + m_wingSize.x, y, z));
-        vertices->push_back(osg::Vec3(x + m_wingSize.x, y + m_wingSize.y, z));
-        vertices->push_back(osg::Vec3(x, y + m_wingSize.y, z));
-        
-        // 翼部顶面四个顶点
-        vertices->push_back(osg::Vec3(x, y, z + m_height));
-        vertices->push_back(osg::Vec3(x + m_wingSize.x, y, z + m_height));
-        vertices->push_back(osg::Vec3(x + m_wingSize.x, y + m_wingSize.y, z + m_height));
-        vertices->push_back(osg::Vec3(x, y + m_wingSize.y, z + m_height));
-        
-        geometry->setVertexArray(vertices);
-        
-        // 绘制主体底面边
-        for (int i = 0; i < 4; ++i)
-        {
-            int next = (i + 1) % 4;
-            osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::LINES, i, 2);
-            geometry->addPrimitiveSet(drawArrays);
-        }
-        
-        // 绘制主体顶面边
-        for (int i = 0; i < 4; ++i)
-        {
-            int next = (i + 1) % 4;
-            osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::LINES, 4 + i, 2);
-            geometry->addPrimitiveSet(drawArrays);
-        }
-        
-        // 绘制主体连接边
-        for (int i = 0; i < 4; ++i)
-        {
-            osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::LINES, i, 2);
-            geometry->addPrimitiveSet(drawArrays);
-        }
-        
-        // 绘制翼部底面边
-        for (int i = 0; i < 4; ++i)
-        {
-            int next = (i + 1) % 4;
-            osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::LINES, 8 + i, 2);
-            geometry->addPrimitiveSet(drawArrays);
-        }
-        
-        // 绘制翼部顶面边
-        for (int i = 0; i < 4; ++i)
-        {
-            int next = (i + 1) % 4;
-            osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::LINES, 12 + i, 2);
-            geometry->addPrimitiveSet(drawArrays);
-        }
-        
-        // 绘制翼部连接边
-        for (int i = 0; i < 4; ++i)
-        {
-            osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::LINES, 8 + i, 2);
-            geometry->addPrimitiveSet(drawArrays);
-        }
-    }
+    buildStageEdgeGeometries(getCurrentStage());
 }
 
 void LHouse3D_Geo::buildFaceGeometries()
 {
     mm_node()->clearFaceGeometry();
-    
-    if (!mm_controlPoint()->hasControlPoints())
-        return;
-    
-    // 获取现有的几何体
-    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getFaceGeometry();
-    if (!geometry.valid())
-        return;
-    
-    // 创建顶点数组和法向量数组
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-    osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
-    
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (controlPoints.size() >= 4)
-    {
-        const Point3D& basePoint = controlPoints[0];
-        float x = basePoint.x();
-        float y = basePoint.y();
-        float z = basePoint.z();
-        
-        // 生成L型房屋顶点和法向量
-        // 主体部分顶点
-        // 底面四个顶点
-        vertices->push_back(osg::Vec3(x, y, z));
-        vertices->push_back(osg::Vec3(x + m_mainSize.x, y, z));
-        vertices->push_back(osg::Vec3(x + m_mainSize.x, y + m_mainSize.y, z));
-        vertices->push_back(osg::Vec3(x, y + m_mainSize.y, z));
-        
-        // 顶面四个顶点
-        vertices->push_back(osg::Vec3(x, y, z + m_height));
-        vertices->push_back(osg::Vec3(x + m_mainSize.x, y, z + m_height));
-        vertices->push_back(osg::Vec3(x + m_mainSize.x, y + m_mainSize.y, z + m_height));
-        vertices->push_back(osg::Vec3(x, y + m_mainSize.y, z + m_height));
-        
-        // 翼部顶点
-        // 翼部底面四个顶点
-        vertices->push_back(osg::Vec3(x, y, z));
-        vertices->push_back(osg::Vec3(x + m_wingSize.x, y, z));
-        vertices->push_back(osg::Vec3(x + m_wingSize.x, y + m_wingSize.y, z));
-        vertices->push_back(osg::Vec3(x, y + m_wingSize.y, z));
-        
-        // 翼部顶面四个顶点
-        vertices->push_back(osg::Vec3(x, y, z + m_height));
-        vertices->push_back(osg::Vec3(x + m_wingSize.x, y, z + m_height));
-        vertices->push_back(osg::Vec3(x + m_wingSize.x, y + m_wingSize.y, z + m_height));
-        vertices->push_back(osg::Vec3(x, y + m_wingSize.y, z + m_height));
-        
-        // 添加法向量
-        for (int i = 0; i < 16; ++i)
-        {
-            normals->push_back(osg::Vec3(0, 0, 1));
-        }
-        
-        geometry->setVertexArray(vertices);
-        geometry->setNormalArray(normals);
-        geometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
-        
-        // 绘制主体底面
-        osg::ref_ptr<osg::DrawArrays> mainBottomFace = new osg::DrawArrays(osg::PrimitiveSet::QUADS, 0, 4);
-        geometry->addPrimitiveSet(mainBottomFace);
-        
-        // 绘制主体顶面
-        osg::ref_ptr<osg::DrawArrays> mainTopFace = new osg::DrawArrays(osg::PrimitiveSet::QUADS, 4, 4);
-        geometry->addPrimitiveSet(mainTopFace);
-        
-        // 绘制主体侧面
-        for (int i = 0; i < 4; ++i)
-        {
-            int next = (i + 1) % 4;
-            osg::ref_ptr<osg::DrawArrays> sideFace = new osg::DrawArrays(osg::PrimitiveSet::QUADS, i, 4);
-            geometry->addPrimitiveSet(sideFace);
-        }
-        
-        // 绘制翼部底面
-        osg::ref_ptr<osg::DrawArrays> wingBottomFace = new osg::DrawArrays(osg::PrimitiveSet::QUADS, 8, 4);
-        geometry->addPrimitiveSet(wingBottomFace);
-        
-        // 绘制翼部顶面
-        osg::ref_ptr<osg::DrawArrays> wingTopFace = new osg::DrawArrays(osg::PrimitiveSet::QUADS, 12, 4);
-        geometry->addPrimitiveSet(wingTopFace);
-        
-        // 绘制翼部侧面
-        for (int i = 0; i < 4; ++i)
-        {
-            int next = (i + 1) % 4;
-            osg::ref_ptr<osg::DrawArrays> sideFace = new osg::DrawArrays(osg::PrimitiveSet::QUADS, 8 + i, 4);
-            geometry->addPrimitiveSet(sideFace);
-        }
-    }
+    buildStageFaceGeometries(getCurrentStage());
 }
-
-// ==================== 绘制完成检查和控制点验证 ====================
 
 bool LHouse3D_Geo::isDrawingComplete() const
 {
-    // L型房屋需要4个控制点：基点、主体尺寸点、翼部尺寸点、高度点
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    return controlPoints.size() >= 4;
+    return isAllStagesComplete();
 }
 
 bool LHouse3D_Geo::areControlPointsValid() const
 {
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    
-    // 检查控制点数量
-    if (controlPoints.size() < 4) {
-        return false;
-    }
-    
-    // 检查控制点坐标是否有效
-    for (const auto& point : controlPoints) {
-        if (std::isnan(point.x()) || std::isnan(point.y()) || std::isnan(point.z()) ||
-            std::isinf(point.x()) || std::isinf(point.y()) || std::isinf(point.z())) {
-            return false;
-        }
-    }
-    
-    // 检查尺寸是否有效
-    if (controlPoints.size() >= 4) {
-        const Point3D& basePoint = controlPoints[0];
-        const Point3D& mainSizePoint = controlPoints[1];
-        const Point3D& wingSizePoint = controlPoints[2];
-        const Point3D& heightPoint = controlPoints[3];
-        
-        float mainWidth = abs(mainSizePoint.x() - basePoint.x());
-        float mainLength = abs(mainSizePoint.y() - basePoint.y());
-        float wingWidth = abs(wingSizePoint.x() - basePoint.x());
-        float wingLength = abs(wingSizePoint.y() - basePoint.y());
-        float height = abs(heightPoint.z() - basePoint.z());
-        
-        if (mainWidth <= 0.0f || mainLength <= 0.0f || wingWidth <= 0.0f || wingLength <= 0.0f || height <= 0.0f ||
-            std::isnan(mainWidth) || std::isnan(mainLength) || std::isnan(wingWidth) || std::isnan(wingLength) || std::isnan(height) ||
-            std::isinf(mainWidth) || std::isinf(mainLength) || std::isinf(wingWidth) || std::isinf(wingLength) || std::isinf(height)) {
-            return false;
-        }
-    }
-    
-    return true;
+    return isValidLHouseConfiguration();
 } 

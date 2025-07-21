@@ -3,6 +3,7 @@
 #include <osg/PrimitiveSet>
 #include <cmath>
 #include "../../util/MathUtils.h"
+#include <QKeyEvent>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -12,379 +13,249 @@ Cylinder3D_Geo::Cylinder3D_Geo()
     : m_radius(1.0f)
     , m_height(2.0f)
     , m_segments(16)
-    , m_axis(0, 0, 1)
+    , m_baseCenter(0.0f)
+    , m_topCenter(0.0f)
+    , m_calculatedRadius(0.0f)
+    , m_calculatedHeight(0.0f)
 {
     m_geoType = Geo_Cylinder3D;
-    // 确保基类正确初始化
     initialize();
+}
+
+std::vector<StageDescriptor> Cylinder3D_Geo::getStageDescriptors() const
+{
+    std::vector<StageDescriptor> descriptors;
+    descriptors.emplace_back("绘制底面圆心和半径", 2, 2);
+    descriptors.emplace_back("定义圆柱高度", 1, 1);
+    return descriptors;
 }
 
 void Cylinder3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (!mm_state()->isStateComplete())
-    {
-        // 添加控制点
-        mm_controlPoint()->addControlPoint(Point3D(worldPos));
-        
-        // 使用新的检查方法
-        if (isDrawingComplete() && areControlPointsValid())
-        {
-            // 计算圆柱参数
-            const auto& controlPoints = mm_controlPoint()->getControlPoints();
-            glm::vec3 diff = controlPoints[1].position - controlPoints[0].position;
-            m_height = glm::length(diff);
-            if (m_height > 0)
-                m_axis = glm::normalize(diff);
-            m_radius = m_height * 0.3f; // 默认半径为高度的30%
-            mm_state()->setStateComplete();
+    if (mm_state()->isStateComplete()) return;
+    
+    if (event->button() == Qt::RightButton) {
+        if (isCurrentStageComplete()) {
+            if (canAdvanceToNextStage()) {
+                if (nextStage()) {
+                    calculateCylinderParameters();
+                    qDebug() << "圆柱体: 进入阶段" << getCurrentStage() + 1;
+                }
+            }
+            else if (isAllStagesComplete() && areControlPointsValid()) {
+                calculateCylinderParameters();
+                mm_state()->setStateComplete();
+                qDebug() << "圆柱体: 绘制完成";
+            }
+        }
+        return;
+    }
+    
+    if (event->button() == Qt::LeftButton) {
+        bool success = mm_controlPoint()->addControlPointToCurrentStage(Point3D(worldPos));
+        if (success) {
+            calculateCylinderParameters();
+            if (isCurrentStageComplete() && canAdvanceToNextStage()) {
+                nextStage();
+            }
+            else if (isAllStagesComplete() && areControlPointsValid()) {
+                mm_state()->setStateComplete();
+            }
         }
     }
 }
 
 void Cylinder3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (!mm_state()->isStateComplete() && controlPoints.size() == 1)
-    {
-        // 设置临时点用于预览
-        mm_controlPoint()->setTempPoint(Point3D(worldPos));
+    if (mm_state()->isStateComplete()) return;
+    mm_controlPoint()->setCurrentStageTempPoint(Point3D(worldPos));
+}
+
+void Cylinder3D_Geo::keyPressEvent(QKeyEvent* event)
+{
+    if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
+        if (isCurrentStageComplete()) {
+            if (canAdvanceToNextStage()) {
+                if (nextStage()) calculateCylinderParameters();
+            }
+            else if (isAllStagesComplete() && areControlPointsValid()) {
+                calculateCylinderParameters();
+                mm_state()->setStateComplete();
+            }
+        }
     }
+    else if (event->key() == Qt::Key_Escape) {
+        mm_controlPoint()->removeLastControlPointFromCurrentStage();
+        calculateCylinderParameters();
+    }
+}
+
+void Cylinder3D_Geo::buildStageVertexGeometries(int stage)
+{
+    if (stage == 0) buildBaseStageGeometry();
+}
+
+void Cylinder3D_Geo::buildStageEdgeGeometries(int stage)
+{
+    if (stage == 0) buildBaseStageGeometry();
+    else if (stage == 1) buildCylinderStageGeometry();
+}
+
+void Cylinder3D_Geo::buildStageFaceGeometries(int stage)
+{
+    if (stage == 1 && isAllStagesComplete()) buildCylinderStageGeometry();
+}
+
+void Cylinder3D_Geo::buildCurrentStagePreviewGeometries()
+{
+    int currentStage = getCurrentStage();
+    if (currentStage == 0) buildBaseStageGeometry();
+    else if (currentStage == 1) buildCylinderStageGeometry();
+}
+
+void Cylinder3D_Geo::buildBaseStageGeometry()
+{
+    const auto& allStages = mm_controlPoint()->getAllStageControlPoints();
+    if (allStages.empty() || allStages[0].size() < 2) return;
+    
+    osg::ref_ptr<osg::Geometry> edgeGeometry = mm_node()->getEdgeGeometry();
+    if (!edgeGeometry.valid()) return;
+    
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+    
+    const auto& stage0Points = allStages[0];
+    const Point3D& center = stage0Points[0];
+    const Point3D& radiusPoint = stage0Points[1];
+    
+    // 绘制半径线
+    vertices->push_back(osg::Vec3(center.x(), center.y(), center.z()));
+    vertices->push_back(osg::Vec3(radiusPoint.x(), radiusPoint.y(), radiusPoint.z()));
+    
+    // 绘制底面圆
+    if (m_calculatedRadius > 0.0f) {
+        for (int i = 0; i <= m_segments; ++i) {
+            float angle = 2.0f * M_PI * i / m_segments;
+            float x = center.x() + m_calculatedRadius * cos(angle);
+            float y = center.y() + m_calculatedRadius * sin(angle);
+            float z = center.z();
+            vertices->push_back(osg::Vec3(x, y, z));
+        }
+    }
+    
+    edgeGeometry->setVertexArray(vertices);
+    
+    // 半径线
+    osg::ref_ptr<osg::DrawArrays> radiusLine = new osg::DrawArrays(osg::PrimitiveSet::LINES, 0, 2);
+    edgeGeometry->addPrimitiveSet(radiusLine);
+    
+    // 底面圆
+    if (vertices->size() > 2) {
+        osg::ref_ptr<osg::DrawArrays> circle = new osg::DrawArrays(osg::PrimitiveSet::LINE_STRIP, 2, vertices->size() - 2);
+        edgeGeometry->addPrimitiveSet(circle);
+    }
+}
+
+void Cylinder3D_Geo::buildCylinderStageGeometry()
+{
+    if (m_calculatedRadius <= 0.0f || m_calculatedHeight <= 0.0f) return;
+    
+    osg::ref_ptr<osg::Geometry> faceGeometry = mm_node()->getFaceGeometry();
+    if (!faceGeometry.valid()) return;
+    
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+    osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
+    osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(GL_TRIANGLES);
+    
+    // 生成圆柱体顶点
+    for (int i = 0; i <= m_segments; ++i) {
+        float angle = 2.0f * M_PI * i / m_segments;
+        float x = cos(angle);
+        float y = sin(angle);
+        
+        // 底面顶点
+        glm::vec3 bottomPos = m_baseCenter + m_calculatedRadius * glm::vec3(x, y, 0);
+        vertices->push_back(osg::Vec3(bottomPos.x, bottomPos.y, bottomPos.z));
+        normals->push_back(osg::Vec3(x, y, 0));
+        
+        // 顶面顶点
+        glm::vec3 topPos = m_topCenter + m_calculatedRadius * glm::vec3(x, y, 0);
+        vertices->push_back(osg::Vec3(topPos.x, topPos.y, topPos.z));
+        normals->push_back(osg::Vec3(x, y, 0));
+    }
+    
+    // 生成侧面索引
+    for (int i = 0; i < m_segments; ++i) {
+        int bottom1 = i * 2;
+        int top1 = i * 2 + 1;
+        int bottom2 = (i + 1) * 2;
+        int top2 = (i + 1) * 2 + 1;
+        
+        // 第一个三角形
+        indices->push_back(bottom1);
+        indices->push_back(top1);
+        indices->push_back(bottom2);
+        
+        // 第二个三角形
+        indices->push_back(bottom2);
+        indices->push_back(top1);
+        indices->push_back(top2);
+    }
+    
+    faceGeometry->setVertexArray(vertices);
+    faceGeometry->setNormalArray(normals);
+    faceGeometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
+    faceGeometry->addPrimitiveSet(indices);
+}
+
+void Cylinder3D_Geo::calculateCylinderParameters()
+{
+    const auto& allStages = mm_controlPoint()->getAllStageControlPoints();
+    
+    // 第一阶段：计算底面中心和半径
+    if (!allStages.empty() && allStages[0].size() >= 2) {
+        m_baseCenter = allStages[0][0].position;
+        const Point3D& radiusPoint = allStages[0][1];
+        m_calculatedRadius = glm::length(radiusPoint.position - m_baseCenter);
+    }
+    
+    // 第二阶段：计算高度
+    if (allStages.size() >= 2 && !allStages[1].empty()) {
+        const Point3D& heightPoint = allStages[1][0];
+        glm::vec3 heightVec = heightPoint.position - m_baseCenter;
+        m_calculatedHeight = glm::length(heightVec);
+        m_topCenter = m_baseCenter + glm::vec3(0, 0, m_calculatedHeight);
+    }
+}
+
+bool Cylinder3D_Geo::isValidCylinderConfiguration() const
+{
+    return m_calculatedRadius > 0.001f && m_calculatedHeight > 0.001f;
 }
 
 void Cylinder3D_Geo::buildVertexGeometries()
 {
     mm_node()->clearVertexGeometry();
-    
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (controlPoints.empty())
-        return;
-    
-    // 获取现有的几何体
-    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getVertexGeometry();
-    if (!geometry.valid())
-        return;
-    
-    // 创建顶点数组
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-    
-    // 添加控制点
-    for (const Point3D& point : controlPoints)
-    {
-        vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
-    }
-    
-    geometry->setVertexArray(vertices);
-    
-    // 点绘制 - 控制点
-    osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::POINTS, 0, vertices->size());
-    geometry->addPrimitiveSet(drawArrays);
+    buildStageVertexGeometries(getCurrentStage());
 }
 
 void Cylinder3D_Geo::buildEdgeGeometries()
 {
     mm_node()->clearEdgeGeometry();
-    
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (controlPoints.empty())
-        return;
-    
-    // 获取现有的几何体
-    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getEdgeGeometry();
-    if (!geometry.valid())
-        return;
-    
-    // 创建边的几何体（圆柱边界线）
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
-    
-    float radius = m_radius;
-    float height = m_height;
-    glm::vec3 axis = m_axis;
-    glm::vec3 center = controlPoints[0].position;
-    
-    if (controlPoints.size() == 2)
-    {
-        center = (controlPoints[0].position + controlPoints[1].position) * 0.5f;
-    }
-    
-    int segments = static_cast<int>(m_parameters.subdivisionLevel);
-    if (segments < 8) segments = 16;
-    
-    // 计算圆柱的两个圆面中心
-    glm::vec3 bottom = center - axis * (height * 0.5f);
-    glm::vec3 top = center + axis * (height * 0.5f);
-    
-    // 计算垂直于轴的两个正交向量
-    glm::vec3 u, v;
-    if (abs(axis.z) < 0.9f)
-    {
-        u = glm::normalize(glm::cross(axis, glm::vec3(0, 0, 1)));
-    }
-    else
-    {
-        u = glm::normalize(glm::cross(axis, glm::vec3(1, 0, 0)));
-    }
-    v = glm::normalize(glm::cross(axis, u));
-    
-    // 生成底面圆周
-    for (int i = 0; i < segments; ++i)
-    {
-        float angle1 = 2.0f * M_PI * i / segments;
-        float angle2 = 2.0f * M_PI * (i + 1) / segments;
-        
-        glm::vec3 dir1 = static_cast<float>(cos(angle1)) * u + static_cast<float>(sin(angle1)) * v;
-        glm::vec3 dir2 = static_cast<float>(cos(angle2)) * u + static_cast<float>(sin(angle2)) * v;
-        
-        glm::vec3 p1 = bottom + radius * dir1;
-        glm::vec3 p2 = bottom + radius * dir2;
-        
-        vertices->push_back(osg::Vec3(p1.x, p1.y, p1.z));
-        vertices->push_back(osg::Vec3(p2.x, p2.y, p2.z));
-        
-        colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
-                                   m_parameters.lineColor.b, m_parameters.lineColor.a));
-        colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
-                                   m_parameters.lineColor.b, m_parameters.lineColor.a));
-    }
-    
-    // 生成顶面圆周
-    for (int i = 0; i < segments; ++i)
-    {
-        float angle1 = 2.0f * M_PI * i / segments;
-        float angle2 = 2.0f * M_PI * (i + 1) / segments;
-        
-        glm::vec3 dir1 = static_cast<float>(cos(angle1)) * u + static_cast<float>(sin(angle1)) * v;
-        glm::vec3 dir2 = static_cast<float>(cos(angle2)) * u + static_cast<float>(sin(angle2)) * v;
-        
-        glm::vec3 p1 = top + radius * dir1;
-        glm::vec3 p2 = top + radius * dir2;
-        
-        vertices->push_back(osg::Vec3(p1.x, p1.y, p1.z));
-        vertices->push_back(osg::Vec3(p2.x, p2.y, p2.z));
-        
-        colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
-                                   m_parameters.lineColor.b, m_parameters.lineColor.a));
-        colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
-                                   m_parameters.lineColor.b, m_parameters.lineColor.a));
-    }
-    
-    // 生成连接线（每隔几个点连接一条）
-    for (int i = 0; i < segments; i += segments / 4)
-    {
-        float angle = 2.0f * M_PI * i / segments;
-        glm::vec3 dir = static_cast<float>(cos(angle)) * u + static_cast<float>(sin(angle)) * v;
-        
-        glm::vec3 p1 = bottom + radius * dir;
-        glm::vec3 p2 = top + radius * dir;
-        
-        vertices->push_back(osg::Vec3(p1.x, p1.y, p1.z));
-        vertices->push_back(osg::Vec3(p2.x, p2.y, p2.z));
-        
-        colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
-                                   m_parameters.lineColor.b, m_parameters.lineColor.a));
-        colors->push_back(osg::Vec4(m_parameters.lineColor.r, m_parameters.lineColor.g, 
-                                   m_parameters.lineColor.b, m_parameters.lineColor.a));
-    }
-    
-    geometry->setVertexArray(vertices);
-    geometry->setColorArray(colors);
-    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
-    
-    // 线绘制
-    osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::LINES, 0, vertices->size());
-    geometry->addPrimitiveSet(drawArrays);
-    
-    // 设置线的宽度
-    osg::ref_ptr<osg::StateSet> stateSet = geometry->getOrCreateStateSet();
-    osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth;
-    lineWidth->setWidth(m_parameters.lineWidth);
-    stateSet->setAttribute(lineWidth);
+    buildStageEdgeGeometries(getCurrentStage());
 }
 
 void Cylinder3D_Geo::buildFaceGeometries()
 {
     mm_node()->clearFaceGeometry();
-    
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    if (controlPoints.empty())
-        return;
-    
-    // 获取现有的几何体
-    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getFaceGeometry();
-    if (!geometry.valid())
-        return;
-    
-    // 创建面的几何体
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
-    osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
-    
-    float radius = m_radius;
-    float height = m_height;
-    glm::vec3 axis = m_axis;
-    glm::vec3 center = controlPoints[0].position;
-    
-    if (controlPoints.size() == 2)
-    {
-        center = (controlPoints[0].position + controlPoints[1].position) * 0.5f;
-    }
-    
-    int segments = static_cast<int>(m_parameters.subdivisionLevel);
-    if (segments < 8) segments = 16;
-    
-    // 计算圆柱的两个圆面中心
-    glm::vec3 bottom = center - axis * (height * 0.5f);
-    glm::vec3 top = center + axis * (height * 0.5f);
-    
-    // 计算垂直于轴的两个正交向量
-    glm::vec3 u, v;
-    if (abs(axis.z) < 0.9f)
-    {
-        u = glm::normalize(glm::cross(axis, glm::vec3(0, 0, 1)));
-    }
-    else
-    {
-        u = glm::normalize(glm::cross(axis, glm::vec3(1, 0, 0)));
-    }
-    v = glm::normalize(glm::cross(axis, u));
-    
-    Color3D color = m_parameters.fillColor;
-    
-    // 生成圆柱侧面
-    for (int i = 0; i < segments; ++i)
-    {
-        float angle1 = 2.0f * M_PI * i / segments;
-        float angle2 = 2.0f * M_PI * (i + 1) / segments;
-        
-        glm::vec3 dir1 = static_cast<float>(cos(angle1)) * u + static_cast<float>(sin(angle1)) * v;
-        glm::vec3 dir2 = static_cast<float>(cos(angle2)) * u + static_cast<float>(sin(angle2)) * v;
-        
-        glm::vec3 p1_bottom = bottom + radius * dir1;
-        glm::vec3 p2_bottom = bottom + radius * dir2;
-        glm::vec3 p1_top = top + radius * dir1;
-        glm::vec3 p2_top = top + radius * dir2;
-        
-        // 第一个三角形
-        vertices->push_back(osg::Vec3(p1_bottom.x, p1_bottom.y, p1_bottom.z));
-        vertices->push_back(osg::Vec3(p2_bottom.x, p2_bottom.y, p2_bottom.z));
-        vertices->push_back(osg::Vec3(p1_top.x, p1_top.y, p1_top.z));
-        
-        normals->push_back(osg::Vec3(dir1.x, dir1.y, dir1.z));
-        normals->push_back(osg::Vec3(dir2.x, dir2.y, dir2.z));
-        normals->push_back(osg::Vec3(dir1.x, dir1.y, dir1.z));
-        
-        // 第二个三角形
-        vertices->push_back(osg::Vec3(p2_bottom.x, p2_bottom.y, p2_bottom.z));
-        vertices->push_back(osg::Vec3(p2_top.x, p2_top.y, p2_top.z));
-        vertices->push_back(osg::Vec3(p1_top.x, p1_top.y, p1_top.z));
-        
-        normals->push_back(osg::Vec3(dir2.x, dir2.y, dir2.z));
-        normals->push_back(osg::Vec3(dir2.x, dir2.y, dir2.z));
-        normals->push_back(osg::Vec3(dir1.x, dir1.y, dir1.z));
-        
-        // 添加颜色
-        for (int j = 0; j < 6; ++j)
-        {
-            colors->push_back(osg::Vec4(color.r, color.g, color.b, color.a));
-        }
-    }
-    
-    // 生成底面和顶面
-    // 底面
-    for (int i = 0; i < segments; ++i)
-    {
-        float angle1 = 2.0f * M_PI * i / segments;
-        float angle2 = 2.0f * M_PI * (i + 1) / segments;
-        
-        glm::vec3 dir1 = static_cast<float>(cos(angle1)) * u + static_cast<float>(sin(angle1)) * v;
-        glm::vec3 dir2 = static_cast<float>(cos(angle2)) * u + static_cast<float>(sin(angle2)) * v;
-        
-        glm::vec3 p1 = bottom + radius * dir1;
-        glm::vec3 p2 = bottom + radius * dir2;
-        
-        vertices->push_back(osg::Vec3(bottom.x, bottom.y, bottom.z));
-        vertices->push_back(osg::Vec3(p2.x, p2.y, p2.z));
-        vertices->push_back(osg::Vec3(p1.x, p1.y, p1.z));
-        
-        for (int j = 0; j < 3; ++j)
-        {
-            normals->push_back(osg::Vec3(-axis.x, -axis.y, -axis.z));
-            colors->push_back(osg::Vec4(color.r, color.g, color.b, color.a));
-        }
-    }
-    
-    // 顶面
-    for (int i = 0; i < segments; ++i)
-    {
-        float angle1 = 2.0f * M_PI * i / segments;
-        float angle2 = 2.0f * M_PI * (i + 1) / segments;
-        
-        glm::vec3 dir1 = static_cast<float>(cos(angle1)) * u + static_cast<float>(sin(angle1)) * v;
-        glm::vec3 dir2 = static_cast<float>(cos(angle2)) * u + static_cast<float>(sin(angle2)) * v;
-        
-        glm::vec3 p1 = top + radius * dir1;
-        glm::vec3 p2 = top + radius * dir2;
-        
-        vertices->push_back(osg::Vec3(top.x, top.y, top.z));
-        vertices->push_back(osg::Vec3(p1.x, p1.y, p1.z));
-        vertices->push_back(osg::Vec3(p2.x, p2.y, p2.z));
-        
-        for (int j = 0; j < 3; ++j)
-        {
-            normals->push_back(osg::Vec3(axis.x, axis.y, axis.z));
-            colors->push_back(osg::Vec4(color.r, color.g, color.b, color.a));
-        }
-    }
-    
-    geometry->setVertexArray(vertices);
-    geometry->setColorArray(colors);
-    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
-    geometry->setNormalArray(normals);
-    geometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
-    
-    geometry->addPrimitiveSet(new osg::DrawArrays(GL_TRIANGLES, 0, vertices->size()));
-
+    buildStageFaceGeometries(getCurrentStage());
 }
-
-// ==================== 绘制完成检查和控制点验证 ====================
 
 bool Cylinder3D_Geo::isDrawingComplete() const
 {
-    // 圆柱体需要2个控制点（底面中心点和顶面中心点）才能完成绘制
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    return controlPoints.size() >= 2;
+    return isAllStagesComplete();
 }
 
 bool Cylinder3D_Geo::areControlPointsValid() const
 {
-    const auto& controlPoints = mm_controlPoint()->getControlPoints();
-    
-    // 检查控制点数量
-    if (controlPoints.size() < 2) {
-        return false;
-    }
-    
-    // 检查控制点是否重合（允许一定的误差）
-    const float epsilon = 0.001f;
-    glm::vec3 diff = controlPoints[1].position - controlPoints[0].position;
-    float distance = glm::length(diff);
-    
-    if (distance < epsilon) {
-        return false; // 两点重合，无效
-    }
-    
-    // 检查控制点坐标是否有效（不是NaN或无穷大）
-    for (const auto& point : controlPoints) {
-        if (std::isnan(point.x()) || std::isnan(point.y()) || std::isnan(point.z()) ||
-            std::isinf(point.x()) || std::isinf(point.y()) || std::isinf(point.z())) {
-            return false;
-        }
-    }
-    
-    // 检查高度是否合理（不能太短）
-    if (distance < 0.01f) {
-        return false; // 高度太短，无效
-    }
-    
-    return true;
-}
+    return isValidCylinderConfiguration();
+} 
