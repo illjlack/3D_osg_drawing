@@ -8,6 +8,7 @@
 #include "../core/camera/CameraController.h"
 #include "../core/picking/PickingIndicator.h"
 #include "../core/picking/GeometryPickingSystem.h"
+#include "../util/ScaleBarRenderer.h"
 #include <osgViewer/Viewer>
 #include <osgViewer/CompositeViewer>
 #include <osgViewer/ViewerEventHandlers>
@@ -95,7 +96,7 @@ public:
     // 绘制模式管理
     void setDrawMode(DrawMode3D mode);
     
-    // 坐标转换
+    // 坐标转换（委托给CameraController）
     glm::vec3 screenToWorld(int x, int y, float depth = 0.0f);
     glm::vec2 worldToScreen(const glm::vec3& worldPos);
     
@@ -114,51 +115,17 @@ public:
     bool isCoordinateSystemEnabled() const;
     void refreshCoordinateSystem();
     
-    // 摄像机控制器接口（委托给CameraController）
+    // 摄像机控制器接口（直接访问，不再提供委托方法）
     CameraController* getCameraController() const { return m_cameraController.get(); }
     
-    // 相机操控器管理
-    void setManipulatorType(ManipulatorType type);
-    ManipulatorType getManipulatorType() const;
-    void switchToNextManipulator();
-    void switchToPreviousManipulator();
-    
-    // 摄像机移动控制（委托给CameraController）
-    void setCameraMoveSpeed(double speed);
-    double getCameraMoveSpeed() const;
-    void setWheelMoveSensitivity(double sensitivity);
-    double getWheelMoveSensitivity() const;
-    
-    // 加速度移动控制（委托给CameraController）
-    void setAccelerationRate(double rate);
-    double getAccelerationRate() const;
-    void setMaxAccelerationSpeed(double speed);
-    double getMaxAccelerationSpeed() const;
-    void resetAllAcceleration();
-    
-    // 投影模式控制（委托给CameraController）
-    void setProjectionMode(ProjectionMode mode);
-    ProjectionMode getProjectionMode() const;
-    void setFOV(double fov);
-    void setNearFar(double near, double far);
-    void setViewSize(double left, double right, double bottom, double top);
-    
-    // 比例尺相关
-    void enableScaleBar(bool enabled);
-    bool isScaleBarEnabled() const { return m_scaleBarEnabled; }
-    void setScaleBarPosition(const QPoint& position);
-    void setScaleBarSize(int width, int height);
+    // 比例尺渲染器接口
+    ScaleBarRenderer* getScaleBarRenderer() const { return m_scaleBarRenderer.get(); }
 
 signals:
     void geoSelected(Geo3D* geo);
     void mousePositionChanged(const glm::vec3& worldPos);
     void screenPositionChanged(int x, int y);
     void simplePickingResult(const PickResult& result);
-    void cameraMoveSpeedChanged(double speed);
-    void wheelMoveSensitivityChanged(double speed);
-    void accelerationRateChanged(double rate);
-    void maxAccelerationSpeedChanged(double speed);
-    void manipulatorTypeChanged(ManipulatorType type);
 
 protected:
     virtual void paintEvent(QPaintEvent* event) override;
@@ -169,6 +136,7 @@ protected:
     virtual void wheelEvent(QWheelEvent* event) override;
     virtual void keyPressEvent(QKeyEvent* event) override;
     virtual void keyReleaseEvent(QKeyEvent* event) override;
+    virtual void mouseDoubleClickEvent(QMouseEvent* event) override;
 
 private:
     void setupCamera();
@@ -181,11 +149,6 @@ private:
     void updateCurrentDrawing(const glm::vec3& worldPos);
     void completeCurrentDrawing();
     void cancelCurrentDrawing();
-    
-    // 比例尺相关
-    void drawScaleBar();
-    double calculateScaleValue();
-    QString formatScaleText(double worldUnits);
     
     // 拾取系统回调
     void onSimplePickingResult(const PickResult& result);
@@ -235,15 +198,8 @@ private:
     std::unique_ptr<CoordinateSystemRenderer> m_coordinateSystemRenderer;
     bool m_coordinateSystemEnabled;
     
-    // 比例尺相关
-    bool m_scaleBarEnabled;
-    QPoint m_scaleBarPosition;
-    QSize m_scaleBarSize;
-    
-    // 比例尺缓存 - 避免每帧重新计算
-    double m_cachedScaleValue;
-    QDateTime m_lastScaleCalculation;
-    static const int SCALE_CACHE_DURATION = 100; // 100ms缓存时间
+    // 比例尺渲染器
+    std::unique_ptr<ScaleBarRenderer> m_scaleBarRenderer;
     
     // 鼠标位置缓存 - 避免频繁的坐标转换
     QPoint m_lastMouseScreenPos;

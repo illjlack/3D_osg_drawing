@@ -51,6 +51,8 @@ void GeoNodeManager::initializeNodes()
         m_transformNode->addChild(m_controlPointsGeometry.get());
         m_transformNode->addChild(m_boundingBoxGeometry.get());
 
+        // 只可见，因为没有绘制完成，不能被拾取
+        m_osgNode->setNodeMask(NODE_MASK_NOSELECT);
         // 设置各个几何体的专用mask
         m_vertexGeometry->setNodeMask(NODE_MASK_VERTEX);
         m_edgeGeometry->setNodeMask(NODE_MASK_EDGE);
@@ -480,4 +482,12 @@ void GeoNodeManager::createBoundingBoxGeometry(const osg::BoundingBox& boundingB
     m_boundingBoxGeometry->addPrimitiveSet(lines.get());
 
     emit geometryChanged();
+}
+
+void GeoNodeManager::onDrawingCompleted()
+{
+    // 绘制完成后，根节点节点的掩码为NODE_MASK_ALL，使其既可见又可拾取
+    if (m_osgNode.valid()) {
+        m_osgNode->setNodeMask(NODE_MASK_ALL);
+    }
 }

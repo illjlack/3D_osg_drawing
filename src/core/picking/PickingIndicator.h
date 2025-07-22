@@ -11,6 +11,27 @@
 #include <osg/PositionAttitudeTransform>
 #include <glm/glm.hpp>
 
+
+// 指示器配置
+struct IndicatorConfig
+{
+    float size;                 // 指示器大小
+    osg::Vec4 color;           // 颜色
+    float lineWidth;           // 线宽
+    float animationSpeed;      // 动画速度
+    bool enableAnimation;      // 是否启用动画
+    float fadeTime;            // 淡入淡出时间
+    
+    IndicatorConfig()
+        : size(1.0f)                     // 设置合适的默认大小
+        , color(1.0f, 1.0f, 0.0f, 1.0f)  // 黄色
+        , lineWidth(5.0f)                // 增加线宽，让边指示器更明显
+        , animationSpeed(2.0f)
+        , enableAnimation(true)
+        , fadeTime(0.3f)
+    {}
+};
+
 // 拾取指示器 - 用于显示拾取位置和类型
 class PickingIndicator : public osg::Referenced
 {
@@ -25,7 +46,7 @@ public:
     void shutdown();
     
     // 显示指示器
-    void showIndicator(const glm::vec3& position, PickFeatureType featureType);
+    void showIndicator(const glm::vec3& position, PickFeatureType featureType, const glm::vec3& normal = glm::vec3(0.0f, 0.0f, 1.0f));
     
     // 隐藏指示器
     void hideIndicator();
@@ -75,4 +96,7 @@ private:
     
     // 变换节点（用于位置更新）
     osg::ref_ptr<osg::PositionAttitudeTransform> m_indicatorTransform;
+    
+    // 面指示器的法向量变换节点
+    osg::ref_ptr<osg::PositionAttitudeTransform> m_faceTransform;
 }; 

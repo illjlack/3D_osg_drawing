@@ -10,6 +10,7 @@
 #include <osg/StateSet>
 #include <osg/LineWidth>
 #include <osg/Timer>
+#include <osg/AutoTransform>
 #include <cmath>
 #include <algorithm>
 
@@ -72,6 +73,7 @@ void PickingIndicator::shutdown()
         m_vertexIndicator = nullptr;
         m_edgeIndicator = nullptr;
         m_faceIndicator = nullptr;
+        m_faceTransform = nullptr;
         m_indicatorTransform = nullptr;
         m_indicatorRoot = nullptr;
         
@@ -81,7 +83,7 @@ void PickingIndicator::shutdown()
     }
 }
 
-void PickingIndicator::showIndicator(const glm::vec3& position, PickFeatureType featureType)
+void PickingIndicator::showIndicator(const glm::vec3& position, PickFeatureType featureType, const glm::vec3& normal)
 {
     if (!m_initialized) return;
     
@@ -106,6 +108,20 @@ void PickingIndicator::showIndicator(const glm::vec3& position, PickFeatureType 
             break;
         case PickFeatureType::FACE:
             activeIndicator = m_faceIndicator;
+            // 为面指示器设置法向量旋转
+            if (m_faceTransform) {
+                // 计算从默认Z轴到面法向量的旋转
+                osg::Vec3 defaultNormal(0.0f, 0.0f, 1.0f);
+                osg::Vec3 faceNormal(normal.x, normal.y, normal.z);
+                faceNormal.normalize();
+                
+                // 计算旋转四元数
+                osg::Quat rotation;
+                rotation.makeRotate(defaultNormal, faceNormal);
+                
+                // 应用旋转到面变换节点
+                m_faceTransform->setAttitude(rotation);
+            }
             break;
         default:
             return;
@@ -159,6 +175,11 @@ void PickingIndicator::createVertexIndicator()
     m_vertexIndicator = new osg::Group;
     m_vertexIndicator->setName("VertexIndicator");
     
+    // 创建AutoTransform节点实现billboard效果（正对视线）
+    osg::ref_ptr<osg::AutoTransform> autoTransform = new osg::AutoTransform;
+    autoTransform->setAutoRotateMode(osg::AutoTransform::ROTATE_TO_SCREEN);
+    autoTransform->setAutoScaleToScreen(false);
+    
     // 创建圆形几何体
     osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
@@ -166,7 +187,7 @@ void PickingIndicator::createVertexIndicator()
     
     // 创建圆形（用多边形近似）
     const int segments = 16;
-    float radius = m_config.size; // 使用配置的大小
+    float radius = m_config.size; 
     
     for (int i = 0; i < segments; ++i) {
         float angle = (2.0f * M_PI * i) / segments;
@@ -190,7 +211,11 @@ void PickingIndicator::createVertexIndicator()
     stateSet->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
     stateSet->setMode(GL_DEPTH_TEST, osg::StateAttribute::ON);
     
-    m_vertexIndicator->addChild(geode);
+    // 将几何体添加到AutoTransform
+    autoTransform->addChild(geode);
+    
+    // 将AutoTransform添加到指示器组
+    m_vertexIndicator->addChild(autoTransform);
 }
 
 void PickingIndicator::createEdgeIndicator()
@@ -198,22 +223,32 @@ void PickingIndicator::createEdgeIndicator()
     m_edgeIndicator = new osg::Group;
     m_edgeIndicator->setName("EdgeIndicator");
     
-    // 创建线段几何体
+    // 创建AutoTransform节点实现billboard效果（正对视线）
+    osg::ref_ptr<osg::AutoTransform> autoTransform = new osg::AutoTransform;
+    autoTransform->setAutoRotateMode(osg::AutoTransform::ROTATE_TO_SCREEN);
+    autoTransform->setAutoScaleToScreen(false);
+    
+    // 创建正方形几何体
     osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
-    float length = m_config.size;
-    vertices->push_back(osg::Vec3(-length, 0.0f, 0.0f));
-    vertices->push_back(osg::Vec3(length, 0.0f, 0.0f));
+    float size = m_config.size; // 使用固定的合适大小
     
-    colors->push_back(osg::Vec4(m_config.color.r(), m_config.color.g(), m_config.color.b(), m_config.color.a()));
-    colors->push_back(osg::Vec4(m_config.color.r(), m_config.color.g(), m_config.color.b(), m_config.color.a()));
+    // 正方形的四个顶点
+    vertices->push_back(osg::Vec3(-size, -size, 0.0f));
+    vertices->push_back(osg::Vec3(size, -size, 0.0f));
+    vertices->push_back(osg::Vec3(size, size, 0.0f));
+    vertices->push_back(osg::Vec3(-size, size, 0.0f));
+    
+    for (int i = 0; i < 4; ++i) {
+        colors->push_back(osg::Vec4(m_config.color.r(), m_config.color.g(), m_config.color.b(), m_config.color.a()));
+    }
     
     geometry->setVertexArray(vertices);
     geometry->setColorArray(colors);
     geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
-    geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::LINES, 0, vertices->size()));
+    geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::LINE_LOOP, 0, vertices->size()));
     
     // 创建Geode并添加几何体
     osg::ref_ptr<osg::Geode> geode = new osg::Geode;
@@ -226,7 +261,11 @@ void PickingIndicator::createEdgeIndicator()
     osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth(m_config.lineWidth);
     stateSet->setAttributeAndModes(lineWidth, osg::StateAttribute::ON);
     
-    m_edgeIndicator->addChild(geode);
+    // 将几何体添加到AutoTransform
+    autoTransform->addChild(geode);
+    
+    // 将AutoTransform添加到指示器组
+    m_edgeIndicator->addChild(autoTransform);
 }
 
 void PickingIndicator::createFaceIndicator()
@@ -234,12 +273,16 @@ void PickingIndicator::createFaceIndicator()
     m_faceIndicator = new osg::Group;
     m_faceIndicator->setName("FaceIndicator");
     
+    // 创建法向量变换节点用于根据面法向量旋转指示器
+    m_faceTransform = new osg::PositionAttitudeTransform;
+    m_faceTransform->setName("FaceTransform");
+    
     // 创建三角形几何体
     osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
-    float size = m_config.size;
+    float size = m_config.size; // 统一使用固定大小保持一致
     vertices->push_back(osg::Vec3(0.0f, size, 0.0f));
     vertices->push_back(osg::Vec3(-size * 0.866f, -size * 0.5f, 0.0f));
     vertices->push_back(osg::Vec3(size * 0.866f, -size * 0.5f, 0.0f));
@@ -262,7 +305,11 @@ void PickingIndicator::createFaceIndicator()
     stateSet->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
     stateSet->setMode(GL_DEPTH_TEST, osg::StateAttribute::ON);
     
-    m_faceIndicator->addChild(geode);
+    // 将几何体添加到变换节点
+    m_faceTransform->addChild(geode);
+    
+    // 将变换节点添加到指示器组
+    m_faceIndicator->addChild(m_faceTransform);
 }
 
 void PickingIndicator::updateAnimation(double currentTime)

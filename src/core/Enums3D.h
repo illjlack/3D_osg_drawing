@@ -302,7 +302,9 @@ enum NodeMask3D : uint32_t
 {
     // 基础掩码
     NODE_MASK_NONE        = 0x00000000,  // 隐藏节点（完全不可见，不可拾取）
-    
+    NODE_MASK_ALL         = 0xFFFFFFFF,  // 所有节点（可见，可拾取）
+    NODE_MASK_NOSELECT    = 0x80000000,  // 只可见
+
     // 几何体类型掩码（用于拾取系统分类）
     NODE_MASK_VERTEX      = 0x00000001,  // 顶点几何体（第1位）
     NODE_MASK_EDGE        = 0x00000002,  // 边几何体（第2位）
@@ -311,11 +313,13 @@ enum NodeMask3D : uint32_t
     NODE_MASK_BOUNDING_BOX   = 0x00000010,  // 包围盒（第5位）
     
     // 特殊功能组件掩码（高位区域，避免与几何体冲突）
-    NODE_MASK_PICKING_INDICATOR = 0x80000000,  // 拾取指示器（最高位）
-    NODE_MASK_UI_OVERLAY        = 0x40000000,  // UI覆盖层（第二高位）
-    NODE_MASK_DEBUG_INFO        = 0x20000000,  // 调试信息（第三高位）
-    NODE_MASK_SKYBOX            = 0x10000000,  // 天空盒（第四高位）
-    NODE_MASK_COORDINATE_SYSTEM = 0x08000000,  // 坐标系统（第五高位）
+    NODE_MASK_PICKING_INDICATOR = 0x00000020,  // 拾取指示器
+    NODE_MASK_UI_OVERLAY        = 0x00000040,  // UI覆盖层
+    NODE_MASK_DEBUG_INFO        = 0x00000080,  // 调试信息
+    NODE_MASK_SKYBOX            = 0x00000100,  // 天空盒
+    NODE_MASK_COORDINATE_SYSTEM = 0x08000200,  // 坐标系统
+
+    // 
     
     // 常用组合掩码（通过位组合实现）
     NODE_MASK_ALL_GEOMETRY = NODE_MASK_VERTEX | NODE_MASK_EDGE | NODE_MASK_FACE,  // 所有主要几何体

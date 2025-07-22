@@ -60,6 +60,11 @@ PickResult GeometryPickingSystem::pickGeometry(int mouseX, int mouseY)
     // 清空之前的结果
     m_singleResults.clear();
     
+
+    /**
+        因为正在绘制的几何的临时点一直跟踪鼠标，所有要避免临时点以及刚画的线、面不被一直选中而干扰其他几何的选择。
+        只能妥协暂时不加入选中当前在绘制的节点。
+    */
     // 1. 面拾取 - 单独遍历
     if (m_config.enableFacePicking) {
         osg::ref_ptr<osgUtil::LineSegmentIntersector> rayIntersector = 
@@ -94,7 +99,7 @@ PickResult GeometryPickingSystem::pickGeometry(int mouseX, int mouseY)
         osg::ref_ptr<osgUtil::IntersectionVisitor> vertexVisitor = 
             new osgUtil::IntersectionVisitor(cylinderIntersector.get());
         vertexVisitor->setTraversalMask(NODE_MASK_VERTEX|NODE_MASK_CONTROL_POINTS);  // 只访问顶点(和控制点)几何体
-        
+
         // 单独遍历顶点几何体
         m_camera->accept(*vertexVisitor);
         
@@ -165,11 +170,30 @@ PickResult GeometryPickingSystem::selectBestResult(const std::vector<PickResult>
 {
     if (results.empty()) return PickResult();
     
-    // 按优先级排序：顶点 > 边 > 面
-    std::vector<PickResult> sorted = results;
+    // 定义距离阈值，在此范围内认为距离相近
+    const float distanceThreshold = 2.0f; // 可根据需要调整
     
-    std::sort(sorted.begin(), sorted.end(), [](const PickResult& a, const PickResult& b) {
-        // 优先级：顶点=3, 边=2, 面=1
+    // 找到最近的距离
+    float minDistance = std::min_element(results.begin(), results.end(), 
+        [](const PickResult& a, const PickResult& b) {
+            return a.distance < b.distance;
+        })->distance;
+    
+    // 收集距离相近的结果（在阈值范围内）
+    std::vector<PickResult> nearResults;
+    for (const auto& result : results) {
+        if (std::abs(result.distance - minDistance) <= distanceThreshold) {
+            nearResults.push_back(result);
+        }
+    }
+    
+    // 如果只有一个相近的结果，直接返回
+    if (nearResults.size() == 1) {
+        return nearResults[0];
+    }
+    
+    // 如果有多个相近的结果，按优先级选择：顶点 > 边 > 面
+    std::sort(nearResults.begin(), nearResults.end(), [](const PickResult& a, const PickResult& b) {
         int priorityA = static_cast<int>(a.featureType);
         int priorityB = static_cast<int>(b.featureType);
         
@@ -181,7 +205,7 @@ PickResult GeometryPickingSystem::selectBestResult(const std::vector<PickResult>
         return a.distance < b.distance;
     });
     
-    return sorted.front();
+    return nearResults.front();
 }
 
 PickResult GeometryPickingSystem::selectBestSingleResult()

@@ -78,6 +78,10 @@ void Geo3D::connectManagerSignals()
                 }
             });
     
+    // 状态完成时通知节点管理器设置节点可拾取
+    connect(m_stateManager.get(), &GeoStateManager::stateCompleted,
+            m_nodeManager.get(), &GeoNodeManager::onDrawingCompleted);
+    
     // 编辑状态变化时通知渲染管理器
     connect(m_stateManager.get(), &GeoStateManager::editingStarted,
             this, [this]() {

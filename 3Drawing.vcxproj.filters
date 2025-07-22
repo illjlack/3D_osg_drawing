@@ -177,6 +177,9 @@
     <ClCompile Include="src\core\picking\GeometryPickingSystem.cpp">
       <Filter>Core\Picking</Filter>
     </ClCompile>
+    <ClCompile Include="src\util\ScaleBarRenderer.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\core\Common3D.h">
@@ -289,6 +292,9 @@
     </ClInclude>
     <ClInclude Include="src\core\picking\GeometryPickingSystem.h">
       <Filter>Core\Picking</Filter>
+    </ClInclude>
+    <ClInclude Include="src\util\ScaleBarRenderer.h">
+      <Filter>Util</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -520,7 +520,65 @@ void CameraController::home()
     m_directionCacheValid = false;
 }
 
+void CameraController::setRotationCenter(const osg::Vec3d& center)
+{
+    if (!m_currentManipulator) {
+        LOG_WARNING("设置旋转中心失败：当前操控器为空", "相机");
+        return;
+    }
+    
+    // 主要针对轨道球操控器
+    if (m_currentManipulatorType == ManipulatorType::Trackball && m_trackballManipulator) {
+        // 获取当前相机位置和方向
+        osg::Vec3d currentEye, currentCenter, currentUp;
+        m_currentManipulator->getInverseMatrix().getLookAt(currentEye, currentCenter, currentUp);
+        
+        // 计算新的距离（从眼点到新中心的距离）
+        double newDistance = (currentEye - center).length();
+        
+        // 只设置新的中心点和距离，保持眼点位置不变
+        m_trackballManipulator->setCenter(center);
+        m_trackballManipulator->setDistance(newDistance);
+        
+        LOG_INFO(QString("相机旋转中心已设置为: (%1, %2, %3), 新距离: %4")
+                 .arg(center.x(), 0, 'f', 2)
+                 .arg(center.y(), 0, 'f', 2)
+                 .arg(center.z(), 0, 'f', 2)
+                 .arg(newDistance, 0, 'f', 2), "相机");
+    } else {
+        // 对于其他操控器类型，使用通用方法
+        // 获取当前状态
+        osg::Vec3d currentEye, currentCenter, currentUp;
+        m_currentManipulator->getInverseMatrix().getLookAt(currentEye, currentCenter, currentUp);
+        
+        // 保持眼点位置不变，只改变观察中心
+        osg::Matrix lookAtMatrix = osg::Matrix::lookAt(currentEye, center, currentUp);
+        m_currentManipulator->setByInverseMatrix(lookAtMatrix);
+        
+        LOG_INFO(QString("相机中心已设置为: (%1, %2, %3)，眼点位置保持不变")
+                 .arg(center.x(), 0, 'f', 2)
+                 .arg(center.y(), 0, 'f', 2)
+                 .arg(center.z(), 0, 'f', 2), "相机");
+    }
+    
+    m_directionCacheValid = false;
+}
 
+osg::Vec3d CameraController::getRotationCenter() const
+{
+    if (!m_currentManipulator) {
+        LOG_WARNING("获取旋转中心失败：当前操控器为空", "相机");
+        return osg::Vec3d(0, 0, 0);
+    }
+    
+    // 对于轨道球操控器，直接获取中心点
+    if (m_currentManipulatorType == ManipulatorType::Trackball && m_trackballManipulator) {
+        return m_trackballManipulator->getCenter();
+    } else {
+        // 对于其他操控器，返回当前观察点
+        return getCenterPosition();
+    }
+}
 
 osg::Vec3d CameraController::screenToWorld(int screenX, int screenY, double depth, int viewportWidth, int viewportHeight) const
 {

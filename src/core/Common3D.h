@@ -313,58 +313,6 @@ struct Ray3D
     glm::vec3 pointAt(float t) const { return origin + t * direction; }
 };
 
-// 拾取结果
-struct PickResult3D
-{
-    bool hit;
-    float distance;
-    glm::vec3 point;
-    glm::vec3 normal;
-    void* userData;  // 可以存储几何对象指针
-    
-    // KDTree相关成员
-    Geo3D* geoObject;  // 几何对象指针
-    int geometryType;   // 几何体类型 (0:点, 1:线, 2:面)
-    int geometryIndex;  // 几何体索引
-    
-    PickResult3D() : hit(false), distance(FLT_MAX), point(0.0f), normal(0.0f), 
-                     userData(nullptr), geoObject(nullptr), geometryType(0), geometryIndex(-1) {}
-};
-
-// 拾取Feature结构
-struct PickingFeature
-{
-    FeatureType type;
-    uint32_t index;                    // Feature在该类型中的索引
-    osg::ref_ptr<osg::Geometry> geometry;  // 该Feature的几何体
-    osg::Vec3 center;                  // Feature中心点(用于指示器定位)
-    float size;                        // Feature大小(用于指示器缩放)
-    
-    PickingFeature(FeatureType t, uint32_t idx) 
-        : type(t), index(idx), center(0,0,0), size(1.0f) {}
-};
-
-// 指示器配置
-struct IndicatorConfig
-{
-    float size;                 // 指示器大小
-    osg::Vec4 color;           // 颜色
-    float lineWidth;           // 线宽
-    float animationSpeed;      // 动画速度
-    bool enableAnimation;      // 是否启用动画
-    float fadeTime;            // 淡入淡出时间
-    
-    IndicatorConfig()
-        : size(5.0f)                     // 进一步增加默认大小到5.0，确保在3D场景中容易看见
-        , color(1.0f, 1.0f, 0.0f, 1.0f)  // 黄色
-        , lineWidth(5.0f)                // 增加线宽，让边指示器更明显
-        , animationSpeed(2.0f)
-        , enableAnimation(true)
-        , fadeTime(0.3f)
-    {}
-};
-
-
 /*
 // 日志辅助类
 class LogHelper3D

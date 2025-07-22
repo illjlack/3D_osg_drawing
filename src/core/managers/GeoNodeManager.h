@@ -74,6 +74,11 @@ public:
     
     // 更新包围盒可见性状态
     void updateBoundingBoxVisibility();
+    
+public slots:
+    // 处理绘制完成后的节点设置
+    void onDrawingCompleted();
+    
 signals:
     // 用于更新材质和渲染
     void geometryChanged();

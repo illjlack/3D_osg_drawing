@@ -103,6 +103,10 @@ public:
     void setPosition(const osg::Vec3d& eye, const osg::Vec3d& center, const osg::Vec3d& up);
     void setHomePosition(const osg::Vec3d& eye, const osg::Vec3d& center, const osg::Vec3d& up);
     void home();
+    
+    // 设置相机旋转中心（仅对轨道球操控器有效）
+    void setRotationCenter(const osg::Vec3d& center);
+    osg::Vec3d getRotationCenter() const;
 
     // 获取当前视图矩阵
     inline osg::Matrix getViewMatrix() const 

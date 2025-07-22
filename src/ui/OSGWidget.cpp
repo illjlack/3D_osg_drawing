@@ -66,11 +66,8 @@ OSGWidget::OSGWidget(QWidget* parent)
     , m_skyboxEnabled(true)
     , m_coordinateSystemRenderer(std::make_unique<CoordinateSystemRenderer>())
     , m_coordinateSystemEnabled(true)
-    , m_scaleBarEnabled(true)
-    , m_scaleBarPosition(10, 10)
-    , m_scaleBarSize(200, 60)
+    , m_scaleBarRenderer(std::make_unique<ScaleBarRenderer>())
     , m_updateTimer(new QTimer(this))
-    , m_cachedScaleValue(0.0)
     , m_mousePosCacheValid(false)
     , m_multiSelectMode(false)
     , m_isDraggingControlPoint(false)
@@ -94,20 +91,15 @@ OSGWidget::OSGWidget(QWidget* parent)
 
     assert(qobject_cast<QObject*>(m_cameraController.get()));
 
-    // 连接CameraController的信号
-    connect(m_cameraController.get(), &CameraController::cameraMoveSpeedChanged, 
-            this, &OSGWidget::cameraMoveSpeedChanged);
-    connect(m_cameraController.get(), &CameraController::wheelMoveSensitivityChanged, 
-            this, &OSGWidget::wheelMoveSensitivityChanged);
-    connect(m_cameraController.get(), &CameraController::accelerationRateChanged, 
-            this, &OSGWidget::accelerationRateChanged);
-    connect(m_cameraController.get(), &CameraController::maxAccelerationSpeedChanged, 
-            this, &OSGWidget::maxAccelerationSpeedChanged);
-    connect(m_cameraController.get(), &CameraController::manipulatorTypeChanged, 
-            this, &OSGWidget::manipulatorTypeChanged);
+    // CameraController信号连接已移除 - 直接使用CameraController的信号
     
     // 连接初始化完成信号
     connect(this, &osgQOpenGLWidget::initialized, this, &OSGWidget::initializeScene);
+    
+    // 设置比例尺渲染器的相机控制器
+    m_scaleBarRenderer->setCameraController(m_cameraController.get());
+    
+    // 注意：比例尺渲染器会根据相机状态自动更新，无需信号连接
     
     // 设置渲染循环
     m_updateTimer->start(16);
@@ -657,6 +649,7 @@ glm::vec3 OSGWidget::screenToWorld(int x, int y, float depth)
         return m_cachedMouseWorldPos;
     }
     
+    // 直接委托给CameraController
     osg::Vec3d worldPoint = m_cameraController->screenToWorld(x, y, depth, width(), height());
     glm::vec3 result(worldPoint.x(), worldPoint.y(), worldPoint.z());
     
@@ -673,6 +666,7 @@ glm::vec2 OSGWidget::worldToScreen(const glm::vec3& worldPos)
 {
     if (!m_cameraController) return glm::vec2(0, 0);
     
+    // 直接委托给CameraController
     osg::Vec2d screenPoint = m_cameraController->worldToScreen(osg::Vec3d(worldPos.x, worldPos.y, worldPos.z), width(), height());
     return glm::vec2(screenPoint.x(), screenPoint.y());
 }
@@ -688,10 +682,11 @@ void OSGWidget::paintEvent(QPaintEvent* event)
         m_cameraController->updateCameraPosition();
     }
     
-    // 绘制比例尺 - 只在启用时绘制
-    if (m_scaleBarEnabled)
+    // 绘制比例尺 - 使用ScaleBarRenderer
+    if (m_scaleBarRenderer && m_scaleBarRenderer->isEnabled())
     {
-        drawScaleBar();
+        QPainter painter(this);
+        m_scaleBarRenderer->drawScaleBar(painter, width(), height());
     }
 }
 
@@ -727,23 +722,22 @@ void OSGWidget::mousePressEvent(QMouseEvent* event)
     }
     else 
     { 
-        screenToWorld(event->x(), event->y(), 0.5f); 
+        worldPos= screenToWorld(event->x(), event->y(), 0.5f);
         // 坐标限制在坐标系内
         CoordinateSystem3D* coordSystem = CoordinateSystem3D::getInstance();
         glm::vec3 clampedPos = coordSystem->clampPointToSkybox(worldPos);
         worldPos = clampedPos;
     }
+
     emit mousePositionChanged(worldPos);
 
     if (GlobalDrawMode3D == DrawSelect3D)
     {
-        bool isCtrlPressed = (QApplication::keyboardModifiers() & Qt::ControlModifier);
-
         if (pickResult.hasResult && pickResult.geometry)
         {
             Geo3D* pickedGeo = pickResult.geometry;
 
-            if (isCtrlPressed)
+            if (QApplication::keyboardModifiers() & Qt::ControlModifier)
             {
                 // Ctrl+点击：多选模式
                 if (isSelected(pickedGeo))
@@ -766,10 +760,22 @@ void OSGWidget::mousePressEvent(QMouseEvent* event)
         }
         else
         {
-            // 没有点击到对象，清除选择
-            if (!isCtrlPressed)
+            clearSelection();
+        }
+
+        if (pickResult.hasResult && pickResult.geometry && pickResult.osgGeometry)
+        {
+            // 检查是否为顶点拾取（控制点）
+            if (pickResult.featureType == PickFeatureType::VERTEX && pickResult.osgGeometry->getNodeMask() == NODE_MASK_CONTROL_POINTS && pickResult.primitiveIndex >= 0)
             {
-                clearSelection();
+                // 检查该几何体是否在选中列表中
+                auto it = std::find(m_selectedGeos.begin(), m_selectedGeos.end(), pickResult.geometry);
+                if (it != m_selectedGeos.end())
+                {
+                    startDraggingControlPoint(pickResult.geometry, pickResult.primitiveIndex);
+                    event->accept();
+                    return;
+                }
             }
         }
     }
@@ -796,26 +802,6 @@ void OSGWidget::mousePressEvent(QMouseEvent* event)
             if (m_currentDrawingGeo->mm_state()->isStateComplete())
             {
                 completeCurrentDrawing();
-            }
-        }
-    }
-    
-    // 处理拖动控制点
-    if (GlobalDrawMode3D == DrawSelect3D && event->button() == Qt::LeftButton)
-    {
-        if (pickResult.hasResult && pickResult.geometry && pickResult.osgGeometry)
-        {
-            // 检查是否为顶点拾取（控制点）
-            if (pickResult.featureType == PickFeatureType::VERTEX && pickResult.osgGeometry->getNodeMask()== NODE_MASK_CONTROL_POINTS && pickResult.primitiveIndex >= 0)
-            {
-                // 检查该几何体是否在选中列表中
-                auto it = std::find(m_selectedGeos.begin(), m_selectedGeos.end(), pickResult.geometry);
-                if (it != m_selectedGeos.end())
-                {
-                    startDraggingControlPoint(pickResult.geometry, pickResult.primitiveIndex);
-                    event->accept();
-                    return;
-                }
             }
         }
     }
@@ -931,6 +917,54 @@ void OSGWidget::mouseReleaseEvent(QMouseEvent* event)
     }
     
     osgQOpenGLWidget::mouseReleaseEvent(event);
+}
+
+void OSGWidget::mouseDoubleClickEvent(QMouseEvent* event)
+{
+    // 只在选择模式和左键双击时处理
+    if (GlobalDrawMode3D != DrawSelect3D || event->button() != Qt::LeftButton) {
+        osgQOpenGLWidget::mouseDoubleClickEvent(event);
+        return;
+    }
+    
+    // 执行拾取操作获取双击位置的世界坐标
+    PickResult pickResult = performSimplePicking(event->x(), height() - event->y());
+    glm::vec3 worldPos;
+    
+    if (pickResult.hasResult) {
+        // 如果拾取到了几何对象，使用拾取到的世界坐标
+        worldPos = pickResult.worldPosition;
+        LOG_INFO(QString("双击拾取到几何对象，位置: (%1, %2, %3)")
+                 .arg(worldPos.x, 0, 'f', 2)
+                 .arg(worldPos.y, 0, 'f', 2)
+                 .arg(worldPos.z, 0, 'f', 2), "相机");
+    } else {
+        // 如果没有拾取到几何对象，使用屏幕坐标转换为世界坐标
+        worldPos = screenToWorld(event->x(), event->y(), 0.5f);
+        
+        // 坐标限制在坐标系内
+        CoordinateSystem3D* coordSystem = CoordinateSystem3D::getInstance();
+        glm::vec3 clampedPos = coordSystem->clampPointToSkybox(worldPos);
+        worldPos = clampedPos;
+        
+        LOG_INFO(QString("双击空白区域，转换世界坐标: (%1, %2, %3)")
+                 .arg(worldPos.x, 0, 'f', 2)
+                 .arg(worldPos.y, 0, 'f', 2)
+                 .arg(worldPos.z, 0, 'f', 2), "相机");
+    }
+    
+    // 设置相机旋转中心
+    if (m_cameraController) {
+        osg::Vec3d newCenter(worldPos.x, worldPos.y, worldPos.z);
+        m_cameraController->setRotationCenter(newCenter);
+        
+        LOG_SUCCESS(QString("相机旋转中心已设置为: (%1, %2, %3)")
+                   .arg(worldPos.x, 0, 'f', 2)
+                   .arg(worldPos.y, 0, 'f', 2)
+                   .arg(worldPos.z, 0, 'f', 2), "相机");
+    }
+    
+    event->accept();
 }
 
 void OSGWidget::wheelEvent(QWheelEvent* event)
@@ -1187,103 +1221,8 @@ void OSGWidget::refreshCoordinateSystem()
 
 
 
-// ========================================= 摄像机控制器委托方法 =========================================
-
-void OSGWidget::setManipulatorType(ManipulatorType type)
-{
-    if (m_cameraController)
-    {
-        m_cameraController->setManipulatorType(type);
-        
-        // 清除比例尺缓存，因为相机操控器改变了
-        m_lastScaleCalculation = QDateTime();
-        
-        // 清除鼠标位置缓存，因为相机改变了
-        m_mousePosCacheValid = false;
-        
-        LOG_INFO(QString("切换相机操控器: %1").arg(static_cast<int>(type)), "相机");
-    }
-}
-
-ManipulatorType OSGWidget::getManipulatorType() const
-{
-    if (m_cameraController)
-    {
-        return m_cameraController->getManipulatorType();
-    }
-    return ManipulatorType::Trackball;
-}
-
-void OSGWidget::switchToNextManipulator()
-{
-    m_cameraController->switchToNextManipulator();
-}
-
-void OSGWidget::switchToPreviousManipulator()
-{
-    m_cameraController->switchToPreviousManipulator();
-}
-
-void OSGWidget::setCameraMoveSpeed(double speed)
-{
-    m_cameraController->setCameraMoveSpeed(speed);
-}
-
-double OSGWidget::getCameraMoveSpeed() const
-{
-    if (m_cameraController)
-    {
-        return m_cameraController->getCameraMoveSpeed();
-    }
-    return 1.0;
-}
-
-void OSGWidget::setWheelMoveSensitivity(double sensitivity)
-{
-    m_cameraController->setWheelMoveSensitivity(sensitivity);
-}
-
-double OSGWidget::getWheelMoveSensitivity() const
-{
-    if (m_cameraController)
-    {
-        return m_cameraController->getWheelMoveSensitivity();
-    }
-    return 1.0;
-}
-
-void OSGWidget::setAccelerationRate(double rate)
-{
-    m_cameraController->setAccelerationRate(rate);
-}
-
-double OSGWidget::getAccelerationRate() const
-{
-    if (m_cameraController)
-    {
-        return m_cameraController->getAccelerationRate();
-    }
-    return 1.5;
-}
-
-void OSGWidget::setMaxAccelerationSpeed(double speed)
-{
-    m_cameraController->setMaxAccelerationSpeed(speed);
-}
-
-double OSGWidget::getMaxAccelerationSpeed() const
-{
-    if (m_cameraController)
-    {
-        return m_cameraController->getMaxAccelerationSpeed();
-    }
-    return 10.0;
-}
-
-void OSGWidget::resetAllAcceleration()
-{
-    m_cameraController->resetAllAcceleration();
-}
+// ========================================= 摄像机控制器委托方法已移除 =========================================
+// 现在直接通过getCameraController()访问相机控制器的功能
 
 
 
@@ -1380,231 +1319,11 @@ void OSGWidget::keyReleaseEvent(QKeyEvent* event)
     event->accept();
 }
 
-// ========================================= 比例尺相关方法 =========================================
+// ========================================= 比例尺相关方法已移至ScaleBarRenderer =========================================
+// 现在通过getScaleBarRenderer()访问比例尺功能
 
-void OSGWidget::drawScaleBar()
-{
-    QPainter painter(this);
-    painter.setRenderHint(QPainter::Antialiasing);
-    
-    // 获取当前相机信息
-    osgViewer::Viewer* viewer = getOsgViewer();
-    if (!viewer) return;
-    
-    osg::Camera* camera = viewer->getCamera();
-    if (!camera) return;
-    
-    // 计算比例尺
-    double scaleValue = calculateScaleValue();
-    QString scaleText = formatScaleText(scaleValue);
-    
-    // 设置绘制区域
-    QRect scaleRect(m_scaleBarPosition.x(), m_scaleBarPosition.y(), 
-                   m_scaleBarSize.width(), m_scaleBarSize.height());
-    
-    // 绘制背景
-    painter.fillRect(scaleRect, QColor(0, 0, 0, 100));
-    painter.setPen(QPen(QColor(255, 255, 255), 1));
-    painter.drawRect(scaleRect);
-    
-    // 绘制比例尺线条
-    int barWidth = m_scaleBarSize.width() - 20;
-    int barHeight = 4;
-    int barY = scaleRect.center().y() - barHeight / 2;
-    
-    // 绘制主线条
-    painter.setPen(QPen(QColor(255, 255, 255), 2));
-    painter.drawLine(scaleRect.left() + 10, barY, scaleRect.left() + 10 + barWidth, barY);
-    
-    // 绘制刻度线
-    painter.setPen(QPen(QColor(255, 255, 255), 1));
-    for (int i = 0; i <= 10; ++i)
-    {
-        int x = scaleRect.left() + 10 + (barWidth * i) / 10;
-        int tickHeight = (i % 5 == 0) ? 8 : 4;
-        painter.drawLine(x, barY - tickHeight, x, barY + tickHeight);
-    }
-    
-    // 绘制文本
-    painter.setPen(QColor(255, 255, 255));
-    painter.setFont(QFont("Arial", 8));
-    
-    // 绘制比例尺值
-    QRect textRect = scaleRect.adjusted(5, barY + 10, -5, -5);
-    painter.drawText(textRect, Qt::AlignCenter, scaleText);
-}
-
-double OSGWidget::calculateScaleValue()
-{
-    if (!m_cameraController) return 1.0;
-    
-    // 检查缓存是否有效
-    QDateTime currentTime = QDateTime::currentDateTime();
-    if (m_lastScaleCalculation.isValid() && 
-        m_lastScaleCalculation.msecsTo(currentTime) < SCALE_CACHE_DURATION)
-    {
-        return m_cachedScaleValue;
-    }
-    
-    ProjectionMode mode = m_cameraController->getProjectionMode();
-    
-    if (mode == ProjectionMode::Orthographic)
-    {
-        // 正交投影模式：直接使用正交投影的大小计算比例尺
-        double orthoWidth = m_cameraController->getRight() - m_cameraController->getLeft();
-        double scaleBarPixels = m_scaleBarSize.width() - 20; // 减去边距
-        double scaleBarWorldUnits = (orthoWidth * scaleBarPixels) / width();
-        
-        m_cachedScaleValue = scaleBarWorldUnits;
-        m_lastScaleCalculation = currentTime;
-        return scaleBarWorldUnits;
-    }
-    else
-    {
-        // 透视投影模式：使用原来的计算方法
-        // 获取相机位置
-        osg::Vec3d eye = m_cameraController->getEyePosition();
-        osg::Vec3d center = m_cameraController->getCenterPosition();
-        
-        // 计算相机到中心的距离
-        double distance = (eye - center).length();
-        
-        // 获取视口信息
-        osgViewer::Viewer* viewer = getOsgViewer();
-        if (!viewer || !viewer->getCamera()) return 1.0;
-        
-        osg::Viewport* viewport = viewer->getCamera()->getViewport();
-        if (!viewport) return 1.0;
-        
-        // 计算屏幕像素对应的世界单位
-        double screenHeight = viewport->height();
-        double fov = m_cameraController->getFOV(); // 使用当前设置的FOV
-        double worldHeight = 2.0 * distance * tan(osg::DegreesToRadians(fov / 2.0));
-        double pixelsPerUnit = screenHeight / worldHeight;
-        
-        // 计算比例尺对应的世界单位
-        double scaleBarPixels = m_scaleBarSize.width() - 20; // 减去边距
-        double scaleBarWorldUnits = scaleBarPixels / pixelsPerUnit;
-        
-        m_cachedScaleValue = scaleBarWorldUnits;
-        m_lastScaleCalculation = currentTime;
-        return scaleBarWorldUnits;
-    }
-}
-
-QString OSGWidget::formatScaleText(double worldUnits)
-{
-    QString unit = "m";
-    double value = worldUnits;
-    
-    // 根据数值大小选择合适的单位
-    if (value >= 1000.0)
-    {
-        value /= 1000.0;
-        unit = "km";
-    }
-    else if (value < 1.0 && value >= 0.01)
-    {
-        value *= 100.0;
-        unit = "cm";
-    }
-    else if (value < 0.01)
-    {
-        value *= 1000.0;
-        unit = "mm";
-    }
-    
-    // 格式化数值
-    if (value >= 100.0)
-    {
-        return QString("%1 %2").arg(static_cast<int>(value)).arg(unit);
-    }
-    else if (value >= 10.0)
-    {
-        return QString("%1 %2").arg(value, 0, 'f', 1).arg(unit);
-    }
-    else
-    {
-        return QString("%1 %2").arg(value, 0, 'f', 2).arg(unit);
-    }
-}
-
-void OSGWidget::enableScaleBar(bool enabled)
-{
-    m_scaleBarEnabled = enabled;
-    update(); // 触发重绘
-}
-
-void OSGWidget::setScaleBarPosition(const QPoint& position)
-{
-    m_scaleBarPosition = position;
-    update(); // 触发重绘
-}
-
-void OSGWidget::setScaleBarSize(int width, int height)
-{
-    m_scaleBarSize = QSize(width, height);
-    update(); // 触发重绘
-}
-
-// ========================================= 投影模式相关方法 =========================================
-
-void OSGWidget::setProjectionMode(ProjectionMode mode)
-{
-    if (m_cameraController)
-    {
-        m_cameraController->setProjectionMode(mode);
-        
-        // 如果切换到正交模式，自动调整正交投影的大小
-        if (mode == ProjectionMode::Orthographic)
-        {
-            // 获取当前场景的包围盒来设置正交投影的大小
-            CoordinateSystem3D* coordSystem = CoordinateSystem3D::getInstance();
-            const CoordinateSystem3D::CoordinateRange& range = coordSystem->getCoordinateRange();
-            
-            double maxRange = range.maxRange();
-            double orthoSize = maxRange * 0.6; // 使用坐标范围的60%作为正交投影大小
-            
-            m_cameraController->setViewSize(-orthoSize, orthoSize, -orthoSize, orthoSize);
-            m_cameraController->setNearFar(-maxRange, maxRange);
-        }
-        
-        update(); // 触发重绘
-    }
-}
-
-ProjectionMode OSGWidget::getProjectionMode() const
-{
-    if (m_cameraController)
-    {
-        return m_cameraController->getProjectionMode();
-    }
-    return ProjectionMode::Perspective;
-}
-
-void OSGWidget::setFOV(double fov)
-{
-    if (m_cameraController)
-    {
-        m_cameraController->setFOV(fov);
-    }
-}
-
-void OSGWidget::setNearFar(double near_, double far_)
-{
-    if (m_cameraController)
-    {
-        m_cameraController->setNearFar(near_, far_);
-    }
-}
-
-void OSGWidget::setViewSize(double left, double right, double bottom, double top)
-{
-    if (m_cameraController)
-    {
-        m_cameraController->setViewSize(left, right, bottom, top);
-    }
-}
+// ========================================= 投影模式相关方法已移至CameraController =========================================
+// 现在直接通过getCameraController()访问投影模式功能
 
 // ========================================= 几何对象查询方法 =========================================
 
@@ -1633,7 +1352,7 @@ PickResult OSGWidget::performSimplePicking(int mouseX, int mouseY)
     
     // 如果有拾取结果且有拾取指示器，更新指示器位置
     if (result.hasResult && m_pickingIndicator) {
-        m_pickingIndicator->showIndicator(result.worldPosition, result.featureType);
+        m_pickingIndicator->showIndicator(result.worldPosition, result.featureType, result.surfaceNormal);
     } else if (m_pickingIndicator) {
         m_pickingIndicator->hideIndicator();
     }

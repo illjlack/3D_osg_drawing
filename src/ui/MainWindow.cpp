@@ -96,8 +96,8 @@ MainWindow::MainWindow(QWidget* parent)
                     }
                 });
         
-        // 连接摄像机移动速度变化
-        connect(m_osgWidget, &OSGWidget::cameraMoveSpeedChanged,
+        // 连接摄像机移动速度变化 - 直接连接CameraController
+        connect(m_osgWidget->getCameraController(), &CameraController::cameraMoveSpeedChanged,
                 this, [this](double speed) {
                     if (m_statusBar3D) {
                         m_statusBar3D->updateCameraSpeed(speed);
@@ -497,7 +497,8 @@ void MainWindow::connectSignals()
             }
         });
         connect(m_osgWidget, &OSGWidget::simplePickingResult, this, &MainWindow::onSimplePickingResult);
-        connect(m_osgWidget, &OSGWidget::manipulatorTypeChanged, this, [this](ManipulatorType type) {
+        // 连接相机操控器类型变化 - 直接连接CameraController
+        connect(m_osgWidget->getCameraController(), &CameraController::manipulatorTypeChanged, this, [this](ManipulatorType type) {
             if (m_manipulatorCombo) {
                 int index = static_cast<int>(type);
                 if (index >= 0 && index < m_manipulatorCombo->count()) {
@@ -1383,7 +1384,7 @@ void MainWindow::onDisplaySettings()
     QCheckBox* scaleBarCheck = new QCheckBox(tr("显示比例尺"), coordinateGroup);
     
     coordinateSystemCheck->setChecked(m_osgWidget ? m_osgWidget->isCoordinateSystemEnabled() : true);
-    scaleBarCheck->setChecked(m_osgWidget ? m_osgWidget->isScaleBarEnabled() : true);
+    scaleBarCheck->setChecked(m_osgWidget ? m_osgWidget->getScaleBarRenderer()->isEnabled() : true);
     
     coordinateLayout->addWidget(coordinateSystemCheck);
     coordinateLayout->addWidget(scaleBarCheck);
@@ -1448,7 +1449,7 @@ void MainWindow::onDisplaySettings()
     
     connect(scaleBarCheck, &QCheckBox::toggled, [this](bool enabled) {
         if (m_osgWidget) {
-            m_osgWidget->enableScaleBar(enabled);
+            m_osgWidget->getScaleBarRenderer()->setEnabled(enabled);
         }
     });
     
@@ -1468,7 +1469,8 @@ void MainWindow::onProjectionModeChanged()
     int index = m_projectionModeCombo->currentIndex();
     ProjectionMode mode = static_cast<ProjectionMode>(m_projectionModeCombo->itemData(index).toInt());
     
-    m_osgWidget->setProjectionMode(mode);
+    // 直接使用CameraController
+    m_osgWidget->getCameraController()->setProjectionMode(mode);
     
     // 根据投影模式启用/禁用相关控件
     bool isPerspective = (mode == ProjectionMode::Perspective);
@@ -1485,7 +1487,8 @@ void MainWindow::onPerspectiveFOVChanged()
     if (!m_osgWidget) return;
     
     double fov = m_perspectiveFOVSpinBox->value();
-    m_osgWidget->setFOV(fov);
+    // 直接使用CameraController
+    m_osgWidget->getCameraController()->setFOV(fov);
     
     updateStatusBar(tr("FOV设置为: %1°").arg(fov));
 }
@@ -1495,7 +1498,8 @@ void MainWindow::onOrthographicSizeChanged()
     if (!m_osgWidget) return;
     
     double size = m_orthographicSizeSpinBox->value();
-    m_osgWidget->setViewSize(-size, size, -size, size);
+    // 直接使用CameraController
+    m_osgWidget->getCameraController()->setViewSize(-size, size, -size, size);
     
     updateStatusBar(tr("视图大小设置为: ±%1m").arg(size));
     // 视图大小设置（移除调试日志）
@@ -1510,7 +1514,8 @@ void MainWindow::onManipulatorTypeChanged()
     int index = m_manipulatorCombo->currentIndex();
     ManipulatorType type = static_cast<ManipulatorType>(m_manipulatorCombo->itemData(index).toInt());
     
-    m_osgWidget->setManipulatorType(type);
+    // 直接使用CameraController
+    m_osgWidget->getCameraController()->setManipulatorType(type);
     
     QString typeName;
     switch (type) {
