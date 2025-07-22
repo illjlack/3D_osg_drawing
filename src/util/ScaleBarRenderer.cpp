@@ -9,12 +9,12 @@
 
 ScaleBarRenderer::ScaleBarRenderer()
     : m_cameraController(nullptr)
-    , m_enabled(true)
+    , m_enabled(false)  // 暂时禁用比例尺
     , m_position(10, 10)
     , m_size(200, 60)
     , m_cachedScaleValue(0.0)
 {
-    LOG_INFO("创建比例尺渲染器", "比例尺");
+    LOG_INFO("创建比例尺渲染器（暂时禁用）", "比例尺");
 }
 
 void ScaleBarRenderer::setCameraController(CameraController* controller)
