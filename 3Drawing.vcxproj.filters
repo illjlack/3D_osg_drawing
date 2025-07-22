@@ -171,11 +171,11 @@
     <ClCompile Include="src\ui\ToolPanel3D.cpp">
       <Filter>UI</Filter>
     </ClCompile>
-    <ClCompile Include="src\core\picking\RayPickingSystem.cpp">
+    <ClCompile Include="src\core\picking\PickingIndicator.cpp">
       <Filter>Core\Picking</Filter>
     </ClCompile>
-    <ClCompile Include="src\ui\PickingSystemDialog.cpp">
-      <Filter>UI</Filter>
+    <ClCompile Include="src\core\picking\GeometryPickingSystem.cpp">
+      <Filter>Core\Picking</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -281,7 +281,13 @@
     <ClInclude Include="src\core\buildings\SpireHouse3D.h">
       <Filter>Core\buildings</Filter>
     </ClInclude>
-    <ClInclude Include="src\core\picking\RayPickingSystem.h">
+    <ClInclude Include="src\core\picking\PickingIndicator.h">
+      <Filter>Core\Picking</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\picking\PickingTypes.h">
+      <Filter>Core\Picking</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\picking\GeometryPickingSystem.h">
       <Filter>Core\Picking</Filter>
     </ClInclude>
   </ItemGroup>
@@ -293,9 +299,6 @@
       <Filter>UI</Filter>
     </QtMoc>
     <QtMoc Include="src\ui\CoordinateSystemDialog.h">
-      <Filter>UI</Filter>
-    </QtMoc>
-    <QtMoc Include="src\ui\PickingSystemDialog.h">
       <Filter>UI</Filter>
     </QtMoc>
     <QtMoc Include="src\core\world\CoordinateSystem3D.h">

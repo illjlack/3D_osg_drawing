@@ -295,3 +295,57 @@ enum BuildingType3D
     
     EndBuildingType3D
 };
+
+// 节点掩码定义 - 用于OSG节点的显示/隐藏和拾取控制
+// 每个组件使用独立的位标识，显示时通过位组合控制，不可见时置0
+enum NodeMask3D : uint32_t
+{
+    // 基础掩码
+    NODE_MASK_NONE        = 0x00000000,  // 隐藏节点（完全不可见，不可拾取）
+    
+    // 几何体类型掩码（用于拾取系统分类）
+    NODE_MASK_VERTEX      = 0x00000001,  // 顶点几何体（第1位）
+    NODE_MASK_EDGE        = 0x00000002,  // 边几何体（第2位）
+    NODE_MASK_FACE        = 0x00000004,  // 面几何体（第3位）
+    NODE_MASK_CONTROL_POINTS = 0x00000008,  // 控制点（第4位）
+    NODE_MASK_BOUNDING_BOX   = 0x00000010,  // 包围盒（第5位）
+    
+    // 特殊功能组件掩码（高位区域，避免与几何体冲突）
+    NODE_MASK_PICKING_INDICATOR = 0x80000000,  // 拾取指示器（最高位）
+    NODE_MASK_UI_OVERLAY        = 0x40000000,  // UI覆盖层（第二高位）
+    NODE_MASK_DEBUG_INFO        = 0x20000000,  // 调试信息（第三高位）
+    NODE_MASK_SKYBOX            = 0x10000000,  // 天空盒（第四高位）
+    NODE_MASK_COORDINATE_SYSTEM = 0x08000000,  // 坐标系统（第五高位）
+    
+    // 常用组合掩码（通过位组合实现）
+    NODE_MASK_ALL_GEOMETRY = NODE_MASK_VERTEX | NODE_MASK_EDGE | NODE_MASK_FACE,  // 所有主要几何体
+    NODE_MASK_ALL_VISIBLE  = NODE_MASK_ALL_GEOMETRY | NODE_MASK_CONTROL_POINTS | NODE_MASK_BOUNDING_BOX,  // 所有可见几何元素
+    NODE_MASK_WIREFRAME_ONLY = NODE_MASK_VERTEX | NODE_MASK_EDGE,              // 仅线框模式
+    NODE_MASK_SOLID_ONLY     = NODE_MASK_FACE,                                 // 仅实体模式
+    NODE_MASK_POINTS_ONLY    = NODE_MASK_VERTEX,                              // 仅点模式
+    
+    // 场景组合掩码
+    NODE_MASK_GEOMETRY_WITH_UI = NODE_MASK_ALL_GEOMETRY | NODE_MASK_UI_OVERLAY | NODE_MASK_PICKING_INDICATOR,  // 几何体+UI
+    NODE_MASK_FULL_SCENE = NODE_MASK_ALL_VISIBLE | NODE_MASK_SKYBOX | NODE_MASK_COORDINATE_SYSTEM,            // 完整场景
+};
+
+// NodeMask3D 操作函数（内联函数，提高性能）
+inline bool hasNodeMask(uint32_t currentMask, NodeMask3D checkMask) 
+{
+    return (currentMask & checkMask) != 0;
+}
+
+inline uint32_t addNodeMask(uint32_t currentMask, NodeMask3D addMask) 
+{
+    return currentMask | addMask;
+}
+
+inline uint32_t removeNodeMask(uint32_t currentMask, NodeMask3D removeMask) 
+{
+    return currentMask & (~removeMask);
+}
+
+inline uint32_t toggleNodeMask(uint32_t currentMask, NodeMask3D toggleMask) 
+{
+    return currentMask ^ toggleMask;
+}

@@ -6,7 +6,8 @@
 #include "../core/world/CoordinateSystem3D.h"
 #include "../core/world/CoordinateSystemRenderer.h"
 #include "../core/camera/CameraController.h"
-#include "../core/picking/RayPickingSystem.h"
+#include "../core/picking/PickingIndicator.h"
+#include "../core/picking/GeometryPickingSystem.h"
 #include <osgViewer/Viewer>
 #include <osgViewer/CompositeViewer>
 #include <osgViewer/ViewerEventHandlers>
@@ -35,6 +36,7 @@
 // 前向声明
 class Geo3D;
 class SimplePickingIndicatorManager;
+class GeometryPickingSystem;
 
 // OSG视图组件
 class OSGWidget : public osgQOpenGLWidget
@@ -84,24 +86,8 @@ public:
     void updateSelectionHighlight();
     void highlightSelectedObjects();
     
-    // 拾取
-    // PickResult3D pick(int x, int y);
-    
-    // 高级拾取系统
-    void enableAdvancedPicking(bool enabled);
-    bool isAdvancedPickingEnabled() const;
-    void setPickingRadius(int radius);
-    void setPickingFrequency(double frequency);
-    
-    // 拾取系统配置
-    void setPickingConfig(const PickConfig& config);
-    QString getPickingSystemInfo() const;
-    
-    // 确保所有几何对象都在拾取系统中
-    void ensureAllGeosInPickingSystem();
-    
-    // 获取拾取系统状态信息
-    QString getPickingSystemStatus() const;
+    // 简化的拾取功能
+    PickResult performSimplePicking(int mouseX, int mouseY);
     
     // 绘制状态查询
     bool isDrawing() const { return m_isDrawing; }
@@ -192,7 +178,6 @@ private:
     void setupSkybox();
     void setupCoordinateSystem();
     
-    void handleDrawingInput(QMouseEvent* event);
     void updateCurrentDrawing(const glm::vec3& worldPos);
     void completeCurrentDrawing();
     void cancelCurrentDrawing();
@@ -236,8 +221,11 @@ private:
     bool m_isDrawing;
     glm::vec3 m_lastMouseWorldPos;
     
-    // 拾取系统
-    bool m_advancedPickingEnabled;
+    // 拾取指示器
+    osg::ref_ptr<PickingIndicator> m_pickingIndicator;
+    
+    // 几何拾取系统
+    osg::ref_ptr<GeometryPickingSystem> m_geometryPickingSystem;
     
     // 天空盒
     std::unique_ptr<Skybox> m_skybox;
@@ -267,8 +255,4 @@ private:
     QTimer* m_updateTimer;
 
 private slots:
-    // 几何对象信号响应
-    void onGeoDrawingCompleted(Geo3D* geo);
-    void onGeoGeometryUpdated(Geo3D* geo);
-    void onGeoParametersChanged(Geo3D* geo);
 }; 

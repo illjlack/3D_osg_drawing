@@ -16,6 +16,7 @@ class GeoNodeManager : public QObject
 {
     Q_OBJECT
 public:
+
     explicit GeoNodeManager(Geo3D* parent);
     ~GeoNodeManager() = default;
 
@@ -58,6 +59,15 @@ public:
     bool isFaceVisible() const;
     bool isControlPointsVisible() const;
     bool isBoundingBoxVisible() const;
+
+    // 批量可见性控制 - 使用mask进行精细控制
+    void setGeometryMask(unsigned int mask);     // 设置几何体的组合mask
+    unsigned int getGeometryMask() const;        // 获取当前几何体的组合mask
+    void showOnlyVertices();                     // 只显示点
+    void showOnlyEdges();                        // 只显示线
+    void showOnlyFaces();                        // 只显示面
+    void showAllGeometries();                    // 显示所有主要几何体（点、线、面）
+    void hideAllGeometries();                    // 隐藏所有几何体
 
     // 更新节点和包围盒、kdtree
     void updateGeometries();

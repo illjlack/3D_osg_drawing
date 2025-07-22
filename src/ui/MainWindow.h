@@ -54,7 +54,7 @@
 
 #include "OSGWidget.h"
 #include "CoordinateSystemDialog.h"
-#include "PickingSystemDialog.h"
+
 #include "LogOutputWidget.h"
 #include "StatusBar3D.h"
 #include "../util/GeoOsgbIO.h"

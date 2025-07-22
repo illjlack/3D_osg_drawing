@@ -1,4 +1,5 @@
-﻿#include "GeoNodeManager.h"
+﻿
+#include "GeoNodeManager.h"
 #include "../GeometryBase.h"
 #include <osg/Geode>
 #include <osg/Material>
@@ -12,6 +13,7 @@
 #include <osg/Array>
 #include <osg/PrimitiveSet>
 #include "../../util/LogManager.h"
+#include "../Enums3D.h"
 
 GeoNodeManager::GeoNodeManager(Geo3D* parent)
     : QObject(parent)
@@ -36,15 +38,26 @@ void GeoNodeManager::initializeNodes()
         m_controlPointsGeometry = new osg::Geometry();
         m_boundingBoxGeometry = new osg::Geometry();
         
+        // 设置用户数据，存储指向父几何体对象的指针
+        m_vertexGeometry->setUserData(m_parent);
+        m_edgeGeometry->setUserData(m_parent);
+        m_faceGeometry->setUserData(m_parent);
+        m_controlPointsGeometry->setUserData(m_parent);
+        m_boundingBoxGeometry->setUserData(m_parent);
+
         m_transformNode->addChild(m_vertexGeometry.get());
         m_transformNode->addChild(m_edgeGeometry.get());
         m_transformNode->addChild(m_faceGeometry.get());
         m_transformNode->addChild(m_controlPointsGeometry.get());
         m_transformNode->addChild(m_boundingBoxGeometry.get());
 
-        // 默认隐藏控制点和包围盒
-        m_controlPointsGeometry->setNodeMask(0x0);
-        m_boundingBoxGeometry->setNodeMask(0x0);
+        // 设置各个几何体的专用mask
+        m_vertexGeometry->setNodeMask(NODE_MASK_VERTEX);
+        m_edgeGeometry->setNodeMask(NODE_MASK_EDGE);
+        m_faceGeometry->setNodeMask(NODE_MASK_FACE);
+        // 设置初始状态
+        m_controlPointsGeometry->setNodeMask(NODE_MASK_NONE);
+        m_boundingBoxGeometry->setNodeMask(NODE_MASK_NONE);
 
         m_initialized = true;
         
@@ -144,7 +157,28 @@ void GeoNodeManager::resetTransform()
 void GeoNodeManager::setVisible(bool visible)
 {
     if (m_transformNode.valid()) {
-        m_transformNode->setNodeMask(visible ? 0xffffffff : 0x0);
+        // 设置变换节点的可见性 - 显示所有几何元素或完全隐藏
+        m_transformNode->setNodeMask(visible ? NODE_MASK_ALL_VISIBLE : NODE_MASK_NONE);
+    }
+    
+    // 如果设置为可见，恢复各个几何体的默认mask
+    if (visible) {
+        if (m_vertexGeometry.valid()) {
+            m_vertexGeometry->setNodeMask(NODE_MASK_VERTEX);
+        }
+        if (m_edgeGeometry.valid()) {
+            m_edgeGeometry->setNodeMask(NODE_MASK_EDGE);
+        }
+        if (m_faceGeometry.valid()) {
+            m_faceGeometry->setNodeMask(NODE_MASK_FACE);
+        }
+        // 控制点和包围盒保持隐藏状态
+        if (m_controlPointsGeometry.valid()) {
+            m_controlPointsGeometry->setNodeMask(NODE_MASK_NONE);
+        }
+        if (m_boundingBoxGeometry.valid()) {
+            m_boundingBoxGeometry->setNodeMask(NODE_MASK_NONE);
+        }
     }
 }
 
@@ -156,61 +190,117 @@ bool GeoNodeManager::isVisible() const
 void GeoNodeManager::setVertexVisible(bool visible)
 {
     if (m_vertexGeometry.valid()) {
-        m_vertexGeometry->setNodeMask(visible ? 0xffffffff : 0x0);
+        m_vertexGeometry->setNodeMask(visible ? NODE_MASK_VERTEX : NODE_MASK_NONE);
     }
 }
 
 void GeoNodeManager::setEdgeVisible(bool visible)
 {
     if (m_edgeGeometry.valid()) {
-        m_edgeGeometry->setNodeMask(visible ? 0xffffffff : 0x0);
+        m_edgeGeometry->setNodeMask(visible ? NODE_MASK_EDGE : NODE_MASK_NONE);
     }
 }
 
 void GeoNodeManager::setFaceVisible(bool visible)
 {
     if (m_faceGeometry.valid()) {
-        m_faceGeometry->setNodeMask(visible ? 0xffffffff : 0x0);
+        m_faceGeometry->setNodeMask(visible ? NODE_MASK_FACE : NODE_MASK_NONE);
     }
 }
 
 void GeoNodeManager::setControlPointsVisible(bool visible)
 {
     if (m_controlPointsGeometry.valid()) {
-        m_controlPointsGeometry->setNodeMask(visible ? 0xffffffff : 0x0);
+        m_controlPointsGeometry->setNodeMask(visible ? NODE_MASK_CONTROL_POINTS : NODE_MASK_NONE);
     }
 }
 
 void GeoNodeManager::setBoundingBoxVisible(bool visible)
 {
     if (m_boundingBoxGeometry.valid()) {
-        m_boundingBoxGeometry->setNodeMask(visible ? 0xffffffff : 0x0);
+        m_boundingBoxGeometry->setNodeMask(visible ? NODE_MASK_BOUNDING_BOX : NODE_MASK_NONE);
     }
 }
 
 bool GeoNodeManager::isVertexVisible() const
 {
-    return m_vertexGeometry.valid() ? m_vertexGeometry->getNodeMask() != 0x0 : false;
+    return m_vertexGeometry.valid() ? (m_vertexGeometry->getNodeMask() & NODE_MASK_VERTEX) != 0 : false;
 }
 
 bool GeoNodeManager::isEdgeVisible() const
 {
-    return m_edgeGeometry.valid() ? m_edgeGeometry->getNodeMask() != 0x0 : false;
+    return m_edgeGeometry.valid() ? (m_edgeGeometry->getNodeMask() & NODE_MASK_EDGE) != 0 : false;
 }
 
 bool GeoNodeManager::isFaceVisible() const
 {
-    return m_faceGeometry.valid() ? m_faceGeometry->getNodeMask() != 0x0 : false;
+    return m_faceGeometry.valid() ? (m_faceGeometry->getNodeMask() & NODE_MASK_FACE) != 0 : false;
 }
 
 bool GeoNodeManager::isControlPointsVisible() const
 {
-    return m_controlPointsGeometry.valid() ? m_controlPointsGeometry->getNodeMask() != 0x0 : false;
+    return m_controlPointsGeometry.valid() ? (m_controlPointsGeometry->getNodeMask() & NODE_MASK_CONTROL_POINTS) != 0 : false;
 }
 
 bool GeoNodeManager::isBoundingBoxVisible() const
 {
-    return m_boundingBoxGeometry.valid() ? m_boundingBoxGeometry->getNodeMask() != 0x0 : false;
+    return m_boundingBoxGeometry.valid() ? (m_boundingBoxGeometry->getNodeMask() & NODE_MASK_BOUNDING_BOX) != 0 : false;
+}
+
+void GeoNodeManager::setGeometryMask(unsigned int mask)
+{
+    // 根据mask设置各个几何体的可见性
+    if (m_vertexGeometry.valid()) {
+        m_vertexGeometry->setNodeMask((mask & NODE_MASK_VERTEX) ? NODE_MASK_VERTEX : NODE_MASK_NONE);
+    }
+    if (m_edgeGeometry.valid()) {
+        m_edgeGeometry->setNodeMask((mask & NODE_MASK_EDGE) ? NODE_MASK_EDGE : NODE_MASK_NONE);
+    }
+    if (m_faceGeometry.valid()) {
+        m_faceGeometry->setNodeMask((mask & NODE_MASK_FACE) ? NODE_MASK_FACE : NODE_MASK_NONE);
+    }
+    if (m_controlPointsGeometry.valid()) {
+        m_controlPointsGeometry->setNodeMask((mask & NODE_MASK_CONTROL_POINTS) ? NODE_MASK_CONTROL_POINTS : NODE_MASK_NONE);
+    }
+    if (m_boundingBoxGeometry.valid()) {
+        m_boundingBoxGeometry->setNodeMask((mask & NODE_MASK_BOUNDING_BOX) ? NODE_MASK_BOUNDING_BOX : NODE_MASK_NONE);
+    }
+}
+
+unsigned int GeoNodeManager::getGeometryMask() const
+{
+    unsigned int mask = 0;
+    if (isVertexVisible()) mask |= NODE_MASK_VERTEX;
+    if (isEdgeVisible()) mask |= NODE_MASK_EDGE;
+    if (isFaceVisible()) mask |= NODE_MASK_FACE;
+    if (isControlPointsVisible()) mask |= NODE_MASK_CONTROL_POINTS;
+    if (isBoundingBoxVisible()) mask |= NODE_MASK_BOUNDING_BOX;
+    return mask;
+}
+
+void GeoNodeManager::showOnlyVertices()
+{
+    setGeometryMask(NODE_MASK_VERTEX);
+}
+
+void GeoNodeManager::showOnlyEdges()
+{
+    setGeometryMask(NODE_MASK_EDGE);
+}
+
+void GeoNodeManager::showOnlyFaces()
+{
+    setGeometryMask(NODE_MASK_FACE);
+}
+
+void GeoNodeManager::showAllGeometries()
+{
+    setGeometryMask(NODE_MASK_ALL_GEOMETRY);
+}
+
+void GeoNodeManager::hideAllGeometries()
+{
+    setGeometryMask(0x0);
 }
 
 void GeoNodeManager::updateSpatialIndex()

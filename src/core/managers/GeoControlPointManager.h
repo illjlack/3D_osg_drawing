@@ -36,8 +36,6 @@ public:
     explicit GeoControlPointManager(Geo3D* parent);
     ~GeoControlPointManager() = default;
 
-    // ==================== 多阶段管理接口 ====================
-    
     // 阶段管理
     void setStageDescriptors(const std::vector<StageDescriptor>& descriptors);
     const std::vector<StageDescriptor>& getStageDescriptors() const;

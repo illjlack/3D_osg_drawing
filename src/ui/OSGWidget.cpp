@@ -1,7 +1,7 @@
 ﻿#include "OSGWidget.h"
 #include "../core/Common3D.h"
 #include "../core/GeometryBase.h"
-#include "../core/picking/RayPickingSystem.h"
+#include "../core/picking/PickingIndicator.h"
 
 #include "../util/LogManager.h"
 #include <osgViewer/Viewer>
@@ -61,7 +61,7 @@ OSGWidget::OSGWidget(QWidget* parent)
     , m_selectedGeo(nullptr)
     , m_isDrawing(false)
     , m_lastMouseWorldPos(0.0f)
-    , m_advancedPickingEnabled(false)
+
     , m_skybox(std::make_unique<Skybox>())
     , m_skyboxEnabled(true)
     , m_coordinateSystemRenderer(std::make_unique<CoordinateSystemRenderer>())
@@ -76,6 +76,7 @@ OSGWidget::OSGWidget(QWidget* parent)
     , m_isDraggingControlPoint(false)
     , m_draggingGeo(nullptr)
     , m_draggingControlPointIndex(-1)
+    , m_geometryPickingSystem(nullptr)
 {
     setFocusPolicy(Qt::StrongFocus);
     setMouseTracking(true);
@@ -121,6 +122,12 @@ OSGWidget::~OSGWidget()
     {
         m_updateTimer->stop();
     }
+    
+    // 清理几何拾取系统
+    if (m_geometryPickingSystem) {
+        m_geometryPickingSystem->shutdown();
+        m_geometryPickingSystem = nullptr;
+    }
 }
 
 void OSGWidget::initializeScene()
@@ -139,7 +146,7 @@ void OSGWidget::initializeScene()
     m_sceneNode->addChild(m_geoNode);
     
     // 确保拾取指示器节点不被拾取系统检测到
-    m_pickingIndicatorNode->setNodeMask(0x80000000); // 使用最高位，避免被拾取
+    m_pickingIndicatorNode->setNodeMask(NODE_MASK_PICKING_INDICATOR); // 使用最高位，避免被拾取
     
     // 为根节点设置抗锯齿
     osg::StateSet* rootStateSet = m_rootNode->getOrCreateStateSet();
@@ -238,55 +245,34 @@ void OSGWidget::setupEventHandlers()
 
 void OSGWidget::setupPickingSystem()
 {
-    osgViewer::Viewer* viewer = getOsgViewer();
-    if (!viewer) return;
-    
-    if (!PickingSystemManager::getInstance().initialize(
-        viewer->getCamera(), m_geoNode.get()))
-    {
-        LOG_ERROR("Failed to initialize simplified picking system", "拾取");
+    // 创建拾取指示器
+    m_pickingIndicator = new PickingIndicator;
+    if (!m_pickingIndicator->initialize()) {
+        LOG_ERROR("拾取指示器初始化失败", "拾取");
         return;
     }
     
-    // 设置拾取配置
-    PickConfig config;
-    config.pickRadius = 15.0f;       // 拾取半径
-    config.snapThreshold = 0.2f;     // 捕捉阈值（适中的值）
-    config.enableSnapping = true;    // 启用捕捉，但会优先使用拾取坐标
-    config.enableIndicator = true;   // 确保指示器启用
-    config.enableHighlight = true;   // 确保高亮启用
-    config.indicatorSize = 1.0f;     // 增大指示器基础大小，配合视距缩放
-    PickingSystemManager::getInstance().setConfig(config);
-    
-    // 设置拾取回调
-    PickingSystemManager::getInstance().setPickingCallback(
-        [this](const PickResult& result) {
-            emit simplePickingResult(result);
-            
-            // 如果有拾取结果，立即更新状态栏坐标（覆盖普通坐标）
-            if (result.hasResult)
-            {
-                m_lastMouseWorldPos = result.worldPosition;
-                emit mousePositionChanged(result.worldPosition);
-            }
-        });
-    
-    // 添加事件处理器
-    osgGA::GUIEventHandler* eventHandler = PickingSystemManager::getInstance().getEventHandler();
-    if (eventHandler) {
-        viewer->addEventHandler(eventHandler);
-    }
-    
-    // 将指示器根节点添加到场景图
-    osg::Group* indicatorRoot = PickingSystemManager::getInstance().getIndicatorRoot();
+    // 添加指示器到场景
+    osg::Group* indicatorRoot = m_pickingIndicator->getIndicatorRoot();
     if (indicatorRoot) {
         m_pickingIndicatorNode->addChild(indicatorRoot);
-        LOG_INFO("Added simplified picking indicator root to scene graph", "拾取");
     }
     
-    m_advancedPickingEnabled = true;
+    // 创建几何拾取系统
+    m_geometryPickingSystem = new GeometryPickingSystem();
     
-    LOG_SUCCESS("Simplified picking system initialized successfully", "拾取");
+    // 获取相机和场景根节点来初始化拾取系统
+    osgViewer::Viewer* viewer = getOsgViewer();
+    if (viewer && viewer->getCamera()) {
+        if (!m_geometryPickingSystem->initialize(viewer->getCamera(), m_sceneNode.get())) {
+            LOG_ERROR("几何拾取系统初始化失败", "拾取");
+            m_geometryPickingSystem = nullptr;
+        } else {
+            LOG_SUCCESS("几何拾取系统初始化完成", "拾取");
+        }
+    }
+    
+    LOG_SUCCESS("拾取指示器设置完成", "拾取");
 }
 
 void OSGWidget::resetCamera()
@@ -428,27 +414,7 @@ void OSGWidget::addGeo(Geo3D* geo)
         // connect(geo, &Geo3D::geometryUpdated, this, &OSGWidget::onGeoGeometryUpdated);
         // connect(geo, &Geo3D::parametersChanged, this, &OSGWidget::onGeoParametersChanged);
         
-        // 添加到拾取系统 - 对于从文件IO读入的几何对象，强制添加到拾取系统
-        if (m_advancedPickingEnabled)
-        {
-            // 检查几何对象是否已经完成绘制
-            if (geo->mm_state()->isStateComplete())
-            {
-                PickingSystemManager::getInstance().addGeometry(geo);
-                // 添加完成的几何体到拾取系统（移除调试日志）
-            }
-            else
-            {
-                // 对于未完成的几何对象（如从文件读入的），也强制添加到拾取系统
-                // 这样可以确保文件IO读入的几何对象能够被拾取
-                PickingSystemManager::getInstance().addGeometry(geo);
-                // 添加未完成的几何体到拾取系统（移除调试日志）
-            }
-        }
-        else
-        {
-            // 高级拾取已禁用（移除调试日志）
-        }
+        // 几何体已添加到场景，无需额外的拾取系统注册
     }
 }
 
@@ -467,12 +433,6 @@ void OSGWidget::removeGeo(Geo3D* geo)
             
             m_geoNode->removeChild(geo->mm_node()->getOSGNode().get());
             m_geoList.erase(it);
-            
-            // 从OSG索引拾取系统移除
-            if (m_advancedPickingEnabled)
-            {
-                PickingSystemManager::getInstance().removeGeometry(geo);
-            }
         }
     }
 }
@@ -485,13 +445,6 @@ void OSGWidget::removeAllGeos()
         m_geoList.clear();
         m_selectedGeo = nullptr;
         m_currentDrawingGeo = nullptr;
-        
-        // 清除拾取系统中的所有几何对象
-        if (m_advancedPickingEnabled)
-        {
-            PickingSystemManager::getInstance().clearAllGeometries();
-            // 清除所有几何体（移除调试日志）
-        }
     }
 }
 
@@ -531,12 +484,6 @@ void OSGWidget::addToSelection(Geo3D* geo)
         
         m_selectedGeos.push_back(geo);
         geo->mm_state()->setStateSelected(); // 这会自动显示包围盒
-        
-        // 不再使用控制点高亮功能
-        // if (m_advancedPickingEnabled)
-        // {
-        //     PickingSystemManager::getInstance().showHighlight(geo);
-        // }
         
         // 发送选择信号
         emit geoSelected(geo);
@@ -633,8 +580,6 @@ void OSGWidget::startDraggingControlPoint(Geo3D* geo, int controlPointIndex)
     m_draggingGeo = geo;
     m_draggingControlPointIndex = controlPointIndex;
     m_dragStartPosition = m_lastMouseWorldPos;
-    
-            // 开始拖动控制点（移除调试日志）
 }
 
 void OSGWidget::stopDraggingControlPoint()
@@ -684,81 +629,6 @@ void OSGWidget::highlightSelectedObjects()
     // }
 }
 
-// 高级拾取系统接口
-void OSGWidget::enableAdvancedPicking(bool enabled)
-{
-    m_advancedPickingEnabled = enabled;
-}
-
-bool OSGWidget::isAdvancedPickingEnabled() const
-{
-    return m_advancedPickingEnabled;
-}
-
-void OSGWidget::setPickingRadius(int radius)
-{
-    PickConfig config = PickingSystemManager::getInstance().getConfig();
-    config.pickRadius = static_cast<float>(radius);
-    PickingSystemManager::getInstance().setConfig(config);
-}
-
-void OSGWidget::setPickingFrequency(double frequency)
-{
-    // 新版本不支持pickingFrequency配置，这个方法将被忽略
-    LOG_INFO("setPickingFrequency is not supported in SimplifiedPickingSystem", "拾取");
-}
-
-void OSGWidget::setPickingConfig(const PickConfig& config)
-{
-    PickingSystemManager::getInstance().setConfig(config);
-    
-    LOG_INFO(QString("Updated picking config - Radius: %1, Threshold: %2")
-        .arg(config.pickRadius)
-        .arg(config.snapThreshold), "拾取");
-}
-
-QString OSGWidget::getPickingSystemInfo() const
-{
-    // 新版本不支持getSystemInfo，返回基本状态信息
-    if (PickingSystemManager::getInstance().isInitialized()) {
-        return "SimplifiedPickingSystem initialized";
-    } else {
-        return "SimplifiedPickingSystem not initialized";
-    }
-}
-
-void OSGWidget::ensureAllGeosInPickingSystem()
-{
-    if (!m_advancedPickingEnabled) return;
-    
-    // 确保所有几何对象都在拾取系统中（移除频繁的日志）
-    // 新版本不支持updateGeometry，使用addGeometry代替
-    
-            for (const auto& geoRef : m_geoList)
-        {
-            if (geoRef)
-            {
-                // 新版本直接添加几何体，系统内部会处理重复添加
-                PickingSystemManager::getInstance().addGeometry(geoRef.get());
-            }
-        }
-    
-    // 所有几何对象已确保在拾取系统中（移除频繁的日志）
-}
-
-QString OSGWidget::getPickingSystemStatus() const
-{
-    if (!m_advancedPickingEnabled) {
-        return "拾取系统已禁用";
-    }
-    
-    QString status = QString("拾取系统状态:\n");
-    status += QString("- 几何对象总数: %1\n").arg(m_geoList.size());
-    status += QString("- 拾取系统信息: %1").arg(getPickingSystemInfo());
-    
-    return status;
-}
-
 void OSGWidget::onSimplePickingResult(const PickResult& result)
 {
     // 发射OSG索引拾取结果信号
@@ -770,82 +640,6 @@ void OSGWidget::onSimplePickingResult(const PickResult& result)
         emit mousePositionChanged(result.worldPosition);
     }
 }
-
-
-
-// PickResult3D OSGWidget::pick(int x, int y)
-// {
-//     PickResult3D result;
-    
-//     osgViewer::Viewer* viewer = getOsgViewer();
-//     if (!viewer) return result;
-    
-//     osg::Camera* camera = viewer->getCamera();
-    
-//     // 创建射线
-//     osg::Vec3f nearPoint, farPoint;
-//     if (camera->getViewport())
-//     {
-//         osg::Matrix VPW = camera->getViewMatrix() * 
-//                          camera->getProjectionMatrix() * 
-//                          camera->getViewport()->computeWindowMatrix();
-//         osg::Matrix invVPW;
-//         invVPW.invert(VPW);
-        
-//         nearPoint = osg::Vec3f(x, height() - y, 0.0f) * invVPW;
-//         farPoint = osg::Vec3f(x, height() - y, 1.0f) * invVPW;
-//     }
-    
-//     // 计算射线方向和起点
-//     glm::vec3 rayOrigin(nearPoint.x(), nearPoint.y(), nearPoint.z());
-//     glm::vec3 rayDirection = glm::normalize(glm::vec3(farPoint.x() - nearPoint.x(), 
-//                                                       farPoint.y() - nearPoint.y(), 
-//                                                       farPoint.z() - nearPoint.z()));
-    
-//     Ray3D ray(rayOrigin, rayDirection);
-    
-//     // 添加调试信息
-//     LOG_DEBUG(QString("射线拾取: 屏幕坐标(%1,%2), 射线起点(%3,%4,%5), 方向(%6,%7,%8)")
-//         .arg(x).arg(y)
-//         .arg(rayOrigin.x, 0, 'f', 3).arg(rayOrigin.y, 0, 'f', 3).arg(rayOrigin.z, 0, 'f', 3)
-//         .arg(rayDirection.x, 0, 'f', 3).arg(rayDirection.y, 0, 'f', 3).arg(rayDirection.z, 0, 'f', 3), "拾取");
-    
-//     LOG_DEBUG(QString("几何体数量: %1").arg(m_geoList.size()), "拾取");
-    
-//     // 测试所有几何对象，使用KDTree支持的快速查询
-//     float minDistance = FLT_MAX;
-//     for (const osg::ref_ptr<Geo3D>& geo : m_geoList)
-//     {
-//         if (!geo) continue;
-        
-//         LOG_DEBUG(QString("测试几何体: 类型=%1, 状态=%2")
-//             .arg(geo->getGeoType())
-//             .arg(geo->isStateComplete() ? "完成" : "未完成"), "拾取");
-        
-//         PickResult3D geoResult;
-//         // 优先使用KDTree支持的hitTest，如果失败则使用传统方法
-//         if (geo->hitTestWithKdTree(ray, geoResult) || geo->hitTestVisible(ray, geoResult))
-//         {
-//             LOG_DEBUG(QString("几何体命中: 类型=%1, 距离=%2")
-//                 .arg(geo->getGeoType())
-//                 .arg(geoResult.distance, 0, 'f', 3), "拾取");
-            
-//             if (geoResult.distance < minDistance)
-//             {
-//                 minDistance = geoResult.distance;
-//                 result = geoResult;
-//             }
-//         }
-//     }
-    
-//     if (result.hit) {
-//         LOG_DEBUG(QString("射线拾取成功: 距离=%1").arg(result.distance, 0, 'f', 3), "拾取");
-//     } else {
-//         LOG_DEBUG("射线拾取失败: 没有命中任何几何体", "拾取");
-//     }
-    
-//     return result;
-// }
 
 
 
@@ -914,19 +708,105 @@ void OSGWidget::resizeEvent(QResizeEvent* event)
 
 void OSGWidget::mousePressEvent(QMouseEvent* event)
 {
-    // 处理绘制输入
-    handleDrawingInput(event);
-    
-    // 处理拖动控制点 - 使用拾取系统
-    if (GlobalDrawMode3D == DrawSelect3D && event->button() == Qt::LeftButton)
+    // 右键完成绘制
+    if (event->button() == Qt::RightButton && m_isDrawing)
     {
-        // 使用拾取系统进行拾取
-        PickResult pickResult = PickingSystemManager::getInstance().pick(event->x(), height() - event->y());
-        
+        completeCurrentDrawing();
+        return;
+    }
+
+    // 只处理左键事件
+    if (event->button() != Qt::LeftButton)
+        return;
+
+    PickResult pickResult = performSimplePicking(event->x(), height() - event->y());
+    glm::vec3 worldPos;
+    if (pickResult.hasResult) 
+    { 
+        worldPos = pickResult.worldPosition; 
+    }
+    else 
+    { 
+        screenToWorld(event->x(), event->y(), 0.5f); 
+        // 坐标限制在坐标系内
+        CoordinateSystem3D* coordSystem = CoordinateSystem3D::getInstance();
+        glm::vec3 clampedPos = coordSystem->clampPointToSkybox(worldPos);
+        worldPos = clampedPos;
+    }
+    emit mousePositionChanged(worldPos);
+
+    if (GlobalDrawMode3D == DrawSelect3D)
+    {
+        bool isCtrlPressed = (QApplication::keyboardModifiers() & Qt::ControlModifier);
+
         if (pickResult.hasResult && pickResult.geometry)
         {
+            Geo3D* pickedGeo = pickResult.geometry;
+
+            if (isCtrlPressed)
+            {
+                // Ctrl+点击：多选模式
+                if (isSelected(pickedGeo))
+                {
+                    // 如果已经选中，则从选中列表中移除
+                    removeFromSelection(pickedGeo);
+                }
+                else
+                {
+                    // 如果未选中，则添加到选中列表
+                    addToSelection(pickedGeo);
+                }
+            }
+            else
+            {
+                // 普通点击：单选模式
+                clearSelection();
+                addToSelection(pickedGeo);
+            }
+        }
+        else
+        {
+            // 没有点击到对象，清除选择
+            if (!isCtrlPressed)
+            {
+                clearSelection();
+            }
+        }
+    }
+    else
+    {
+        if (!m_isDrawing)
+        {
+            // 开始新的绘制
+            Geo3D* newGeo = createGeo3D(GlobalDrawMode3D);
+            if (newGeo)
+            {
+                m_currentDrawingGeo = newGeo;
+                m_isDrawing = true;
+                addGeo(newGeo);
+                LOG_INFO("开始绘制...", "绘制");
+            }
+        }
+
+        if (m_currentDrawingGeo)
+        {
+            m_currentDrawingGeo->mousePressEvent(event, worldPos);
+
+            // 检查是否完成绘制
+            if (m_currentDrawingGeo->mm_state()->isStateComplete())
+            {
+                completeCurrentDrawing();
+            }
+        }
+    }
+    
+    // 处理拖动控制点
+    if (GlobalDrawMode3D == DrawSelect3D && event->button() == Qt::LeftButton)
+    {
+        if (pickResult.hasResult && pickResult.geometry && pickResult.osgGeometry)
+        {
             // 检查是否为顶点拾取（控制点）
-            if (pickResult.featureType == PickFeatureType::VERTEX && pickResult.primitiveIndex >= 0)
+            if (pickResult.featureType == PickFeatureType::VERTEX && pickResult.osgGeometry->getNodeMask()== NODE_MASK_CONTROL_POINTS && pickResult.primitiveIndex >= 0)
             {
                 // 检查该几何体是否在选中列表中
                 auto it = std::find(m_selectedGeos.begin(), m_selectedGeos.end(), pickResult.geometry);
@@ -960,33 +840,19 @@ void OSGWidget::mouseMoveEvent(QMouseEvent* event)
     QDateTime currentTime = QDateTime::currentDateTime();
     if (!lastMouseUpdate.isValid() || lastMouseUpdate.msecsTo(currentTime) >= MOUSE_CACHE_DURATION)
     {
-        if (m_advancedPickingEnabled)
+        // 使用简化拾取获取世界坐标
+        PickResult pickResult = performSimplePicking(event->x(), height() - event->y());
+        
+        if (pickResult.hasResult)
         {
-            // 使用拾取系统获取世界坐标
-            PickResult pickResult = PickingSystemManager::getInstance().pick(event->x(), height() - event->y());
-            
-            if (pickResult.hasResult)
-            {
-                // 使用拾取结果的世界坐标覆盖普通坐标
-                m_lastMouseWorldPos = pickResult.worldPosition;
-                emit mousePositionChanged(pickResult.worldPosition);
-            }
-            else
-            {
-                // 如果没有拾取到对象，使用屏幕坐标转换
-                glm::vec3 worldPos = screenToWorld(event->x(), event->y(), 0.5f);
-                
-                // 应用坐标范围限制
-                CoordinateSystem3D* coordSystem = CoordinateSystem3D::getInstance();
-                glm::vec3 clampedPos = coordSystem->clampPointToSkybox(worldPos);
-                
-                m_lastMouseWorldPos = clampedPos;
-                emit mousePositionChanged(clampedPos);
-            }
+            // 使用拾取结果的世界坐标
+            m_lastMouseWorldPos = pickResult.worldPosition;
+            emit mousePositionChanged(pickResult.worldPosition);
+            emit simplePickingResult(pickResult);
         }
         else
         {
-            // 非拾取模式：使用传统的屏幕坐标转换
+            // 如果没有拾取到对象，使用屏幕坐标转换
             glm::vec3 worldPos = screenToWorld(event->x(), event->y(), 0.5f);
             
             // 应用坐标范围限制
@@ -1032,13 +898,13 @@ void OSGWidget::mouseMoveEvent(QMouseEvent* event)
     // 处理绘制预览 - 使用拾取系统获取更精确的世界坐标
     if (m_isDrawing && m_currentDrawingGeo)
     {
-        // 使用拾取系统获取世界坐标
-        PickResult pickResult = PickingSystemManager::getInstance().pick(event->x(), height() - event->y());
+        // 使用简化拾取获取世界坐标
+        PickResult pickResult = performSimplePicking(event->x(), height() - event->y());
         glm::vec3 drawingWorldPos;
         
         if (pickResult.hasResult)
         {
-            // 使用拾取结果的世界坐标覆盖普通坐标
+            // 使用拾取结果的世界坐标
             drawingWorldPos = pickResult.worldPosition;
             m_lastMouseWorldPos = pickResult.worldPosition;
             // 更新状态栏坐标
@@ -1091,120 +957,6 @@ void OSGWidget::wheelEvent(QWheelEvent* event)
         // 滚轮缩放（移除调试日志）
         
         osgQOpenGLWidget::wheelEvent(event);
-    }
-}
-
-void OSGWidget::handleDrawingInput(QMouseEvent* event)
-{
-    // 右键完成绘制
-    if (event->button() == Qt::RightButton && m_isDrawing)
-    {
-        completeCurrentDrawing();
-        return;
-    }
-    
-    // 只处理左键事件
-    if (event->button() != Qt::LeftButton)
-        return;
-    
-    if (GlobalDrawMode3D == DrawSelect3D)
-    {
-        // 选择模式：使用拾取系统进行选择
-        PickResult pickResult = PickingSystemManager::getInstance().pick(event->x(), event->y());
-        
-        // 检查是否按下了Ctrl键（多选模式）
-        bool isCtrlPressed = (QApplication::keyboardModifiers() & Qt::ControlModifier);
-        
-        // 选择模式点击（移除频繁的日志）
-        
-        if (pickResult.hasResult && pickResult.geometry)
-        {
-            Geo3D* pickedGeo = pickResult.geometry;
-            
-            if (isCtrlPressed)
-            {
-                // Ctrl+点击：多选模式
-                if (isSelected(pickedGeo))
-                {
-                    // 如果已经选中，则从选中列表中移除
-                    removeFromSelection(pickedGeo);
-                }
-                else
-                {
-                    // 如果未选中，则添加到选中列表
-                    addToSelection(pickedGeo);
-                }
-            }
-            else
-            {
-                // 普通点击：单选模式
-                clearSelection();
-                addToSelection(pickedGeo);
-            }
-        }
-        else
-        {
-            // 没有点击到对象，清除选择
-            if (!isCtrlPressed)
-            {
-                clearSelection();
-            }
-        }
-    }
-    else
-    {
-        // 绘制模式：使用拾取系统获取世界坐标
-        PickResult pickResult = PickingSystemManager::getInstance().pick(event->x(), event->y());
-        glm::vec3 worldPos;
-        
-        if (pickResult.hasResult)
-        {
-            // 使用拾取结果的世界坐标覆盖普通坐标
-            worldPos = pickResult.worldPosition;
-            m_lastMouseWorldPos = pickResult.worldPosition;
-            // 在绘制模式下也更新状态栏坐标
-            emit mousePositionChanged(pickResult.worldPosition);
-        }
-        else
-        {
-            // 如果没有拾取到对象，使用屏幕坐标转换
-            worldPos = screenToWorld(event->x(), event->y(), 0.5f);
-            // 应用坐标范围限制
-            CoordinateSystem3D* coordSystem = CoordinateSystem3D::getInstance();
-            glm::vec3 clampedPos = coordSystem->clampPointToSkybox(worldPos);
-            worldPos = clampedPos;
-            m_lastMouseWorldPos = clampedPos;
-            // 更新状态栏坐标
-            emit mousePositionChanged(clampedPos);
-        }
-        
-        if (!m_isDrawing)
-        {
-            // 开始新的绘制
-            Geo3D* newGeo = createGeo3D(GlobalDrawMode3D);
-            if (newGeo)
-            {
-                m_currentDrawingGeo = newGeo;
-                m_isDrawing = true;
-                addGeo(newGeo);
-                LOG_INFO("开始绘制...", "绘制");
-            }
-        }
-        
-        if (m_currentDrawingGeo)
-        {
-            // 应用天空盒范围限制，确保不会超出天空盒
-            CoordinateSystem3D* coordSystem = CoordinateSystem3D::getInstance();
-            glm::vec3 clampedPos = coordSystem->clampPointToSkybox(worldPos);
-            
-            m_currentDrawingGeo->mousePressEvent(event, clampedPos);
-            
-            // 检查是否完成绘制
-            if (m_currentDrawingGeo->mm_state()->isStateComplete())
-            {
-                completeCurrentDrawing();
-            }
-        }
     }
 }
 
@@ -1866,23 +1618,25 @@ const std::vector<osg::ref_ptr<Geo3D>>& OSGWidget::getAllGeos() const
     return m_geoList;
 }
 
-void OSGWidget::onGeoDrawingCompleted(Geo3D* geo)
-{
-    if (!geo || !m_advancedPickingEnabled)
-        return;
-    PickingSystemManager::getInstance().addGeometry(geo);
-}
+// ========================================= 拾取系统实现 =========================================
 
-void OSGWidget::onGeoGeometryUpdated(Geo3D* geo)
+PickResult OSGWidget::performSimplePicking(int mouseX, int mouseY)
 {
-    if (!geo || !m_advancedPickingEnabled)
-        return;
-    PickingSystemManager::getInstance().addGeometry(geo);
-}
-
-void OSGWidget::onGeoParametersChanged(Geo3D* geo)
-{
-    if (!geo || !m_advancedPickingEnabled)
-        return;
-    PickingSystemManager::getInstance().addGeometry(geo);
+    // 检查几何拾取系统是否已初始化
+    if (!m_geometryPickingSystem || !m_geometryPickingSystem->isInitialized()) {
+        LOG_WARNING("几何拾取系统未初始化，返回空拾取结果", "拾取");
+        return PickResult();
+    }
+    
+    // 使用几何拾取系统进行拾取
+    PickResult result = m_geometryPickingSystem->pickGeometry(mouseX, mouseY);
+    
+    // 如果有拾取结果且有拾取指示器，更新指示器位置
+    if (result.hasResult && m_pickingIndicator) {
+        m_pickingIndicator->showIndicator(result.worldPosition, result.featureType);
+    } else if (m_pickingIndicator) {
+        m_pickingIndicator->hideIndicator();
+    }
+    
+    return result;
 }

@@ -355,9 +355,9 @@ struct IndicatorConfig
     float fadeTime;            // 淡入淡出时间
     
     IndicatorConfig()
-        : size(0.1f)
+        : size(5.0f)                     // 进一步增加默认大小到5.0，确保在3D场景中容易看见
         , color(1.0f, 1.0f, 0.0f, 1.0f)  // 黄色
-        , lineWidth(3.0f)
+        , lineWidth(5.0f)                // 增加线宽，让边指示器更明显
         , animationSpeed(2.0f)
         , enableAnimation(true)
         , fadeTime(0.3f)

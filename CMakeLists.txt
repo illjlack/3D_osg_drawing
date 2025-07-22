@@ -119,14 +119,13 @@ set(UI_SOURCES
     src/ui/OSGWidget.cpp
     src/ui/MainWindow.cpp
     src/ui/CoordinateSystemDialog.cpp
-    src/ui/PickingSystemDialog.cpp
     src/ui/LogOutputWidget.cpp
 )
 set(UI_HEADERS
     src/ui/OSGWidget.h
     src/ui/MainWindow.h
     src/ui/CoordinateSystemDialog.h
-    src/ui/PickingSystemDialog.h
+
     src/ui/LogOutputWidget.h
 )
 set(CORE_SOURCES
@@ -183,19 +182,17 @@ set(PICKING_SOURCES
     src/core/picking/PickingIntegration.cpp
     src/core/picking/PickingIndicator.cpp
     src/core/picking/SimplifiedPickingSystem.cpp
-    src/core/picking/RayPickingSystem.cpp
 )
 set(PICKING_HEADERS
     src/core/picking/PickingSystem.h
     src/core/picking/PickingIntegration.h
     src/core/picking/PickingIndicator.h
+    src/core/picking/PickingTypes.h
     src/core/picking/SimplifiedPickingSystem.h
-    src/core/picking/RayPickingSystem.h
 )
 set(UTIL_SOURCES
     src/util/OSGUtils.cpp
     src/util/GeometryFactory.cpp
-    src/core/picking/PickingIndicator.cpp
     src/util/MathUtils.cpp
     src/util/LogManager.cpp
     src/util/GeoOsgbIO.cpp

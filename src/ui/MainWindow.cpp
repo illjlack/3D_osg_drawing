@@ -1,6 +1,6 @@
 ﻿#include "MainWindow.h"
 #include "../core/GeometryBase.h"
-#include "../core/picking/RayPickingSystem.h"
+#include "../core/picking/PickingIndicator.h"
 #include <QTimer>
 #include <QSplitter>
 #include <QVBoxLayout>
@@ -652,9 +652,6 @@ void MainWindow::onFileOpen()
                     }
                 }
                 
-                // 确保所有从文件IO读入的几何对象都加入了拾取系统
-                m_osgWidget->ensureAllGeosInPickingSystem();
-                
                 // 记录拾取系统状态（移除频繁的日志）
                 
                 m_currentFilePath = fileName;
@@ -674,11 +671,6 @@ void MainWindow::onFileOpen()
                 {
                     LOG_INFO(QString("加载单个几何对象: 类型=%1").arg(loadedGeo->getGeoType()), "文件");
                     m_osgWidget->addGeo(loadedGeo);
-                    
-                    // 确保从文件IO读入的几何对象加入了拾取系统
-                    m_osgWidget->ensureAllGeosInPickingSystem();
-                    
-                    // 记录拾取系统状态（移除频繁的日志）
                     
                     m_currentFilePath = fileName;
                     m_modified = false;
@@ -1288,12 +1280,9 @@ void MainWindow::onCoordinateSystemSettings()
 
 void MainWindow::onPickingSystemSettings()
 {
-    PickingSystemDialog dialog(this);
-    if (dialog.exec() == QDialog::Accepted)
-    {
-        updateStatusBar("拾取系统设置已更新");
-        LOG_SUCCESS("拾取系统设置已更新", "拾取系统");
-    }
+    // 简化的拾取指示器系统不需要复杂配置
+    updateStatusBar("拾取指示器使用固定配置，无需设置");
+    LOG_INFO("拾取指示器使用简化的固定配置", "拾取系统");
 }
 
 void MainWindow::onClearScene()
