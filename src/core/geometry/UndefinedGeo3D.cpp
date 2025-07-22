@@ -90,12 +90,13 @@ void UndefinedGeo3D_Geo::buildStageEdgeGeometries(int stage)
 
 void UndefinedGeo3D_Geo::buildStageFaceGeometries(int stage)
 {
-    // 未定义几何体默认不绘制面
+    // 对于未定义几何体，面几何体在文件导入时直接挂载，这里不需要额外构建
+    // 主要用途是保持与其他几何体一致的状态管理
 }
 
 void UndefinedGeo3D_Geo::buildCurrentStagePreviewGeometries()
 {
-    buildGenericGeometry();
+    buildGenericGeometry(); // 只构建点预览
 }
 
 void UndefinedGeo3D_Geo::buildGenericGeometry()
@@ -161,5 +162,30 @@ bool UndefinedGeo3D_Geo::areControlPointsValid() const
     }
     
     return true;
+}
+
+// ==================== 导入节点处理实现 ====================
+
+void UndefinedGeo3D_Geo::setImportedFaceNode(osg::Node* node)
+{
+    if (!node) {
+        LOG_WARNING("导入节点为空，无法设置", "UndefinedGeo3D");
+        return;
+    }
+    
+    // 设置节点的NodeMask为面拾取，使其可以被选中
+    node->setNodeMask(NODE_MASK_FACE);
+    
+    // 设置用户数据，指向这个几何体对象，供拾取系统使用
+    node->setUserData(this);
+    
+    // 将导入的节点挂载到变换节点下，与其他面几何体在同一层级
+    auto transformNode = mm_node()->getTransformNode();
+    if (transformNode.valid()) {
+        transformNode->addChild(node);
+        LOG_INFO("成功将导入节点设置为面节点，可支持选中拾取", "UndefinedGeo3D");
+    } else {
+        LOG_ERROR("变换节点无效，无法挂载导入节点", "UndefinedGeo3D");
+    }
 }
 

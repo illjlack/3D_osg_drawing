@@ -1,4 +1,4 @@
-#include "ScaleBarRenderer.h"
+﻿#include "ScaleBarRenderer.h"
 #include "LogManager.h"
 #include <QPen>
 #include <QFont>

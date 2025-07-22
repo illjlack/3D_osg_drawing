@@ -204,19 +204,33 @@ Geo3D* GeoOsgbIO::loadFromOsgb(const QString& path)
     if (type == Geo_UndefinedGeo3D) {
         geo = new UndefinedGeo3D_Geo();
         LOG_INFO("创建未定义几何体对象", "文件IO");
+        
+        // 对于未定义几何体，使用专门的方法设置导入的面节点
+        UndefinedGeo3D_Geo* undefinedGeo = static_cast<UndefinedGeo3D_Geo*>(geo);
+        undefinedGeo->setImportedFaceNode(node.get());
     } else {
         geo = createGeo3D(static_cast<DrawMode3D>(type));
         if (!geo) {
             geo = new UndefinedGeo3D_Geo();
             LOG_WARNING(QString("无法创建类型 %1 的几何体，使用默认类型").arg(type), "文件IO");
+            
+            // 对于创建失败后使用默认类型的情况，也使用专门的方法设置面节点
+            UndefinedGeo3D_Geo* undefinedGeo = static_cast<UndefinedGeo3D_Geo*>(geo);
+            undefinedGeo->setImportedFaceNode(node.get());
         } else {
             LOG_INFO(QString("创建几何体对象，类型: %1").arg(type), "文件IO");
+            // 对于已知类型，挂载到根节点
+            geo->mm_node()->getOSGNode()->addChild(node.get());
         }
     }
     
-    // 挂载节点
-            geo->mm_node()->getOSGNode()->addChild(node.get());
     geo->setGeoType(type);
+    
+    // 对于未定义几何体，设置其状态为完成，使其可以被选中拾取
+    if (type == Geo_UndefinedGeo3D) {
+        geo->mm_state()->setStateComplete();
+        LOG_INFO("设置未定义几何体状态为完成，可被选中拾取", "文件IO");
+    }
     
     LOG_SUCCESS(QString("成功加载文件: %1").arg(path), "文件IO");
     return geo;

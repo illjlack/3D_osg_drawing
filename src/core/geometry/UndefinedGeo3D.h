@@ -16,6 +16,9 @@ public:
     virtual void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos) override;
     virtual void keyPressEvent(QKeyEvent* event) override;
 
+    // ==================== 导入节点处理 ====================
+    void setImportedFaceNode(osg::Node* node);
+
 protected:
     virtual void buildVertexGeometries() override;
     virtual void buildEdgeGeometries() override;
