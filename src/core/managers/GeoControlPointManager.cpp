@@ -117,3 +117,21 @@ const std::vector<std::vector<Point3D>>& GeoControlPointManager::getAllStageCont
         return m_stagesTemp;
     }
 }
+
+const StageDescriptors& GeoControlPointManager::getStageDescriptors() const
+{
+    assert(m_parent);
+    return m_parent->getStageDescriptors();
+}
+
+const StageDescriptor& GeoControlPointManager::getStageDescriptor(int idx) const
+{
+    assert(m_parent && idx < getStageDescriptors().size());
+    return getStageDescriptors()[idx];
+}
+
+GeoStateManager* GeoControlPointManager::getState() const
+{
+    assert(m_parent);
+    return m_parent->mm_state();
+}

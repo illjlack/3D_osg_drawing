@@ -95,23 +95,9 @@ private:
         return currentStage().size();
     }
 
-    inline const StageDescriptors& getStageDescriptors() const
-    {
-        assert(m_parent);
-        return m_parent->getStageDescriptors();
-    }
-
-    inline const StageDescriptor& getStageDescriptor(int idx) const
-    {
-        assert(m_parent && idx < getStageDescriptors().size());
-        return getStageDescriptors()[idx];
-    }
-
-    inline GeoStateManager* getState() const
-    {
-        assert(m_parent);
-        return m_parent->mm_state();
-    }
+    const StageDescriptors& getStageDescriptors() const;
+    const StageDescriptor& getStageDescriptor(int idx) const;
+    GeoStateManager* getState() const;
 
 private:
     Geo3D* m_parent;

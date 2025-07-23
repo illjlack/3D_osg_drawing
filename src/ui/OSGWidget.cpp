@@ -1255,7 +1255,34 @@ void OSGWidget::mousePressEvent(QMouseEvent* event)
 
         if (m_currentDrawingGeo)
         {
-            m_currentDrawingGeo->mousePressEvent(event, worldPos);
+            // 直接调用控制点管理器而不是几何体的事件处理方法
+            auto controlPointManager = m_currentDrawingGeo->mm_controlPoint();
+            if (controlPointManager)
+            {
+                // 左键添加控制点
+                if (event->button() == Qt::LeftButton)
+                {
+                    bool success = controlPointManager->addControlPoint(Point3D(worldPos));
+                    if (success)
+                    {
+                        LOG_INFO("添加控制点成功", "绘制");
+                        
+                        // 检查是否完成绘制
+                        if (m_currentDrawingGeo->mm_state()->isStateComplete())
+                        {
+                            completeCurrentDrawing();
+                        }
+                    }
+                }
+                // 右键进入下一阶段或完成绘制（某些几何体需要）
+                else if (event->button() == Qt::RightButton && !m_isDrawing)
+                {
+                    // 这里右键已经在函数开头处理了，用于完成绘制
+                    // 如果需要处理阶段切换，可以在这里添加
+                }
+            }
+
+            // m_currentDrawingGeo->mousePressEvent(event, worldPos);  // 移除原来的调用
 
             // 检查是否完成绘制
             if (m_currentDrawingGeo->mm_state()->isStateComplete())
@@ -1461,8 +1488,15 @@ void OSGWidget::updateCurrentDrawing(const glm::vec3& worldPos)
         CoordinateSystem3D* coordSystem = CoordinateSystem3D::getInstance();
         glm::vec3 clampedPos = coordSystem->clampPointToSkybox(worldPos);
         
-        QMouseEvent moveEvent(QEvent::MouseMove, QPoint(0, 0), Qt::NoButton, Qt::NoButton, Qt::NoModifier);
-        m_currentDrawingGeo->mouseMoveEvent(&moveEvent, clampedPos);
+        // 直接调用控制点管理器设置临时点
+        auto controlPointManager = m_currentDrawingGeo->mm_controlPoint();
+        if (controlPointManager)
+        {
+            controlPointManager->setTempPoint(Point3D(clampedPos));
+        }
+        
+        // QMouseEvent moveEvent(QEvent::MouseMove, QPoint(0, 0), Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+        // m_currentDrawingGeo->mouseMoveEvent(&moveEvent, clampedPos);  // 移除原来的调用
     }
 }
 
@@ -1713,15 +1747,28 @@ void OSGWidget::keyPressEvent(QKeyEvent* event)
             // 处理绘制相关按键
             if (m_isDrawing && m_currentDrawingGeo)
             {
-                m_currentDrawingGeo->keyPressEvent(event);
-                
-                if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter)
+                auto controlPointManager = m_currentDrawingGeo->mm_controlPoint();
+                if (controlPointManager)
                 {
-                    completeCurrentDrawing();
-                }
-                else if (event->key() == Qt::Key_Escape)
-                {
-                    cancelCurrentDrawing();
+                    if (event->key() == Qt::Key_Escape)
+                    {
+                        // ESC键撤销上一个控制点，如果没有控制点则取消绘制
+                        bool hasControlPoints = controlPointManager->undoLastControlPoint();
+                        if (!hasControlPoints)
+                        {
+                            cancelCurrentDrawing();
+                        }
+                        LOG_INFO("撤销上一个控制点", "绘制");
+                    }
+                    else if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter)
+                    {
+                        completeCurrentDrawing();
+                    }
+                    else
+                    {
+                        // 其他按键仍然传递给几何体处理（如果有特殊需求）
+                        m_currentDrawingGeo->keyPressEvent(event);
+                    }
                 }
             }
             

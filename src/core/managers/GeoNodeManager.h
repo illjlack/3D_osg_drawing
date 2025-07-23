@@ -31,9 +31,9 @@ public:
     osg::ref_ptr<osg::Geometry> getVertexGeometry() const { return m_vertexGeometry; }
     osg::ref_ptr<osg::Geometry> getEdgeGeometry() const { return m_edgeGeometry; }
     osg::ref_ptr<osg::Geometry> getFaceGeometry() const { return m_faceGeometry; }
-    // 控制点，只是用来可视化和操作
+    // 控制点
     osg::ref_ptr<osg::Geometry> getControlPointsGeometry() const { return m_controlPointsGeometry; }
-    // 包围盒，用来可视化，是点、线、面的包围盒对应的立方体
+    // 包围盒，用来可视化，是点、线、面的包围盒对应的立方体(自动更新)
     osg::ref_ptr<osg::Geometry> getBoundingBoxGeometry() const { return m_boundingBoxGeometry; }
 
     // 几何体清理

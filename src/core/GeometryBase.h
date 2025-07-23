@@ -79,42 +79,23 @@ public:
         static StageDescriptors stageDescriptors{};
         return stageDescriptors;
     }
-
-    // 绘制完成检查和控制点验证
-    virtual bool isDrawingComplete() const = 0;  // 检查是否绘制完成（检查控制点个数是否符合要求）
-    virtual bool areControlPointsValid() const = 0;  // 检查控制点是否合法
     
-
     void updateGeometries();
 
 protected:
     // 初始化
     virtual void initialize();
-    
     // 点线面节点管理辅助方法
-    virtual void buildVertexGeometries() = 0;  // 子类实现具体的顶点几何体构建
-    virtual void buildEdgeGeometries() = 0;    // 子类实现具体的边几何体构建
-    virtual void buildFaceGeometries() = 0;    // 子类实现具体的面几何体构建
+    virtual void buildControlPointGeometries();         // 子类实现具体的控制点构建(默认选择时所有控制点可见)
+    virtual void buildVertexGeometries() = 0;           // 子类实现具体的顶点几何体构建
+    virtual void buildEdgeGeometries() = 0;             // 子类实现具体的边几何体构建
+    virtual void buildFaceGeometries() = 0;             // 子类实现具体的面几何体构建
     
-    // ==================== 多阶段几何构建方法 ====================
-    
-    // 为不同阶段构建特定的几何体（由派生类重写以实现阶段特定的绘制逻辑）
-    virtual void buildStageVertexGeometries(int stage) {} // 可选：阶段特定的顶点几何体构建
-    virtual void buildStageEdgeGeometries(int stage) {}   // 可选：阶段特定的边几何体构建  
-    virtual void buildStageFaceGeometries(int stage) {}   // 可选：阶段特定的面几何体构建
-    
-    // ==================== 多阶段临时点跟踪绘制 ====================
-    
-    // 构建当前阶段的临时预览几何体（包含临时点的预览绘制）
-    virtual void buildCurrentStagePreviewGeometries() {} // 可选：当前阶段的预览绘制
-
 protected:
     // 基本属性
     GeoType3D m_geoType;
     GeoParameters3D m_parameters;
     bool m_parametersChanged;
-    bool m_stagesInitialized; // 阶段描述符是否已初始化
-
     // 管理器组件
     std::unique_ptr<GeoStateManager> m_stateManager;
     std::unique_ptr<GeoNodeManager> m_nodeManager;
