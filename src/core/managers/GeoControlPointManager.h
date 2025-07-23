@@ -16,7 +16,7 @@ class GeoStateManager;
 #define INT_INF 0x3f3f3f3f
 #endif
 
-typedef ConstraintSystem::StageConstraintFunction StageConstraintFunction;
+typedef constraint::StageConstraintFunction StageConstraintFunction;
 
 struct StageDescriptor 
 {

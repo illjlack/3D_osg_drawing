@@ -111,22 +111,22 @@ void OSGWidget::contextMenuEvent(QContextMenuEvent* event)
     // ========================================= 自定义条件判断 =========================================
     
 
-    // if (GlobalDrawMode3D != DrawSelect3D) {
-    //     LOG_INFO("非选择模式，跳过右键菜单", "右键菜单");
-    //     return; // 不显示右键菜单
-    // }   
+     if (GlobalDrawMode3D != DrawSelect3D) {
+         LOG_INFO("非选择模式，跳过右键菜单", "右键菜单");
+         return; // 不显示右键菜单
+     }   
 
-    if (m_isDrawing) {
-        LOG_INFO("正在绘制中，跳过右键菜单", "右键菜单");
-        return; // 不显示右键菜单
-    }
+    //if (m_isDrawing) {
+    //    LOG_INFO("正在绘制中，跳过右键菜单", "右键菜单");
+    //    return; // 不显示右键菜单
+    //}
     
 
     
     m_lastContextMenuPos = event->pos();
     
     // 使用拾取系统检测右键点击位置的对象
-    PickResult pickResult = performSimplePicking(event->x(), event->y());
+    PickResult pickResult = performSimplePicking(event->x(), height() - event->y());
     
     QMenu contextMenu(this);
     

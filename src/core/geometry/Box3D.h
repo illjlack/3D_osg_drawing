@@ -14,15 +14,19 @@ public:
     // 获取长方体的阶段描述符
     virtual const StageDescriptors& getStageDescriptors() const
     {
-        static StageDescriptors stageDescriptors
-        { 
-            //{"确定一条边", 2, 2, ConstraintSystem::noConstraint},
-            //{"确定底面", 1, 1, ConstraintSystem::perpendicularToLastTwoPointsConstraint},
-            //{"确定长方体高度", 1, 1, ConstraintSystem::verticalToBaseConstraint} 
+        using namespace constraint;
+        static StageDescriptors stageDescriptors = 
+        {
+            {"确定一条边", 2, 2},
+            {"确定底面", 1, 1, createConstraintCall(perpendicularToLastTwoPointsConstraint, {{0,0}, {0,1}})},
+            {"确定高", 1, 1, combineStageConstraints({
+                    createConstraintCall(perpendicularToLastTwoPointsConstraint, {{0,0}, {0,1}}),
+                    createConstraintCall(perpendicularToLastTwoPointsConstraint, {{1,0}, {0,1}})
+                })}
         };
         // 第一阶段：确定底面的第一个角点，使用平面约束
         // 第二阶段：确定底面的对角点，保持在同一平面，形成矩形底面
-        // 第三阶段：确定长方体的高度，垂直于底面方向
+        // 第三阶段：确定长方体的高度，垂直于两个底边切垂足为0,1
         return stageDescriptors;
     }
 

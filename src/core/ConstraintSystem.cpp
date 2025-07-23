@@ -3,16 +3,19 @@
 #include <algorithm>
 #include <cmath>
 
+namespace constraint 
+{
+
 // ============= 基础约束函数实现 =============
 
-Point3D ConstraintSystem::noConstraint(const Point3D& inputPoint, 
-                                       const std::vector<Point3D>& points)
+Point3D noConstraint(const Point3D& inputPoint, 
+                    const std::vector<Point3D>& points)
 {
     return inputPoint; // 直接返回输入点，无约束
 }
 
-Point3D ConstraintSystem::planeConstraint(const Point3D& inputPoint, 
-                                          const std::vector<Point3D>& points)
+Point3D planeConstraint(const Point3D& inputPoint, 
+                       const std::vector<Point3D>& points)
 {
     // 如果有至少3个点，投影到这3个点构成的平面
     if (points.size() >= 3) {
@@ -33,8 +36,8 @@ Point3D ConstraintSystem::planeConstraint(const Point3D& inputPoint,
     return inputPoint; // 如果无法构成平面，返回原点
 }
 
-Point3D ConstraintSystem::lineConstraint(const Point3D& inputPoint, 
-                                         const std::vector<Point3D>& points)
+Point3D lineConstraint(const Point3D& inputPoint, 
+                      const std::vector<Point3D>& points)
 {
     // 如果有至少2个点，投影到这两点构成的直线
     if (points.size() >= 2) {
@@ -51,8 +54,8 @@ Point3D ConstraintSystem::lineConstraint(const Point3D& inputPoint,
     return inputPoint; // 如果无法构成直线，返回原点
 }
 
-Point3D ConstraintSystem::zPlaneConstraint(const Point3D& inputPoint, 
-                                           const std::vector<Point3D>& points)
+Point3D zPlaneConstraint(const Point3D& inputPoint, 
+                        const std::vector<Point3D>& points)
 {
     // 如果有控制点，使用第一个点的Z坐标作为约束平面
     float constraintZ = 0.0f;
@@ -64,8 +67,8 @@ Point3D ConstraintSystem::zPlaneConstraint(const Point3D& inputPoint,
     return Point3D(inputPoint.x(), inputPoint.y(), constraintZ);
 }
 
-Point3D ConstraintSystem::verticalToBaseConstraint(const Point3D& inputPoint, 
-                                                   const std::vector<Point3D>& points)
+Point3D verticalToBaseConstraint(const Point3D& inputPoint, 
+                                const std::vector<Point3D>& points)
 {
     // 检查是否有至少3个点构成底面
     if (points.size() >= 3) {
@@ -97,8 +100,8 @@ Point3D ConstraintSystem::verticalToBaseConstraint(const Point3D& inputPoint,
     return inputPoint; // 如果无法构成底面，返回原点
 }
 
-Point3D ConstraintSystem::perpendicularToLastTwoPointsConstraint(const Point3D& inputPoint, 
-                                                                 const std::vector<Point3D>& points)
+Point3D perpendicularToLastTwoPointsConstraint(const Point3D& inputPoint, 
+                                              const std::vector<Point3D>& points)
 {
     // 检查是否有至少2个点
     if (points.size() >= 2) {
@@ -138,16 +141,16 @@ Point3D ConstraintSystem::perpendicularToLastTwoPointsConstraint(const Point3D& 
 
 // ============= 约束函数组合器实现 =============
 
-ConstraintSystem::ConstraintFunction ConstraintSystem::combineConstraints(const std::vector<ConstraintFunction>& constraints)
+StageConstraintFunction combineStageConstraints(const std::vector<StageConstraintFunction>& constraints)
 {
     return [constraints](const Point3D& inputPoint, 
-                        const std::vector<Point3D>& points) -> Point3D {
+                        const std::vector<std::vector<Point3D>>& pointss) -> Point3D {
         Point3D result = inputPoint;
         
-        // 依次执行每个约束函数
+        // 依次执行每个阶段约束函数
         for (const auto& constraint : constraints) {
             if (constraint) {
-                result = constraint(result, points);
+                result = constraint(result, pointss);
             }
         }
         
@@ -157,7 +160,7 @@ ConstraintSystem::ConstraintFunction ConstraintSystem::combineConstraints(const 
 
 // ============= 约束器生成器实现 =============
 
-ConstraintSystem::StageConstraintFunction ConstraintSystem::createConstraintCall(ConstraintFunction constraintFunc, const std::vector<std::pair<int, int>>& indices)
+StageConstraintFunction createConstraintCall(ConstraintFunction constraintFunc, const std::vector<std::pair<int, int>>& indices)
 {
     return [constraintFunc, indices](const Point3D& inputPoint, 
                                     const std::vector<std::vector<Point3D>>& pointss) -> Point3D {
@@ -181,4 +184,6 @@ ConstraintSystem::StageConstraintFunction ConstraintSystem::createConstraintCall
         
         return inputPoint; // 如果约束函数为空，返回原始输入点
     };
+}
+
 }
