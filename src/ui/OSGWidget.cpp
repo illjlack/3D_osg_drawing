@@ -1268,14 +1268,6 @@ void OSGWidget::mousePressEvent(QMouseEvent* event)
                     // 如果需要处理阶段切换，可以在这里添加
                 }
             }
-
-            // m_currentDrawingGeo->mousePressEvent(event, worldPos);  // 移除原来的调用
-
-            // 检查是否完成绘制
-            if (m_currentDrawingGeo->mm_state()->isStateComplete())
-            {
-                completeCurrentDrawing();
-            }
         }
     }
     

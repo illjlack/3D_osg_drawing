@@ -13,7 +13,7 @@ public:
     // 获取线的阶段描述符
     virtual const StageDescriptors& getStageDescriptors() const
     {
-        static StageDescriptors stageDescriptors{ {"确定起始点", 1, 1},{"确定结束点", 1} };
+        static StageDescriptors stageDescriptors{ {"确定起始点", 1, 1},{"确定结束点", 1, 1} };
         return stageDescriptors;
     }
 

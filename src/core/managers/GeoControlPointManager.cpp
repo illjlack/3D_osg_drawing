@@ -24,7 +24,7 @@ bool GeoControlPointManager::addControlPoint(const Point3D& point)
     * 所以不需要太多判断
     */
     currentStage().emplace_back(point);
-    if (currentStagePointIdx() == getStageDescriptor(currentStageIdx()).maxControlPoints)
+    if (currentStagePointSize() == getStageDescriptor(currentStageIdx()).maxControlPoints)
     {
         nextStage();
     }
