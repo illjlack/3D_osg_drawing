@@ -10,8 +10,6 @@ public:
     Triangle3D_Geo();
     virtual ~Triangle3D_Geo() = default;
 
-    // ==================== 多阶段绘制支持 ====================
-    
     // 获取三角形的阶段描述符
     virtual const StageDescriptors& getStageDescriptors() const
     {

@@ -10,12 +10,10 @@ public:
     BezierCurve3D_Geo();
     virtual ~BezierCurve3D_Geo() = default;
 
-    // ==================== 多阶段绘制支持 ====================
-    
     // 获取贝塞尔曲线的阶段描述符
     virtual const StageDescriptors& getStageDescriptors() const
     {
-        static StageDescriptors stageDescriptors{ {"确定控制点", 3} };
+        static StageDescriptors stageDescriptors{ {"确定控制点", 2} };
         return stageDescriptors;
     }
 

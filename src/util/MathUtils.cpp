@@ -3,6 +3,7 @@
 #include <glm/geometric.hpp>
 #include <cmath>
 #include <algorithm>
+#include "../core/Common3D.h"
 
 float MathUtils::degToRad(float degrees)
 {
@@ -761,3 +762,154 @@ bool MathUtils::isEqual(const glm::vec3& a, const glm::vec3& b, float epsilon)
 {
     return isEqual(a.x, b.x, epsilon) && isEqual(a.y, b.y, epsilon) && isEqual(a.z, b.z, epsilon);
 } 
+
+// ============= 基础几何计算函数 =============
+
+// 通过三点计算圆心和半径
+bool MathUtils::calculateCircleCenterAndRadius(const glm::vec3& p1, const glm::vec3& p2, const glm::vec3& p3, 
+                                               glm::vec3& center, float& radius)
+{
+    // 计算两个向量
+    glm::vec3 v1 = p2 - p1;
+    glm::vec3 v2 = p3 - p1;
+    
+    // 检查三点是否共线
+    glm::vec3 cross = glm::cross(v1, v2);
+    if (glm::length(cross) < EPSILON) {
+        return false; // 三点共线，无法构成圆
+    }
+    
+    // 计算平面法向量
+    glm::vec3 normal = glm::normalize(cross);
+    
+    // 计算圆心
+    // 使用三点圆的几何方法
+    float d1 = glm::dot(p1, p1);
+    float d2 = glm::dot(p2, p2);
+    float d3 = glm::dot(p3, p3);
+    
+    float denominator = 2.0f * (p1.x * (p2.y - p3.y) + p2.x * (p3.y - p1.y) + p3.x * (p1.y - p2.y));
+    
+    if (std::abs(denominator) < EPSILON) {
+        return false;
+    }
+    
+    center.x = (d1 * (p2.y - p3.y) + d2 * (p3.y - p1.y) + d3 * (p1.y - p2.y)) / denominator;
+    center.y = (d1 * (p3.x - p2.x) + d2 * (p1.x - p3.x) + d3 * (p2.x - p1.x)) / denominator;
+    
+    // 对于3D情况，我们投影到最适合的平面
+    // 这里简化处理，假设z坐标为三点的平均值
+    center.z = (p1.z + p2.z + p3.z) / 3.0f;
+    
+    // 计算半径
+    radius = glm::distance(center, p1);
+    
+    return true;
+}
+
+// 生成圆弧上的点
+std::vector<glm::vec3> MathUtils::generateArcPointsFromThreePoints(const glm::vec3& p1, const glm::vec3& p2, const glm::vec3& p3, int segments)
+{
+    std::vector<glm::vec3> points;
+    
+    glm::vec3 center;
+    float radius;
+    
+    if (!calculateCircleCenterAndRadius(p1, p2, p3, center, radius)) {
+        // 三点共线，返回直线段
+        for (int i = 0; i <= segments; ++i) {
+            float t = static_cast<float>(i) / segments;
+            if (t <= 0.5f) {
+                points.push_back(lerp(p1, p2, t * 2.0f));
+            } else {
+                points.push_back(lerp(p2, p3, (t - 0.5f) * 2.0f));
+            }
+        }
+        return points;
+    }
+    
+    // 计算起始角度和结束角度
+    glm::vec3 v1 = glm::normalize(p1 - center);
+    glm::vec3 v2 = glm::normalize(p2 - center);
+    glm::vec3 v3 = glm::normalize(p3 - center);
+    
+    // 计算角度
+    float angle1 = std::atan2(v1.y, v1.x);
+    float angle2 = std::atan2(v2.y, v2.x);
+    float angle3 = std::atan2(v3.y, v3.x);
+    
+    // 确保角度顺序正确
+    while (angle2 < angle1) angle2 += 2.0f * PI;
+    while (angle3 < angle2) angle3 += 2.0f * PI;
+    
+    // 生成圆弧点
+    for (int i = 0; i <= segments; ++i) {
+        float t = static_cast<float>(i) / segments;
+        float angle = angle1 + t * (angle3 - angle1);
+        
+        glm::vec3 point;
+        point.x = center.x + radius * std::cos(angle);
+        point.y = center.y + radius * std::sin(angle);
+        point.z = center.z; // 简化处理，保持z坐标不变
+        
+        points.push_back(point);
+    }
+    
+    return points;
+}
+
+// 计算多边形的法向量
+glm::vec3 MathUtils::calculatePolygonNormal(const std::vector<glm::vec3>& vertices)
+{
+    if (vertices.size() < 3) {
+        return glm::vec3(0.0f, 0.0f, 1.0f); // 默认向上
+    }
+    
+    glm::vec3 normal(0.0f);
+    
+    // 使用Newell方法计算法向量
+    for (size_t i = 0; i < vertices.size(); ++i) {
+        const glm::vec3& v1 = vertices[i];
+        const glm::vec3& v2 = vertices[(i + 1) % vertices.size()];
+        
+        normal.x += (v1.y - v2.y) * (v1.z + v2.z);
+        normal.y += (v1.z - v2.z) * (v1.x + v2.x);
+        normal.z += (v1.x - v2.x) * (v1.y + v2.y);
+    }
+    
+    return glm::normalize(normal);
+}
+
+// 生成线段的顶点
+std::vector<glm::vec3> MathUtils::generateLineVertices(const glm::vec3& start, const glm::vec3& end)
+{
+    return {start, end};
+}
+
+// 生成矩形的顶点
+std::vector<glm::vec3> MathUtils::generateRectangleVertices(const glm::vec3& p1, const glm::vec3& p2, const glm::vec3& p3, const glm::vec3& p4)
+{
+    return {p1, p2, p3, p4};
+}
+
+// 生成三角形的顶点和法向量
+std::vector<glm::vec3> MathUtils::generateTriangleVertices(const glm::vec3& v1, const glm::vec3& v2, const glm::vec3& v3, glm::vec3& normal)
+{
+    normal = calculateNormal(v1, v2, v3);
+    return {v1, v2, v3};
+}
+
+// 生成四边形的顶点和法向量（三角化）
+std::vector<glm::vec3> MathUtils::generateQuadVertices(const glm::vec3& v1, const glm::vec3& v2, const glm::vec3& v3, const glm::vec3& v4, std::vector<glm::vec3>& normals)
+{
+    // 将四边形分成两个三角形
+    glm::vec3 normal1 = calculateNormal(v1, v2, v3);
+    glm::vec3 normal2 = calculateNormal(v1, v3, v4);
+    
+    normals = {normal1, normal1, normal1, normal2, normal2, normal2};
+    
+    // 返回两个三角形的顶点
+    return {v1, v2, v3, v1, v3, v4};
+}
+
+ 

@@ -2,6 +2,7 @@
 #pragma execution_character_set("utf-8")
 
 #include "../GeometryBase.h"
+#include "../../util/MathUtils.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846

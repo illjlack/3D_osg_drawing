@@ -2,6 +2,8 @@
 #pragma execution_character_set("utf-8")
 
 #include "../GeometryBase.h"
+#include "../../util/MathUtils.h"
+#include "../../util/MathUtils.h"
 
 // 多边形几何体类
 class Polygon3D_Geo : public Geo3D
@@ -10,12 +12,10 @@ public:
     Polygon3D_Geo();
     virtual ~Polygon3D_Geo() = default;
 
-    // ==================== 多阶段绘制支持 ====================
-    
     // 获取多边形的阶段描述符
     virtual const StageDescriptors& getStageDescriptors() const
     {
-        static StageDescriptors stageDescriptors{ {"确定多边形顶点", 3, 100} };
+        static StageDescriptors stageDescriptors{ {"确定多边形顶点", 3} };
         return stageDescriptors;
     }
 

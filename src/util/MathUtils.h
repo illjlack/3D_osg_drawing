@@ -234,4 +234,65 @@ public:
     static bool isEqual(float a, float b, float epsilon = EPSILON);
     static bool isZero(float value, float epsilon = EPSILON);
     static bool isEqual(const glm::vec3& a, const glm::vec3& b, float epsilon = EPSILON);
+
+    // ============= 基础几何计算函数 =============
+    
+    // 圆弧相关计算
+    static bool calculateCircleCenterAndRadius(const glm::vec3& p1, const glm::vec3& p2, const glm::vec3& p3, 
+                                               glm::vec3& center, float& radius);
+    static std::vector<glm::vec3> generateArcPointsFromThreePoints(const glm::vec3& p1, const glm::vec3& p2, const glm::vec3& p3, int segments = 50);
+    
+    // 基础几何图形生成
+    static glm::vec3 calculatePolygonNormal(const std::vector<glm::vec3>& vertices);
+    static std::vector<glm::vec3> generateLineVertices(const glm::vec3& start, const glm::vec3& end);
+    static std::vector<glm::vec3> generateRectangleVertices(const glm::vec3& p1, const glm::vec3& p2, const glm::vec3& p3, const glm::vec3& p4);
+    static std::vector<glm::vec3> generateTriangleVertices(const glm::vec3& v1, const glm::vec3& v2, const glm::vec3& v3, glm::vec3& normal);
+    static std::vector<glm::vec3> generateQuadVertices(const glm::vec3& v1, const glm::vec3& v2, const glm::vec3& v3, const glm::vec3& v4, std::vector<glm::vec3>& normals);
+
+    // ============= 统一几何计算 =============
+    
+    // 几何计算结果结构
+    struct GeometryResult {
+        std::vector<glm::vec3> vertices;      // 顶点数据
+        std::vector<glm::vec3> edgeVertices;  // 边顶点数据
+        std::vector<glm::vec3> faceVertices;  // 面顶点数据
+        std::vector<glm::vec3> normals;       // 面法向量
+        std::vector<unsigned int> indices;    // 索引数据
+        bool hasValidGeometry;                // 是否有有效几何体
+    };
+
+    // 根据控制点数据和几何类型计算几何图形
+    static GeometryResult calculateGeometry(const std::vector<std::vector<glm::vec3>>& stageControlPoints, int geoType);
+
+    // 具体几何图形的计算函数
+    static GeometryResult calculatePointGeometry(const std::vector<std::vector<glm::vec3>>& controlPoints);
+    static GeometryResult calculateLineGeometry(const std::vector<std::vector<glm::vec3>>& controlPoints);
+    static GeometryResult calculateArcGeometry(const std::vector<std::vector<glm::vec3>>& controlPoints);
+    static GeometryResult calculateBezierCurveGeometry(const std::vector<std::vector<glm::vec3>>& controlPoints);
+    static GeometryResult calculateTriangleGeometry(const std::vector<std::vector<glm::vec3>>& controlPoints);
+    static GeometryResult calculateQuadGeometry(const std::vector<std::vector<glm::vec3>>& controlPoints);
+    static GeometryResult calculatePolygonGeometry(const std::vector<std::vector<glm::vec3>>& controlPoints);
+    static GeometryResult calculateBoxGeometry(const std::vector<std::vector<glm::vec3>>& controlPoints);
+    static GeometryResult calculateCubeGeometry(const std::vector<std::vector<glm::vec3>>& controlPoints);
+    static GeometryResult calculateCylinderGeometry(const std::vector<std::vector<glm::vec3>>& controlPoints);
+    static GeometryResult calculateConeGeometry(const std::vector<std::vector<glm::vec3>>& controlPoints);
+    static GeometryResult calculateSphereGeometry(const std::vector<std::vector<glm::vec3>>& controlPoints);
+    static GeometryResult calculateTorusGeometry(const std::vector<std::vector<glm::vec3>>& controlPoints);
+    static GeometryResult calculatePrismGeometry(const std::vector<std::vector<glm::vec3>>& controlPoints);
+    static GeometryResult calculateHemisphereGeometry(const std::vector<std::vector<glm::vec3>>& controlPoints);
+    static GeometryResult calculateEllipsoidGeometry(const std::vector<std::vector<glm::vec3>>& controlPoints);
+
+    // 建筑物几何计算函数
+    static GeometryResult calculateFlatHouseGeometry(const std::vector<std::vector<glm::vec3>>& controlPoints);
+    static GeometryResult calculateDomeHouseGeometry(const std::vector<std::vector<glm::vec3>>& controlPoints);
+    static GeometryResult calculateSpireHouseGeometry(const std::vector<std::vector<glm::vec3>>& controlPoints);
+    static GeometryResult calculateGableHouseGeometry(const std::vector<std::vector<glm::vec3>>& controlPoints);
+    static GeometryResult calculateLHouseGeometry(const std::vector<std::vector<glm::vec3>>& controlPoints);
+
+    // 辅助函数
+    static std::vector<glm::vec3> generateCirclePoints(const glm::vec3& center, float radius, const glm::vec3& normal, int segments = 32);
+    static std::vector<glm::vec3> generateBoxVertices(const glm::vec3& min, const glm::vec3& max);
+    static std::vector<glm::vec3> generateBoxEdges(const glm::vec3& min, const glm::vec3& max);
+    static std::vector<glm::vec3> generateBoxFaces(const glm::vec3& min, const glm::vec3& max, std::vector<glm::vec3>& normals);
+    static std::vector<unsigned int> generateBoxIndices();
 }; 

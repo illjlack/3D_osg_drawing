@@ -103,6 +103,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\core\ConstraintSystem.cpp" />
     <ClCompile Include="src\core\picking\GeometryPickingSystem.cpp" />
     <ClCompile Include="src\core\picking\PickingIndicator.cpp">
       <Filter>Core\Picking</Filter>
@@ -243,6 +244,7 @@
       <Filter>Core</Filter>
     </ClInclude>
     <QtMoc Include="src\ui\ImportInfoDialog.h" />
+    <ClInclude Include="src\core\ConstraintSystem.h" />
     <ClInclude Include="src\util\ScaleBarRenderer.h" />
     <QtMoc Include="src\core\GeometryBase.h">
       <Filter>Core</Filter>

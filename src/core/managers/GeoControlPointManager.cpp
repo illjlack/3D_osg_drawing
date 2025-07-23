@@ -20,11 +20,22 @@ bool GeoControlPointManager::addControlPoint(const Point3D& point)
            currentStagePointSize() <= getStageDescriptor(currentStageIdx()).maxControlPoints && "不应该超过限制的点数");
 
     /**
+    * 应用约束函数（如果存在）
+    */
+    Point3D constrainedPoint = point;
+    const auto& currentDescriptor = getStageDescriptor(currentStageIdx());
+
+    if (currentDescriptor.constraint) 
+    {
+        constrainedPoint = currentDescriptor.constraint(point, currentStage(), m_stages, currentStageIdx());
+    }
+
+    /**
     * 因为一个阶段至少能容纳一个，且达到上限后自动切换下一阶段
     * 所以不需要太多判断
     */
-    currentStage().emplace_back(point);
-    if (currentStagePointSize() == getStageDescriptor(currentStageIdx()).maxControlPoints)
+    currentStage().emplace_back(constrainedPoint);
+    if (currentStagePointSize() == currentDescriptor.maxControlPoints)
     {
         nextStage();
     }

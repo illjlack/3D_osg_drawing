@@ -2,9 +2,11 @@
 #pragma execution_character_set("utf-8")
 
 #include "../Common3D.h"
+#include "../ConstraintSystem.h"
 #include <QObject>
 #include <vector>
 #include <string>
+#include <functional>
 
 // 前向声明
 class Geo3D;
@@ -14,15 +16,19 @@ class GeoStateManager;
 #define INT_INF 0x3f3f3f3f
 #endif
 
+typedef ConstraintSystem::ConstraintFunction ConstraintFunction;
+
 struct StageDescriptor 
 {
     std::string stageName;      // 阶段名称
     int minControlPoints;       // 该阶段最少控制点数量
     int maxControlPoints;       // 该阶段最多控制点数量
+    ConstraintSystem::ConstraintFunction constraint; // 约束函数，可选
     
-    StageDescriptor() : minControlPoints(1), maxControlPoints(1) {}
-    StageDescriptor(const std::string& name, int minPoints, int maxPoints = INT_INF)
-        : stageName(name), minControlPoints(minPoints), maxControlPoints(maxPoints) 
+    StageDescriptor() : minControlPoints(1), maxControlPoints(1), constraint(nullptr) {}
+    
+    StageDescriptor(const std::string& name, int minPoints, int maxPoints = INT_INF, ConstraintFunction constraintFunc = nullptr)
+        : stageName(name), minControlPoints(minPoints), maxControlPoints(maxPoints), constraint(constraintFunc)
     {
         // 至少能容纳一个
         assert(maxControlPoints >= 1);
