@@ -308,7 +308,7 @@ void GeoNodeManager::hideAllGeometries()
 void GeoNodeManager::updateSpatialIndex()
 {
     // 只在绘制完成时才构建KdTree，提高性能
-    if (!m_parent->isDrawingComplete()) {
+    if (!m_parent->mm_state()->isStateComplete()) {
         return;
     }
     

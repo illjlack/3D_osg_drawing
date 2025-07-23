@@ -340,24 +340,11 @@ void OSGWidget::onMovePointToCoordinate()
         return;
     }
     
-    // 获取当前点的坐标
-    auto controlPoints = m_contextMenuGeo->mm_controlPoint()->getControlPoints();
-    if (m_contextMenuPointIndex >= static_cast<int>(controlPoints.size()))
-    {
-        LOG_ERROR("控制点索引超出范围", "右键菜单");
-        return;
-    }
-    
-    Point3D currentPoint = controlPoints[m_contextMenuPointIndex];
-    
     bool ok;
     QString coordText = QInputDialog::getText(this, "移动点到坐标", 
-        QString("请输入新的坐标 (x,y,z):\n当前位置: (%1, %2, %3)")
-            .arg(currentPoint.x(), 0, 'f', 3)
-            .arg(currentPoint.y(), 0, 'f', 3)
-            .arg(currentPoint.z(), 0, 'f', 3),
+        QString("请输入新的坐标 (x,y,z):"),
         QLineEdit::Normal,
-        QString("%1,%2,%3").arg(currentPoint.x(), 0, 'f', 3).arg(currentPoint.y(), 0, 'f', 3).arg(currentPoint.z(), 0, 'f', 3),
+        QString("0,0,0"),
         &ok);
     
     if (!ok || coordText.isEmpty()) return;
@@ -1341,30 +1328,11 @@ void OSGWidget::mouseMoveEvent(QMouseEvent* event)
     // 处理拖动控制点
     if (m_isDraggingControlPoint && m_draggingGeo && m_draggingControlPointIndex >= 0)
     {
-        // 计算拖动偏移
-        glm::vec3 dragOffset = m_lastMouseWorldPos - m_dragStartPosition;
+        // 直接使用当前鼠标世界坐标作为新的控制点位置
+        Point3D newPoint(m_lastMouseWorldPos.x, m_lastMouseWorldPos.y, m_lastMouseWorldPos.z);
+        m_draggingGeo->mm_controlPoint()->setControlPoint(m_draggingControlPointIndex, newPoint);
         
-        // 更新控制点位置
-        const auto& controlPoints = m_draggingGeo->mm_controlPoint()->getControlPoints();
-        if (m_draggingControlPointIndex < static_cast<int>(controlPoints.size()))
-        {
-            // 更新控制点
-            Point3D newPoint = controlPoints[m_draggingControlPointIndex];
-            newPoint.position += dragOffset;
-            m_draggingGeo->mm_controlPoint()->setControlPoint(m_draggingControlPointIndex, newPoint);
-            
-            // 更新拖动起始位置
-            m_dragStartPosition = m_lastMouseWorldPos;
-            
-            // 拖动控制点更新（移除频繁的调试日志）
-        }
-        else
-        {
-            // 包围盒控制点功能已移除，直接使用OSG的包围盒
-            m_dragStartPosition = m_lastMouseWorldPos;
-            
-            // 拖动包围盒控制点功能已移除
-        }
+        // 拖动控制点更新（移除频繁的调试日志）
     }
     
     // 处理绘制预览 - 使用拾取系统获取更精确的世界坐标
@@ -1766,8 +1734,8 @@ void OSGWidget::keyPressEvent(QKeyEvent* event)
                     }
                     else
                     {
-                        // 其他按键仍然传递给几何体处理（如果有特殊需求）
-                        m_currentDrawingGeo->keyPressEvent(event);
+                        // 其他按键处理 - 移除了keyPressEvent调用，因为不再提供此接口
+                        // m_currentDrawingGeo->keyPressEvent(event);
                     }
                 }
             }
@@ -1818,7 +1786,8 @@ void OSGWidget::keyReleaseEvent(QKeyEvent* event)
             
             if (m_isDrawing && m_currentDrawingGeo)
             {
-                m_currentDrawingGeo->keyReleaseEvent(event);
+                // 移除了keyReleaseEvent调用，因为不再提供此接口
+                // m_currentDrawingGeo->keyReleaseEvent(event);
             }
             break;
     }

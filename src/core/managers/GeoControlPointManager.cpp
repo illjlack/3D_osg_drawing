@@ -37,7 +37,7 @@ bool GeoControlPointManager::undoLastControlPoint()
     assert(m_stages.size() && "初始化时已经不为空了");
 
     // 第一阶段为空时，不做撤销
-    if (!stageSize() <= 1 && !currentStagePointSize())
+    if (stageSize() <= 1 && !currentStagePointSize())
         return false;
 
     if (currentStagePointSize())

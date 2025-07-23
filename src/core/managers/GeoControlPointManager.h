@@ -8,6 +8,7 @@
 
 // 前向声明
 class Geo3D;
+class GeoStateManager;
 
 #ifndef INT_INF
 #define INT_INF 0x3f3f3f3f
