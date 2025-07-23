@@ -66,22 +66,6 @@ void Triangle3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPo
     mm_controlPoint()->setCurrentStageTempPoint(Point3D(worldPos));
 }
 
-void Triangle3D_Geo::keyPressEvent(QKeyEvent* event)
-{
-    if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
-        // 回车键完成绘制
-        if (isCurrentStageComplete() && areControlPointsValid()) {
-            calculateTriangleParameters();
-            mm_state()->setStateComplete();
-            qDebug() << "三角形: 回车键完成绘制";
-        }
-    }
-    else if (event->key() == Qt::Key_Escape) {
-        // ESC键撤销最后一个控制点
-        mm_controlPoint()->removeLastControlPointFromCurrentStage();
-    }
-}
-
 // ==================== 多阶段几何构建方法实现 ====================
 
 void Triangle3D_Geo::buildStageVertexGeometries(int stage)

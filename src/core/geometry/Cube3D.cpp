@@ -59,8 +59,7 @@ void Cube3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 
 void Cube3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (mm_state()->isStateComplete()) return;
-    mm_controlPoint()->setCurrentStageTempPoint(Point3D(worldPos));
+
 }
 
 void Cube3D_Geo::keyPressEvent(QKeyEvent* event)

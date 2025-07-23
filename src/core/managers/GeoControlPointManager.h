@@ -9,25 +9,28 @@
 // 前向声明
 class Geo3D;
 
-/**
- * @brief 阶段描述符结构体
- * 描述每个绘制阶段的规则
- */
+#ifndef INT_INF
+#define INT_INF 0x3f3f3f3f
+#endif
+
 struct StageDescriptor 
 {
     std::string stageName;      // 阶段名称
     int minControlPoints;       // 该阶段最少控制点数量
-    int maxControlPoints;       // 该阶段最多控制点数量 (-1表示无限制)
+    int maxControlPoints;       // 该阶段最多控制点数量
     
     StageDescriptor() : minControlPoints(1), maxControlPoints(1) {}
-    StageDescriptor(const std::string& name, int minPoints, int maxPoints)
-        : stageName(name), minControlPoints(minPoints), maxControlPoints(maxPoints) {}
+    StageDescriptor(const std::string& name, int minPoints, int maxPoints = INT_INF)
+        : stageName(name), minControlPoints(minPoints), maxControlPoints(maxPoints) 
+    {
+        // 至少能容纳一个
+        assert(maxControlPoints >= 1);
+    }
 };
 
-/**
- * @brief 控制点管理器
- * 负责管理几何对象的多阶段控制点，支持每个阶段的临时点跟踪
- */
+typedef std::vector<StageDescriptor> StageDescriptors;
+
+
 class GeoControlPointManager : public QObject
 {
     Q_OBJECT
@@ -36,125 +39,84 @@ public:
     explicit GeoControlPointManager(Geo3D* parent);
     ~GeoControlPointManager() = default;
 
-    // 阶段管理
-    void setStageDescriptors(const std::vector<StageDescriptor>& descriptors);
-    const std::vector<StageDescriptor>& getStageDescriptors() const;
+    /**
+    * 提供的关于控制点的操作
+    * 1.添加控制点（自动切换阶段，如果无上限或者有范围可能需要手动切换阶段）
+    * 2.撤销上一控制点（可能要回到上一阶段，空则无操作）
+    * 3.进入下一阶段（自动验证上一阶段是否完成，未完成则析构）
+    * 4.移动临时点（临时点在整个绘制阶段都存在，预览用）
+    * 5.修改控制点（这里的数据是其他地方的参考，需要这里修改然后通知其它地方，对外只有一个下标编号，里面按顺序排列）
+    * 6.获得所有控制点（二维的两种）
+    */
     
-    // 当前阶段控制
-    int getCurrentStage() const;
-    bool nextStage(); // 进入下一阶段，返回是否成功
-    bool canAdvanceToNextStage() const; // 检查是否可以进入下一阶段
-    bool isCurrentStageComplete() const; // 检查当前阶段是否完成
-    bool isAllStagesComplete() const; // 检查是否所有阶段都完成
-    const StageDescriptor* getCurrentStageDescriptor() const;
+    // 1. 添加控制点（自动切换阶段）
+    bool addControlPoint(const Point3D& point);
     
-    // ==================== 控制点访问接口 ====================
+    // 2. 撤销上一控制点（可能回到上一阶段）
+    bool undoLastControlPoint();
     
-    // 获取指定阶段的控制点（包含临时点用于预览）
-    const std::vector<Point3D>& getStageControlPoints(int stage) const;
+    // 3. 进入下一阶段（自动验证上一阶段是否完成）
+    bool nextStage();
     
-    // 获取当前阶段的控制点（包含临时点用于预览）
-    const std::vector<Point3D>& getCurrentStageControlPoints() const;
-    
-    // 获取所有阶段的控制点（二维数组）
-    const std::vector<std::vector<Point3D>>& getAllStageControlPoints() const;
-    
-    // 获取指定阶段、指定索引的控制点
-    Point3D getStageControlPoint(int stage, int index) const;
-    
-    // 获取当前阶段的控制点数量（不包含临时点）
-    int getCurrentStageControlPointCount() const;
-    
-    // 获取指定阶段的控制点数量（不包含临时点）
-    int getStageControlPointCount(int stage) const;
-    
-    // ==================== 控制点操作接口 ====================
-    
-    // 向当前阶段添加控制点
-    bool addControlPointToCurrentStage(const Point3D& point);
-    
-    // 设置指定阶段、指定索引的控制点
-    bool setStageControlPoint(int stage, int index, const Point3D& point);
-    
-    // 移除当前阶段的最后一个控制点
-    bool removeLastControlPointFromCurrentStage();
-    
-    // 清除所有控制点
-    void clearAllControlPoints();
-    
-    // 清除当前阶段的控制点
-    void clearCurrentStageControlPoints();
-    
-    // ==================== 临时点管理接口 ====================
-    
-    // 设置当前阶段的临时点
-    void setCurrentStageTempPoint(const Point3D& point);
-    
-    // 清除当前阶段的临时点
-    void clearCurrentStageTempPoint();
-    
-    // 检查当前阶段是否有临时点
-    bool hasCurrentStageTempPoint() const;
-    
-    // ==================== 兼容性接口（保持原有接口） ====================
-    
-    // 兼容原有的单一控制点数组接口，返回所有阶段的所有控制点
-    const std::vector<Point3D>& getControlPoints() const;
-    Point3D getControlPoint(int index) const;
-    int getControlPointCountWithoutTempPoint() const;
-    bool hasControlPoints() const;
-    
-    // 兼容原有的操作接口，操作当前阶段
-    void addControlPoint(const Point3D& point);
-    void setControlPoint(int index, const Point3D& point);
-    void removeControlPoint(int index);
-    void clearControlPoints();
-    
-    // 兼容原有的临时点接口，操作当前阶段的临时点
+    // 4. 移动临时点（预览用）
     void setTempPoint(const Point3D& point);
-    void clearTempPoint();
     
-    // ==================== 查询和验证接口 ====================
+    // 5. 修改控制点（通过全局索引）
+    bool setControlPoint(int globalIndex, const Point3D& point);
     
-    // 控制点查询
-    int findNearestControlPoint(const Point3D& point, float threshold = 0.1f) const;
-    bool isValidStageIndex(int stage) const;
-    bool isValidControlPointIndex(int stage, int index) const;
-    
-    // 绘制相关通知方法
-    void notifyGeometryChanged();
+    // 6. 获得所有控制点
+    const std::vector<std::vector<Point3D>>& getAllStageControlPoints();
 
 signals:
-    void stageChanged(int newStage); // 阶段切换信号
-    void stageCompleted(int stage);  // 阶段完成信号
-    void allStagesCompleted();       // 所有阶段完成信号
+    void controlPointChanged();
 
 private:
-    // 验证方法
-    void validateStageIndex(int stage) const;
-    void validateControlPointIndex(int stage, int index) const;
-    
-    // 内部状态检查
-    bool isDrawingComplete() const; // 检查绘制是否完成状态
+
+    typedef std::vector<Point3D> ControlPoints;
+    typedef std::vector<ControlPoints> Stages;
+    inline std::size_t stageSize()
+    {
+        return m_stages.size();
+    }
+    inline ControlPoints& currentStage()
+    {
+        return m_stages.back();
+    }
+    inline std::size_t currentStageIdx()
+    {
+        return m_stages.size() - 1;
+    }
+    inline std::size_t currentStagePointIdx()
+    {
+        return currentStage().size() - 1;
+    }
+    inline std::size_t currentStagePointSize()
+    {
+        return currentStage().size();
+    }
+
+    inline const StageDescriptors& getStageDescriptors() const
+    {
+        assert(m_parent);
+        return m_parent->getStageDescriptors();
+    }
+
+    inline const StageDescriptor& getStageDescriptor(int idx) const
+    {
+        assert(m_parent && idx < getStageDescriptors().size());
+        return getStageDescriptors()[idx];
+    }
+
+    inline GeoStateManager* getState() const
+    {
+        assert(m_parent);
+        return m_parent->mm_state();
+    }
 
 private:
     Geo3D* m_parent;
-    
-    // 多阶段控制点存储（二维数组）
-    std::vector<std::vector<Point3D>> m_stageControlPoints;
-    
-    // 每个阶段的临时点
-    std::vector<Point3D> m_stageTempPoints;
-    
-    // 阶段描述符
-    std::vector<StageDescriptor> m_stageDescriptors;
-    
-    // 当前阶段索引
-    int m_currentStage;
-    
-    // 兼容性支持 - 用于返回扁平化的控制点列表
-    mutable std::vector<Point3D> m_flattenedControlPoints;
-    
-    // 用于返回包含临时点的控制点列表（每个阶段）
-    mutable std::vector<std::vector<Point3D>> m_tempStageControlPointsList;
+ 
+    Stages m_stages;
+    Stages m_stagesTemp;
+    Point3D m_tempPoint;
 };

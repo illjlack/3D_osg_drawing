@@ -47,7 +47,6 @@ Geo3D* createGeo3D(DrawMode3D mode);
 class Geo3D : public QObject, public osg::Referenced
 {
     Q_OBJECT
-
 public:
     Geo3D();
     virtual ~Geo3D();
@@ -57,6 +56,12 @@ public:
     void setGeoType(GeoType3D type) { m_geoType = type; }
 
     // 管理器直接访问接口(mm_开头：成员、管理器)
+    /**
+    * 控制点管理器负责绘制流程,修改
+    * 节点管理器负责osg节点管理
+    * 状态管理器负责阶段信号
+    * 渲染管理器负责参数颜色材质的渲染
+    */
     GeoStateManager*        mm_state() const { return m_stateManager.get(); }
     GeoNodeManager*         mm_node() const { return m_nodeManager.get(); }
     GeoRenderManager*       mm_render() const { return m_renderManager.get(); }
@@ -65,36 +70,20 @@ public:
     // 参数设置
     const GeoParameters3D& getParameters() const { return m_parameters; }
     void setParameters(const GeoParameters3D& params);
-
-    // ==================== 多阶段绘制接口 ====================
     
-    // 获取该几何图形的阶段描述符（由派生类实现）
-    virtual std::vector<StageDescriptor> getStageDescriptors() const = 0;
-    
-    // 当前阶段相关方法
-    int getCurrentStage() const;
-    bool nextStage(); // 进入下一阶段
-    bool canAdvanceToNextStage() const;
-    bool isCurrentStageComplete() const;
-    bool isAllStagesComplete() const;
-    const StageDescriptor* getCurrentStageDescriptor() const;
-    
-    // 阶段切换和验证
-    bool validateCurrentStage() const; // 验证当前阶段的控制点是否有效
-    void initializeStages(); // 初始化阶段描述符（在构造函数中调用）
-
-    // 事件处理
-    virtual void mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos);
-    virtual void mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos);
-    virtual void keyPressEvent(QKeyEvent* event);
-    virtual void keyReleaseEvent(QKeyEvent* event);
+    // =============================== 控制点绘制相关 ==============================
+    // 获取该几何图形的阶段描述符
+    // 控制点管理器依据这个控制绘制阶段
+    virtual const StageDescriptors& getStageDescriptors() const
+    {
+        static StageDescriptors stageDescriptors{};
+        return stageDescriptors;
+    }
 
     // 绘制完成检查和控制点验证
     virtual bool isDrawingComplete() const = 0;  // 检查是否绘制完成（检查控制点个数是否符合要求）
     virtual bool areControlPointsValid() const = 0;  // 检查控制点是否合法
     
-    // 绘制完成检查和信号发送
-    void checkAndEmitDrawingComplete();
 
     void updateGeometries();
 

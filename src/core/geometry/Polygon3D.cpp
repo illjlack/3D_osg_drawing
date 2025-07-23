@@ -27,36 +27,10 @@ std::vector<StageDescriptor> Polygon3D_Geo::getStageDescriptors() const
 
 void Polygon3D_Geo::mousePressEvent(QMouseEvent* event, const glm::vec3& worldPos)
 {
-    if (mm_state()->isStateComplete()) {
-        return;
-    }
+
     
-    const StageDescriptor* desc = getCurrentStageDescriptor();
-    if (!desc) {
-        return;
-    }
     
-    // 处理右键完成绘制
-    if (event->button() == Qt::RightButton) {
-        if (isCurrentStageComplete()) {
-            // 右键完成绘制
-            if (areControlPointsValid()) {
-                calculatePolygonParameters();
-                mm_state()->setStateComplete();
-                qDebug() << "多边形: 绘制完成";
-            }
-        }
-        return;
-    }
     
-    // 处理左键添加控制点
-    if (event->button() == Qt::LeftButton) {
-        bool success = mm_controlPoint()->addControlPointToCurrentStage(Point3D(worldPos));
-        
-        if (success) {
-            qDebug() << "多边形: 添加顶点，当前数量:" << mm_controlPoint()->getCurrentStageControlPointCount();
-        }
-    }
 }
 
 void Polygon3D_Geo::mouseMoveEvent(QMouseEvent* event, const glm::vec3& worldPos)

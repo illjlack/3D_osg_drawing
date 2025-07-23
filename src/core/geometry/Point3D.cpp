@@ -16,15 +16,10 @@ Point3D_Geo::Point3D_Geo()
     initialize();
 }
 
-// ==================== 多阶段绘制支持实现 ====================
-
 std::vector<StageDescriptor> Point3D_Geo::getStageDescriptors() const
 {
-    std::vector<StageDescriptor> descriptors;
-    
     // 点只有一个阶段：选择位置（需要1个点）
-    descriptors.emplace_back("选择点位置", 1, 1);
-    
+    static std::vector<StageDescriptor> descriptors = { { "选择点位置", 1, 1 } };
     return descriptors;
 }
 
