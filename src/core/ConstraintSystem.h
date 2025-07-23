@@ -102,4 +102,26 @@ namespace constraint
      */
     Point3D perpendicularToLastTwoPointsConstraint(const Point3D& inputPoint, 
                                                   const std::vector<Point3D>& points);
+
+    /**
+     * @brief 圆形约束函数
+     * 将输入点约束到以第一个点为中心、与第二个点等距的球面上
+     * 使得三点A、B、C满足|AB| = |AC|，从而能确定一个圆且都在圆的边上
+     * @param inputPoint 输入点
+     * @param points 相关控制点（第一个点A作为约束中心，第二个点B用于确定约束距离）
+     * @return 约束后的点C，满足|AC| = |AB|
+     */
+    Point3D circleConstraint(const Point3D& inputPoint, 
+                            const std::vector<Point3D>& points);
+
+    /**
+     * @brief 垂直于圆平面的约束函数
+     * 将输入点约束在垂直于三点构成的圆平面且通过圆心的直线上
+     * 适用于圆锥的锥顶点约束，确保锥顶点在圆形底面的法向量方向上
+     * @param inputPoint 输入点（锥顶点候选）
+     * @param points 相关控制点（前三个点A、B、C确定圆，A是圆心）
+     * @return 约束到垂直直线上的点
+     */
+    Point3D perpendicularToCirclePlaneConstraint(const Point3D& inputPoint, 
+                                                 const std::vector<Point3D>& points);
 } 

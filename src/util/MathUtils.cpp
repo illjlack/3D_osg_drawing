@@ -57,7 +57,16 @@ glm::vec3 MathUtils::calculateNormal(const glm::vec3& a, const glm::vec3& b, con
 {
     glm::vec3 v1 = b - a;
     glm::vec3 v2 = c - a;
-    return normalize(glm::cross(v1, v2));
+    glm::vec3 cross = glm::cross(v1, v2);
+    
+    // 检查三点是否共线
+    float crossLength = glm::length(cross);
+    if (crossLength < EPSILON) {
+        // 三点共线，无法确定平面，返回默认向上法向量
+        return glm::vec3(0.0f, 0.0f, 1.0f);
+    }
+    
+    return cross / crossLength; // 手动标准化，避免normalize函数处理零向量
 }
 
 glm::vec3 MathUtils::calculateCentroid(const std::vector<glm::vec3>& points)
@@ -877,7 +886,17 @@ glm::vec3 MathUtils::calculatePolygonNormal(const std::vector<glm::vec3>& vertic
         normal.z += (v1.x - v2.x) * (v1.y + v2.y);
     }
     
-    return glm::normalize(normal);
+    // 检查法向量是否为零（所有顶点共线或重合）
+    float normalLength = glm::length(normal);
+    if (normalLength < EPSILON) {
+        // 尝试使用前三个点的叉积计算法向量
+        if (vertices.size() >= 3) {
+            return calculateNormal(vertices[0], vertices[1], vertices[2]);
+        }
+        return glm::vec3(0.0f, 0.0f, 1.0f); // 默认向上
+    }
+    
+    return normal / normalLength; // 手动标准化
 }
 
 // 生成线段的顶点

@@ -14,6 +14,7 @@
 #include <osg/PrimitiveSet>
 #include "../../util/LogManager.h"
 #include "../Enums3D.h"
+#include <algorithm>
 
 GeoNodeManager::GeoNodeManager(Geo3D* parent)
     : QObject(parent)
@@ -402,7 +403,19 @@ void GeoNodeManager::updateBoundingBoxGeometry()
 
     // 如果包围盒有效，创建包围盒几何体
     if (boundingBox.valid()) {
-        createBoundingBoxGeometry(boundingBox);
+        // 计算包围盒的尺寸，用于确定扩展量
+        osg::Vec3 size = boundingBox.corner(7) - boundingBox.corner(0); // 对角线向量
+        float maxDimension = std::max({size.x(), size.y(), size.z()});
+        float expandAmount = maxDimension * 0.05f; // 扩展5%
+        
+        // 确保最小扩展量，避免包围盒太小时看不清
+        expandAmount = std::max(expandAmount, 0.1f);
+        
+        // 向外扩展包围盒
+        osg::BoundingBox expandedBox = boundingBox;
+        expandedBox.expandBy(osg::Vec3(expandAmount, expandAmount, expandAmount));
+        
+        createBoundingBoxGeometry(expandedBox);
         
         // 更新包围盒可见性状态
         updateBoundingBoxVisibility();
