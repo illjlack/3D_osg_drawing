@@ -23,6 +23,9 @@ public:
     // 节点访问
     osg::ref_ptr<osg::Group> getOSGNode() const { return m_osgNode; }
     osg::ref_ptr<osg::MatrixTransform> getTransformNode() const { return m_transformNode; }
+    
+    // 节点设置 - 允许加载外部节点
+    void setOSGNode(osg::ref_ptr<osg::Node> node);
 
     // 几何体访问
     osg::ref_ptr<osg::Geometry> getVertexGeometry() const { return m_vertexGeometry; }
@@ -90,6 +93,10 @@ private:
     void initializeNodes();
     void buildKdTreeForGeometry(osg::Geometry* geometry);
     void createBoundingBoxGeometry(const osg::BoundingBox& boundingBox);
+    
+    // 查找并分配节点组件
+    void findAndAssignNodeComponents(osg::Node* node);
+    void identifyGeometryByCharacteristics(osg::Geometry* geometry);
 
     // 空间索引管理
     void updateSpatialIndex();

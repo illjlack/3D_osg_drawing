@@ -114,6 +114,9 @@ public:
         if (!m_currentManipulator) return osg::Matrix::identity();
         return m_currentManipulator->getInverseMatrix(); 
     }
+    
+    // 获取LookAt形式的视图矩阵参数
+    bool getViewMatrixAsLookAt(osg::Vec3& eye, osg::Vec3& center, osg::Vec3& up) const;
 
     // 计算屏幕到世界的转换
     osg::Vec3d screenToWorld(int screenX, int screenY, double depth, int viewportWidth, int viewportHeight) const;

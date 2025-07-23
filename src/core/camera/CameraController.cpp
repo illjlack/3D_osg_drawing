@@ -1172,3 +1172,22 @@ QString CameraController::getManipulatorTypeString(ManipulatorType type) const
     // 获取操控器类型字符串（移除调试日志）
     return result;
 }
+
+bool CameraController::getViewMatrixAsLookAt(osg::Vec3& eye, osg::Vec3& center, osg::Vec3& up) const
+{
+    if (!m_currentManipulator) {
+        return false;
+    }
+    
+    // 从当前操控器获取视图参数
+    osg::Vec3d eyePosition = getEyePosition();
+    osg::Vec3d centerPosition = getCenterPosition();
+    osg::Vec3d upVector = getCameraUpVector();
+    
+    // 转换为Vec3类型
+    eye.set(eyePosition.x(), eyePosition.y(), eyePosition.z());
+    center.set(centerPosition.x(), centerPosition.y(), centerPosition.z());
+    up.set(upVector.x(), upVector.y(), upVector.z());
+    
+    return true;
+}

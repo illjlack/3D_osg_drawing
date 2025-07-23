@@ -319,6 +319,7 @@ enum NodeMask3D : uint32_t
     NODE_MASK_SKYBOX            = 0x00000100,  // 天空盒
     NODE_MASK_COORDINATE_SYSTEM = 0x08000200,  // 坐标系统
 
+
     // 
     
     // 常用组合掩码（通过位组合实现）

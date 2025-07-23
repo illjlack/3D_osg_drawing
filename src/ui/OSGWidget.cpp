@@ -28,6 +28,7 @@
 #include <osg/Math>
 #include <osg/BlendFunc>
 #include <osg/Multisample>
+#include <osg/ComputeBoundsVisitor>
 #include <osgDB/Registry>
 #include <osgQOpenGL/osgQOpenGLWidget>
 #include <QTimer>
@@ -46,6 +47,12 @@
 #include <QDateTime> // Added for cache
 #include <QProcessEnvironment>
 #include <thread>
+#include <QContextMenuEvent>
+#include <QMenu>
+#include <QAction>
+#include <QInputDialog>
+#include <QMessageBox>
+#include "ImportInfoDialog.h"
 
 // ========================================= OSGWidget 实现 =========================================
 OSGWidget::OSGWidget(QWidget* parent)
@@ -81,17 +88,7 @@ OSGWidget::OSGWidget(QWidget* parent)
     
     // 连接信号槽
     connect(m_updateTimer, &QTimer::timeout, this, [this]() {
-        update();
-    });
-    
-    int* a = new int[8];
-    assert(a);
-
-    assert(m_cameraController.get());
-
-    assert(qobject_cast<QObject*>(m_cameraController.get()));
-
-    // CameraController信号连接已移除 - 直接使用CameraController的信号
+        update(); });
     
     // 连接初始化完成信号
     connect(this, &osgQOpenGLWidget::initialized, this, &OSGWidget::initializeScene);
@@ -99,13 +96,400 @@ OSGWidget::OSGWidget(QWidget* parent)
     // 设置比例尺渲染器的相机控制器
     m_scaleBarRenderer->setCameraController(m_cameraController.get());
     
-    // 注意：比例尺渲染器会根据相机状态自动更新，无需信号连接
-    
     // 设置渲染循环
     m_updateTimer->start(16);
     
     LOG_INFO("OSGWidget初始化完成", "系统");
-    // 渲染循环已启动（移除调试日志）
+}
+
+// ========================================= 右键菜单功能实现 =========================================
+
+void OSGWidget::contextMenuEvent(QContextMenuEvent* event)
+{
+    if (!event) return;
+    
+    // ========================================= 自定义条件判断 =========================================
+    
+
+    // if (GlobalDrawMode3D != DrawSelect3D) {
+    //     LOG_INFO("非选择模式，跳过右键菜单", "右键菜单");
+    //     return; // 不显示右键菜单
+    // }   
+
+    if (m_isDrawing) {
+        LOG_INFO("正在绘制中，跳过右键菜单", "右键菜单");
+        return; // 不显示右键菜单
+    }
+    
+
+    
+    m_lastContextMenuPos = event->pos();
+    
+    // 使用拾取系统检测右键点击位置的对象
+    PickResult pickResult = performSimplePicking(event->x(), event->y());
+    
+    QMenu contextMenu(this);
+    
+    if (pickResult.hasResult && pickResult.geometry)
+    {
+        // 点击到了对象
+        m_contextMenuGeo = pickResult.geometry;
+        m_contextMenuPointIndex = pickResult.primitiveIndex;
+        
+        // 对象相关菜单
+        QAction* deleteAction = contextMenu.addAction("删除选中对象");
+        deleteAction->setIcon(QIcon(":/icons/delete.png"));
+        connect(deleteAction, &QAction::triggered, this, &OSGWidget::onDeleteSelectedObjects);
+        
+        contextMenu.addSeparator();
+        
+        if (pickResult.featureType == PickFeatureType::VERTEX && pickResult.primitiveIndex >= 0)
+        {
+            // 点击到了顶点
+            QAction* movePointAction = contextMenu.addAction("移动点到坐标...");
+            movePointAction->setIcon(QIcon(":/icons/move.png"));
+            connect(movePointAction, &QAction::triggered, this, &OSGWidget::onMovePointToCoordinate);
+        }
+        
+        QAction* centerObjectAction = contextMenu.addAction("将对象居中显示");
+        centerObjectAction->setIcon(QIcon(":/icons/center.png"));
+        connect(centerObjectAction, &QAction::triggered, this, &OSGWidget::onCenterObjectToView);
+    }
+    else
+    {
+        // 点击到了空白区域
+        m_contextMenuGeo = nullptr;
+        m_contextMenuPointIndex = -1;
+        
+        // 通用菜单
+        if (!m_selectedGeos.empty())
+        {
+            QAction* deleteSelectedAction = contextMenu.addAction(QString("删除选中对象 (%1个)").arg(m_selectedGeos.size()));
+            deleteSelectedAction->setIcon(QIcon(":/icons/delete.png"));
+            connect(deleteSelectedAction, &QAction::triggered, this, &OSGWidget::onDeleteSelectedObjects);
+            
+            contextMenu.addSeparator();
+        }
+    }
+    
+    // 视图相关菜单
+    QMenu* viewMenu = contextMenu.addMenu("视图");
+    
+    QAction* setCameraAction = viewMenu->addAction("设置眼点坐标...");
+    setCameraAction->setIcon(QIcon(":/icons/camera.png"));
+    connect(setCameraAction, &QAction::triggered, this, &OSGWidget::onSetEyePosition);
+    
+    QAction* resetCameraAction = viewMenu->addAction("重置相机");
+    resetCameraAction->setIcon(QIcon(":/icons/reset_camera.png"));
+    connect(resetCameraAction, &QAction::triggered, this, &OSGWidget::onResetCamera);
+    
+    QAction* fitAllAction = viewMenu->addAction("适应窗口");
+    fitAllAction->setIcon(QIcon(":/icons/fit_all.png"));
+    connect(fitAllAction, &QAction::triggered, this, &OSGWidget::onFitAll);
+    
+    // 坐标系设置菜单
+    contextMenu.addSeparator();
+    QAction* coordSystemAction = contextMenu.addAction("坐标系统设置...");
+    coordSystemAction->setIcon(QIcon(":/icons/coordinates.png"));
+    connect(coordSystemAction, &QAction::triggered, [this]() {
+        // 发射信号给主窗口处理
+        emit coordinateSystemSettingsRequested();
+    });
+    
+    // 显示菜单
+    if (!contextMenu.actions().isEmpty())
+    {
+        contextMenu.exec(event->globalPos());
+    }
+    
+    LOG_INFO("显示右键菜单", "右键菜单");
+}
+
+void OSGWidget::onDeleteSelectedObjects()
+{
+    if (m_selectedGeos.empty() && !m_contextMenuGeo)
+    {
+        LOG_WARNING("没有选中的对象可删除", "右键菜单");
+        return;
+    }
+    
+    int objectCount = 0;
+    
+    if (m_contextMenuGeo)
+    {
+        // 删除右键点击的对象
+        removeGeo(m_contextMenuGeo);
+        objectCount = 1;
+        LOG_INFO("删除右键点击的对象", "右键菜单");
+    }
+    
+    if (!m_selectedGeos.empty())
+    {
+        // 删除所有选中的对象
+        std::vector<Geo3D*> objectsToDelete = m_selectedGeos; // 复制列表避免迭代时修改
+        
+        for (Geo3D* geo : objectsToDelete)
+        {
+            if (geo)
+            {
+                removeGeo(geo);
+                objectCount++;
+            }
+        }
+        
+        clearSelection();
+        LOG_INFO(QString("删除 %1 个选中对象").arg(objectsToDelete.size()), "右键菜单");
+    }
+    
+    // 重置上下文菜单状态
+    m_contextMenuGeo = nullptr;
+    m_contextMenuPointIndex = -1;
+    
+    QMessageBox::information(this, "删除完成", QString("已删除 %1 个对象").arg(objectCount));
+}
+
+void OSGWidget::onSetEyePosition()
+{
+    if (!m_cameraController)
+    {
+        LOG_ERROR("摄像机控制器不可用", "右键菜单");
+        return;
+    }
+    
+    // 获取当前相机位置
+    osg::Vec3 currentEye, currentCenter, currentUp;
+    m_cameraController->getViewMatrixAsLookAt(currentEye, currentCenter, currentUp);
+    
+    bool ok;
+    
+    // 输入新的眼点坐标
+    QString eyeText = QInputDialog::getText(this, "设置眼点坐标", 
+        QString("请输入眼点坐标 (x,y,z):\n当前位置: (%1, %2, %3)")
+            .arg(currentEye.x(), 0, 'f', 3)
+            .arg(currentEye.y(), 0, 'f', 3)
+            .arg(currentEye.z(), 0, 'f', 3),
+        QLineEdit::Normal,
+        QString("%1,%2,%3").arg(currentEye.x(), 0, 'f', 3).arg(currentEye.y(), 0, 'f', 3).arg(currentEye.z(), 0, 'f', 3),
+        &ok);
+    
+    if (!ok || eyeText.isEmpty()) return;
+    
+    // 解析输入的坐标
+    QStringList coords = eyeText.split(',');
+    if (coords.size() != 3)
+    {
+        QMessageBox::warning(this, "输入错误", "请输入有效的坐标格式: x,y,z");
+        return;
+    }
+    
+    bool xOk, yOk, zOk;
+    double x = coords[0].trimmed().toDouble(&xOk);
+    double y = coords[1].trimmed().toDouble(&yOk);
+    double z = coords[2].trimmed().toDouble(&zOk);
+    
+    if (!xOk || !yOk || !zOk)
+    {
+        QMessageBox::warning(this, "输入错误", "请输入有效的数值坐标");
+        return;
+    }
+    
+    // 输入目标点坐标
+    QString targetText = QInputDialog::getText(this, "设置目标点坐标", 
+        QString("请输入目标点坐标 (x,y,z):\n当前目标: (%1, %2, %3)")
+            .arg(currentCenter.x(), 0, 'f', 3)
+            .arg(currentCenter.y(), 0, 'f', 3)
+            .arg(currentCenter.z(), 0, 'f', 3),
+        QLineEdit::Normal,
+        QString("%1,%2,%3").arg(currentCenter.x(), 0, 'f', 3).arg(currentCenter.y(), 0, 'f', 3).arg(currentCenter.z(), 0, 'f', 3),
+        &ok);
+    
+    if (!ok || targetText.isEmpty()) return;
+    
+    // 解析目标点坐标
+    QStringList targetCoords = targetText.split(',');
+    if (targetCoords.size() != 3)
+    {
+        QMessageBox::warning(this, "输入错误", "请输入有效的目标点坐标格式: x,y,z");
+        return;
+    }
+    
+    bool txOk, tyOk, tzOk;
+    double tx = targetCoords[0].trimmed().toDouble(&txOk);
+    double ty = targetCoords[1].trimmed().toDouble(&tyOk);
+    double tz = targetCoords[2].trimmed().toDouble(&tzOk);
+    
+    if (!txOk || !tyOk || !tzOk)
+    {
+        QMessageBox::warning(this, "输入错误", "请输入有效的目标点数值坐标");
+        return;
+    }
+    
+    // 设置相机位置
+    setCameraPosition(glm::vec3(x, y, z), glm::vec3(tx, ty, tz));
+    
+    LOG_INFO(QString("设置眼点坐标: (%1, %2, %3) -> (%4, %5, %6)")
+        .arg(x, 0, 'f', 3).arg(y, 0, 'f', 3).arg(z, 0, 'f', 3)
+        .arg(tx, 0, 'f', 3).arg(ty, 0, 'f', 3).arg(tz, 0, 'f', 3), "右键菜单");
+}
+
+void OSGWidget::onMovePointToCoordinate()
+{
+    if (!m_contextMenuGeo || m_contextMenuPointIndex < 0)
+    {
+        LOG_WARNING("没有选中的有效控制点", "右键菜单");
+        return;
+    }
+    
+    // 获取当前点的坐标
+    auto controlPoints = m_contextMenuGeo->mm_controlPoint()->getControlPoints();
+    if (m_contextMenuPointIndex >= static_cast<int>(controlPoints.size()))
+    {
+        LOG_ERROR("控制点索引超出范围", "右键菜单");
+        return;
+    }
+    
+    Point3D currentPoint = controlPoints[m_contextMenuPointIndex];
+    
+    bool ok;
+    QString coordText = QInputDialog::getText(this, "移动点到坐标", 
+        QString("请输入新的坐标 (x,y,z):\n当前位置: (%1, %2, %3)")
+            .arg(currentPoint.x(), 0, 'f', 3)
+            .arg(currentPoint.y(), 0, 'f', 3)
+            .arg(currentPoint.z(), 0, 'f', 3),
+        QLineEdit::Normal,
+        QString("%1,%2,%3").arg(currentPoint.x(), 0, 'f', 3).arg(currentPoint.y(), 0, 'f', 3).arg(currentPoint.z(), 0, 'f', 3),
+        &ok);
+    
+    if (!ok || coordText.isEmpty()) return;
+    
+    // 解析输入的坐标
+    QStringList coords = coordText.split(',');
+    if (coords.size() != 3)
+    {
+        QMessageBox::warning(this, "输入错误", "请输入有效的坐标格式: x,y,z");
+        return;
+    }
+    
+    bool xOk, yOk, zOk;
+    double x = coords[0].trimmed().toDouble(&xOk);
+    double y = coords[1].trimmed().toDouble(&yOk);
+    double z = coords[2].trimmed().toDouble(&zOk);
+    
+    if (!xOk || !yOk || !zOk)
+    {
+        QMessageBox::warning(this, "输入错误", "请输入有效的数值坐标");
+        return;
+    }
+    
+    // 移动点到新坐标
+    movePointToCoordinate(m_contextMenuGeo, m_contextMenuPointIndex, glm::vec3(x, y, z));
+    
+    LOG_INFO(QString("移动控制点到新坐标: (%1, %2, %3)")
+        .arg(x, 0, 'f', 3).arg(y, 0, 'f', 3).arg(z, 0, 'f', 3), "右键菜单");
+}
+
+void OSGWidget::onCenterObjectToView()
+{
+    if (!m_contextMenuGeo)
+    {
+        LOG_WARNING("没有选中的对象", "右键菜单");
+        return;
+    }
+    
+    // 计算对象的包围盒
+    osg::ComputeBoundsVisitor visitor;
+    m_contextMenuGeo->mm_node()->getOSGNode()->accept(visitor);
+    osg::BoundingBox boundingBox = visitor.getBoundingBox();
+    
+    if (!boundingBox.valid())
+    {
+        LOG_WARNING("对象包围盒无效", "右键菜单");
+        return;
+    }
+    
+    // 设置相机查看整个对象
+    osg::Vec3 center = boundingBox.center();
+    double radius = boundingBox.radius();
+    double distance = radius * 2.5; // 距离为半径的2.5倍
+    
+    osg::Vec3 eye = center + osg::Vec3(distance, distance, distance);
+    setCameraPosition(glm::vec3(eye.x(), eye.y(), eye.z()), glm::vec3(center.x(), center.y(), center.z()));
+    
+    LOG_INFO("将对象居中显示", "右键菜单");
+}
+
+void OSGWidget::onResetCamera()
+{
+    resetCamera();
+    LOG_INFO("重置相机", "右键菜单");
+}
+
+void OSGWidget::onFitAll()
+{
+    fitAll();
+    LOG_INFO("适应窗口", "右键菜单");
+}
+
+// ========================================= 右键菜单相关公共方法实现 =========================================
+
+void OSGWidget::deleteSelectedObjects()
+{
+    onDeleteSelectedObjects();
+}
+
+void OSGWidget::setCameraPosition(const glm::vec3& position, const glm::vec3& target)
+{
+    if (!m_cameraController)
+    {
+        LOG_ERROR("摄像机控制器不可用", "相机");
+        return;
+    }
+    
+    osg::Vec3d eye(position.x, position.y, position.z);
+    osg::Vec3d center(target.x, target.y, target.z);
+    osg::Vec3d up(0, 0, 1); // 默认向上方向
+    
+    m_cameraController->setPosition(eye, center, up);
+    
+    LOG_INFO(QString("设置相机位置: 眼点(%1,%2,%3) 目标(%4,%5,%6)")
+        .arg(position.x, 0, 'f', 3).arg(position.y, 0, 'f', 3).arg(position.z, 0, 'f', 3)
+        .arg(target.x, 0, 'f', 3).arg(target.y, 0, 'f', 3).arg(target.z, 0, 'f', 3), "相机");
+}
+
+void OSGWidget::movePointToCoordinate(Geo3D* geo, int pointIndex, const glm::vec3& newPosition)
+{
+    if (!geo || pointIndex < 0)
+    {
+        LOG_ERROR("无效的几何体或点索引", "点移动");
+        return;
+    }
+    
+    // 获取控制点管理器
+    auto controlPointManager = geo->mm_controlPoint();
+    if (!controlPointManager)
+    {
+        LOG_ERROR("几何体没有控制点管理器", "点移动");
+        return;
+    }
+    
+    // 更新控制点位置
+    Point3D newPoint(newPosition.x, newPosition.y, newPosition.z);
+    controlPointManager->setControlPoint(pointIndex, newPoint);
+    if (true) // setControlPoint没有返回值，假设总是成功
+    {
+        // 重新构建几何体
+        geo->updateGeometries();
+        
+        LOG_SUCCESS(QString("成功移动控制点 %1 到位置 (%2,%3,%4)")
+            .arg(pointIndex)
+            .arg(newPosition.x, 0, 'f', 3)
+            .arg(newPosition.y, 0, 'f', 3)
+            .arg(newPosition.z, 0, 'f', 3), "点移动");
+    }
+    else
+    {
+        LOG_ERROR("移动控制点失败", "点移动");
+    }
 }
 
 OSGWidget::~OSGWidget()
@@ -137,37 +521,61 @@ void OSGWidget::initializeScene()
     m_rootNode->addChild(m_skyboxNode);
     m_sceneNode->addChild(m_geoNode);
     
-    // 确保拾取指示器节点不被拾取系统检测到
-    m_pickingIndicatorNode->setNodeMask(NODE_MASK_PICKING_INDICATOR); // 使用最高位，避免被拾取
+    // 设置各个节点的掩码
+    m_pickingIndicatorNode->setNodeMask(NODE_MASK_PICKING_INDICATOR); // 拾取指示器，避免被拾取
+    m_skyboxNode->setNodeMask(NODE_MASK_SKYBOX);                     // 天空盒节点掩码
     
-    // 为根节点设置抗锯齿
+    // ========================================= 改进的抗锯齿设置 =========================================
     osg::StateSet* rootStateSet = m_rootNode->getOrCreateStateSet();
+    
+    // 1. 基础抗锯齿设置
     rootStateSet->setMode(GL_LINE_SMOOTH, osg::StateAttribute::ON);
     rootStateSet->setMode(GL_POINT_SMOOTH, osg::StateAttribute::ON);
+    rootStateSet->setMode(GL_POLYGON_SMOOTH, osg::StateAttribute::ON);
     rootStateSet->setMode(GL_MULTISAMPLE, osg::StateAttribute::ON);
     
-    // 设置混合函数以支持线抗锯齿
+    // 2. 高质量混合函数设置
     osg::ref_ptr<osg::BlendFunc> rootBlendFunc = new osg::BlendFunc();
-    rootBlendFunc->setSource(GL_SRC_ALPHA);
-    rootBlendFunc->setDestination(GL_ONE_MINUS_SRC_ALPHA);
-    rootStateSet->setAttributeAndModes(rootBlendFunc.get(), osg::StateAttribute::ON);
+    rootBlendFunc->setSource(osg::BlendFunc::SRC_ALPHA);
+    rootBlendFunc->setDestination(osg::BlendFunc::ONE_MINUS_SRC_ALPHA);
+    rootStateSet->setAttributeAndModes(rootBlendFunc.get(), osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
     
-    // 设置多重采样抗锯齿（如果硬件支持）
+    // 3. 改进的多重采样抗锯齿设置
     osg::ref_ptr<osg::Multisample> rootMultisample = new osg::Multisample();
-    rootMultisample->setCoverage(0.5f);
-    rootStateSet->setAttributeAndModes(rootMultisample.get(), osg::StateAttribute::ON);
+    rootMultisample->setHint(osg::Multisample::NICEST);  // 使用最高质量
+    rootMultisample->setCoverage(1.0f);  // 提高覆盖率到1.0
+    rootMultisample->setInvert(false);
+    rootStateSet->setAttributeAndModes(rootMultisample.get(), osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
     
-    // 设置线宽和点大小
+    // 4. 优化线宽和点大小以获得更好的抗锯齿效果
     osg::ref_ptr<osg::LineWidth> rootLineWidth = new osg::LineWidth();
-    rootLineWidth->setWidth(1.0f);  // 设置更细的线宽以更好地展示抗锯齿
+    rootLineWidth->setWidth(1.5f);  // 稍微增加线宽以改善抗锯齿效果
     rootStateSet->setAttributeAndModes(rootLineWidth.get(), osg::StateAttribute::ON);
     
     osg::ref_ptr<osg::Point> rootPointSize = new osg::Point();
-    rootPointSize->setSize(3.0f);  // 设置更小的点大小
+    rootPointSize->setSize(4.0f);  // 稍微增加点大小
+    rootPointSize->setMinSize(2.0f);  // 设置最小点大小
+    rootPointSize->setMaxSize(8.0f);  // 设置最大点大小
+    rootPointSize->setDistanceAttenuation(osg::Vec3(1.0f, 0.0f, 0.0f));  // 距离衰减
     rootStateSet->setAttributeAndModes(rootPointSize.get(), osg::StateAttribute::ON);
     
-    // 启用混合以支持抗锯齿
+    // 5. 启用混合和深度测试
     rootStateSet->setMode(GL_BLEND, osg::StateAttribute::ON);
+    rootStateSet->setMode(GL_DEPTH_TEST, osg::StateAttribute::ON);
+    
+    // 6. 设置更高质量的渲染提示
+    rootStateSet->setMode(GL_NORMALIZE, osg::StateAttribute::ON);
+    
+    // 7. 针对几何体节点的特殊抗锯齿设置
+    osg::StateSet* geoStateSet = m_geoNode->getOrCreateStateSet();
+    geoStateSet->setMode(GL_LINE_SMOOTH, osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
+    geoStateSet->setMode(GL_POINT_SMOOTH, osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
+    geoStateSet->setMode(GL_POLYGON_SMOOTH, osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
+    
+    // 为几何体设置更精细的线宽
+    osg::ref_ptr<osg::LineWidth> geoLineWidth = new osg::LineWidth();
+    geoLineWidth->setWidth(2.0f);  // 几何体使用稍粗的线条
+    geoStateSet->setAttributeAndModes(geoLineWidth.get(), osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
     
     viewer->setSceneData(m_rootNode);
     
@@ -237,6 +645,8 @@ void OSGWidget::setupEventHandlers()
 
 void OSGWidget::setupPickingSystem()
 {
+    LOG_INFO("开始设置拾取系统", "拾取");
+    
     // 创建拾取指示器
     m_pickingIndicator = new PickingIndicator;
     if (!m_pickingIndicator->initialize()) {
@@ -248,20 +658,69 @@ void OSGWidget::setupPickingSystem()
     osg::Group* indicatorRoot = m_pickingIndicator->getIndicatorRoot();
     if (indicatorRoot) {
         m_pickingIndicatorNode->addChild(indicatorRoot);
+        LOG_INFO("拾取指示器已添加到场景", "拾取");
     }
     
     // 创建几何拾取系统
     m_geometryPickingSystem = new GeometryPickingSystem();
     
+    // 配置拾取系统，使其与拾取指示器使用相同的像素半径
+    PickConfig pickConfig;
+    pickConfig.cylinderRadius = m_pickingIndicator->getConfig().pickingPixelRadius;  // 保持一致
+    m_geometryPickingSystem->setConfig(pickConfig);
+    
     // 获取相机和场景根节点来初始化拾取系统
     osgViewer::Viewer* viewer = getOsgViewer();
-    if (viewer && viewer->getCamera()) {
-        if (!m_geometryPickingSystem->initialize(viewer->getCamera(), m_sceneNode.get())) {
-            LOG_ERROR("几何拾取系统初始化失败", "拾取");
-            m_geometryPickingSystem = nullptr;
-        } else {
-            LOG_SUCCESS("几何拾取系统初始化完成", "拾取");
-        }
+    if (!viewer) {
+        LOG_WARNING("OSG查看器为空，延迟初始化几何拾取系统", "拾取");
+        // 使用定时器延迟重试
+        QTimer::singleShot(100, this, [this]() {
+            if (getOsgViewer() && getOsgViewer()->getCamera()) {
+                if (m_geometryPickingSystem && !m_geometryPickingSystem->isInitialized()) {
+                    // 再次配置拾取系统
+                    PickConfig pickConfig;
+                    pickConfig.cylinderRadius = m_pickingIndicator->getConfig().pickingPixelRadius;
+                    m_geometryPickingSystem->setConfig(pickConfig);
+                    
+                    if (m_geometryPickingSystem->initialize(getOsgViewer()->getCamera(), m_sceneNode.get())) {
+                        LOG_SUCCESS("几何拾取系统延迟初始化完成", "拾取");
+                    } else {
+                        LOG_ERROR("几何拾取系统延迟初始化失败", "拾取");
+                    }
+                }
+            }
+        });
+        return;
+    }
+    
+    if (!viewer->getCamera()) {
+        LOG_WARNING("OSG相机为空，延迟初始化几何拾取系统", "拾取");
+        // 使用定时器延迟重试
+        QTimer::singleShot(100, this, [this]() {
+            if (getOsgViewer() && getOsgViewer()->getCamera()) {
+                if (m_geometryPickingSystem && !m_geometryPickingSystem->isInitialized()) {
+                    // 再次配置拾取系统
+                    PickConfig pickConfig;
+                    pickConfig.cylinderRadius = m_pickingIndicator->getConfig().pickingPixelRadius;
+                    m_geometryPickingSystem->setConfig(pickConfig);
+                    
+                    if (m_geometryPickingSystem->initialize(getOsgViewer()->getCamera(), m_sceneNode.get())) {
+                        LOG_SUCCESS("几何拾取系统延迟初始化完成", "拾取");
+                    } else {
+                        LOG_ERROR("几何拾取系统延迟初始化失败", "拾取");
+                    }
+                }
+            }
+        });
+        return;
+    }
+    
+    LOG_INFO("OSG查看器和相机已准备就绪，初始化几何拾取系统", "拾取");
+    if (!m_geometryPickingSystem->initialize(viewer->getCamera(), m_sceneNode.get())) {
+        LOG_ERROR("几何拾取系统初始化失败", "拾取");
+        m_geometryPickingSystem = nullptr;
+    } else {
+        LOG_SUCCESS("几何拾取系统初始化完成", "拾取");
     }
     
     LOG_SUCCESS("拾取指示器设置完成", "拾取");
@@ -1183,6 +1642,7 @@ void OSGWidget::setupCoordinateSystem()
         osg::ref_ptr<osg::Node> coordSystemNode = m_coordinateSystemRenderer->getCoordinateSystemNode();
         if (coordSystemNode)
         {
+            coordSystemNode->setNodeMask(NODE_MASK_COORDINATE_SYSTEM); // 设置坐标系统节点掩码
             m_sceneNode->addChild(coordSystemNode);
         }
     }
@@ -1358,4 +1818,63 @@ PickResult OSGWidget::performSimplePicking(int mouseX, int mouseY)
     }
     
     return result;
+}
+
+// ========================================= 右键菜单槽函数实现 =========================================
+
+void OSGWidget::onSetCameraPosition()
+{
+    if (!m_cameraController) {
+        LOG_ERROR("相机控制器未初始化", "右键菜单");
+        return;
+    }
+    
+    // 获取当前相机位置
+    osg::Vec3 currentEye, currentCenter, currentUp;
+    m_cameraController->getViewMatrixAsLookAt(currentEye, currentCenter, currentUp);
+    
+    bool ok;
+    QString posText = QInputDialog::getText(this, "设置相机位置", 
+        QString("请输入相机位置 (x,y,z):\n当前位置: (%1, %2, %3)")
+            .arg(currentEye.x(), 0, 'f', 3)
+            .arg(currentEye.y(), 0, 'f', 3)
+            .arg(currentEye.z(), 0, 'f', 3),
+        QLineEdit::Normal, 
+        QString("%1,%2,%3")
+            .arg(currentEye.x(), 0, 'f', 3)
+            .arg(currentEye.y(), 0, 'f', 3)
+            .arg(currentEye.z(), 0, 'f', 3), 
+        &ok);
+    
+    if (!ok || posText.isEmpty()) {
+        return;
+    }
+    
+    // 解析坐标
+    QStringList coords = posText.split(',');
+    if (coords.size() != 3) {
+        LOG_ERROR("坐标格式错误，请使用 x,y,z 格式", "右键菜单");
+        return;
+    }
+    
+    bool parseOk = true;
+    osg::Vec3d newEye(
+        coords[0].trimmed().toDouble(&parseOk),
+        coords[1].trimmed().toDouble(&parseOk),
+        coords[2].trimmed().toDouble(&parseOk)
+    );
+    
+    if (!parseOk) {
+        LOG_ERROR("坐标解析失败，请输入有效的数字", "右键菜单");
+        return;
+    }
+    
+    // 设置新的相机位置
+    m_cameraController->setPosition(newEye, osg::Vec3d(currentCenter.x(), currentCenter.y(), currentCenter.z()), 
+                                   osg::Vec3d(currentUp.x(), currentUp.y(), currentUp.z()));
+    
+    LOG_SUCCESS(QString("相机位置已设置为 (%1, %2, %3)")
+        .arg(newEye.x(), 0, 'f', 3)
+        .arg(newEye.y(), 0, 'f', 3)
+        .arg(newEye.z(), 0, 'f', 3), "右键菜单");
 }

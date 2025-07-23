@@ -20,6 +20,7 @@
 #include "PropertyEditor3D.h"
 #include "ToolPanel3D.h"
 #include "PropertyEditor3D.h"
+#include "ImportInfoDialog.h"
 
 // ========================================= MainWindow 实现 =========================================
 MainWindow::MainWindow(QWidget* parent)
@@ -497,6 +498,7 @@ void MainWindow::connectSignals()
             }
         });
         connect(m_osgWidget, &OSGWidget::simplePickingResult, this, &MainWindow::onSimplePickingResult);
+        connect(m_osgWidget, &OSGWidget::coordinateSystemSettingsRequested, this, &MainWindow::onCoordinateSystemSettings);
         // 连接相机操控器类型变化 - 直接连接CameraController
         connect(m_osgWidget->getCameraController(), &CameraController::manipulatorTypeChanged, this, [this](ManipulatorType type) {
             if (m_manipulatorCombo) {
@@ -671,14 +673,55 @@ void MainWindow::onFileOpen()
                 if (loadedGeo)
                 {
                     LOG_INFO(QString("加载单个几何对象: 类型=%1").arg(loadedGeo->getGeoType()), "文件");
-                    m_osgWidget->addGeo(loadedGeo);
                     
-                    m_currentFilePath = fileName;
-                    m_modified = false;
-                    setWindowTitle(tr("3D Drawing Board - %1").arg(QFileInfo(fileName).baseName()));
-                    updateStatusBar(tr("打开文档: %1").arg(fileName));
-                    LOG_SUCCESS(tr("打开文档: %1").arg(fileName), "文件");
-                    updateObjectCount();
+                    // 显示导入信息对话框
+                    ImportInfoDialog importDialog(loadedGeo, this);
+                    if (importDialog.exec() == QDialog::Accepted)
+                    {
+                        // 应用用户设置的变换矩阵
+                        if (importDialog.shouldApplyOffset())
+                        {
+                            osg::Matrix offsetMatrix = importDialog.getOffsetMatrix();
+                            
+                            // 创建变换节点并应用矩阵
+                            osg::ref_ptr<osg::MatrixTransform> transform = new osg::MatrixTransform();
+                            transform->setMatrix(offsetMatrix);
+                            
+                            // 将原始几何体节点作为子节点添加到变换节点
+                            osg::Node* originalNode = loadedGeo->mm_node()->getOSGNode();
+                            if (originalNode)
+                            {
+                                // 移除原始节点的父节点关系
+                                if (originalNode->getNumParents() > 0)
+                                {
+                                    originalNode->getParent(0)->removeChild(originalNode);
+                                }
+                                
+                                // 将原始节点添加到变换节点
+                                transform->addChild(originalNode);
+                                
+                                // 将变换节点设置为几何体的根节点
+                                loadedGeo->mm_node()->setOSGNode(transform.get());
+                            }
+                            
+                            LOG_INFO("已应用导入变换矩阵", "文件");
+                        }
+                        
+                        m_osgWidget->addGeo(loadedGeo);
+                        
+                        m_currentFilePath = fileName;
+                        m_modified = false;
+                        setWindowTitle(tr("3D Drawing Board - %1").arg(QFileInfo(fileName).baseName()));
+                        updateStatusBar(tr("打开文档: %1").arg(fileName));
+                        LOG_SUCCESS(tr("打开文档: %1").arg(fileName), "文件");
+                        updateObjectCount();
+                    }
+                    else
+                    {
+                        // 用户取消导入，清理对象
+                        delete loadedGeo;
+                        LOG_INFO("用户取消导入", "文件");
+                    }
                 }
                 else
                 {

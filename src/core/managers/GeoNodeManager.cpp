@@ -491,3 +491,196 @@ void GeoNodeManager::onDrawingCompleted()
         m_osgNode->setNodeMask(NODE_MASK_ALL);
     }
 }
+
+void GeoNodeManager::setOSGNode(osg::ref_ptr<osg::Node> node)
+{
+    if (!node.valid()) {
+        LogManager::getInstance()->info("尝试设置空的OSG节点", "几何体管理");
+        return;
+    }
+    
+    // 设置节点的用户数据，指向父几何体对象
+    node->setUserData(m_parent);
+    
+    // 设置节点掩码为面拾取，使其可见且可拾取
+    node->setNodeMask(NODE_MASK_ALL);
+    
+    // 尝试在传入的节点下查找各种组件
+    findAndAssignNodeComponents(node.get());
+    
+    // 如果传入的是Group节点，将其设置为根节点
+    osg::Group* groupNode = dynamic_cast<osg::Group*>(node.get());
+    if (groupNode) {
+        // 替换现有的根节点
+        m_osgNode = groupNode;
+        LogManager::getInstance()->info("将传入的Group节点设置为根节点", "几何体管理");
+    } else {
+        // 如果不是Group，将其添加到现有结构中
+        if (m_transformNode.valid()) {
+            m_transformNode->addChild(node.get());
+        } else if (m_osgNode.valid()) {
+            m_osgNode->addChild(node.get());
+        }
+        LogManager::getInstance()->info("将传入节点添加到现有结构中", "几何体管理");
+    }
+    
+    LogManager::getInstance()->success(QString("成功设置外部节点到几何体，节点名称: %1")
+                                     .arg(QString::fromStdString(node->getName())), "几何体管理");
+    
+    // 更新几何体和空间索引
+    updateGeometries();
+    
+    // 通知几何体已更改
+    emit geometryChanged();
+}
+
+void GeoNodeManager::findAndAssignNodeComponents(osg::Node* node)
+{
+    if (!node) return;
+    
+    // 检查节点类型和名称，尝试识别组件
+    std::string nodeName = node->getName();
+    
+    // 检查是否为变换节点
+    osg::MatrixTransform* transform = dynamic_cast<osg::MatrixTransform*>(node);
+    if (transform) {
+        m_transformNode = transform;
+        LogManager::getInstance()->info(QString("找到变换节点: %1").arg(QString::fromStdString(nodeName)), "几何体管理");
+    }
+    
+    // 检查是否为几何体节点
+    osg::Geometry* geometry = dynamic_cast<osg::Geometry*>(node);
+    if (geometry) {
+        // 根据节点名称识别几何体类型
+        if (nodeName.find("vertex") != std::string::npos || 
+            nodeName.find("point") != std::string::npos ||
+            nodeName.find("Point") != std::string::npos) {
+            m_vertexGeometry = geometry;
+            LogManager::getInstance()->info("找到顶点几何体", "几何体管理");
+        }
+        else if (nodeName.find("edge") != std::string::npos || 
+                 nodeName.find("line") != std::string::npos ||
+                 nodeName.find("Line") != std::string::npos) {
+            m_edgeGeometry = geometry;
+            LogManager::getInstance()->info("找到边几何体", "几何体管理");
+        }
+        else if (nodeName.find("face") != std::string::npos || 
+                 nodeName.find("surface") != std::string::npos ||
+                 nodeName.find("Face") != std::string::npos) {
+            m_faceGeometry = geometry;
+            LogManager::getInstance()->info("找到面几何体", "几何体管理");
+        }
+        else if (nodeName.find("control") != std::string::npos ||
+                 nodeName.find("Control") != std::string::npos) {
+            m_controlPointsGeometry = geometry;
+            LogManager::getInstance()->info("找到控制点几何体", "几何体管理");
+        }
+        else if (nodeName.find("bound") != std::string::npos ||
+                 nodeName.find("box") != std::string::npos ||
+                 nodeName.find("Box") != std::string::npos) {
+            m_boundingBoxGeometry = geometry;
+            LogManager::getInstance()->info("找到包围盒几何体", "几何体管理");
+        }
+        else {
+            // 如果没有明确的名称标识，根据几何体特征推断
+            identifyGeometryByCharacteristics(geometry);
+        }
+        
+        // 设置几何体的用户数据
+        geometry->setUserData(m_parent);
+    }
+    
+    // 递归遍历子节点
+    osg::Group* group = dynamic_cast<osg::Group*>(node);
+    if (group) {
+        for (unsigned int i = 0; i < group->getNumChildren(); ++i) {
+            findAndAssignNodeComponents(group->getChild(i));
+        }
+    }
+}
+
+void GeoNodeManager::identifyGeometryByCharacteristics(osg::Geometry* geometry)
+{
+    if (!geometry) return;
+    
+    // 检查图元类型来推断几何体类型
+    bool hasPoints = false;
+    bool hasLines = false;
+    bool hasTriangles = false;
+    
+    for (unsigned int i = 0; i < geometry->getNumPrimitiveSets(); ++i) {
+        osg::PrimitiveSet* primitiveSet = geometry->getPrimitiveSet(i);
+        if (primitiveSet) {
+            GLenum mode = primitiveSet->getMode();
+            switch (mode) {
+                case GL_POINTS:
+                    hasPoints = true;
+                    break;
+                case GL_LINES:
+                case GL_LINE_STRIP:
+                case GL_LINE_LOOP:
+                    hasLines = true;
+                    break;
+                case GL_TRIANGLES:
+                case GL_TRIANGLE_STRIP:
+                case GL_TRIANGLE_FAN:
+                case GL_QUADS:
+                case GL_QUAD_STRIP:
+                case GL_POLYGON:
+                    hasTriangles = true;
+                    break;
+            }
+        }
+    }
+    
+    // 根据图元类型和顶点数量推断几何体类型
+    osg::Vec3Array* vertices = dynamic_cast<osg::Vec3Array*>(geometry->getVertexArray());
+    unsigned int vertexCount = vertices ? vertices->size() : 0;
+    
+    if (hasPoints && !hasLines && !hasTriangles) {
+        // 纯点几何体
+        if (vertexCount > 0 && vertexCount <= 100) {
+            // 少量点，可能是控制点
+            if (!m_controlPointsGeometry.valid()) {
+                m_controlPointsGeometry = geometry;
+                LogManager::getInstance()->info("根据特征识别为控制点几何体", "几何体管理");
+                return;
+            }
+        }
+        // 大量点，可能是顶点
+        if (!m_vertexGeometry.valid()) {
+            m_vertexGeometry = geometry;
+            LogManager::getInstance()->info("根据特征识别为顶点几何体", "几何体管理");
+        }
+    }
+    else if (hasLines && !hasTriangles) {
+        // 线几何体
+        if (vertexCount == 24 && geometry->getNumPrimitiveSets() == 1) {
+            // 可能是包围盒（12条边，24个顶点）
+            if (!m_boundingBoxGeometry.valid()) {
+                m_boundingBoxGeometry = geometry;
+                LogManager::getInstance()->info("根据特征识别为包围盒几何体", "几何体管理");
+                return;
+            }
+        }
+        // 普通边几何体
+        if (!m_edgeGeometry.valid()) {
+            m_edgeGeometry = geometry;
+            LogManager::getInstance()->info("根据特征识别为边几何体", "几何体管理");
+        }
+    }
+    else if (hasTriangles) {
+        // 面几何体
+        if (!m_faceGeometry.valid()) {
+            m_faceGeometry = geometry;
+            LogManager::getInstance()->info("根据特征识别为面几何体", "几何体管理");
+        }
+    }
+    else {
+        // 无法识别的几何体，默认作为面几何体处理
+        if (!m_faceGeometry.valid()) {
+            m_faceGeometry = geometry;
+            LogManager::getInstance()->info("无法识别几何体类型，默认作为面几何体处理", "几何体管理");
+        }
+    }
+}

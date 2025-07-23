@@ -599,40 +599,58 @@ void Skybox::setSizeFromRange(double minX, double maxX, double minY, double maxY
     // 取最大值作为天空盒大小，并添加适当的边距
     double maxRange = std::max({rangeX, rangeY, rangeZ});
     
-    // 对于坐标系统边界，使用更合理的边距比例
-    // 如果范围很小（<1000），使用较大的边距比例
-    // 如果范围很大（>10000），使用较小的边距比例
-    double marginRatio;
-    if (maxRange < 1000.0)
+    // 改进的天空盒大小计算：确保天空盒足够大以包含整个场景
+    double minSkyboxSize = 2000.0; // 最小天空盒大小
+    double skyboxSize;
+    
+    if (maxRange < 100.0)
     {
-        marginRatio = 0.5; // 50%边距，适合小范围
+        // 极小范围：使用固定的最小大小
+        skyboxSize = minSkyboxSize;
     }
-    else if (maxRange < 10000.0)
+    else if (maxRange < 1000.0)
     {
-        marginRatio = 0.3; // 30%边距，适合中等范围
+        // 小范围：使用较大的倍数确保足够空间
+        skyboxSize = maxRange * 5.0;
+    }
+    else if (maxRange < 5000.0)
+    {
+        // 中小范围：使用合适的倍数
+        skyboxSize = maxRange * 3.0;
+    }
+    else if (maxRange < 20000.0)
+    {
+        // 中等范围：使用适中的倍数
+        skyboxSize = maxRange * 2.5;
     }
     else if (maxRange < 100000.0)
     {
-        marginRatio = 0.2; // 20%边距，适合大范围
+        // 大范围：使用较小的倍数
+        skyboxSize = maxRange * 2.0;
     }
     else
     {
-        marginRatio = 0.1; // 10%边距，适合超大范围
+        // 超大范围：使用最小的倍数
+        skyboxSize = maxRange * 1.5;
     }
-    
-    float skyboxSize = static_cast<float>(maxRange * (1.0 + marginRatio));
     
     // 确保天空盒大小在合理范围内
-    skyboxSize = std::max(skyboxSize, 100.0f);  // 最小100单位
-    skyboxSize = std::min(skyboxSize, 1e6f);    // 最大1e6单位，避免过大
+    skyboxSize = std::max(skyboxSize, minSkyboxSize);  // 保证最小大小
+    skyboxSize = std::min(skyboxSize, 1e7);           // 最大1e7单位，避免过大
     
-    // 对于坐标系统边界，确保天空盒不会过大
-    if (skyboxSize > maxRange * 3.0)
+    // 确保天空盒是立方体（使用对角线长度）
+    double diagonalLength = std::sqrt(rangeX*rangeX + rangeY*rangeY + rangeZ*rangeZ);
+    if (diagonalLength > 0)
     {
-        skyboxSize = static_cast<float>(maxRange * 3.0);
+        skyboxSize = std::max(skyboxSize, diagonalLength * 2.0);
     }
     
-    setSize(skyboxSize);
+    setSize(static_cast<float>(skyboxSize));
+    
+    // 输出调试信息
+    qDebug() << "天空盒大小计算: 坐标范围最大值=" << maxRange 
+             << "对角线长度=" << diagonalLength 
+             << "最终天空盒大小=" << skyboxSize;
 }
 
 void Skybox::setCenter(const osg::Vec3& center)

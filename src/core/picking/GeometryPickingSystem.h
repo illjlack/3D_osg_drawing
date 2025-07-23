@@ -81,9 +81,6 @@ private:
     // 几何体匹配 - 通过遍历节点路径查找
     Geo3D* findGeometryFromNodePath(const osg::NodePath& nodePath);
     
-    // 结果优先级选择 - 按顶点>边>面的优先级
-    PickResult selectBestResult(const std::vector<PickResult>& results);
-    
     // NodeMask 获取
     unsigned int getPickingMask() const;
     

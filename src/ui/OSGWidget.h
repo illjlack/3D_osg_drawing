@@ -120,12 +120,18 @@ public:
     
     // 比例尺渲染器接口
     ScaleBarRenderer* getScaleBarRenderer() const { return m_scaleBarRenderer.get(); }
+    
+    // 右键菜单功能
+    void deleteSelectedObjects();
+    void setCameraPosition(const glm::vec3& position, const glm::vec3& target = glm::vec3(0,0,0));
+    void movePointToCoordinate(Geo3D* geo, int pointIndex, const glm::vec3& newPosition);
 
 signals:
     void geoSelected(Geo3D* geo);
     void mousePositionChanged(const glm::vec3& worldPos);
     void screenPositionChanged(int x, int y);
     void simplePickingResult(const PickResult& result);
+    void coordinateSystemSettingsRequested();
 
 protected:
     virtual void paintEvent(QPaintEvent* event) override;
@@ -137,6 +143,17 @@ protected:
     virtual void keyPressEvent(QKeyEvent* event) override;
     virtual void keyReleaseEvent(QKeyEvent* event) override;
     virtual void mouseDoubleClickEvent(QMouseEvent* event) override;
+    virtual void contextMenuEvent(QContextMenuEvent* event) override;
+
+private slots:
+    // 右键菜单槽函数
+    void onDeleteSelectedObjects();
+    void onSetCameraPosition();
+    void onMovePointToCoordinate();
+    void onSetEyePosition();
+    void onResetCamera();
+    void onFitAll();
+    void onCenterObjectToView();
 
 private:
     void setupCamera();
@@ -206,7 +223,12 @@ private:
     glm::vec3 m_cachedMouseWorldPos;
     bool m_mousePosCacheValid;
     QDateTime m_lastMouseCalculation;
-    static const int MOUSE_CACHE_DURATION = 16; // 16ms缓存时间（约60FPS）
+    static const int MOUSE_CACHE_DURATION = 16;
+    
+    // 右键菜单相关
+    QPoint m_lastContextMenuPos;
+    Geo3D* m_contextMenuGeo;
+    int m_contextMenuPointIndex; // 16ms缓存时间（约60FPS）
     
     QTimer* m_updateTimer;
 

@@ -17,12 +17,12 @@ CoordinateSystem3D::CoordinateSystem3D(QObject* parent)
     , m_scaleUnit(Unit_Meter3D)
     , m_customUnitName("单位")
     , m_scaleInterval(1000.0)
-    , m_axisLength(5000.0) // 调整默认轴长度
-    , m_axisThickness(2.0)
-    , m_gridSpacing(1000.0)
-    , m_gridThickness(1.0)
+    , m_axisLength(10000.0) // 增加默认轴长度
+    , m_axisThickness(3.0)  // 增加轴线粗细
+    , m_gridSpacing(500.0)  // 减小网格间距，更密集的网格
+    , m_gridThickness(1.5)  // 增加网格线粗细
     , m_fontSize(FontSize_Medium3D)
-    , m_customFontSize(100.0)
+    , m_customFontSize(120.0) // 增加默认字体大小
 {
     // 默认设置为城市范围，更合理的初始范围
     setPresetRange(Range_City);
@@ -177,26 +177,32 @@ void CoordinateSystem3D::updateSkyboxRange()
     // 对于坐标系统边界，使用更合理的边距计算
     double maxRange = m_currentRange.maxRange();
     
-    // 根据范围大小调整边距比例
+    // 改进的边距计算：使用更大的边距确保天空盒足够大
     double marginRatio;
+    double minMargin = 1000.0; // 最小边距1000单位
+    
     if (maxRange < 1000.0)
     {
-        marginRatio = 0.3; // 30%边距，适合小范围
+        marginRatio = 2.0; // 200%边距，对小范围给予更大空间
+    }
+    else if (maxRange < 5000.0)
+    {
+        marginRatio = 1.0; // 100%边距，适合小到中等范围
     }
     else if (maxRange < 10000.0)
     {
-        marginRatio = 0.2; // 20%边距，适合中等范围
+        marginRatio = 0.5; // 50%边距，适合中等范围
     }
-    else if (maxRange < 100000.0)
+    else if (maxRange < 50000.0)
     {
-        marginRatio = 0.15; // 15%边距，适合大范围
+        marginRatio = 0.3; // 30%边距，适合大范围
     }
     else
     {
-        marginRatio = 0.1; // 10%边距，适合超大范围
+        marginRatio = 0.2; // 20%边距，适合超大范围
     }
     
-    double margin = maxRange * marginRatio;
+    double margin = std::max(maxRange * marginRatio, minMargin);
     
     CoordinateRange skyboxRange(
         m_currentRange.minX - margin,
@@ -209,15 +215,40 @@ void CoordinateSystem3D::updateSkyboxRange()
     
     setSkyboxRange(skyboxRange);
     
-    // 修改：自动调整坐标轴长度以布满天空盒内部空间
-    double skyboxMaxRange = skyboxRange.maxRange();
-    double newAxisLength = skyboxMaxRange * 0.8; // 使用天空盒范围的80%作为轴长度
+    // 自动调整坐标轴长度以覆盖整个坐标范围
+    double coordMaxRange = m_currentRange.maxRange();
+    double newAxisLength = coordMaxRange * 1.5; // 使用坐标范围的150%作为轴长度，确保轴长度足够
     
-    // 只有当轴长度需要调整时才更新
-    if (std::abs(m_axisLength - newAxisLength) > 1.0)
+    // 确保轴长度至少为5000单位
+    newAxisLength = std::max(newAxisLength, 5000.0);
+    
+    // 只有当轴长度需要显著调整时才更新
+    if (std::abs(m_axisLength - newAxisLength) > 100.0)
     {
         m_axisLength = newAxisLength;
         emit axisLengthChanged(m_axisLength);
+        
+        qDebug() << "自动调整轴长度为:" << m_axisLength << "坐标范围:" << coordMaxRange;
+    }
+    
+    // 自动调整网格间距
+    double newGridSpacing = coordMaxRange / 20.0; // 将坐标范围分为20个网格
+    newGridSpacing = std::max(newGridSpacing, 10.0); // 最小网格间距10单位
+    
+    // 网格间距使用合理的步长
+    if (newGridSpacing < 100.0)
+        newGridSpacing = std::round(newGridSpacing / 10.0) * 10.0;
+    else if (newGridSpacing < 1000.0)
+        newGridSpacing = std::round(newGridSpacing / 50.0) * 50.0;
+    else
+        newGridSpacing = std::round(newGridSpacing / 100.0) * 100.0;
+    
+    if (std::abs(m_gridSpacing - newGridSpacing) > 1.0)
+    {
+        m_gridSpacing = newGridSpacing;
+        emit gridSpacingChanged(m_gridSpacing);
+        
+        qDebug() << "自动调整网格间距为:" << m_gridSpacing;
     }
 }
 

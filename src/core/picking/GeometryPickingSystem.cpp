@@ -166,48 +166,6 @@ Geo3D* GeometryPickingSystem::findGeometryFromNodePath(const osg::NodePath& node
     return nullptr;
 }
 
-PickResult GeometryPickingSystem::selectBestResult(const std::vector<PickResult>& results)
-{
-    if (results.empty()) return PickResult();
-    
-    // 定义距离阈值，在此范围内认为距离相近
-    const float distanceThreshold = 2.0f; // 可根据需要调整
-    
-    // 找到最近的距离
-    float minDistance = std::min_element(results.begin(), results.end(), 
-        [](const PickResult& a, const PickResult& b) {
-            return a.distance < b.distance;
-        })->distance;
-    
-    // 收集距离相近的结果（在阈值范围内）
-    std::vector<PickResult> nearResults;
-    for (const auto& result : results) {
-        if (std::abs(result.distance - minDistance) <= distanceThreshold) {
-            nearResults.push_back(result);
-        }
-    }
-    
-    // 如果只有一个相近的结果，直接返回
-    if (nearResults.size() == 1) {
-        return nearResults[0];
-    }
-    
-    // 如果有多个相近的结果，按优先级选择：顶点 > 边 > 面
-    std::sort(nearResults.begin(), nearResults.end(), [](const PickResult& a, const PickResult& b) {
-        int priorityA = static_cast<int>(a.featureType);
-        int priorityB = static_cast<int>(b.featureType);
-        
-        if (priorityA != priorityB) {
-            return priorityA < priorityB; // 数值越小优先级越高（VERTEX=1最高）
-        }
-        
-        // 相同优先级时，选择距离更近的
-        return a.distance < b.distance;
-    });
-    
-    return nearResults.front();
-}
-
 PickResult GeometryPickingSystem::selectBestSingleResult()
 {
     std::vector<PickResult> candidates;
@@ -242,8 +200,9 @@ PickResult GeometryPickingSystem::selectBestSingleResult()
     }
     
     std::sort(candidates.begin(), candidates.end(), [](const PickResult& a, const PickResult& b) {
-        // 先比较距离（保留一定的容差用于距离相等的判断）
-        const double tolerance = 1e-6;
+        // 先比较距离
+        // (因为连接点的线可能在点的上方，此时要拿到点，所以允许一定的高度差，最好是10像素的真实距离，但是不好算，暂时直接用5)
+        const double tolerance = 5; 
         if (std::abs(a.distance - b.distance) > tolerance) {
             return a.distance < b.distance;
         }

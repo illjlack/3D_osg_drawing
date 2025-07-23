@@ -417,4 +417,4 @@ bool ImportInfoDialog::shouldApplyOffset() const
     return (m_offsetXSpin->value() != 0.0 || m_offsetYSpin->value() != 0.0 || m_offsetZSpin->value() != 0.0 ||
             m_rotationXSpin->value() != 0.0 || m_rotationYSpin->value() != 0.0 || m_rotationZSpin->value() != 0.0 ||
             m_scaleXSpin->value() != 1.0 || m_scaleYSpin->value() != 1.0 || m_scaleZSpin->value() != 1.0);
-} 
+}

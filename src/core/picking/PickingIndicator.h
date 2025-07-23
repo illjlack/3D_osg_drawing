@@ -11,21 +11,23 @@
 #include <osg/PositionAttitudeTransform>
 #include <glm/glm.hpp>
 
+// 前向声明
+class CameraController;
 
 // 指示器配置
 struct IndicatorConfig
 {
-    float size;                 // 指示器大小
-    osg::Vec4 color;           // 颜色
-    float lineWidth;           // 线宽
-    float animationSpeed;      // 动画速度
-    bool enableAnimation;      // 是否启用动画
-    float fadeTime;            // 淡入淡出时间
+    float pickingPixelRadius;       // 拾取像素半径（屏幕固定大小）
+    osg::Vec4 color;               // 颜色
+    float lineWidth;               // 线宽
+    float animationSpeed;          // 动画速度
+    bool enableAnimation;          // 是否启用动画
+    float fadeTime;                // 淡入淡出时间
     
     IndicatorConfig()
-        : size(1.0f)                     // 设置合适的默认大小
-        , color(1.0f, 1.0f, 0.0f, 1.0f)  // 黄色
-        , lineWidth(5.0f)                // 增加线宽，让边指示器更明显
+        : pickingPixelRadius(10.0f)          // 与拾取系统的cylinderRadius保持一致
+        , color(1.0f, 1.0f, 0.0f, 1.0f)     // 黄色
+        , lineWidth(3.0f)                    // 线宽
         , animationSpeed(2.0f)
         , enableAnimation(true)
         , fadeTime(0.3f)
@@ -71,19 +73,12 @@ private:
     void createEdgeIndicator(); 
     void createFaceIndicator();
     
-    // 更新指示器位置和类型
-    void updateIndicatorPosition(const glm::vec3& position);
-    void updateIndicatorType(PickFeatureType featureType);
-    
-    // 距离自适应缩放（可选功能）
-    float calculateDistanceBasedScale(const glm::vec3& position) const;
-    
     // 内部状态
     bool m_initialized = false;
     bool m_isVisible = false;
     PickFeatureType m_currentFeatureType = PickFeatureType::NONE;
     double m_animationStartTime = 0.0;
-    glm::vec3 m_currentPosition{0.0f};  // 当前指示器位置（用于距离缩放计算）
+    glm::vec3 m_currentPosition{0.0f};  // 当前指示器位置（用于动画）
     
     // 配置
     IndicatorConfig m_config;

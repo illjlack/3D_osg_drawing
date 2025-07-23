@@ -116,6 +116,7 @@
     <ClCompile Include="src\main.cpp">
       <Filter>Main</Filter>
     </ClCompile>
+    <ClCompile Include="src\ui\ImportInfoDialog.cpp" />
     <ClCompile Include="src\ui\MainWindow.cpp">
       <Filter>UI</Filter>
     </ClCompile>
@@ -241,6 +242,7 @@
     <ClInclude Include="src\core\Common3D.h">
       <Filter>Core</Filter>
     </ClInclude>
+    <QtMoc Include="src\ui\ImportInfoDialog.h" />
     <ClInclude Include="src\util\ScaleBarRenderer.h" />
     <QtMoc Include="src\core\GeometryBase.h">
       <Filter>Core</Filter>

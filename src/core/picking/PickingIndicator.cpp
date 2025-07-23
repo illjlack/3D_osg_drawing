@@ -2,6 +2,7 @@
 #include "../GeometryBase.h"
 #include "../../util/LogManager.h"
 #include "../managers/GeoNodeManager.h"
+#include "../camera/CameraController.h"  // 添加CameraController头文件
 #include <osg/ShapeDrawable>
 #include <osg/PolygonOffset>
 #include <osg/BlendFunc>
@@ -90,7 +91,7 @@ void PickingIndicator::showIndicator(const glm::vec3& position, PickFeatureType 
     // 更新当前特征类型和可见状态
     m_currentFeatureType = featureType;
     m_isVisible = true;
-    m_currentPosition = position;  // 保存当前位置用于动画缩放计算
+    m_currentPosition = position;  // 保存当前位置用于动画
     
     // 先隐藏所有指示器
     if (m_vertexIndicator) m_vertexIndicator->setNodeMask(NODE_MASK_NONE);
@@ -132,17 +133,10 @@ void PickingIndicator::showIndicator(const glm::vec3& position, PickFeatureType 
     // 显示选中的指示器
     activeIndicator->setNodeMask(NODE_MASK_PICKING_INDICATOR);
     
-    // 更新指示器位置和缩放
+    // 更新指示器位置（不再手动设置缩放，由AutoTransform自动处理）
     if (m_indicatorTransform) {
         m_indicatorTransform->setPosition(osg::Vec3(position.x, position.y, position.z));
-        
-        // 设置基础缩放，让指示器在不同距离下保持合适的大小
-        float baseScale = 1.0f;
-        
-        // 启用基于距离的缩放调整（可选）
-        baseScale = calculateDistanceBasedScale(position);
-        
-        m_indicatorTransform->setScale(osg::Vec3(baseScale, baseScale, baseScale));
+        // 移除手动缩放设置，让AutoTransform处理屏幕固定大小
     }
     
     // 记录动画开始时间
@@ -175,19 +169,20 @@ void PickingIndicator::createVertexIndicator()
     m_vertexIndicator = new osg::Group;
     m_vertexIndicator->setName("VertexIndicator");
     
-    // 创建AutoTransform节点实现billboard效果（正对视线）
+    // 创建AutoTransform节点，设置为屏幕固定像素大小
     osg::ref_ptr<osg::AutoTransform> autoTransform = new osg::AutoTransform;
     autoTransform->setAutoRotateMode(osg::AutoTransform::ROTATE_TO_SCREEN);
-    autoTransform->setAutoScaleToScreen(false);
+    autoTransform->setAutoScaleToScreen(true);  // 启用屏幕固定大小
+    autoTransform->setAutoScaleTransitionWidthRatio(0.5);  // 设置过渡比例
     
-    // 创建圆形几何体
+    // 创建圆形几何体 - 使用基于像素半径的实际大小
     osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
-    // 创建圆形（用多边形近似）
+    // 创建圆形（用多边形近似）- 使用像素半径作为基础大小
     const int segments = 16;
-    float radius = m_config.size; 
+    float radius = m_config.pickingPixelRadius;
     
     for (int i = 0; i < segments; ++i) {
         float angle = (2.0f * M_PI * i) / segments;
@@ -206,10 +201,13 @@ void PickingIndicator::createVertexIndicator()
     osg::ref_ptr<osg::Geode> geode = new osg::Geode;
     geode->addDrawable(geometry);
     
-    // 设置材质
+    // 设置材质和线宽
     osg::StateSet* stateSet = geode->getOrCreateStateSet();
     stateSet->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
     stateSet->setMode(GL_DEPTH_TEST, osg::StateAttribute::ON);
+    
+    osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth(m_config.lineWidth);
+    stateSet->setAttributeAndModes(lineWidth, osg::StateAttribute::ON);
     
     // 将几何体添加到AutoTransform
     autoTransform->addChild(geode);
@@ -223,17 +221,18 @@ void PickingIndicator::createEdgeIndicator()
     m_edgeIndicator = new osg::Group;
     m_edgeIndicator->setName("EdgeIndicator");
     
-    // 创建AutoTransform节点实现billboard效果（正对视线）
+    // 创建AutoTransform节点，设置为屏幕固定像素大小
     osg::ref_ptr<osg::AutoTransform> autoTransform = new osg::AutoTransform;
     autoTransform->setAutoRotateMode(osg::AutoTransform::ROTATE_TO_SCREEN);
-    autoTransform->setAutoScaleToScreen(false);
+    autoTransform->setAutoScaleToScreen(true);  // 启用屏幕固定大小
+    autoTransform->setAutoScaleTransitionWidthRatio(0.5);  // 设置过渡比例
     
-    // 创建正方形几何体
+    // 创建正方形几何体 - 使用基于像素半径的实际大小
     osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
-    float size = m_config.size; // 使用固定的合适大小
+    float size = m_config.pickingPixelRadius; // 转换为合适的世界单位
     
     // 正方形的四个顶点
     vertices->push_back(osg::Vec3(-size, -size, 0.0f));
@@ -254,7 +253,7 @@ void PickingIndicator::createEdgeIndicator()
     osg::ref_ptr<osg::Geode> geode = new osg::Geode;
     geode->addDrawable(geometry);
     
-    // 设置材质
+    // 设置材质和线宽
     osg::StateSet* stateSet = geode->getOrCreateStateSet();
     stateSet->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
     stateSet->setMode(GL_DEPTH_TEST, osg::StateAttribute::ON);
@@ -277,12 +276,18 @@ void PickingIndicator::createFaceIndicator()
     m_faceTransform = new osg::PositionAttitudeTransform;
     m_faceTransform->setName("FaceTransform");
     
-    // 创建三角形几何体
+    // 在面变换内部添加AutoTransform用于屏幕固定大小
+    osg::ref_ptr<osg::AutoTransform> autoTransform = new osg::AutoTransform;
+    autoTransform->setAutoRotateMode(osg::AutoTransform::NO_ROTATION);  // 面指示器不需要朝向屏幕
+    autoTransform->setAutoScaleToScreen(true);  // 启用屏幕固定大小
+    autoTransform->setAutoScaleTransitionWidthRatio(0.5);  // 设置过渡比例
+    
+    // 创建三角形几何体 - 使用基于像素半径的实际大小
     osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
-    float size = m_config.size; // 统一使用固定大小保持一致
+    float size = m_config.pickingPixelRadius; // 转换为合适的世界单位（增大10倍）
     vertices->push_back(osg::Vec3(0.0f, size, 0.0f));
     vertices->push_back(osg::Vec3(-size * 0.866f, -size * 0.5f, 0.0f));
     vertices->push_back(osg::Vec3(size * 0.866f, -size * 0.5f, 0.0f));
@@ -300,13 +305,18 @@ void PickingIndicator::createFaceIndicator()
     osg::ref_ptr<osg::Geode> geode = new osg::Geode;
     geode->addDrawable(geometry);
     
-    // 设置材质
+    // 设置材质和线宽
     osg::StateSet* stateSet = geode->getOrCreateStateSet();
     stateSet->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
     stateSet->setMode(GL_DEPTH_TEST, osg::StateAttribute::ON);
+    osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth(m_config.lineWidth);
+    stateSet->setAttributeAndModes(lineWidth, osg::StateAttribute::ON);
     
-    // 将几何体添加到变换节点
-    m_faceTransform->addChild(geode);
+    // 将几何体添加到AutoTransform
+    autoTransform->addChild(geode);
+    
+    // 将AutoTransform添加到面变换节点
+    m_faceTransform->addChild(autoTransform);
     
     // 将变换节点添加到指示器组
     m_faceIndicator->addChild(m_faceTransform);
@@ -318,35 +328,10 @@ void PickingIndicator::updateAnimation(double currentTime)
     
     double elapsed = currentTime - m_animationStartTime;
     
-    // 简单的脉冲动画，基于距离相关的基础缩放进行
-    float baseScale = calculateDistanceBasedScale(m_currentPosition);
-    float animationScale = baseScale * (1.0f + 0.2f * sin(elapsed * m_config.animationSpeed));
+    // 简单的脉冲动画 - 通过修改几何体顶点实现动画效果
+    float animationScale = 1.0f + 0.2f * sin(elapsed * m_config.animationSpeed);
     
-    if (m_indicatorTransform) {
-        m_indicatorTransform->setScale(osg::Vec3(animationScale, animationScale, animationScale));
-    }
+    // 注意：由于使用了AutoTransform，动画效果可能需要不同的实现方式
+    // 这里暂时保留接口，可以在需要时实现具体的动画效果
 }
-
-float PickingIndicator::calculateDistanceBasedScale(const glm::vec3& position) const
-{
-    // 简单的距离自适应缩放 - 可以根据需要调整
-    // 这里假设有一个合理的基础距离和缩放因子
-    
-    const float baseDistance = 100.0f;  // 基础距离
-    const float minScale = 0.5f;        // 最小缩放
-    const float maxScale = 3.0f;        // 最大缩放
-    
-    // TODO: 如果需要基于相机距离的缩放，可以在这里实现
-    // 目前返回固定值，用户可以根据需要修改
-    
-    // 示例：根据Z坐标调整缩放（简化的距离计算）
-    float distance = std::abs(position.z);
-    float scale = baseDistance / std::max(distance, 10.0f); // 避免除零
-    
-    // 限制缩放范围
-    scale = std::max(minScale, std::min(maxScale, scale));
-    
-    return scale;
-}
-
  
