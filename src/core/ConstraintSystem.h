@@ -15,113 +15,90 @@
 class ConstraintSystem
 {
 public:
-    // 约束函数类型定义
-    // 参数：待添加的点，当前阶段的控制点，所有阶段的控制点，当前阶段索引
-    // 返回：约束后的点
+
+    // 实际位置的调用函数
     typedef std::function<Point3D(const Point3D& inputPoint, 
-                                  const std::vector<Point3D>& currentStagePoints,
-                                  const std::vector<std::vector<Point3D>>& allStagePoints,
-                                  int currentStageIndex)> ConstraintFunction;
+        const std::vector<std::vector<Point3D>>& pointss)> StageConstraintFunction;
+
+    // 约束函数类型定义
+    typedef std::function<Point3D(const Point3D& inputPoint,
+        const std::vector<Point3D>& points)> ConstraintFunction;
+
+    // ============= 约束器生成器 =============
+    
+    /**
+    * @brief 创建约束器调用包装器
+    * @param constraintFunc 约束函数
+    * @param indices 二维索引列表，每个索引包含[阶段索引, 点索引]，用于从pointss中获取对应的点
+    * @return 包装后的调用函数，接受二维点数组作为参数
+    */
+    static StageConstraintFunction createConstraintCall(ConstraintFunction constraintFunc, const std::vector<std::pair<int, int>>& indices);
+      
+
+
+
 
     // ============= 基础约束函数 =============
     
     /**
      * @brief 无约束函数
      * @param inputPoint 输入点
-     * @param currentStagePoints 当前阶段控制点
-     * @param allStagePoints 所有阶段控制点
-     * @param currentStageIndex 当前阶段索引
+     * @param points 相关控制点
      * @return 未经约束的原始输入点
      */
     static Point3D noConstraint(const Point3D& inputPoint, 
-                                const std::vector<Point3D>& currentStagePoints,
-                                const std::vector<std::vector<Point3D>>& allStagePoints,
-                                int currentStageIndex);
+                                const std::vector<Point3D>& points);
     
     /**
      * @brief 平面约束函数
-     * 将输入点投影到第一阶段构成的平面上
+     * 将输入点投影到前三个点构成的平面上
      * @param inputPoint 输入点
-     * @param currentStagePoints 当前阶段控制点
-     * @param allStagePoints 所有阶段控制点
-     * @param currentStageIndex 当前阶段索引
+     * @param points 相关控制点（至少需要3个点构成平面）
      * @return 投影到平面上的点
      */
     static Point3D planeConstraint(const Point3D& inputPoint, 
-                                   const std::vector<Point3D>& currentStagePoints,
-                                   const std::vector<std::vector<Point3D>>& allStagePoints,
-                                   int currentStageIndex);
-    
-    /**
-     * @brief 基于前一阶段平面的约束函数
-     * 将输入点投影到前一阶段三点构成的平面上
-     * @param inputPoint 输入点
-     * @param currentStagePoints 当前阶段控制点
-     * @param allStagePoints 所有阶段控制点
-     * @param currentStageIndex 当前阶段索引
-     * @return 投影到前一阶段平面上的点
-     */
-    static Point3D previousTrianglePlaneConstraint(const Point3D& inputPoint, 
-                                                    const std::vector<Point3D>& currentStagePoints,
-                                                    const std::vector<std::vector<Point3D>>& allStagePoints,
-                                                    int currentStageIndex);
+                                   const std::vector<Point3D>& points);
     
     /**
      * @brief 线约束函数
      * 将输入点投影到两点构成的直线上
      * @param inputPoint 输入点
-     * @param currentStagePoints 当前阶段控制点
-     * @param allStagePoints 所有阶段控制点
-     * @param currentStageIndex 当前阶段索引
+     * @param points 相关控制点（至少需要2个点构成直线）
      * @return 投影到直线上的点
      */
     static Point3D lineConstraint(const Point3D& inputPoint, 
-                                  const std::vector<Point3D>& currentStagePoints,
-                                  const std::vector<std::vector<Point3D>>& allStagePoints,
-                                  int currentStageIndex);
+                                  const std::vector<Point3D>& points);
     
     /**
      * @brief Z平面约束函数
      * 保持输入点的Z坐标为指定值（基于已有控制点）
      * @param inputPoint 输入点
-     * @param currentStagePoints 当前阶段控制点
-     * @param allStagePoints 所有阶段控制点
-     * @param currentStageIndex 当前阶段索引
+     * @param points 相关控制点（使用第一个点的Z坐标作为约束）
      * @return Z坐标被约束的点
      */
     static Point3D zPlaneConstraint(const Point3D& inputPoint, 
-                                    const std::vector<Point3D>& currentStagePoints,
-                                    const std::vector<std::vector<Point3D>>& allStagePoints,
-                                    int currentStageIndex);
+                                    const std::vector<Point3D>& points);
     
     /**
      * @brief 垂直于底面的约束函数
      * 用于棱柱等3D体的高度确定，将点约束在垂直于底面的直线上
      * @param inputPoint 输入点
-     * @param currentStagePoints 当前阶段控制点
-     * @param allStagePoints 所有阶段控制点
-     * @param currentStageIndex 当前阶段索引
+     * @param points 相关控制点（构成底面的点）
      * @return 垂直约束后的点
      */
     static Point3D verticalToBaseConstraint(const Point3D& inputPoint, 
-                                            const std::vector<Point3D>& currentStagePoints,
-                                            const std::vector<std::vector<Point3D>>& allStagePoints,
-                                            int currentStageIndex);
+                                            const std::vector<Point3D>& points);
     
     /**
      * @brief 垂直于前两点连线的约束函数
-     * 将输入点约束在垂直于上一阶段最后两点连线的平面上
-     * 即确保BC垂直于AB，其中A、B是上一阶段的最后两点，C是当前输入点
+     * 将输入点约束在垂直于前两点连线的平面上
+     * 即确保BC垂直于AB，其中A、B是前两个点，C是当前输入点
      * @param inputPoint 输入点
-     * @param currentStagePoints 当前阶段控制点
-     * @param allStagePoints 所有阶段控制点
-     * @param currentStageIndex 当前阶段索引
+     * @param points 相关控制点（至少需要2个点作为参考线）
      * @return 垂直约束后的点
      */
     static Point3D perpendicularToLastTwoPointsConstraint(const Point3D& inputPoint, 
-                                                          const std::vector<Point3D>& currentStagePoints,
-                                                          const std::vector<std::vector<Point3D>>& allStagePoints,
-                                                          int currentStageIndex);
+                                                          const std::vector<Point3D>& points);
 
     // ============= 约束函数组合器 =============
     
@@ -132,19 +109,6 @@ public:
      * @return 组合后的约束函数
      */
     static ConstraintFunction combineConstraints(const std::vector<ConstraintFunction>& constraints);
-      
-    /**
-     * @brief 条件约束选择器
-     * 根据条件选择不同的约束函数
-     * @param condition 条件判断函数
-     * @param trueConstraint 条件为真时执行的约束
-     * @param falseConstraint 条件为假时执行的约束
-     * @return 条件约束函数
-     */
-    static ConstraintFunction conditionalConstraint(
-        std::function<bool(const Point3D&, const std::vector<Point3D>&, const std::vector<std::vector<Point3D>>&, int)> condition,
-        ConstraintFunction trueConstraint,
-        ConstraintFunction falseConstraint);
 
 private:
     // 约束系统为静态工具类，禁止实例化

@@ -22,7 +22,7 @@ public:
     {
         static StageDescriptors stageDescriptors
         { 
-            {"圆弧", 3, INT_INF, ConstraintSystem::noConstraint}
+            //{"圆弧", 3, INT_INF, ConstraintSystem::noConstraint}
         };
         // 前三个点确定圆弧, 后面的每个点和前面一个点和它的往前一个小的增量的点，三点确定圆弧
         return stageDescriptors;

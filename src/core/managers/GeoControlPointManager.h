@@ -16,18 +16,18 @@ class GeoStateManager;
 #define INT_INF 0x3f3f3f3f
 #endif
 
-typedef ConstraintSystem::ConstraintFunction ConstraintFunction;
+typedef ConstraintSystem::StageConstraintFunction StageConstraintFunction;
 
 struct StageDescriptor 
 {
     std::string stageName;      // 阶段名称
     int minControlPoints;       // 该阶段最少控制点数量
     int maxControlPoints;       // 该阶段最多控制点数量
-    ConstraintFunction constraint; // 约束函数，可选
+    StageConstraintFunction constraint; // 约束函数，可选
     
     StageDescriptor() : minControlPoints(1), maxControlPoints(1), constraint(nullptr) {}
     
-    StageDescriptor(const std::string& name, int minPoints, int maxPoints = INT_INF, ConstraintFunction constraintFunc = nullptr)
+    StageDescriptor(const std::string& name, int minPoints, int maxPoints = INT_INF, StageConstraintFunction constraintFunc = nullptr)
         : stageName(name), minControlPoints(minPoints), maxControlPoints(maxPoints), constraint(constraintFunc)
     {
         // 至少能容纳一个

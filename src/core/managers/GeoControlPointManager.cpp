@@ -27,7 +27,7 @@ bool GeoControlPointManager::addControlPoint(const Point3D& point)
 
     if (currentDescriptor.constraint) 
     {
-        constrainedPoint = currentDescriptor.constraint(point, currentStage(), m_stages, currentStageIdx());
+        constrainedPoint = currentDescriptor.constraint(point, m_stages);
     }
 
     /**
@@ -106,11 +106,9 @@ bool GeoControlPointManager::setControlPoint(int globalIndex, const Point3D& poi
         {
             const auto& currentDescriptor = getStageDescriptor(stageIdx);
             if (!currentDescriptor.constraint)continue;
-            ControlPoints tempPoints;
             for (auto& point : m_stages[stageIdx])
             {
-                point = currentDescriptor.constraint(point, tempPoints, m_stages, stageIdx);
-                tempPoints.emplace_back(point);
+                point = currentDescriptor.constraint(point, m_stages);
             }
         }
     };
@@ -149,7 +147,7 @@ const std::vector<std::vector<Point3D>>& GeoControlPointManager::getAllStageCont
         const auto& currentDescriptor = getStageDescriptor(currentStageIdx());
         if (currentDescriptor.constraint)
         {
-            m_tempPoint = currentDescriptor.constraint(m_tempPoint, currentStage(), m_stages, currentStageIdx());
+            m_tempPoint = currentDescriptor.constraint(m_tempPoint, m_stages);
         }
 
         m_stagesTemp = m_stages;

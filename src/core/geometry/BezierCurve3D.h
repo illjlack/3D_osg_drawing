@@ -16,7 +16,7 @@ public:
     {
          static StageDescriptors stageDescriptors
          { 
-             {"绘制贝塞尔曲线", 2, INT_INF, ConstraintSystem::noConstraint} 
+             //{"绘制贝塞尔曲线", 2, INT_INF, ConstraintSystem::noConstraint} 
          };
         // 单阶段：至少确定两个控制点，可以添加更多控制点
         return stageDescriptors;
