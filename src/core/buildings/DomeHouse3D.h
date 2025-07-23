@@ -17,7 +17,13 @@ public:
     // 获取穹顶房屋的阶段描述符
     virtual const StageDescriptors& getStageDescriptors() const
     {
-        static StageDescriptors stageDescriptors{ {"确定基座范围", 2, 2},{"确定穹顶高度", 1} };
+        static StageDescriptors stageDescriptors
+        { 
+            //{"确定基座", 3, 3, ConstraintSystem::noConstraint},
+            //{"确定穹顶高度", 1, 1, ConstraintSystem::verticalToBaseConstraint} 
+        };
+        // 第一阶段：确定圆形基座,三点确定一个圆
+        // 第三阶段：确定穹顶高度，垂直于基座平面，形成半球形穹顶
         return stageDescriptors;
     }
 

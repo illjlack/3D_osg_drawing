@@ -158,6 +158,51 @@ Point3D ConstraintSystem::verticalToBaseConstraint(const Point3D& inputPoint,
     return inputPoint; // 如果无法构成底面，返回原点
 }
 
+Point3D ConstraintSystem::perpendicularToLastTwoPointsConstraint(const Point3D& inputPoint, 
+                                                                 const std::vector<Point3D>& currentStagePoints,
+                                                                 const std::vector<std::vector<Point3D>>& allStagePoints,
+                                                                 int currentStageIndex)
+{
+    // 检查前一阶段是否存在且有至少2个点
+    if (currentStageIndex > 0 && allStagePoints.size() > currentStageIndex - 1) {
+        const auto& previousStage = allStagePoints[currentStageIndex - 1];
+        if (previousStage.size() >= 2) {
+            // 获取上一阶段的最后两个点A和B
+            size_t lastIndex = previousStage.size() - 1;
+            Point3D pointA = previousStage[lastIndex - 1]; // 倒数第二个点
+            Point3D pointB = previousStage[lastIndex];     // 最后一个点
+            
+            // 计算向量AB和BC
+            glm::vec3 vecA = glm::vec3(pointA.x(), pointA.y(), pointA.z());
+            glm::vec3 vecB = glm::vec3(pointB.x(), pointB.y(), pointB.z());
+            glm::vec3 vecC = glm::vec3(inputPoint.x(), inputPoint.y(), inputPoint.z());
+            
+            glm::vec3 AB = vecB - vecA;
+            glm::vec3 BC = vecC - vecB;
+            
+            // 检查AB是否为零向量
+            if (glm::length(AB) < 1e-6f) {
+                return inputPoint; // AB向量太小，无法约束
+            }
+            
+            // 计算BC在AB方向上的投影
+            glm::vec3 ABNormalized = glm::normalize(AB);
+            float projectionLength = glm::dot(BC, ABNormalized);
+            glm::vec3 projectionOnAB = projectionLength * ABNormalized;
+            
+            // 计算垂直于AB的BC分量
+            glm::vec3 perpendicularBC = BC - projectionOnAB;
+            
+            // 约束后的点C = B + 垂直分量
+            glm::vec3 constrainedPoint = vecB + perpendicularBC;
+            
+            return Point3D(constrainedPoint.x, constrainedPoint.y, constrainedPoint.z);
+        }
+    }
+    
+    return inputPoint; // 如果无法构成约束条件，返回原点
+}
+
 // ============= 约束函数组合器实现 =============
 
 ConstraintSystem::ConstraintFunction ConstraintSystem::combineConstraints(const std::vector<ConstraintFunction>& constraints)
@@ -195,35 +240,3 @@ ConstraintSystem::ConstraintFunction ConstraintSystem::conditionalConstraint(
         }
     };
 }
-
-// ============= 常用约束组合实现 =============
-
-ConstraintSystem::ConstraintFunction ConstraintSystem::planeAndZLockConstraint()
-{
-    return combineConstraints({planeConstraint, zPlaneConstraint});
-}
-
-ConstraintSystem::ConstraintFunction ConstraintSystem::basedOnPreviousStageConstraint()
-{
-    return previousTrianglePlaneConstraint;
-}
-
-ConstraintSystem::ConstraintFunction ConstraintSystem::flatDrawingConstraint()
-{
-    return zPlaneConstraint;
-}
-
-ConstraintSystem::ConstraintFunction ConstraintSystem::volumeConstraint()
-{
-    return conditionalConstraint(
-        // 条件：当前阶段索引大于0，且前一阶段有足够的点
-        [](const Point3D& inputPoint, const std::vector<Point3D>& currentStagePoints,
-           const std::vector<std::vector<Point3D>>& allStagePoints, int currentStageIndex) -> bool {
-            return currentStageIndex > 0 && 
-                   allStagePoints.size() > currentStageIndex - 1 && 
-                   allStagePoints[currentStageIndex - 1].size() >= 3;
-        },
-        verticalToBaseConstraint,  // 如果条件满足，使用垂直约束
-        noConstraint              // 否则无约束
-    );
-} 

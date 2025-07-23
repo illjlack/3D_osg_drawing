@@ -13,7 +13,11 @@ public:
     // 获取线的阶段描述符
     virtual const StageDescriptors& getStageDescriptors() const
     {
-        static StageDescriptors stageDescriptors{ {"至少两个点", 2} };
+        static StageDescriptors stageDescriptors
+        { 
+            //{"确定线段端点", 2, INT_INF, ConstraintSystem::noConstraint} 
+        };
+        // 单阶段：至少确定两个端点，可以添加更多点形成折线，无约束
         return stageDescriptors;
     }
 

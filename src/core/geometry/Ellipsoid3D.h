@@ -19,7 +19,17 @@ public:
     // 获取椭球的阶段描述符
     virtual const StageDescriptors& getStageDescriptors() const
     {
-        static StageDescriptors stageDescriptors{ {"确定长轴", 2, 2},{"确定短轴", 1} };
+        static StageDescriptors stageDescriptors
+        { 
+            //{"确定椭球中心", 1, 1, ConstraintSystem::noConstraint},
+            //{"确定第一轴端点", 1, 1, ConstraintSystem::noConstraint},
+            //{"确定第二轴端点", 1, 1, ConstraintSystem::noConstraint},
+            //{"确定第三轴端点", 1, 1, ConstraintSystem::noConstraint} 
+        };
+        // 第一阶段：确定椭球中心，无约束
+        // 第二阶段：确定第一轴（长轴）的端点，无约束
+        // 第三阶段：确定第二轴端点，构成椭球的三个轴
+        // 第四阶段：确定第三轴端点，完成椭球定义
         return stageDescriptors;
     }
 

@@ -13,13 +13,19 @@ class Hemisphere3D_Geo : public Geo3D
 public:
     Hemisphere3D_Geo();
     virtual ~Hemisphere3D_Geo() = default;
-
-    // ==================== 多阶段绘制支持 ====================
-    
+ 
     // 获取半球的阶段描述符
     virtual const StageDescriptors& getStageDescriptors() const
     {
-        static StageDescriptors stageDescriptors{ {"确定球心", 1, 1},{"确定半径", 1} };
+        static StageDescriptors stageDescriptors
+        { 
+            //{"确定底面圆心", 1, 1, ConstraintSystem::flatDrawingConstraint()},
+            //{"确定半径", 1, 1, ConstraintSystem::flatDrawingConstraint()},
+            //{"确定半球朝向", 1, 1, ConstraintSystem::verticalToBaseConstraint()} 
+        };
+        // 第一阶段：确定底面圆心，使用平面约束
+        // 第二阶段：确定半径，保持在同一平面
+        // 第三阶段：确定半球的朝向（向上或向下），垂直于底面
         return stageDescriptors;
     }
 

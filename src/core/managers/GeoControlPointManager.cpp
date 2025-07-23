@@ -99,16 +99,38 @@ bool GeoControlPointManager::setControlPoint(int globalIndex, const Point3D& poi
     assert(globalIndex >= 0 && "索引应该非负");
     assert(getState()->isStateComplete() && "应该在绘制完成后调用");
 
+
+    auto updataControlPoint = [&]()
+    {
+        for (int stageIdx = 0; stageIdx < m_stages.size(); stageIdx++)
+        {
+            const auto& currentDescriptor = getStageDescriptor(stageIdx);
+            if (!currentDescriptor.constraint)continue;
+            ControlPoints tempPoints;
+            for (auto& point : m_stages[stageIdx])
+            {
+                point = currentDescriptor.constraint(point, tempPoints, m_stages, stageIdx);
+                tempPoints.emplace_back(point);
+            }
+        }
+    };
+
+
+
     for (int stageIdx = 0; stageIdx < m_stages.size(); stageIdx++)
     {
         if (globalIndex < m_stages[stageIdx].size())
         {
             m_stages[stageIdx][globalIndex] = point;
+            // 控制点点更新，按顺序，后续依次用约束更新,为了方便全部更新
             emit controlPointChanged();
             return true;
         }
         globalIndex -= m_stages[stageIdx].size();
     }
+
+
+
     assert(false && "索引越界");
     return false;
 }
@@ -122,6 +144,13 @@ const std::vector<std::vector<Point3D>>& GeoControlPointManager::getAllStageCont
     else
     {
         assert(currentStagePointSize() < getStageDescriptor(currentStageIdx()).maxControlPoints && "未完成绘制时控制点不应该满");
+
+        // 约束临时点
+        const auto& currentDescriptor = getStageDescriptor(currentStageIdx());
+        if (currentDescriptor.constraint)
+        {
+            m_tempPoint = currentDescriptor.constraint(m_tempPoint, currentStage(), m_stages, currentStageIdx());
+        }
 
         m_stagesTemp = m_stages;
         m_stagesTemp.back().emplace_back(m_tempPoint);

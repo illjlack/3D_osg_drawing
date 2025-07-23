@@ -2,7 +2,7 @@
 #pragma execution_character_set("utf-8")
 
 #include "../GeometryBase.h"
-#include "../../util/MathUtils.h"
+#include "../ConstraintSystem.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -20,8 +20,11 @@ public:
     // 获取圆弧的阶段描述符
     virtual const StageDescriptors& getStageDescriptors() const
     {
-        static StageDescriptors stageDescriptors{ {"确定两个起始点", 2, 2},{"点与前面的点构成圆弧", 1}};
-        // 第三个点与前两个构成圆弧，之后的点与前一个点和前一个弧段上最近的一个点构成圆弧
+        static StageDescriptors stageDescriptors
+        { 
+            {"圆弧", 3, INT_INF, ConstraintSystem::noConstraint}
+        };
+        // 前三个点确定圆弧, 后面的每个点和前面一个点和它的往前一个小的增量的点，三点确定圆弧
         return stageDescriptors;
     }
 

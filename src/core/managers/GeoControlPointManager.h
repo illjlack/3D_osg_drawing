@@ -23,7 +23,7 @@ struct StageDescriptor
     std::string stageName;      // 阶段名称
     int minControlPoints;       // 该阶段最少控制点数量
     int maxControlPoints;       // 该阶段最多控制点数量
-    ConstraintSystem::ConstraintFunction constraint; // 约束函数，可选
+    ConstraintFunction constraint; // 约束函数，可选
     
     StageDescriptor() : minControlPoints(1), maxControlPoints(1), constraint(nullptr) {}
     

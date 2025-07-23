@@ -15,7 +15,11 @@ public:
     // 获取点的阶段描述符
     virtual const StageDescriptors& getStageDescriptors() const
     {
-        static StageDescriptors stageDescriptors{ {"确定点位置", 1, 1} };
+        static StageDescriptors stageDescriptors
+        { 
+            //{"确定点位置", 1, 1, ConstraintSystem::noConstraint} 
+        };
+        // 单阶段：确定点的位置，无约束
         return stageDescriptors;
     }
 

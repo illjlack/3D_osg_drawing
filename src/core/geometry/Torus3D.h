@@ -19,7 +19,15 @@ public:
     // 获取环面的阶段描述符
     virtual const StageDescriptors& getStageDescriptors() const
     {
-        static StageDescriptors stageDescriptors{ {"确定中心点", 1, 1},{"确定主半径", 1},{"确定次半径", 1} };
+        static StageDescriptors stageDescriptors
+        { 
+            //{"确定环面半径", 2, 2, ConstraintSystem::noConstraint},
+            //{"确定圆平面", 1, 1, ConstraintSystem::},
+            //{"确定内环半径", 1, 1, ConstraintSystem::} 
+        };
+        // 第一阶段：确定环面半径
+        // 第二阶段：与第一阶段的两点确定平面
+        // 第三阶段：确定内环半径间接确定次环面半径
         return stageDescriptors;
     }
 
