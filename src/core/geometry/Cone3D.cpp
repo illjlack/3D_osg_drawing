@@ -20,13 +20,14 @@ Cone3D_Geo::Cone3D_Geo()
 
 void Cone3D_Geo::buildVertexGeometries()
 {
+    mm_node()->clearVertexGeometry();
+
     // 获取现有的几何体
     osg::ref_ptr<osg::Geometry> geometry = mm_node()->getVertexGeometry();
     if (!geometry.valid())
     {
         return;
     }
-    
     const auto& allStagePoints = mm_controlPoint()->getAllStageControlPoints();
     
     // 根据阶段和点数量决定顶点
@@ -67,6 +68,7 @@ void Cone3D_Geo::buildVertexGeometries()
     }
     else if (allStagePoints.size() >= 3) 
     {
+        return;
         // 第三阶段
         const auto& stage3 = allStagePoints[2];
         Point3D top = stage3[0];
@@ -85,13 +87,14 @@ void Cone3D_Geo::buildVertexGeometries()
 
 void Cone3D_Geo::buildEdgeGeometries()
 {
+    mm_node()->clearEdgeGeometry();
+
     // 获取现有的几何体
     osg::ref_ptr<osg::Geometry> geometry = mm_node()->getEdgeGeometry();
     if (!geometry.valid())
     {
         return;
     }
-    
     const auto& allStagePoints = mm_controlPoint()->getAllStageControlPoints();
     
     if (allStagePoints.empty()) return;
@@ -283,13 +286,14 @@ void Cone3D_Geo::buildEdgeGeometries()
 
 void Cone3D_Geo::buildFaceGeometries()
 {
+    mm_node()->clearFaceGeometry();
+
     // 获取现有的几何体
     osg::ref_ptr<osg::Geometry> geometry = mm_node()->getFaceGeometry();
     if (!geometry.valid())
     {
         return;
     }
-    
     const auto& allStagePoints = mm_controlPoint()->getAllStageControlPoints();
     
     // 创建顶点数组
