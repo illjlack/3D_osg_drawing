@@ -231,7 +231,8 @@ void Ellipsoid3D_Geo::buildEllipseStageGeometry()
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     
     // 生成椭圆边界点
-    int segments = 32;
+    // 使用细分级别参数而不是固定值
+    int segments = static_cast<int>(m_parameters.subdivisionLevel);
     for (int i = 0; i <= segments; ++i) {
         float angle = 2.0f * M_PI * i / segments;
         float cos_a = cos(angle);
@@ -409,7 +410,8 @@ void Ellipsoid3D_Geo::buildFaceGeometries()
     osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
     
     // 生成椭圆面（这里简化为一个平面椭圆）
-    int segments = 32;
+    // 使用细分级别参数而不是固定值
+    int segments = static_cast<int>(m_parameters.subdivisionLevel);
     
     // 添加中心点
     vertices->push_back(osg::Vec3(m_center.x, m_center.y, m_center.z));

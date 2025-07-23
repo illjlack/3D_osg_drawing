@@ -184,6 +184,7 @@ void UndefinedGeo3D_Geo::setImportedFaceNode(osg::Node* node)
     if (transformNode.valid()) {
         transformNode->addChild(node);
         LOG_INFO("成功将导入节点设置为面节点，可支持选中拾取", "UndefinedGeo3D");
+
     } else {
         LOG_ERROR("变换节点无效，无法挂载导入节点", "UndefinedGeo3D");
     }

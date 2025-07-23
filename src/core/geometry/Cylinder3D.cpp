@@ -131,10 +131,13 @@ void Cylinder3D_Geo::buildBaseStageGeometry()
     vertices->push_back(osg::Vec3(center.x(), center.y(), center.z()));
     vertices->push_back(osg::Vec3(radiusPoint.x(), radiusPoint.y(), radiusPoint.z()));
     
+    // 使用细分级别参数而不是固定的m_segments
+    int segments = static_cast<int>(m_parameters.subdivisionLevel);
+    
     // 绘制底面圆
     if (m_calculatedRadius > 0.0f) {
-        for (int i = 0; i <= m_segments; ++i) {
-            float angle = 2.0f * M_PI * i / m_segments;
+        for (int i = 0; i <= segments; ++i) {
+            float angle = 2.0f * M_PI * i / segments;
             float x = center.x() + m_calculatedRadius * cos(angle);
             float y = center.y() + m_calculatedRadius * sin(angle);
             float z = center.z();
@@ -166,9 +169,12 @@ void Cylinder3D_Geo::buildCylinderStageGeometry()
     osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
     osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(GL_TRIANGLES);
     
+    // 使用细分级别参数而不是固定的m_segments
+    int segments = static_cast<int>(m_parameters.subdivisionLevel);
+    
     // 生成圆柱体顶点
-    for (int i = 0; i <= m_segments; ++i) {
-        float angle = 2.0f * M_PI * i / m_segments;
+    for (int i = 0; i <= segments; ++i) {
+        float angle = 2.0f * M_PI * i / segments;
         float x = cos(angle);
         float y = sin(angle);
         
@@ -184,7 +190,7 @@ void Cylinder3D_Geo::buildCylinderStageGeometry()
     }
     
     // 生成侧面索引
-    for (int i = 0; i < m_segments; ++i) {
+    for (int i = 0; i < segments; ++i) {
         int bottom1 = i * 2;
         int top1 = i * 2 + 1;
         int bottom2 = (i + 1) * 2;

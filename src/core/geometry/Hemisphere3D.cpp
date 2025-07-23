@@ -138,11 +138,14 @@ void Hemisphere3D_Geo::buildHemisphereStageGeometry()
     osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
     osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(GL_TRIANGLES);
     
+    // 使用细分级别参数而不是固定的m_segments
+    int segments = static_cast<int>(m_parameters.subdivisionLevel);
+    
     // 生成半球顶点
-    for (int i = 0; i <= m_segments; ++i) {
-        float phi = M_PI * i / (2 * m_segments);  // 从0到π/2
-        for (int j = 0; j <= m_segments; ++j) {
-            float theta = 2 * M_PI * j / m_segments;  // 从0到2π
+    for (int i = 0; i <= segments; ++i) {
+        float phi = M_PI * i / (2 * segments);  // 从0到π/2
+        for (int j = 0; j <= segments; ++j) {
+            float theta = 2 * M_PI * j / segments;  // 从0到2π
             
             float x = sin(phi) * cos(theta);
             float y = sin(phi) * sin(theta);
@@ -155,10 +158,10 @@ void Hemisphere3D_Geo::buildHemisphereStageGeometry()
     }
     
     // 生成半球索引
-    for (int i = 0; i < m_segments; ++i) {
-        for (int j = 0; j < m_segments; ++j) {
-            int curr = i * (m_segments + 1) + j;
-            int next = curr + m_segments + 1;
+    for (int i = 0; i < segments; ++i) {
+        for (int j = 0; j < segments; ++j) {
+            int curr = i * (segments + 1) + j;
+            int next = curr + segments + 1;
             
             indices->push_back(curr);
             indices->push_back(next);

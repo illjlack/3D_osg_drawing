@@ -142,11 +142,14 @@ void Sphere3D_Geo::buildSphereStageGeometry()
     osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
     osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(GL_TRIANGLES);
     
+    // 使用细分级别参数而不是固定的m_segments
+    int segments = static_cast<int>(m_parameters.subdivisionLevel);
+    
     // 生成球体顶点
-    for (int i = 0; i <= m_segments; ++i) {
-        float lat = M_PI * i / m_segments - M_PI / 2;
-        for (int j = 0; j <= m_segments; ++j) {
-            float lon = 2 * M_PI * j / m_segments;
+    for (int i = 0; i <= segments; ++i) {
+        float lat = M_PI * i / segments - M_PI / 2;
+        for (int j = 0; j <= segments; ++j) {
+            float lon = 2 * M_PI * j / segments;
             
             float x = cos(lat) * cos(lon);
             float y = cos(lat) * sin(lon);
@@ -159,10 +162,10 @@ void Sphere3D_Geo::buildSphereStageGeometry()
     }
     
     // 生成球体索引
-    for (int i = 0; i < m_segments; ++i) {
-        for (int j = 0; j < m_segments; ++j) {
-            int curr = i * (m_segments + 1) + j;
-            int next = curr + m_segments + 1;
+    for (int i = 0; i < segments; ++i) {
+        for (int j = 0; j < segments; ++j) {
+            int curr = i * (segments + 1) + j;
+            int next = curr + segments + 1;
             
             indices->push_back(curr);
             indices->push_back(next);

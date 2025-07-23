@@ -466,7 +466,8 @@ void Cone3D_Geo::buildFaceGeometries()
     osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
     
     int segments = static_cast<int>(m_parameters.subdivisionLevel);
-    if (segments < 8) segments = 16;
+    // 确保最小细分级别，防止几何体过于简单
+    if (segments < 8) segments = 8;
     
     // 使用lambda表达式计算圆锥体参数
     auto calculateConeParams = [&]() -> MathUtils::ConeParameters {

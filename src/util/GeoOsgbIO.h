@@ -7,6 +7,13 @@
 #include <map>
 #include "../core/GeometryBase.h"
 
+// 前向声明
+namespace osg {
+    class Group;
+    class Node;
+    template<class T> class ref_ptr;
+}
+
 // 场景对象属性标记
 struct SceneObjectTag
 {
@@ -91,4 +98,19 @@ private:
     static bool readObjectTags(osg::Group* root, std::map<Geo3D*, SceneObjectTag>& tags);
     static QString serializeTag(const SceneObjectTag& tag);
     static bool deserializeTag(const QString& data, SceneObjectTag& tag);
+    
+    // 递归查找几何对象的辅助函数
+    static void recursiveFindGeoObjects(osg::Group* parentGroup, 
+                                       std::vector<Geo3D*>& geoObjects,
+                                       std::vector<osg::ref_ptr<osg::Node>>& drawableNodes,
+                                       const QString& baseDir = QString());
+    
+    // 强制加载 PagedLOD 数据的辅助函数
+    static void forceLoadPagedLODData(osg::Group* group, const QString& baseDir = QString());
+    
+    // 优化渲染质量的辅助函数
+    static void optimizeRenderingQuality(osg::Node* node);
+    
+    // 相机设置优化建议
+    static void suggestCameraSettings();
 }; 
