@@ -458,21 +458,6 @@ void OSGWidget::movePointToCoordinate(Geo3D* geo, int pointIndex, const glm::dve
     // 更新控制点位置
     Point3D newPoint(newPosition.x, newPosition.y, newPosition.z);
     controlPointManager->setControlPoint(pointIndex, newPoint);
-    if (true) // setControlPoint没有返回值，假设总是成功
-    {
-        // 重新构建几何体
-        geo->updateGeometries();
-        
-        LOG_SUCCESS(QString("成功移动控制点 %1 到位置 (%2,%3,%4)")
-            .arg(pointIndex)
-            .arg(newPosition.x, 0, 'f', 3)
-            .arg(newPosition.y, 0, 'f', 3)
-            .arg(newPosition.z, 0, 'f', 3), "点移动");
-    }
-    else
-    {
-        LOG_ERROR("移动控制点失败", "点移动");
-    }
 }
 
 OSGWidget::~OSGWidget()

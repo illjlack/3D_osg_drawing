@@ -108,7 +108,7 @@ void Geo3D::connectManagerSignals()
 
     connect(m_controlPointManager.get(), &GeoControlPointManager::controlPointChanged,
         this, [this]() {
-            updateGeometries();
+            mm_node()->updateGeometries();
         });
 
     qDebug() << "Geo3D::connectManagerSignals: 所有管理器信号连接完成";
@@ -158,14 +158,6 @@ void Geo3D::initialize()
     // 获得此时的全局参数
     m_parameters.resetToGlobal();
     mm_state()->setStateInitialized();
-}
-
-void Geo3D::updateGeometries()
-{
-    buildControlPointGeometries();
-    buildVertexGeometries();
-    buildEdgeGeometries();
-    buildFaceGeometries();
 }
 
 void Geo3D::buildControlPointGeometries()

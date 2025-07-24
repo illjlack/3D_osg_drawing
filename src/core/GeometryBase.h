@@ -79,10 +79,10 @@ public:
         static StageDescriptors stageDescriptors{};
         return stageDescriptors;
     }
-    
-    void updateGeometries();
 
 protected:
+    
+    friend class GeoNodeManager;
     // 初始化
     virtual void initialize();
     // 点线面节点管理辅助方法
