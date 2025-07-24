@@ -14,11 +14,11 @@ public:
     // 获取四边形的阶段描述符
     virtual const StageDescriptors& getStageDescriptors() const
     {
+        using namespace constraint;
         static StageDescriptors stageDescriptors
         { 
-            // {"确定四个顶点", 4, 4, ConstraintSystem::flatDrawingConstraint()} 
+            {"确定四边形顶点", 4, 4, createConstraintCall(planeConstraint, {{0,0}, {0,1},{0,2}})}
         };
-        // 使用Z平面约束，保持所有顶点在同一平面上
         return stageDescriptors;
     }
 

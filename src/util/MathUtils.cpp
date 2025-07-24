@@ -250,28 +250,84 @@ MathUtils::ArcParameters MathUtils::calculateArcFromThreePoints(const glm::dvec3
     params.center = midAB + t * perpA;
     params.radius = glm::length(p1 - params.center);
     
-    // 计算起始和结束角度
-    glm::dvec3 ref = normalize(p1 - params.center);
-    glm::dvec3 perpRef = normalize(glm::cross(params.normal, ref));
+    // 建立局部坐标系
+    params.uAxis = normalize(p1 - params.center);
+    params.vAxis = normalize(glm::cross(params.normal, params.uAxis));
     
-    glm::dvec3 v1 = normalize(p1 - params.center);
-    glm::dvec3 v3 = normalize(p3 - params.center);
+    // 计算三个点在局部坐标系中的角度
+    auto getAngle = [&](const glm::dvec3& point) -> double {
+        glm::dvec3 vec = normalize(point - params.center);
+        return atan2(glm::dot(vec, params.vAxis), glm::dot(vec, params.uAxis));
+    };
     
-    params.startAngle = atan2(glm::dot(v1, perpRef), glm::dot(v1, ref));
-    params.endAngle = atan2(glm::dot(v3, perpRef), glm::dot(v3, ref));
+    double angle1 = getAngle(p1);  // 起点角度
+    double angle2 = getAngle(p2);  // 中间点角度  
+    double angle3 = getAngle(p3);  // 终点角度
     
-    // 确保角度范围正确
-    if (params.endAngle < params.startAngle)
-        params.endAngle += 2.0 * PI;
+    // 规范化角度到 [0, 2π] 范围
+    auto normalizeAngle = [](double angle) -> double {
+        while (angle < 0) angle += 2.0 * PI;
+        while (angle >= 2.0 * PI) angle -= 2.0 * PI;
+        return angle;
+    };
     
-    // 计算扫掠角度
-    params.sweepAngle = params.endAngle - params.startAngle;
-    if (params.sweepAngle < 0)
-        params.sweepAngle += 2.0 * PI;
+    angle1 = normalizeAngle(angle1);
+    angle2 = normalizeAngle(angle2);
+    angle3 = normalizeAngle(angle3);
     
-    // 计算坐标轴
-    params.uAxis = ref;
-    params.vAxis = normalize(glm::cross(params.normal, ref));
+    // 设置起点为angle1
+    params.startAngle = angle1;
+    
+    // 确定从p1到p3经过p2的正确路径
+    // 检查两种可能的路径：顺时针和逆时针
+    
+    // 路径1：顺时针从p1到p3
+    double clockwiseEnd = angle3;
+    if (clockwiseEnd <= angle1) {
+        clockwiseEnd += 2.0 * PI;
+    }
+    double clockwiseSweep = clockwiseEnd - angle1;
+    
+    // 检查p2是否在顺时针路径上
+    double angle2_cw = angle2;
+    if (angle2_cw <= angle1) {
+        angle2_cw += 2.0 * PI;
+    }
+    bool p2OnClockwise = (angle2_cw > angle1) && (angle2_cw < clockwiseEnd);
+    
+    // 路径2：逆时针从p1到p3
+    double counterClockwiseEnd = angle3;
+    if (counterClockwiseEnd >= angle1) {
+        counterClockwiseEnd -= 2.0 * PI;
+    }
+    double counterClockwiseSweep = counterClockwiseEnd - angle1;
+    
+    // 检查p2是否在逆时针路径上
+    double angle2_ccw = angle2;
+    if (angle2_ccw >= angle1) {
+        angle2_ccw -= 2.0 * PI;
+    }
+    bool p2OnCounterClockwise = (angle2_ccw < angle1) && (angle2_ccw > counterClockwiseEnd);
+    
+    // 选择经过p2的路径
+    if (p2OnClockwise && !p2OnCounterClockwise) {
+        // 使用顺时针路径
+        params.endAngle = clockwiseEnd;
+        params.sweepAngle = clockwiseSweep;
+    } else if (p2OnCounterClockwise && !p2OnClockwise) {
+        // 使用逆时针路径
+        params.endAngle = counterClockwiseEnd;
+        params.sweepAngle = counterClockwiseSweep;
+    } else {
+        // 如果两个路径都经过或都不经过p2，选择较短的路径
+        if (std::abs(clockwiseSweep) <= std::abs(counterClockwiseSweep)) {
+            params.endAngle = clockwiseEnd;
+            params.sweepAngle = clockwiseSweep;
+        } else {
+            params.endAngle = counterClockwiseEnd;
+            params.sweepAngle = counterClockwiseSweep;
+        }
+    }
     
     return params;
 }
@@ -841,7 +897,7 @@ bool MathUtils::calculateCircleCenterAndRadius(const glm::dvec3& p1, const glm::
     double r2 = glm::length(p2 - center);
     double r3 = glm::length(p3 - center);
     
-    assert(std::fabs(glm::dot(center - p1, normal)) < EPSILON && "圆心的位置都不在同平面上");
+    assert(std::fabs(glm::dot(glm::normalize(center - p1), normal)) < EPSILON && "圆心的位置都不在同平面上");
     assert(std::abs(radius - r2) < EPSILON && std::abs(radius - r3) < EPSILON && "圆心计算错误");
     
     return true;
@@ -868,34 +924,11 @@ std::vector<glm::dvec3> MathUtils::generateArcPointsFromThreePoints(const glm::d
         return points;
     }
     
-    // 计算起始角度和结束角度
-    glm::dvec3 v1 = glm::normalize(p1 - center);
-    glm::dvec3 v2 = glm::normalize(p2 - center);
-    glm::dvec3 v3 = glm::normalize(p3 - center);
+    // 使用完整的3D圆弧参数计算
+    ArcParameters arcParams = calculateArcFromThreePoints(p1, p2, p3);
     
-    // 计算角度
-    double angle1 = std::atan2(v1.y, v1.x);
-    double angle2 = std::atan2(v2.y, v2.x);
-    double angle3 = std::atan2(v3.y, v3.x);
-    
-    // 确保角度顺序正确
-    while (angle2 < angle1) angle2 += 2.0 * PI;
-    while (angle3 < angle2) angle3 += 2.0 * PI;
-    
-    // 生成圆弧点
-    for (int i = 0; i <= segments; ++i) {
-        double t = static_cast<double>(i) / segments;
-        double angle = angle1 + t * (angle3 - angle1);
-        
-        glm::dvec3 point;
-        point.x = center.x + radius * std::cos(angle);
-        point.y = center.y + radius * std::sin(angle);
-        point.z = center.z; // 简化处理，保持z坐标不变
-        
-        points.push_back(point);
-    }
-    
-    return points;
+    // 使用3D圆弧生成函数
+    return generateArcPoints(arcParams, segments);
 }
 
 // 计算多边形的法向量

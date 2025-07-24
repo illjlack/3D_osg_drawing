@@ -19,15 +19,16 @@ public:
     // 获取环面的阶段描述符
     virtual const StageDescriptors& getStageDescriptors() const
     {
+        using namespace constraint;
         static StageDescriptors stageDescriptors
         { 
-            //{"确定环面半径", 2, 2, ConstraintSystem::noConstraint},
-            //{"确定圆平面", 1, 1, ConstraintSystem::},
-            //{"确定内环半径", 1, 1, ConstraintSystem::} 
+            {"确定环面轴线", 2, 2},
+            {"确定主圆", 1, 1, createConstraintCall(planeConstraint, {{0,0}, {0,1}, {1,0}})},
+            {"确定内圆半径", 1, 1, createConstraintCall(planeConstraint, {{0,0}, {0,1}, {1,0}})} 
         };
-        // 第一阶段：确定环面半径
-        // 第二阶段：与第一阶段的两点确定平面
-        // 第三阶段：确定内环半径间接确定次环面半径
+        // 第一阶段：确定环面轴线（2个点定义轴线和主半径）
+        // 第二阶段：确定主圆（第3个点与前两点确定平面，绘制主圆）
+        // 第三阶段：确定内圆半径（第4个点确定内环半径，绘制完整圆环）
         return stageDescriptors;
     }
 

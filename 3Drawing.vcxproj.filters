@@ -159,9 +159,6 @@
     <ClCompile Include="src\core\buildings\LHouse3D.cpp">
       <Filter>Core\buildings</Filter>
     </ClCompile>
-    <ClCompile Include="src\core\geometry\Prism3D.cpp">
-      <Filter>Core\buildings</Filter>
-    </ClCompile>
     <ClCompile Include="src\core\buildings\SpireHouse3D.cpp">
       <Filter>Core\buildings</Filter>
     </ClCompile>
@@ -185,6 +182,9 @@
     </ClCompile>
     <ClCompile Include="src\core\ConstraintSystem.cpp">
       <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\geometry\Prism3D.cpp">
+      <Filter>Core\Geometry</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -284,9 +284,6 @@
     <ClInclude Include="src\core\buildings\LHouse3D.h">
       <Filter>Core\buildings</Filter>
     </ClInclude>
-    <ClInclude Include="src\core\geometry\Prism3D.h">
-      <Filter>Core\buildings</Filter>
-    </ClInclude>
     <ClInclude Include="src\core\buildings\SpireHouse3D.h">
       <Filter>Core\buildings</Filter>
     </ClInclude>
@@ -304,6 +301,9 @@
     </ClInclude>
     <ClInclude Include="src\core\ConstraintSystem.h">
       <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\geometry\Prism3D.h">
+      <Filter>Core\Geometry</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

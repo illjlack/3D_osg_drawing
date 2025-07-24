@@ -14,50 +14,7 @@ Arc3D_Geo::Arc3D_Geo()
 void Arc3D_Geo::buildVertexGeometries()
 {
     mm_node()->clearVertexGeometry();
-
-    // 获取所有控制点用于绘制
-    const auto& controlPointss = mm_controlPoint()->getAllStageControlPoints();
-
-    // 获取现有的几何体
-    osg::ref_ptr<osg::Geometry> geometry = mm_node()->getVertexGeometry();
-    if (!geometry.valid())
-    {
-        return;
-    }
-
-    // 创建顶点数组
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-
-    // 收集所有控制点
-    std::vector<glm::dvec3> allPoints;
-    for (auto& points : controlPointss)
-        for (auto& point : points)
-        {
-            allPoints.push_back(MathUtils::osgToGlm(osg::Vec3(point.x(), point.y(), point.z())));
-        }
-
-    // 根据控制点个数决定如何显示顶点
-    if (allPoints.size() >= 3)
-    {
-        // 如果有足够的点形成圆弧，显示圆弧上的关键点
-        auto arcVertices = MathUtils::generateArcPointsFromThreePoints(allPoints[0], allPoints[1], allPoints[2], 10);
-        for (const auto& vertex : arcVertices)
-        {
-            vertices->push_back(MathUtils::glmToOsg(vertex));
-        }
-    }
-    else
-    {
-        // 显示原始控制点
-        for (const auto& point : allPoints)
-        {
-            vertices->push_back(MathUtils::glmToOsg(point));
-        }
-    }
-
-    geometry->setVertexArray(vertices);
-    osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::POINTS, 0, vertices->size());
-    geometry->addPrimitiveSet(drawArrays);
+    // 不用绘制顶点
 }
 
 void Arc3D_Geo::buildEdgeGeometries()
@@ -88,6 +45,9 @@ void Arc3D_Geo::buildEdgeGeometries()
         return; // 点数不足，无法绘制
     }
 
+    // 从参数获取细分级别
+    int subdivisionLevel = static_cast<int>(m_parameters.subdivisionLevel);
+
     // 创建顶点数组
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     
@@ -109,8 +69,8 @@ void Arc3D_Geo::buildEdgeGeometries()
         // 至少3个点，可以绘制圆弧
         if (allPoints.size() == 3)
         {
-            // 精确的三点圆弧
-            auto arcVertices = MathUtils::generateArcPointsFromThreePoints(allPoints[0], allPoints[1], allPoints[2], 50);
+            // 精确的三点圆弧，使用细分级别参数
+            auto arcVertices = MathUtils::generateArcPointsFromThreePoints(allPoints[0], allPoints[1], allPoints[2], subdivisionLevel);
             for (const auto& vertex : arcVertices)
             {
                 vertices->push_back(MathUtils::glmToOsg(vertex));
@@ -118,13 +78,28 @@ void Arc3D_Geo::buildEdgeGeometries()
         }
         else
         {
-            // 多个点，绘制连续的圆弧段
-            for (size_t i = 0; i < allPoints.size() - 2; ++i)
+            // 多个点，绘制连续的平滑圆弧段
+            // 第一段：使用前三个控制点
+            auto firstArcVertices = MathUtils::generateArcPointsFromThreePoints(allPoints[0], allPoints[1], allPoints[2], subdivisionLevel);
+            
+            // 添加第一段的所有顶点
+            for (const auto& vertex : firstArcVertices)
             {
-                auto arcVertices = MathUtils::generateArcPointsFromThreePoints(allPoints[i], allPoints[i+1], allPoints[i+2], 20);
-                for (const auto& vertex : arcVertices)
+                vertices->push_back(MathUtils::glmToOsg(vertex));
+            }
+            
+            for (size_t i = 3; i < allPoints.size(); ++i)
+            {
+                // 获取上一段的最后一个点（作为起始点）
+                assert(vertices->size() > 2);
+                glm::dvec3 lastPoint1 = MathUtils::osgToGlm((*vertices)[vertices->size() - 2]);
+                glm::dvec3 lastPoint2 = MathUtils::osgToGlm((*vertices)[vertices->size() - 1]);
+                auto arcVertices = MathUtils::generateArcPointsFromThreePoints(lastPoint1, lastPoint2, allPoints[i], subdivisionLevel);
+                
+                // 跳过第一个点（避免重复），添加其余顶点
+                for (size_t j = 1; j < arcVertices.size(); ++j)
                 {
-                    vertices->push_back(MathUtils::glmToOsg(vertex));
+                    vertices->push_back(MathUtils::glmToOsg(arcVertices[j]));
                 }
             }
         }

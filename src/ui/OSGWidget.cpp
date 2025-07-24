@@ -1149,10 +1149,37 @@ void OSGWidget::resizeEvent(QResizeEvent* event)
 
 void OSGWidget::mousePressEvent(QMouseEvent* event)
 {
-    // 右键完成绘制
+    // 右键进入下一阶段或完成绘制
     if (event->button() == Qt::RightButton && m_isDrawing)
     {
-        completeCurrentDrawing();
+        if (m_currentDrawingGeo)
+        {
+            auto controlPointManager = m_currentDrawingGeo->mm_controlPoint();
+            if (controlPointManager)
+            {
+                // 尝试进入下一阶段
+                bool hasNextStage = controlPointManager->nextStage();
+                if (!hasNextStage)
+                {
+                    // 没有下一阶段，完成绘制
+                    completeCurrentDrawing();
+                }
+                else
+                {
+                    LOG_INFO("进入下一阶段", "绘制");
+                }
+            }
+            else
+            {
+                // 没有控制点管理器，直接完成绘制
+                completeCurrentDrawing();
+            }
+        }
+        else
+        {
+            // 没有当前绘制对象，直接完成绘制
+            completeCurrentDrawing();
+        }
         return;
     }
 
@@ -1264,8 +1291,8 @@ void OSGWidget::mousePressEvent(QMouseEvent* event)
                 // 右键进入下一阶段或完成绘制（某些几何体需要）
                 else if (event->button() == Qt::RightButton && !m_isDrawing)
                 {
-                    // 这里右键已经在函数开头处理了，用于完成绘制
-                    // 如果需要处理阶段切换，可以在这里添加
+                    // 这里右键已经在函数开头处理了，用于进入下一阶段或完成绘制
+                    // 具体逻辑已经在函数开头实现
                 }
             }
         }

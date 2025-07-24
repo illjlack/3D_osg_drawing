@@ -14,10 +14,14 @@ public:
     // 获取棱柱的阶段描述符
     virtual const StageDescriptors& getStageDescriptors() const
     {
+        using namespace constraint;
         static StageDescriptors stageDescriptors
          { 
-            //{"确定底面", 3, INT_INF, ConstraintSystem::flatDrawingConstraint()},
-            //{"确定高度", 1, 1, ConstraintSystem::volumeConstraint()} 
+            {"确定多边形顶点", 3, INT_INF, createConstraintCall(planeConstraint, {{0,0}, {0,1},{0,2}})},
+            {"确定高", 1, 1, combineStageConstraints({
+                    createConstraintCall(perpendicularToLastTwoPointsConstraint, {{0,1}, {0,0}}),
+                    createConstraintCall(perpendicularToLastTwoPointsConstraint, {{0,2}, {0,0}})
+                })}
         };
         // 第一阶段使用2D平面绘制约束，确保底面在同一平面
         // 第二阶段使用3D立体约束，确保高度点在垂直方向上

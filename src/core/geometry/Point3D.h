@@ -17,7 +17,7 @@ public:
     {
         static StageDescriptors stageDescriptors
         { 
-            //{"确定点位置", 1, 1, ConstraintSystem::noConstraint} 
+            {"确定点位置", 1, 1} 
         };
         // 单阶段：确定点的位置，无约束
         return stageDescriptors;

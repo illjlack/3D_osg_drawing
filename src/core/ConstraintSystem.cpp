@@ -227,10 +227,22 @@ StageConstraintFunction createConstraintCall(ConstraintFunction constraintFunc, 
             int stageIndex = index.first;
             int pointIndex = index.second;
             
-            assert (stageIndex >= 0 && stageIndex < static_cast<int>(pointss.size()) &&
-                pointIndex >= 0 && pointIndex < static_cast<int>(pointss[stageIndex].size()) && "静态索引应该要正确");
+            //assert (stageIndex >= 0 && stageIndex < static_cast<int>(pointss.size()) &&
+            //    pointIndex >= 0 && pointIndex < static_cast<int>(pointss[stageIndex].size()) && "静态索引应该要正确");
 
-            points.push_back(pointss[stageIndex][pointIndex]);
+            
+            if (stageIndex >= 0 && stageIndex < static_cast<int>(pointss.size()) &&
+                pointIndex >= 0 && pointIndex < static_cast<int>(pointss[stageIndex].size()))
+            {
+                points.push_back(pointss[stageIndex][pointIndex]);
+            }
+            else
+            {
+                // 为了更能拓展, 允许暂时没有
+                // 此时不执行约束。
+                return inputPoint;
+            }
+            
         }
         
         // 调用约束函数

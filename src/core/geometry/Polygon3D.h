@@ -15,9 +15,10 @@ public:
     // 获取多边形的阶段描述符
     virtual const StageDescriptors& getStageDescriptors() const
     {
+        using namespace constraint;
         static StageDescriptors stageDescriptors
         { 
-            //{"确定多边形顶点", 3, INT_INF, ConstraintSystem::flatDrawingConstraint()} 
+            {"确定多边形顶点", 3, INT_INF, createConstraintCall(planeConstraint, {{0,0}, {0,1},{0,2}})}
         };
         // 单阶段：至少确定三个顶点，可以添加更多顶点，使用平面约束保证所有点共面
         return stageDescriptors;

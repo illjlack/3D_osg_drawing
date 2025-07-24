@@ -16,7 +16,7 @@ public:
     {
         static StageDescriptors stageDescriptors
         { 
-            //{"确定三角形顶点", 3, 3, ConstraintSystem::noConstraint} 
+            {"确定三角形顶点", 3, 3} 
         };
         // 单阶段：确定三个顶点
         return stageDescriptors;

@@ -19,13 +19,13 @@ public:
     // 获取球体的阶段描述符
     virtual const StageDescriptors& getStageDescriptors() const
     {
+        // 根据球面的四个点确定球
+        using namespace constraint;
         static StageDescriptors stageDescriptors
-        { 
-            //{"确定球心", 1, 1, ConstraintSystem::noConstraint},
-            //{"确定半径", 1, 1, ConstraintSystem::noConstraint} 
+        {
+            {"三个点确定球的一个截面", 3, 3},
+            {"确定球", 1, 1, }
         };
-        // 第一阶段：确定球心，无约束
-        // 第二阶段：确定球面上一点以确定半径，无约束
         return stageDescriptors;
     }
 
