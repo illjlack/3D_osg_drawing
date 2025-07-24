@@ -3,8 +3,8 @@
 #include <stdexcept>
 #include <algorithm>
 
-GeoControlPointManager::GeoControlPointManager(Geo3D* parent)
-    : QObject(parent)
+GeoControlPointManager::GeoControlPointManager(osg::ref_ptr<Geo3D> parent)
+    : QObject(parent.get())
     , m_parent(parent)
 {
     /**

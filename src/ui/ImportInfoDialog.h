@@ -19,7 +19,7 @@ class ImportInfoDialog : public QDialog
     Q_OBJECT
 
 public:
-    explicit ImportInfoDialog(Geo3D* importedGeo, QWidget* parent = nullptr);
+    explicit ImportInfoDialog(osg::ref_ptr<Geo3D> importedGeo, QWidget* parent = nullptr);
     ~ImportInfoDialog() = default;
 
     // 获取偏移矩阵
@@ -42,7 +42,7 @@ private:
     void calculateCurrentMatrix();
 
 private:
-    Geo3D* m_geometry;
+    osg::ref_ptr<Geo3D> m_geometry;
     
     // 包围盒信息显示
     QGroupBox* m_boundingBoxGroup;

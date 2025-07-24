@@ -145,6 +145,19 @@ public:
     
     // 滚轮缩放控制
     void handleWheelZoom(int delta);
+    void zoom(double delta);
+    
+    // 鼠标拖动控制
+    void startPan(int x, int y);
+    void updatePan(int x, int y);
+    void endPan();
+    void updateRotation(int x, int y);
+    void endRotation();
+    
+    // 视图操作
+    void fitAll();
+    void resetCamera();
+    void setViewDirection(const osg::Vec3d& direction, const osg::Vec3d& up = osg::Vec3d(0, 0, 1));
 
 signals:
     void manipulatorTypeChanged(ManipulatorType type);
@@ -206,5 +219,13 @@ private:
     QTimer* m_updateTimer;
     qint64 m_lastMoveTime;  // 上次移动时间
     bool m_isMoving;        // 是否正在移动
+    
+    // 鼠标拖动相关
+    bool m_isPanning;
+    bool m_isRotating;
+    int m_lastMouseX;
+    int m_lastMouseY;
+    double m_panSensitivity;
+    double m_rotateSensitivity;
 }; 
 

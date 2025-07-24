@@ -73,7 +73,7 @@ private:
     void createBuildingPage();
     
     // 辅助方法
-    QPushButton* createStyledButton(const QString& emoji, const QString& text, const QString& tooltip, DrawMode3D mode);
+    QPushButton* createStyledButton(const QString& emoji, const QString& text, const QString& tooltip, DrawMode3D mode, const QString& shortcut = "");
     QPushButton* createActionButton(const QString& emoji, const QString& text, const QString& tooltip);
 
 private:

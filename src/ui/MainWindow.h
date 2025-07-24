@@ -62,9 +62,8 @@
 #include "PropertyEditor3D.h"
 #include "ToolPanel3D.h"
 #include "PropertyEditor3D.h"
+#include "../core/GeometryBase.h"
 
-// 前向声明
-class Geo3D;
 class PropertyEditor3D;
 class ToolPanel3D;
 class SimplePickingIndicatorManager;
@@ -131,11 +130,14 @@ private slots:
     void onHelpAbout();
     
     void onDrawModeChanged(DrawMode3D mode);
-    void onGeoSelected(Geo3D* geo);
+    void onDrawModeChangedFromOSG(DrawMode3D mode);  // 来自OSGWidget的绘制模式改变信号
+    void onGeoSelected(osg::ref_ptr<Geo3D> geo);
     void onGeoParametersChanged();
     void onGeometryRecalculationRequired();
     void onRenderingParametersChanged();
     void onSimplePickingResult(const PickResult& result);
+
+
 
 private:
     void setupUI();

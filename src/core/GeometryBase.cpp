@@ -230,15 +230,4 @@ bool Geo3D::deserialize(const QString& data)
     return true;
 }
 
-// ============================================================================
-// 工厂函数（临时实现）
-// ============================================================================
-
-#include "../util/GeometryFactory.h"
-
-Geo3D* createGeo3D(DrawMode3D mode)
-{
-    return GeometryFactory::createGeometry(mode);
-}
-
 

@@ -24,7 +24,7 @@
 #include "../core/buildings/FlatHouse3D.h"
 #include "../core/buildings/LHouse3D.h"
 
-Geo3D* GeometryFactory::createGeometry(DrawMode3D mode)
+Geo3D::Ptr GeometryFactory::createGeometry(DrawMode3D mode)
 {
     switch (mode)
     {
@@ -76,92 +76,92 @@ Geo3D* GeometryFactory::createGeometry(DrawMode3D mode)
     }
 }
 
-Geo3D* GeometryFactory::createGeometry(GeoType3D type)
+Geo3D::Ptr GeometryFactory::createGeometry(GeoType3D type)
 {
     return createGeometry(geoTypeToDrawMode(type));
 }
 
-Point3D_Geo* GeometryFactory::createPoint()
+Geo3D::Ptr GeometryFactory::createPoint()
 {
     return new Point3D_Geo();
 }
 
-Line3D_Geo* GeometryFactory::createLine()
+Geo3D::Ptr GeometryFactory::createLine()
 {
     return new Line3D_Geo();
 }
 
-Arc3D_Geo* GeometryFactory::createArc()
+Geo3D::Ptr GeometryFactory::createArc()
 {
     return new Arc3D_Geo();
 }
 
-BezierCurve3D_Geo* GeometryFactory::createBezierCurve()
+Geo3D::Ptr GeometryFactory::createBezierCurve()
 {
     return new BezierCurve3D_Geo();
 }
 
-Triangle3D_Geo* GeometryFactory::createTriangle()
+Geo3D::Ptr GeometryFactory::createTriangle()
 {
     return new Triangle3D_Geo();
 }
 
-Quad3D_Geo* GeometryFactory::createQuad()
+Geo3D::Ptr GeometryFactory::createQuad()
 {
     return new Quad3D_Geo();
 }
 
-Polygon3D_Geo* GeometryFactory::createPolygon()
+Geo3D::Ptr GeometryFactory::createPolygon()
 {
     return new Polygon3D_Geo();
 }
 
-Box3D_Geo* GeometryFactory::createBox()
+Geo3D::Ptr GeometryFactory::createBox()
 {
     return new Box3D_Geo();
 }
 
-Cube3D_Geo* GeometryFactory::createCube()
+Geo3D::Ptr GeometryFactory::createCube()
 {
     return new Cube3D_Geo();
 }
 
-Cylinder3D_Geo* GeometryFactory::createCylinder()
+Geo3D::Ptr GeometryFactory::createCylinder()
 {
     return new Cylinder3D_Geo();
 }
 
-Cone3D_Geo* GeometryFactory::createCone()
+Geo3D::Ptr GeometryFactory::createCone()
 {
     return new Cone3D_Geo();
 }
 
-Sphere3D_Geo* GeometryFactory::createSphere()
+Geo3D::Ptr GeometryFactory::createSphere()
 {
     return new Sphere3D_Geo();
 }
 
-Torus3D_Geo* GeometryFactory::createTorus()
+Geo3D::Ptr GeometryFactory::createTorus()
 {
     return new Torus3D_Geo();
 }
 
-Prism3D_Geo* GeometryFactory::createPrism()
+Geo3D::Ptr GeometryFactory::createPrism()
 {
     return new Prism3D_Geo();
 }
 
-Hemisphere3D_Geo* GeometryFactory::createHemisphere()
+Geo3D::Ptr GeometryFactory::createHemisphere()
 {
     return new Hemisphere3D_Geo();
 }
 
-Ellipsoid3D_Geo* GeometryFactory::createEllipsoid()
+Geo3D::Ptr GeometryFactory::createEllipsoid()
 {
     return new Ellipsoid3D_Geo();
 }
 
-UndefinedGeo3D_Geo* GeometryFactory::createUndefinedGeo()
+Geo3D::Ptr GeometryFactory::createUndefinedGeo()
 {
     return new UndefinedGeo3D_Geo();
 }

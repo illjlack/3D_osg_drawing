@@ -27,6 +27,12 @@ CameraController::CameraController()
     , m_updateTimer(new QTimer(this))
     , m_lastMoveTime(0)
     , m_isMoving(false)
+    , m_isPanning(false)
+    , m_isRotating(false)
+    , m_lastMouseX(0)
+    , m_lastMouseY(0)
+    , m_panSensitivity(0.01)
+    , m_rotateSensitivity(0.01)
 {
     LOG_INFO("创建相机控制器", "相机");
     
@@ -1108,15 +1114,18 @@ void CameraController::updateCameraPosition()
 
 void CameraController::handleWheelZoom(int delta)
 {
+    zoom(delta / 120.0); // 标准滚轮增量
+}
+
+void CameraController::zoom(double delta)
+{
     if (!m_currentManipulator) {
-        LOG_WARNING("滚轮缩放失败：当前操控器为空", "相机");
+        LOG_WARNING("缩放失败：当前操控器为空", "相机");
         return;
     }
     
-    // 滚轮缩放事件（移除调试日志）
-    
-    double zoomFactor = delta > 0 ? 0.9 : 1.1; // 滚轮向上缩小，向下放大
-    zoomFactor *= m_wheelMoveSensitivity;
+    double zoomFactor = delta > 0 ? 0.9 : 1.1; // 正值缩小，负值放大
+    zoomFactor = 1.0 + (zoomFactor - 1.0) * m_wheelMoveSensitivity;
     
     // 根据当前操控器类型执行不同的缩放操作
     switch (m_currentManipulatorType) {
@@ -1125,7 +1134,6 @@ void CameraController::handleWheelZoom(int delta)
             if (m_trackballManipulator) {
                 double distance = m_trackballManipulator->getDistance();
                 m_trackballManipulator->setDistance(distance * zoomFactor);
-                // 轨道球缩放（移除调试日志）
             } else {
                 LOG_WARNING("轨道球操控器为空，无法执行缩放", "相机");
             }
@@ -1139,6 +1147,94 @@ void CameraController::handleWheelZoom(int delta)
             moveForward(moveDistance);
             break;
     }
+}
+
+// 鼠标拖动控制
+void CameraController::startPan(int x, int y)
+{
+    m_isPanning = true;
+    m_lastMouseX = x;
+    m_lastMouseY = y;
+    LOG_INFO(QString("开始平移: (%1, %2)").arg(x).arg(y), "相机");
+}
+
+void CameraController::updatePan(int x, int y)
+{
+    // 平移操作由OSG默认事件处理器处理
+    LOG_INFO(QString("平移操作: (%1, %2)").arg(x).arg(y), "相机");
+}
+
+void CameraController::endPan()
+{
+    m_isPanning = false;
+    LOG_INFO("结束平移", "相机");
+}
+
+void CameraController::updateRotation(int x, int y)
+{
+    // 旋转操作由OSG默认事件处理器处理
+    LOG_INFO(QString("旋转操作: (%1, %2)").arg(x).arg(y), "相机");
+}
+
+void CameraController::endRotation()
+{
+    m_isRotating = false;
+    LOG_INFO("结束旋转", "相机");
+}
+
+// 视图操作
+void CameraController::fitAll()
+{
+    if (!m_currentManipulator) {
+        LOG_WARNING("适应全部失败：当前操控器为空", "相机");
+        return;
+    }
+    
+    // TODO: 需要场景信息来计算包围盒
+    // 暂时使用默认视图
+    osg::Vec3d center(0, 0, 0);
+    osg::Vec3d eye(15, 15, 15);
+    setPosition(eye, center, osg::Vec3d(0, 0, 1));
+    
+    LOG_INFO("适应全部显示", "相机");
+}
+
+void CameraController::resetCamera()
+{
+    if (!m_currentManipulator) {
+        LOG_WARNING("重置相机失败：当前操控器为空", "相机");
+        return;
+    }
+    
+    // 重置到默认位置
+    osg::Vec3d center(0, 0, 0);
+    osg::Vec3d eye(10, 10, 10);
+    setPosition(eye, center, osg::Vec3d(0, 0, 1));
+    
+    LOG_INFO("重置相机位置", "相机");
+}
+
+void CameraController::setViewDirection(const osg::Vec3d& direction, const osg::Vec3d& up)
+{
+    if (!m_currentManipulator) {
+        LOG_WARNING("设置视图方向失败：当前操控器为空", "相机");
+        return;
+    }
+    
+    // 计算视点位置
+    osg::Vec3d center(0, 0, 0);
+    double distance = 15.0; // 默认距离
+    osg::Vec3d normalizedDirection = direction;
+    normalizedDirection.normalize();
+    
+    osg::Vec3d eye = center - normalizedDirection * distance;
+    
+    setPosition(eye, center, up);
+    
+    LOG_INFO(QString("设置视图方向: 方向(%1,%2,%3)")
+             .arg(direction.x(), 0, 'f', 2)
+             .arg(direction.y(), 0, 'f', 2)
+             .arg(direction.z(), 0, 'f', 2), "相机");
 }
 
 void CameraController::onUpdateTimer()

@@ -19,8 +19,8 @@
 
 // ============= 构造函数 =============
 
-GeoNodeManager::GeoNodeManager(Geo3D* parent)
-    : QObject(parent)
+GeoNodeManager::GeoNodeManager(osg::ref_ptr<Geo3D> parent)
+    : QObject(parent.get())
     , m_parent(parent)
     , m_initialized(false)
     , m_selected(false)

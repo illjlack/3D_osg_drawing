@@ -464,13 +464,13 @@ void PropertyEditor3D::updateColorButton(QPushButton* button, const QColor& colo
 }
 
 // 剩余部分保持与当前实现类似的逻辑，但简化了参数处理
-void PropertyEditor3D::setGeo(Geo3D* geo)
+void PropertyEditor3D::setGeo(Geo3D::Ptr geo)
 {
     m_currentGeo = geo;
     updateFromGeo();
 }
 
-void PropertyEditor3D::setSelectedGeos(const std::vector<Geo3D*>& geos)
+void PropertyEditor3D::setSelectedGeos(const std::vector<Geo3D::Ptr>& geos)
 {
     m_selectedGeos = geos;
     if (!geos.empty())
@@ -486,7 +486,7 @@ void PropertyEditor3D::setSelectedGeos(const std::vector<Geo3D*>& geos)
 
 void PropertyEditor3D::updateFromGeo()
 {
-    if (!m_currentGeo)
+    if (!m_currentGeo.valid())
     {
         updateGlobalSettings();
         return;
@@ -595,9 +595,9 @@ void PropertyEditor3D::onPointShapeChanged()
     
     if (!m_selectedGeos.empty())
     {
-        for (auto* geo : m_selectedGeos)
+        for (auto& geo : m_selectedGeos)
         {
-            if (geo)
+            if (geo.valid())
             {
                 GeoParameters3D params = geo->getParameters();
                 params.pointShape = shape;
@@ -605,7 +605,7 @@ void PropertyEditor3D::onPointShapeChanged()
             }
         }
     }
-    else if (m_currentGeo)
+    else if (m_currentGeo.valid())
     {
         GeoParameters3D params = m_currentGeo->getParameters();
         params.pointShape = shape;
@@ -627,9 +627,9 @@ void PropertyEditor3D::onSubdivisionLevelChanged()
     
     if (!m_selectedGeos.empty())
     {
-        for (auto* geo : m_selectedGeos)
+        for (auto& geo : m_selectedGeos)
         {
-            if (geo)
+            if (geo.valid())
             {
                 GeoParameters3D params = geo->getParameters();
                 params.subdivisionLevel = level;
@@ -637,7 +637,7 @@ void PropertyEditor3D::onSubdivisionLevelChanged()
             }
         }
     }
-    else if (m_currentGeo)
+    else if (m_currentGeo.valid())
     {
         GeoParameters3D params = m_currentGeo->getParameters();
         params.subdivisionLevel = level;
@@ -661,9 +661,9 @@ void PropertyEditor3D::onPointSizeChanged()
     
     if (!m_selectedGeos.empty())
     {
-        for (auto* geo : m_selectedGeos)
+        for (auto& geo : m_selectedGeos)
         {
-            if (geo)
+            if (geo.valid())
             {
                 GeoParameters3D params = geo->getParameters();
                 params.pointSize = size;
@@ -671,7 +671,7 @@ void PropertyEditor3D::onPointSizeChanged()
             }
         }
     }
-    else if (m_currentGeo)
+    else if (m_currentGeo.valid())
     {
         GeoParameters3D params = m_currentGeo->getParameters();
         params.pointSize = size;
@@ -698,9 +698,9 @@ void PropertyEditor3D::onPointColorChanged()
         
         if (!m_selectedGeos.empty())
         {
-            for (auto* geo : m_selectedGeos)
+            for (auto& geo : m_selectedGeos)
             {
-                if (geo)
+                if (geo.valid())
                 {
                     GeoParameters3D params = geo->getParameters();
                     params.pointColor = color;
@@ -708,7 +708,7 @@ void PropertyEditor3D::onPointColorChanged()
                 }
             }
         }
-        else if (m_currentGeo)
+        else if (m_currentGeo.valid())
         {
             GeoParameters3D params = m_currentGeo->getParameters();
             params.pointColor = color;
@@ -731,9 +731,9 @@ void PropertyEditor3D::onLineWidthChanged()
     
     if (!m_selectedGeos.empty())
     {
-        for (auto* geo : m_selectedGeos)
+        for (auto& geo : m_selectedGeos)
         {
-            if (geo)
+            if (geo.valid())
             {
                 GeoParameters3D params = geo->getParameters();
                 params.lineWidth = width;
@@ -741,7 +741,7 @@ void PropertyEditor3D::onLineWidthChanged()
             }
         }
     }
-    else if (m_currentGeo)
+    else if (m_currentGeo.valid())
     {
         GeoParameters3D params = m_currentGeo->getParameters();
         params.lineWidth = width;
@@ -768,9 +768,9 @@ void PropertyEditor3D::onLineColorChanged()
         
         if (!m_selectedGeos.empty())
         {
-            for (auto* geo : m_selectedGeos)
+            for (auto& geo : m_selectedGeos)
             {
-                if (geo)
+                if (geo.valid())
                 {
                     GeoParameters3D params = geo->getParameters();
                     params.lineColor = color;
@@ -778,7 +778,7 @@ void PropertyEditor3D::onLineColorChanged()
                 }
             }
         }
-        else if (m_currentGeo)
+        else if (m_currentGeo.valid())
         {
             GeoParameters3D params = m_currentGeo->getParameters();
             params.lineColor = color;
@@ -804,9 +804,9 @@ void PropertyEditor3D::onLineStyleChanged()
     
     if (!m_selectedGeos.empty())
     {
-        for (auto* geo : m_selectedGeos)
+        for (auto& geo : m_selectedGeos)
         {
-            if (geo)
+            if (geo.valid())
             {
                 GeoParameters3D params = geo->getParameters();
                 params.lineStyle = style;
@@ -814,7 +814,7 @@ void PropertyEditor3D::onLineStyleChanged()
             }
         }
     }
-    else if (m_currentGeo)
+    else if (m_currentGeo.valid())
     {
         GeoParameters3D params = m_currentGeo->getParameters();
         params.lineStyle = style;
@@ -836,9 +836,9 @@ void PropertyEditor3D::onLineDashPatternChanged()
     
     if (!m_selectedGeos.empty())
     {
-        for (auto* geo : m_selectedGeos)
+        for (auto& geo : m_selectedGeos)
         {
-            if (geo)
+            if (geo.valid())
             {
                 GeoParameters3D params = geo->getParameters();
                 params.lineDashPattern = pattern;
@@ -846,7 +846,7 @@ void PropertyEditor3D::onLineDashPatternChanged()
             }
         }
     }
-    else if (m_currentGeo)
+    else if (m_currentGeo.valid())
     {
         GeoParameters3D params = m_currentGeo->getParameters();
         params.lineDashPattern = pattern;
@@ -873,9 +873,9 @@ void PropertyEditor3D::onFillColorChanged()
         
         if (!m_selectedGeos.empty())
         {
-            for (auto* geo : m_selectedGeos)
+            for (auto& geo : m_selectedGeos)
             {
-                if (geo)
+                if (geo.valid())
                 {
                     GeoParameters3D params = geo->getParameters();
                     params.fillColor = color;
@@ -883,7 +883,7 @@ void PropertyEditor3D::onFillColorChanged()
                 }
             }
         }
-        else if (m_currentGeo)
+        else if (m_currentGeo.valid())
         {
             GeoParameters3D params = m_currentGeo->getParameters();
             params.fillColor = color;
@@ -914,9 +914,9 @@ void PropertyEditor3D::onShowPointsChanged()
     
     if (!m_selectedGeos.empty())
     {
-        for (auto* geo : m_selectedGeos)
+        for (auto& geo : m_selectedGeos)
         {
-            if (geo)
+            if (geo.valid())
             {
                 GeoParameters3D params = geo->getParameters();
                 params.showPoints = show;
@@ -928,7 +928,7 @@ void PropertyEditor3D::onShowPointsChanged()
             }
         }
     }
-    else if (m_currentGeo)
+    else if (m_currentGeo.valid())
     {
         GeoParameters3D params = m_currentGeo->getParameters();
         params.showPoints = show;
@@ -964,9 +964,9 @@ void PropertyEditor3D::onShowEdgesChanged()
     
     if (!m_selectedGeos.empty())
     {
-        for (auto* geo : m_selectedGeos)
+        for (auto& geo : m_selectedGeos)
         {
-            if (geo)
+            if (geo.valid())
             {
                 GeoParameters3D params = geo->getParameters();
                 params.showEdges = show;
@@ -977,7 +977,7 @@ void PropertyEditor3D::onShowEdgesChanged()
             }
         }
     }
-    else if (m_currentGeo)
+    else if (m_currentGeo.valid())
     {
         GeoParameters3D params = m_currentGeo->getParameters();
         params.showEdges = show;
@@ -1013,9 +1013,9 @@ void PropertyEditor3D::onShowFacesChanged()
     
     if (!m_selectedGeos.empty())
     {
-        for (auto* geo : m_selectedGeos)
+        for (auto& geo : m_selectedGeos)
         {
-            if (geo)
+            if (geo.valid())
             {
                 GeoParameters3D params = geo->getParameters();
                 params.showFaces = show;
@@ -1026,7 +1026,7 @@ void PropertyEditor3D::onShowFacesChanged()
             }
         }
     }
-    else if (m_currentGeo)
+    else if (m_currentGeo.valid())
     {
         GeoParameters3D params = m_currentGeo->getParameters();
         params.showFaces = show;

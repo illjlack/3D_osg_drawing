@@ -37,17 +37,14 @@
 #include <set>
 #include <algorithm>
 
-// 前向声明
-class Geo3D;
-
-// 几何对象工厂
-Geo3D* createGeo3D(DrawMode3D mode);
-
 // 三维几何对象基类
 class Geo3D : public QObject, public osg::Referenced
 {
     Q_OBJECT
 public:
+    // 类型别名定义
+    using Ptr = osg::ref_ptr<Geo3D>;
+    
     Geo3D();
     virtual ~Geo3D();
 

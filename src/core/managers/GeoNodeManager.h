@@ -10,13 +10,14 @@
 #include <osg/BoundingBox>
 #include <QObject>
 
+// 前向声明
 class Geo3D;
 
 class GeoNodeManager : public QObject
 {
     Q_OBJECT
 public:
-    explicit GeoNodeManager(Geo3D* parent);
+    explicit GeoNodeManager(osg::ref_ptr<Geo3D> parent);
     ~GeoNodeManager() = default;
 
     // ============= 节点访问 =============
@@ -71,7 +72,7 @@ private:
     void setupBoundingBoxRendering();
 
     // ============= 成员变量 =============
-    Geo3D* m_parent;
+    osg::ref_ptr<Geo3D> m_parent;
     
     // 节点层次结构
     osg::ref_ptr<osg::Group> m_osgNode;

@@ -19,7 +19,7 @@ const std::string GeoOsgbIO::SCENE_ROOT_NAME = NodeTags3D::SCENE_ROOT;
 // 公共接口实现
 // ============================================================================
 
-bool GeoOsgbIO::saveGeoList(const QString& filePath, const std::vector<Geo3D*>& geoList)
+bool GeoOsgbIO::saveGeoList(const QString& filePath, const std::vector<Geo3D::Ptr>& geoList)
 {
     if (geoList.empty()) {
         LOG_WARNING("保存的几何体列表为空", "文件IO");
@@ -37,7 +37,7 @@ bool GeoOsgbIO::saveGeoList(const QString& filePath, const std::vector<Geo3D*>& 
     sceneRoot->setName(SCENE_ROOT_NAME);
 
     // 将每个几何体的OSG节点添加到场景根节点下
-    for (Geo3D* geo : geoList) {
+    for (Geo3D::Ptr geo : geoList) {
         if (!geo) continue;
         
         osg::ref_ptr<osg::Node> geoNode = geo->mm_node()->getOSGNode();
@@ -62,9 +62,9 @@ bool GeoOsgbIO::saveGeoList(const QString& filePath, const std::vector<Geo3D*>& 
     return success;
 }
 
-std::vector<Geo3D*> GeoOsgbIO::loadGeoList(const QString& filePath)
+std::vector<Geo3D::Ptr> GeoOsgbIO::loadGeoList(const QString& filePath)
 {
-    std::vector<Geo3D*> result;
+    std::vector<Geo3D::Ptr> result;
 
     // 检查OSG插件是否可用
     if (!osgDB::Registry::instance()->getReaderWriterForExtension("osgb")) {
@@ -94,7 +94,7 @@ std::vector<Geo3D*> GeoOsgbIO::loadGeoList(const QString& filePath)
             for (unsigned int i = 0; i < sceneGroup->getNumChildren(); ++i) {
                 osg::Node* childNode = sceneGroup->getChild(i);
                 if (childNode) {
-                    Geo3D* geo = loadGeoDataFromNode(childNode);
+                    Geo3D::Ptr geo = loadGeoDataFromNode(childNode);
                     if (geo) {
                         // 将OSG节点设置给几何体
                         geo->mm_node()->setOSGNode(childNode);
@@ -108,7 +108,7 @@ std::vector<Geo3D*> GeoOsgbIO::loadGeoList(const QString& filePath)
         // 不是我们软件保存的文件，直接用未定义对象加载
         LOG_INFO("检测到外部文件，用未定义对象加载", "文件IO");
         
-        Geo3D* undefinedGeo = GeometryFactory::createGeometry(Geo_Undefined3D);
+        Geo3D::Ptr undefinedGeo = GeometryFactory::createGeometry(Geo_Undefined3D);
         if (undefinedGeo) {
             undefinedGeo->mm_node()->setOSGNode(rootNode.get());
             result.push_back(undefinedGeo);
@@ -123,7 +123,7 @@ std::vector<Geo3D*> GeoOsgbIO::loadGeoList(const QString& filePath)
 // 私有辅助函数实现
 // ============================================================================
 
-void GeoOsgbIO::saveGeoDataToNode(osg::Node* node, Geo3D* geo)
+void GeoOsgbIO::saveGeoDataToNode(osg::Node* node, Geo3D::Ptr geo)
 {
     if (!node || !geo) return;
 
@@ -141,7 +141,7 @@ void GeoOsgbIO::saveGeoDataToNode(osg::Node* node, Geo3D* geo)
     LOG_INFO("几何体数据已保存到OSG节点", "文件IO");
 }
 
-Geo3D* GeoOsgbIO::loadGeoDataFromNode(osg::Node* node)
+Geo3D::Ptr GeoOsgbIO::loadGeoDataFromNode(osg::Node* node)
 {
     if (!node) return nullptr;
 
@@ -169,7 +169,7 @@ Geo3D* GeoOsgbIO::loadGeoDataFromNode(osg::Node* node)
     GeoType3D geoType = static_cast<GeoType3D>(geoTypeInt);
 
     // 根据类型创建几何体对象
-    Geo3D* geo = GeometryFactory::createGeometry(geoType);
+    Geo3D::Ptr geo = GeometryFactory::createGeometry(geoType);
     if (!geo) {
         LOG_ERROR(QString("创建几何体对象失败，类型: %1").arg(geoTypeInt), "文件IO");
         return nullptr;

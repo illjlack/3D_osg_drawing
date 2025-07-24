@@ -5,7 +5,7 @@
 #include "FlatHouse3D.h"
 #include "LHouse3D.h"
 
-Geo3D* BuildingFactory::createBuilding(BuildingType3D type)
+Geo3D::Ptr BuildingFactory::createBuilding(BuildingType3D type)
 {
     switch (type)
     {
@@ -24,27 +24,27 @@ Geo3D* BuildingFactory::createBuilding(BuildingType3D type)
     }
 }
 
-GableHouse3D_Geo* BuildingFactory::createGableHouse()
+Geo3D::Ptr BuildingFactory::createGableHouse()
 {
     return new GableHouse3D_Geo();
 }
 
-SpireHouse3D_Geo* BuildingFactory::createSpireHouse()
+Geo3D::Ptr BuildingFactory::createSpireHouse()
 {
     return new SpireHouse3D_Geo();
 }
 
-DomeHouse3D_Geo* BuildingFactory::createDomeHouse()
+Geo3D::Ptr BuildingFactory::createDomeHouse()
 {
     return new DomeHouse3D_Geo();
 }
 
-FlatHouse3D_Geo* BuildingFactory::createFlatHouse()
+Geo3D::Ptr BuildingFactory::createFlatHouse()
 {
     return new FlatHouse3D_Geo();
 }
 
-LHouse3D_Geo* BuildingFactory::createLHouse()
+Geo3D::Ptr BuildingFactory::createLHouse()
 {
     return new LHouse3D_Geo();
 }

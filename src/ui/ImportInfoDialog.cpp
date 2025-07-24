@@ -9,12 +9,12 @@
 #include <osg/ComputeBoundsVisitor>
 #include <cmath>
 
-ImportInfoDialog::ImportInfoDialog(Geo3D* importedGeo, QWidget* parent)
+ImportInfoDialog::ImportInfoDialog(osg::ref_ptr<Geo3D> importedGeo, QWidget* parent)
     : QDialog(parent)
     , m_geometry(importedGeo)
     , m_updating(false)
 {
-    if (!m_geometry) {
+    if (!m_geometry.valid()) {
         LOG_ERROR("导入几何体为空", "导入对话框");
         reject();
         return;

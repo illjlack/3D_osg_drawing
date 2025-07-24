@@ -21,7 +21,8 @@ protected:
     virtual void buildVertexGeometries() override;
     virtual void buildEdgeGeometries() override;
     virtual void buildFaceGeometries() override;
-
+    virtual void buildControlPointGeometries() override;
+    
 private:
     
 private:

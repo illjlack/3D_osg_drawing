@@ -13,18 +13,17 @@ UndefinedGeo3D_Geo::UndefinedGeo3D_Geo()
 
 void UndefinedGeo3D_Geo::buildVertexGeometries()
 {
-    mm_node()->clearVertexGeometry();
-    
 }
 
 void UndefinedGeo3D_Geo::buildEdgeGeometries()
 {
-    mm_node()->clearEdgeGeometry();
 }
 
 void UndefinedGeo3D_Geo::buildFaceGeometries()
 {
-    mm_node()->clearFaceGeometry();
 }
 
+void UndefinedGeo3D_Geo::buildControlPointGeometries()
+{
+}
 

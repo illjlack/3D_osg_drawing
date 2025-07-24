@@ -4,9 +4,7 @@
 #include <glm/glm.hpp>
 #include <osg/Geometry>
 #include <osg/ref_ptr>
-
-// 前向声明
-class Geo3D;
+#include "../GeometryBase.h"
 
 // 拾取特征类型
 enum class PickFeatureType {
@@ -19,7 +17,7 @@ enum class PickFeatureType {
 // 拾取结果
 struct PickResult {
     bool hasResult = false;
-    Geo3D* geometry = nullptr;
+    Geo3D::Ptr geometry = nullptr;
     glm::dvec3 worldPosition{0.0};
     glm::dvec3 surfaceNormal{0.0};
     double distance = FLT_MAX;

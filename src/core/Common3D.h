@@ -342,6 +342,7 @@ void initializeGlobal3DSettings();
 
 // 实用函数
 QString drawMode3DToString(DrawMode3D mode);
+QString geoType3DToString(GeoType3D type);
 QString pointShape3DToString(PointShape3D shape);
 QString lineStyle3DToString(LineStyle3D style);
 QString fillType3DToString(FillType3D type);

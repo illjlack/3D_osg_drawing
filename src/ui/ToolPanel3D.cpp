@@ -107,10 +107,10 @@ void ToolPanel3D::createGeometryPage()
     basicLabel->setObjectName("subGroupLabel");
     layout->addWidget(basicLabel);
     
-    m_pointButton = createStyledButton("🔘", "点", "绘制点", DrawPoint3D);
-    m_lineButton = createStyledButton("📏", "线", "绘制直线", DrawLine3D);
-    m_arcButton = createStyledButton("🌙", "圆弧", "绘制圆弧", DrawArc3D);
-    m_bezierButton = createStyledButton("〰️", "贝塞尔", "绘制贝塞尔曲线", DrawBezierCurve3D);
+    m_pointButton = createStyledButton("🔘", "点", "绘制点", DrawPoint3D, "1");
+    m_lineButton = createStyledButton("📏", "线", "绘制直线", DrawLine3D, "2");
+    m_arcButton = createStyledButton("🌙", "圆弧", "绘制圆弧", DrawArc3D, "3");
+    m_bezierButton = createStyledButton("〰️", "贝塞尔", "绘制贝塞尔曲线", DrawBezierCurve3D, "4");
     
     layout->addWidget(m_pointButton);
     layout->addWidget(m_lineButton);
@@ -122,9 +122,9 @@ void ToolPanel3D::createGeometryPage()
     planeLabel->setObjectName("subGroupLabel");
     layout->addWidget(planeLabel);
     
-    m_triangleButton = createStyledButton("🔺", "三角形", "绘制三角形", DrawTriangle3D);
-    m_quadButton = createStyledButton("🔸", "四边形", "绘制四边形", DrawQuad3D);
-    m_polygonButton = createStyledButton("⬟", "多边形", "绘制多边形", DrawPolygon3D);
+    m_triangleButton = createStyledButton("🔺", "三角形", "绘制三角形", DrawTriangle3D, "5");
+    m_quadButton = createStyledButton("🔸", "四边形", "绘制四边形", DrawQuad3D, "6");
+    m_polygonButton = createStyledButton("⬟", "多边形", "绘制多边形", DrawPolygon3D, "7");
     
     layout->addWidget(m_triangleButton);
     layout->addWidget(m_quadButton);
@@ -135,9 +135,9 @@ void ToolPanel3D::createGeometryPage()
     basicSolidLabel->setObjectName("subGroupLabel");
     layout->addWidget(basicSolidLabel);
     
-    m_cubeButton = createStyledButton("⬜", "正方体", "绘制正方体", DrawCube3D);
-    m_boxButton = createStyledButton("📦", "长方体", "绘制长方体", DrawBox3D);
-    m_sphereButton = createStyledButton("⚪", "球体", "绘制球体", DrawSphere3D);
+    m_cubeButton = createStyledButton("⬜", "正方体", "绘制正方体", DrawCube3D, "8");
+    m_boxButton = createStyledButton("📦", "长方体", "绘制长方体", DrawBox3D, "9");
+    m_sphereButton = createStyledButton("⚪", "球体", "绘制球体", DrawSphere3D, "0");
     m_cylinderButton = createStyledButton("🛢️", "圆柱", "绘制圆柱", DrawCylinder3D);
     m_coneButton = createStyledButton("🦀", "圆锥", "绘制圆锥", DrawCone3D);
     m_torusButton = createStyledButton("🍩", "圆环", "绘制圆环", DrawTorus3D);
@@ -375,12 +375,22 @@ void ToolPanel3D::createCollapsibleSkyboxSection(QVBoxLayout* parentLayout)
     connect(m_skyboxCustomButton, &QPushButton::clicked, this, &ToolPanel3D::onSkyboxCustomClicked);
 }
 
-QPushButton* ToolPanel3D::createStyledButton(const QString& emoji, const QString& text, const QString& tooltip, DrawMode3D mode)
+QPushButton* ToolPanel3D::createStyledButton(const QString& emoji, const QString& text, const QString& tooltip, DrawMode3D mode, const QString& shortcut)
 {
     QPushButton* button = new QPushButton();
     button->setObjectName("geometryButton");
-    button->setText(QString("%1 %2").arg(emoji).arg(text));
-    button->setToolTip(tooltip);
+    
+    // 如果有快捷键，添加到按钮文本中
+    QString buttonText;
+    if (!shortcut.isEmpty()) {
+        buttonText = QString("%1 %2 [%3]").arg(emoji).arg(text).arg(shortcut);
+        button->setToolTip(QString("%1 (快捷键: %2)").arg(tooltip).arg(shortcut));
+    } else {
+        buttonText = QString("%1 %2").arg(emoji).arg(text);
+        button->setToolTip(tooltip);
+    }
+    
+    button->setText(buttonText);
     button->setCheckable(true);
     button->setProperty("drawMode", static_cast<int>(mode));
     button->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);

@@ -17,20 +17,20 @@ class GeoOsgbIO
 {
 public:
     // 保存Geo3D对象列表到osgb文件
-    static bool saveGeoList(const QString& filePath, const std::vector<Geo3D*>& geoList);
+    static bool saveGeoList(const QString& filePath, const std::vector<Geo3D::Ptr>& geoList);
     
     // 从osgb文件加载Geo3D对象列表
-    static std::vector<Geo3D*> loadGeoList(const QString& filePath);
+    static std::vector<Geo3D::Ptr> loadGeoList(const QString& filePath);
 
 private:
     // 场景根节点标识名
     static const std::string SCENE_ROOT_NAME;
     
     // 在OSG节点中保存Geo3D对象信息
-    static void saveGeoDataToNode(osg::Node* node, Geo3D* geo);
+    static void saveGeoDataToNode(osg::Node* node, Geo3D::Ptr geo);
     
     // 从OSG节点中读取Geo3D对象信息
-    static Geo3D* loadGeoDataFromNode(osg::Node* node);
+    static Geo3D::Ptr loadGeoDataFromNode(osg::Node* node);
 }; 
 
 

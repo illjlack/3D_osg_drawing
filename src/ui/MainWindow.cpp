@@ -17,6 +17,7 @@
 #include <QGroupBox>
 #include <QCheckBox>
 #include <QSlider>
+#include <QKeyEvent>
 #include "PropertyEditor3D.h"
 #include "ToolPanel3D.h"
 #include "PropertyEditor3D.h"
@@ -499,6 +500,7 @@ void MainWindow::connectSignals()
         });
         connect(m_osgWidget, &OSGWidget::simplePickingResult, this, &MainWindow::onSimplePickingResult);
         connect(m_osgWidget, &OSGWidget::coordinateSystemSettingsRequested, this, &MainWindow::onCoordinateSystemSettings);
+        connect(m_osgWidget, &OSGWidget::drawModeChanged, this, &MainWindow::onDrawModeChangedFromOSG);
         // 连接相机操控器类型变化 - 直接连接CameraController
         connect(m_osgWidget->getCameraController(), &CameraController::manipulatorTypeChanged, this, [this](ManipulatorType type) {
             if (m_manipulatorCombo) {
@@ -594,7 +596,7 @@ void MainWindow::updateObjectCount()
 {
     if (m_statusBar3D && m_osgWidget)
     {
-        const auto& allGeos = m_osgWidget->getAllGeos();
+        const auto& allGeos = m_osgWidget->getSceneManager()->getAllGeometries();
         int count = static_cast<int>(allGeos.size());
         m_statusBar3D->updateObjectCount(count);
     }
@@ -620,7 +622,7 @@ void MainWindow::onFileNew()
     
     if (m_osgWidget)
     {
-        m_osgWidget->removeAllGeos();
+        m_osgWidget->getSceneManager()->removeAllGeometries();
         
 
     }
@@ -642,19 +644,19 @@ void MainWindow::onFileOpen()
     {
         if (m_osgWidget)
         {
-            m_osgWidget->removeAllGeos();
+            m_osgWidget->getSceneManager()->removeAllGeometries();
             
             // 使用新的简化接口加载几何体列表
-            std::vector<Geo3D*> loadedGeos = GeoOsgbIO::loadGeoList(fileName);
+            std::vector<Geo3D::Ptr> loadedGeos = GeoOsgbIO::loadGeoList(fileName);
             if (!loadedGeos.empty())
             {
                 // 成功加载几何体
                 LOG_INFO(QString("开始添加 %1 个几何对象到场景").arg(loadedGeos.size()), "文件");
-                for (Geo3D* geo : loadedGeos)
+                for (Geo3D::Ptr geo : loadedGeos)
                 {
                     if (geo)
                     {
-                        m_osgWidget->addGeo(geo);
+                        m_osgWidget->getSceneManager()->addGeometry(geo);
                     }
                 }
                 
@@ -700,10 +702,10 @@ void MainWindow::onFileSave()
         setWindowTitle(tr("3D Drawing Board - %1").arg(QFileInfo(savePath).baseName()));
         
         // 获取所有几何对象
-        const auto& allGeos = m_osgWidget->getAllGeos();
+        const auto& allGeos = m_osgWidget->getSceneManager()->getAllGeometries();
         
-        // 转换为std::vector<Geo3D*>
-        std::vector<Geo3D*> geoList;
+        // 转换为std::vector<Geo3D::Ptr>
+        std::vector<Geo3D::Ptr> geoList;
         for (const auto& geoRef : allGeos)
         {
             if (geoRef)
@@ -743,10 +745,10 @@ void MainWindow::onFileSaveAs()
             LOG_INFO(QString("用户选择了另存为路径: %1").arg(fileName), "文件");
             
             // 获取所有几何对象
-            const auto& allGeos = m_osgWidget->getAllGeos();
+            const auto& allGeos = m_osgWidget->getSceneManager()->getAllGeometries();
             
-            // 转换为std::vector<Geo3D*>
-            std::vector<Geo3D*> geoList;
+            // 转换为std::vector<Geo3D::Ptr>
+            std::vector<Geo3D::Ptr> geoList;
             for (const auto& geoRef : allGeos)
             {
                 if (geoRef)
@@ -824,9 +826,9 @@ void MainWindow::onEditSelectAll()
 // 视图菜单槽函数
 void MainWindow::onViewResetCamera()
 {
-    if (m_osgWidget)
+    if (m_osgWidget && m_osgWidget->getCameraController())
     {
-        m_osgWidget->resetCamera();
+        m_osgWidget->getCameraController()->resetCamera();
         updateStatusBar(tr("重置相机"));
         LOG_INFO("重置相机视角", "视图");
     }
@@ -834,9 +836,9 @@ void MainWindow::onViewResetCamera()
 
 void MainWindow::onViewFitAll()
 {
-    if (m_osgWidget)
+    if (m_osgWidget && m_osgWidget->getCameraController())
     {
-        m_osgWidget->fitAll();
+        m_osgWidget->getCameraController()->fitAll();
         updateStatusBar(tr("适应窗口"));
         LOG_INFO("适应窗口显示", "视图");
     }
@@ -846,7 +848,7 @@ void MainWindow::onViewTop()
 {
     if (m_osgWidget)
     {
-        m_osgWidget->setViewDirection(glm::dvec3(0, 0, -1), glm::dvec3(0, 1, 0));
+        m_osgWidget->getCameraController()->setViewDirection(osg::Vec3d(0, 0, -1), osg::Vec3d(0, 1, 0));
         updateStatusBar(tr("俯视图"));
         LOG_INFO("切换到俯视图", "视图");
     }
@@ -856,7 +858,7 @@ void MainWindow::onViewFront()
 {
     if (m_osgWidget)
     {
-        m_osgWidget->setViewDirection(glm::dvec3(0, -1, 0), glm::dvec3(0, 0, 1));
+        m_osgWidget->getCameraController()->setViewDirection(osg::Vec3d(0, -1, 0), osg::Vec3d(0, 0, 1));
         updateStatusBar(tr("前视图"));
         LOG_INFO("切换到前视图", "视图");
     }
@@ -866,7 +868,7 @@ void MainWindow::onViewRight()
 {
     if (m_osgWidget)
     {
-        m_osgWidget->setViewDirection(glm::dvec3(-1, 0, 0), glm::dvec3(0, 0, 1));
+        m_osgWidget->getCameraController()->setViewDirection(osg::Vec3d(-1, 0, 0), osg::Vec3d(0, 0, 1));
         updateStatusBar(tr("右视图"));
         LOG_INFO("切换到右视图", "视图");
     }
@@ -876,7 +878,7 @@ void MainWindow::onViewIsometric()
 {
     if (m_osgWidget)
     {
-        m_osgWidget->setViewDirection(glm::dvec3(-1, -1, -1), glm::dvec3(0, 0, 1));
+        m_osgWidget->getCameraController()->setViewDirection(osg::Vec3d(-1, -1, -1), osg::Vec3d(0, 0, 1));
         updateStatusBar(tr("等轴测图"));
         LOG_INFO("切换到等轴测图", "视图");
     }
@@ -886,7 +888,7 @@ void MainWindow::onViewWireframe()
 {
     if (m_osgWidget)
     {
-        m_osgWidget->setWireframeMode(true);
+        m_osgWidget->getSceneManager()->setWireframeMode(true);
         updateStatusBar(tr("线框模式"));
         LOG_INFO("切换到线框模式", "显示");
     }
@@ -896,7 +898,7 @@ void MainWindow::onViewShaded()
 {
     if (m_osgWidget)
     {
-        m_osgWidget->setShadedMode(true);
+        m_osgWidget->getSceneManager()->setShadedMode(true);
         updateStatusBar(tr("着色模式"));
         LOG_INFO("切换到着色模式", "显示");
     }
@@ -906,8 +908,8 @@ void MainWindow::onViewShadedWireframe()
 {
     if (m_osgWidget)
     {
-        m_osgWidget->setWireframeMode(true);
-        m_osgWidget->setShadedMode(true);
+        m_osgWidget->getSceneManager()->setWireframeMode(true);
+        m_osgWidget->getSceneManager()->setShadedMode(true);
         updateStatusBar(tr("着色+线框模式"));
         LOG_INFO("切换到着色+线框模式", "显示");
     }
@@ -930,7 +932,8 @@ void MainWindow::onDrawModeChanged(DrawMode3D mode)
     // 通过OSGWidget设置绘制模式，确保状态正确重置
     if (m_osgWidget)
     {
-        m_osgWidget->setDrawMode(mode);
+        // setDrawMode现在直接设置全局变量，不再通过OSGWidget
+        GlobalDrawMode3D = mode;
     }
     else
     {
@@ -942,20 +945,28 @@ void MainWindow::onDrawModeChanged(DrawMode3D mode)
     LOG_INFO(tr("切换到绘制模式: %1").arg(drawMode3DToString(mode)), "模式");
 }
 
-void MainWindow::onGeoSelected(Geo3D* geo)
+void MainWindow::onDrawModeChangedFromOSG(DrawMode3D mode)
+{
+    // 来自OSGWidget的绘制模式改变信号，只需要更新UI状态
+    updateDrawModeUI();
+    updateStatusBar(tr("快捷键切换到: %1").arg(drawMode3DToString(mode)));
+    LOG_INFO(tr("快捷键切换到: %1").arg(drawMode3DToString(mode)), "快捷键");
+}
+
+void MainWindow::onGeoSelected(osg::ref_ptr<Geo3D> geo)
 {
     if (m_propertyEditor)
     {
         // 检查是否有多个选中的对象
-        if (m_osgWidget && m_osgWidget->getSelectionCount() > 1)
+        if (m_osgWidget && m_osgWidget->getSceneManager()->getSelectionCount() > 1)
         {
             // 多选情况：显示第一个选中对象的属性
-            const auto& selectedGeos = m_osgWidget->getSelectedGeos();
+            const auto& selectedGeos = m_osgWidget->getSceneManager()->getSelectedGeometries();
             if (!selectedGeos.empty())
             {
                 m_propertyEditor->setSelectedGeos(selectedGeos);
-                updateStatusBar(tr("选中 %1 个几何对象").arg(m_osgWidget->getSelectionCount()));
-                LOG_INFO(tr("选中 %1 个几何对象").arg(m_osgWidget->getSelectionCount()), "选择");
+                updateStatusBar(tr("选中 %1 个几何对象").arg(m_osgWidget->getSceneManager()->getSelectionCount()));
+                LOG_INFO(tr("选中 %1 个几何对象").arg(m_osgWidget->getSceneManager()->getSelectionCount()), "选择");
             }
         }
         else
@@ -1070,7 +1081,7 @@ void MainWindow::onViewSkybox()
     if (!action || !m_osgWidget) return;
     
     bool enabled = action->isChecked();
-    m_osgWidget->enableSkybox(enabled);
+    m_osgWidget->getSceneManager()->enableSkybox(enabled);
     
     updateStatusBar(enabled ? "天空盒已启用" : "天空盒已禁用");
 }
@@ -1079,7 +1090,7 @@ void MainWindow::onToolPanelSkyboxEnabled(bool enabled)
 {
     if (!m_osgWidget) return;
     
-    m_osgWidget->enableSkybox(enabled);
+    m_osgWidget->getSceneManager()->enableSkybox(enabled);
     
     updateStatusBar(enabled ? "天空盒已启用" : "天空盒已禁用");
     LOG_INFO(enabled ? "天空盒已启用" : "天空盒已禁用", "天空盒");
@@ -1109,7 +1120,7 @@ void MainWindow::onSkyboxGradient()
             osg::Vec4 osgTopColor(topColor.redF(), topColor.greenF(), topColor.blueF(), topColor.alphaF());
             osg::Vec4 osgBottomColor(bottomColor.redF(), bottomColor.greenF(), bottomColor.blueF(), bottomColor.alphaF());
             
-            m_osgWidget->setSkyboxGradient(osgTopColor, osgBottomColor);
+            m_osgWidget->getSceneManager()->setSkyboxGradient(osgTopColor, osgBottomColor);
             updateStatusBar("已设置渐变天空盒");
             LOG_SUCCESS("已设置渐变天空盒", "天空盒");
         }
@@ -1131,7 +1142,7 @@ void MainWindow::onSkyboxSolid()
         // 转换为OSG颜色格式
         osg::Vec4 osgColor(color.redF(), color.greenF(), color.blueF(), color.alphaF());
         
-        m_osgWidget->setSkyboxSolidColor(osgColor);
+        m_osgWidget->getSceneManager()->setSkyboxSolidColor(osgColor);
         updateStatusBar("已设置纯色天空盒");
         LOG_SUCCESS("已设置纯色天空盒", "天空盒");
     }
@@ -1167,7 +1178,7 @@ void MainWindow::onSkyboxCustom()
         std::string positiveZ = fileNames[4].toStdString();
         std::string negativeZ = fileNames[5].toStdString();
         
-        m_osgWidget->setSkyboxCubeMap(positiveX, negativeX, positiveY, negativeY, positiveZ, negativeZ);
+        m_osgWidget->getSceneManager()->setSkyboxCubeMap(positiveX, negativeX, positiveY, negativeY, positiveZ, negativeZ);
         updateStatusBar("已设置自定义立方体贴图天空盒");
         LOG_SUCCESS("已设置自定义立方体贴图天空盒", "天空盒");
     }
@@ -1184,15 +1195,15 @@ void MainWindow::onCoordinateSystemSettings()
     if (dialog.exec() == QDialog::Accepted)
     {
         // 如果天空盒已启用，重新设置天空盒以应用新的范围
-        if (m_osgWidget && m_osgWidget->isSkyboxEnabled())
+        if (m_osgWidget && m_osgWidget->getSceneManager()->isSkyboxEnabled())
         {
-            m_osgWidget->refreshSkybox();
+            m_osgWidget->getSceneManager()->refreshSkybox();
         }
         
         // 刷新坐标系显示
         if (m_osgWidget)
         {
-            m_osgWidget->refreshCoordinateSystem();
+            m_osgWidget->getSceneManager()->refreshCoordinateSystem();
         }
         
         // 更新状态栏显示
@@ -1219,7 +1230,7 @@ void MainWindow::onClearScene()
     
     if (ret == QMessageBox::Yes)
     {
-        m_osgWidget->removeAllGeos();
+        m_osgWidget->getSceneManager()->removeAllGeometries();
         m_modified = true;
         updateStatusBar(tr("场景已清空"));
         updateObjectCount(); // 更新对象数量显示
@@ -1294,7 +1305,7 @@ void MainWindow::onDisplaySettings()
     
     QPushButton* backgroundColorButton = new QPushButton(tr("选择背景颜色"), backgroundGroup);
     QCheckBox* skyboxCheck = new QCheckBox(tr("启用天空盒"), backgroundGroup);
-    skyboxCheck->setChecked(m_osgWidget ? m_osgWidget->isSkyboxEnabled() : true);
+    skyboxCheck->setChecked(m_osgWidget ? m_osgWidget->getSceneManager()->isSkyboxEnabled() : true);
     
     backgroundLayout->addWidget(backgroundColorButton);
     backgroundLayout->addWidget(skyboxCheck);
@@ -1305,7 +1316,7 @@ void MainWindow::onDisplaySettings()
     
     QCheckBox* coordinateSystemCheck = new QCheckBox(tr("显示坐标系统"), coordinateGroup);
     
-    coordinateSystemCheck->setChecked(m_osgWidget ? m_osgWidget->isCoordinateSystemEnabled() : true);
+    coordinateSystemCheck->setChecked(m_osgWidget ? m_osgWidget->getSceneManager()->isCoordinateSystemEnabled() : true);
     
     coordinateLayout->addWidget(coordinateSystemCheck);
     
@@ -1331,39 +1342,39 @@ void MainWindow::onDisplaySettings()
     // 连接显示模式信号
     connect(wireframeCheck, &QCheckBox::toggled, [this](bool checked) {
         if (checked && m_osgWidget) {
-            m_osgWidget->setWireframeMode(true);
-            m_osgWidget->setShadedMode(false);
-            m_osgWidget->setPointMode(false);
+            m_osgWidget->getSceneManager()->setWireframeMode(true);
+            m_osgWidget->getSceneManager()->setShadedMode(false);
+            m_osgWidget->getSceneManager()->setPointMode(false);
         }
     });
     
     connect(shadedCheck, &QCheckBox::toggled, [this](bool checked) {
         if (checked && m_osgWidget) {
-            m_osgWidget->setWireframeMode(false);
-            m_osgWidget->setShadedMode(true);
-            m_osgWidget->setPointMode(false);
+            m_osgWidget->getSceneManager()->setWireframeMode(false);
+            m_osgWidget->getSceneManager()->setShadedMode(true);
+            m_osgWidget->getSceneManager()->setPointMode(false);
         }
     });
     
     connect(pointModeCheck, &QCheckBox::toggled, [this](bool checked) {
         if (checked && m_osgWidget) {
-            m_osgWidget->setWireframeMode(false);
-            m_osgWidget->setShadedMode(false);
-            m_osgWidget->setPointMode(true);
+            m_osgWidget->getSceneManager()->setWireframeMode(false);
+            m_osgWidget->getSceneManager()->setShadedMode(false);
+            m_osgWidget->getSceneManager()->setPointMode(true);
         }
     });
     
     // 连接天空盒信号
     connect(skyboxCheck, &QCheckBox::toggled, [this](bool enabled) {
         if (m_osgWidget) {
-            m_osgWidget->enableSkybox(enabled);
+            m_osgWidget->getSceneManager()->enableSkybox(enabled);
         }
     });
     
     // 连接坐标系统信号
     connect(coordinateSystemCheck, &QCheckBox::toggled, [this](bool enabled) {
         if (m_osgWidget) {
-            m_osgWidget->enableCoordinateSystem(enabled);
+            m_osgWidget->getSceneManager()->enableCoordinateSystem(enabled);
         }
     });
     
@@ -1450,6 +1461,12 @@ void MainWindow::onManipulatorTypeChanged()
     updateStatusBar(tr("相机操控器切换为: %1").arg(typeName));
     LOG_INFO(tr("相机操控器切换为: %1").arg(typeName), "相机");
 }
+
+// ============================================================================
+// 键盘事件处理
+// ============================================================================
+
+
 
 
 

@@ -96,6 +96,37 @@ QString drawMode3DToString(DrawMode3D mode)
     }
 }
 
+QString geoType3DToString(GeoType3D type)
+{
+    switch (type)
+    {
+        case Geo_Undefined3D: return "未定义";
+        case Geo_Point3D: return "点";
+        case Geo_Line3D: return "线";
+        case Geo_Arc3D: return "弧";
+        case Geo_BezierCurve3D: return "贝塞尔曲线";
+        case Geo_Triangle3D: return "三角形";
+        case Geo_Quad3D: return "四边形";
+        case Geo_Polygon3D: return "多边形";
+        case Geo_Box3D: return "长方体";
+        case Geo_Cube3D: return "正方体";
+        case Geo_Cone3D: return "圆锥";
+        case Geo_Cylinder3D: return "圆柱";
+        case Geo_Prism3D: return "多棱柱";
+        case Geo_Torus3D: return "圆环";
+        case Geo_Sphere3D: return "球";
+        case Geo_Hemisphere3D: return "半球";
+        case Geo_Ellipsoid3D: return "椭球";
+        case Geo_GableHouse3D: return "人字房";
+        case Geo_SpireHouse3D: return "尖顶房";
+        case Geo_DomeHouse3D: return "穹顶房";
+        case Geo_FlatHouse3D: return "平顶房";
+        case Geo_LHouse3D: return "L型房";
+        case Geo_UndefinedGeo3D: return "未定义几何体";
+        default: return "未知";
+    }
+}
+
 QString pointShape3DToString(PointShape3D shape)
 {
     switch (shape)
