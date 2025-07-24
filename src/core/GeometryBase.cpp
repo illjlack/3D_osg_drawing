@@ -190,6 +190,47 @@ void Geo3D::buildControlPointGeometries()
 }
 
 // ============================================================================
+// 序列化/反序列化实现
+// ============================================================================
+
+QString Geo3D::serialize() const
+{
+    // 序列化格式：几何体类型|参数数据
+    QString result;
+    result += QString::number(static_cast<int>(m_geoType)) + "|";
+    result += QString::fromStdString(m_parameters.toString());
+    return result;
+}
+
+bool Geo3D::deserialize(const QString& data)
+{
+    // 解析序列化数据
+    QStringList parts = data.split("|");
+    if (parts.size() < 2) {
+        LOG_ERROR("反序列化数据格式错误", "几何体");
+        return false;
+    }
+    
+    // 恢复几何体类型
+    bool ok;
+    int geoTypeInt = parts[0].toInt(&ok);
+    if (!ok) {
+        LOG_ERROR("反序列化几何体类型失败", "几何体");
+        return false;
+    }
+    m_geoType = static_cast<GeoType3D>(geoTypeInt);
+    
+    // 恢复参数数据
+    QString paramData = parts.mid(1).join("|"); // 重新组合参数部分
+    if (!m_parameters.fromString(paramData.toStdString())) {
+        LOG_ERROR("反序列化参数数据失败", "几何体");
+        return false;
+    }
+    
+    return true;
+}
+
+// ============================================================================
 // 工厂函数（临时实现）
 // ============================================================================
 

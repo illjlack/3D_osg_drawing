@@ -287,6 +287,7 @@ namespace NodeTags3D
     const std::string BOUNDING_BOX_GEOMETRY = "3D_BOUNDING_BOX_GEOM";
     const std::string TRANSFORM_NODE = "3D_TRANSFORM_NODE";
     const std::string ROOT_GROUP = "3D_ROOT_GROUP";
+    const std::string SCENE_ROOT = "3D_SCENE_ROOT";  // 场景根节点标识
 }
 
 // 节点掩码定义 - 用于OSG节点的显示/隐藏和拾取控制

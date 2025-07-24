@@ -71,6 +71,10 @@ public:
     const GeoParameters3D& getParameters() const { return m_parameters; }
     void setParameters(const GeoParameters3D& params);
     
+    // 序列化/反序列化参数描述 (用于文件保存/加载)
+    virtual QString serialize() const;           // 序列化对象数据为字符串
+    virtual bool deserialize(const QString& data); // 从字符串反序列化对象数据
+    
     // =============================== 控制点绘制相关 ==============================
     // 获取该几何图形的阶段描述符
     // 控制点管理器依据这个控制绘制阶段

@@ -644,94 +644,33 @@ void MainWindow::onFileOpen()
         {
             m_osgWidget->removeAllGeos();
             
-            // 尝试加载场景数据（多个对象）
-            SceneData sceneData = GeoOsgbIO::loadSceneFromOsgb(fileName);
-            if (!sceneData.objects.empty())
+            // 使用新的简化接口加载几何体列表
+            std::vector<Geo3D*> loadedGeos = GeoOsgbIO::loadGeoList(fileName);
+            if (!loadedGeos.empty())
             {
-                // 成功加载场景数据
-                LOG_INFO(QString("开始添加 %1 个几何对象到场景").arg(sceneData.objects.size()), "文件");
-                for (Geo3D* geo : sceneData.objects)
+                // 成功加载几何体
+                LOG_INFO(QString("开始添加 %1 个几何对象到场景").arg(loadedGeos.size()), "文件");
+                for (Geo3D* geo : loadedGeos)
                 {
                     if (geo)
                     {
                         m_osgWidget->addGeo(geo);
-                        // 已添加几何对象到场景（移除调试日志）
                     }
                 }
-                
-                // 记录拾取系统状态（移除频繁的日志）
                 
                 m_currentFilePath = fileName;
                 m_modified = false;
                 setWindowTitle(tr("3D Drawing Board - %1").arg(QFileInfo(fileName).baseName()));
-                updateStatusBar(tr("打开场景文档: %1，包含 %2 个对象").arg(fileName).arg(sceneData.objects.size()));
-                LOG_SUCCESS(tr("打开场景文档: %1，包含 %2 个对象").arg(fileName).arg(sceneData.objects.size()), "文件");
+                updateStatusBar(tr("打开文档: %1，包含 %2 个对象").arg(fileName).arg(loadedGeos.size()));
+                LOG_SUCCESS(tr("打开文档: %1，包含 %2 个对象").arg(fileName).arg(loadedGeos.size()), "文件");
                 
                 // 更新对象数量显示
                 updateObjectCount();
             }
             else
             {
-                // 尝试加载单个对象（向后兼容）
-                Geo3D* loadedGeo = GeoOsgbIO::loadFromOsgb(fileName);
-                if (loadedGeo)
-                {
-                    LOG_INFO(QString("加载单个几何对象: 类型=%1").arg(loadedGeo->getGeoType()), "文件");
-                    
-                    // 显示导入信息对话框
-                    ImportInfoDialog importDialog(loadedGeo, this);
-                    if (importDialog.exec() == QDialog::Accepted)
-                    {
-                        // 应用用户设置的变换矩阵
-                        if (importDialog.shouldApplyOffset())
-                        {
-                            osg::Matrix offsetMatrix = importDialog.getOffsetMatrix();
-                            
-                            // 创建变换节点并应用矩阵
-                            osg::ref_ptr<osg::MatrixTransform> transform = new osg::MatrixTransform();
-                            transform->setMatrix(offsetMatrix);
-                            
-                            // 将原始几何体节点作为子节点添加到变换节点
-                            osg::Node* originalNode = loadedGeo->mm_node()->getOSGNode();
-                            if (originalNode)
-                            {
-                                // 移除原始节点的父节点关系
-                                if (originalNode->getNumParents() > 0)
-                                {
-                                    originalNode->getParent(0)->removeChild(originalNode);
-                                }
-                                
-                                // 将原始节点添加到变换节点
-                                transform->addChild(originalNode);
-                                
-                                // 将变换节点设置为几何体的根节点
-                                loadedGeo->mm_node()->setOSGNode(transform.get());
-                            }
-                            
-                            LOG_INFO("已应用导入变换矩阵", "文件");
-                        }
-                        
-                        m_osgWidget->addGeo(loadedGeo);
-                        
-                        m_currentFilePath = fileName;
-                        m_modified = false;
-                        setWindowTitle(tr("3D Drawing Board - %1").arg(QFileInfo(fileName).baseName()));
-                        updateStatusBar(tr("打开文档: %1").arg(fileName));
-                        LOG_SUCCESS(tr("打开文档: %1").arg(fileName), "文件");
-                        updateObjectCount();
-                    }
-                    else
-                    {
-                        // 用户取消导入，清理对象
-                        delete loadedGeo;
-                        LOG_INFO("用户取消导入", "文件");
-                    }
-                }
-                else
-                {
-                    QMessageBox::warning(this, tr("打开失败"), tr("无法打开文件: %1").arg(fileName));
-                    LOG_ERROR(tr("打开文档失败: %1").arg(fileName), "文件");
-                }
+                QMessageBox::warning(this, tr("打开失败"), tr("无法打开文件: %1").arg(fileName));
+                LOG_ERROR(tr("打开文档失败: %1").arg(fileName), "文件");
             }
         }
     }
@@ -763,76 +702,27 @@ void MainWindow::onFileSave()
         // 获取所有几何对象
         const auto& allGeos = m_osgWidget->getAllGeos();
         
-        if (!allGeos.empty())
+        // 转换为std::vector<Geo3D*>
+        std::vector<Geo3D*> geoList;
+        for (const auto& geoRef : allGeos)
         {
-            // 创建场景数据
-            SceneData sceneData;
-            sceneData.sceneName = QFileInfo(savePath).baseName();
-            sceneData.description = tr("3D绘图板场景");
-            sceneData.author = tr("用户");
-            sceneData.version = "1.0";
-            sceneData.createTime = QDateTime::currentDateTime();
-            sceneData.modifyTime = QDateTime::currentDateTime();
-            
-            // 添加所有几何对象到场景数据
-            for (const auto& geoRef : allGeos)
+            if (geoRef)
             {
-                if (geoRef)
-                {
-                    sceneData.objects.push_back(geoRef.get());
-                    
-                    // 为每个对象创建标签
-                    SceneObjectTag tag;
-                    tag.name = tr("对象_%1").arg(sceneData.objects.size());
-                    tag.description = tr("几何对象");
-                    tag.category = tr("几何体");
-                    tag.visible = true;
-                    tag.selectable = true;
-                    tag.opacity = 1.0;
-                    tag.layer = 0;
-                    tag.createTime = QDateTime::currentDateTime();
-                    tag.modifyTime = QDateTime::currentDateTime();
-                    
-                    sceneData.objectTags[geoRef.get()] = tag;
-                }
+                geoList.push_back(geoRef.get());
             }
-            
-            // 使用GeoOsgbIO保存场景数据
-            if (GeoOsgbIO::saveSceneToOsgb(savePath, sceneData))
-            {
-                m_modified = false;
-                updateStatusBar(tr("保存场景文档: %1，包含 %2 个对象").arg(savePath).arg(sceneData.objects.size()));
-                LOG_SUCCESS(tr("保存场景文档: %1，包含 %2 个对象").arg(savePath).arg(sceneData.objects.size()), "文件");
-            }
-            else
-            {
-                QMessageBox::warning(this, tr("保存失败"), tr("无法保存文件: %1").arg(savePath));
-                LOG_ERROR(tr("保存文档失败: %1").arg(savePath), "文件");
-            }
+        }
+        
+        // 使用新的简化接口保存
+        if (GeoOsgbIO::saveGeoList(savePath, geoList))
+        {
+            m_modified = false;
+            updateStatusBar(tr("保存文档: %1，包含 %2 个对象").arg(savePath).arg(geoList.size()));
+            LOG_SUCCESS(tr("保存文档: %1，包含 %2 个对象").arg(savePath).arg(geoList.size()), "文件");
         }
         else
         {
-            // 即使没有几何对象，也创建一个空的场景文件
-            SceneData sceneData;
-            sceneData.sceneName = QFileInfo(savePath).baseName();
-            sceneData.description = tr("3D绘图板场景");
-            sceneData.author = tr("用户");
-            sceneData.version = "1.0";
-            sceneData.createTime = QDateTime::currentDateTime();
-            sceneData.modifyTime = QDateTime::currentDateTime();
-            
-            // 使用GeoOsgbIO保存空场景数据
-            if (GeoOsgbIO::saveSceneToOsgb(savePath, sceneData))
-            {
-                m_modified = false;
-                updateStatusBar(tr("保存空场景文档: %1").arg(savePath));
-                LOG_SUCCESS(tr("保存空场景文档: %1").arg(savePath), "文件");
-            }
-            else
-            {
-                QMessageBox::warning(this, tr("保存失败"), tr("无法保存文件: %1").arg(savePath));
-                LOG_ERROR(tr("保存文档失败: %1").arg(savePath), "文件");
-            }
+            QMessageBox::warning(this, tr("保存失败"), tr("无法保存文件: %1").arg(savePath));
+            LOG_ERROR(tr("保存文档失败: %1").arg(savePath), "文件");
         }
     }
 }
@@ -855,80 +745,29 @@ void MainWindow::onFileSaveAs()
             // 获取所有几何对象
             const auto& allGeos = m_osgWidget->getAllGeos();
             
-            if (!allGeos.empty())
+            // 转换为std::vector<Geo3D*>
+            std::vector<Geo3D*> geoList;
+            for (const auto& geoRef : allGeos)
             {
-                // 创建场景数据
-                SceneData sceneData;
-                sceneData.sceneName = QFileInfo(fileName).baseName();
-                sceneData.description = tr("3D绘图板场景");
-                sceneData.author = tr("用户");
-                sceneData.version = "1.0";
-                sceneData.createTime = QDateTime::currentDateTime();
-                sceneData.modifyTime = QDateTime::currentDateTime();
-                
-                // 添加所有几何对象到场景数据
-                for (const auto& geoRef : allGeos)
+                if (geoRef)
                 {
-                    if (geoRef)
-                    {
-                        sceneData.objects.push_back(geoRef.get());
-                        
-                        // 为每个对象创建标签
-                        SceneObjectTag tag;
-                        tag.name = tr("对象_%1").arg(sceneData.objects.size());
-                        tag.description = tr("几何对象");
-                        tag.category = tr("几何体");
-                        tag.visible = true;
-                        tag.selectable = true;
-                        tag.opacity = 1.0;
-                        tag.layer = 0;
-                        tag.createTime = QDateTime::currentDateTime();
-                        tag.modifyTime = QDateTime::currentDateTime();
-                        
-                        sceneData.objectTags[geoRef.get()] = tag;
-                    }
+                    geoList.push_back(geoRef.get());
                 }
-                
-                // 使用GeoOsgbIO保存场景数据
-                if (GeoOsgbIO::saveSceneToOsgb(fileName, sceneData))
-                {
-                    m_currentFilePath = fileName;
-                    m_modified = false;
-                    setWindowTitle(tr("3D Drawing Board - %1").arg(QFileInfo(fileName).baseName()));
-                    updateStatusBar(tr("另存为场景文档: %1，包含 %2 个对象").arg(fileName).arg(sceneData.objects.size()));
-                    LOG_SUCCESS(tr("另存为场景文档: %1，包含 %2 个对象").arg(fileName).arg(sceneData.objects.size()), "文件");
-                }
-                else
-                {
-                    QMessageBox::warning(this, tr("保存失败"), tr("无法保存文件: %1").arg(fileName));
-                    LOG_ERROR(tr("另存为失败: %1").arg(fileName), "文件");
-                }
+            }
+            
+            // 使用新的简化接口保存
+            if (GeoOsgbIO::saveGeoList(fileName, geoList))
+            {
+                m_currentFilePath = fileName;
+                m_modified = false;
+                setWindowTitle(tr("3D Drawing Board - %1").arg(QFileInfo(fileName).baseName()));
+                updateStatusBar(tr("另存为文档: %1，包含 %2 个对象").arg(fileName).arg(geoList.size()));
+                LOG_SUCCESS(tr("另存为文档: %1，包含 %2 个对象").arg(fileName).arg(geoList.size()), "文件");
             }
             else
             {
-                // 即使没有几何对象，也创建一个空的场景文件
-                SceneData sceneData;
-                sceneData.sceneName = QFileInfo(fileName).baseName();
-                sceneData.description = tr("3D绘图板场景");
-                sceneData.author = tr("用户");
-                sceneData.version = "1.0";
-                sceneData.createTime = QDateTime::currentDateTime();
-                sceneData.modifyTime = QDateTime::currentDateTime();
-                
-                // 使用GeoOsgbIO保存空场景数据
-                if (GeoOsgbIO::saveSceneToOsgb(fileName, sceneData))
-                {
-                    m_currentFilePath = fileName;
-                    m_modified = false;
-                    setWindowTitle(tr("3D Drawing Board - %1").arg(QFileInfo(fileName).baseName()));
-                    updateStatusBar(tr("另存为空场景文档: %1").arg(fileName));
-                    LOG_SUCCESS(tr("另存为空场景文档: %1").arg(fileName), "文件");
-                }
-                else
-                {
-                    QMessageBox::warning(this, tr("保存失败"), tr("无法保存文件: %1").arg(fileName));
-                    LOG_ERROR(tr("另存为失败: %1").arg(fileName), "文件");
-                }
+                QMessageBox::warning(this, tr("保存失败"), tr("无法保存文件: %1").arg(fileName));
+                LOG_ERROR(tr("另存为失败: %1").arg(fileName), "文件");
             }
         }
     }

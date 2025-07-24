@@ -79,10 +79,13 @@ void GeoNodeManager::updateGeometries()
     m_parent->buildEdgeGeometries();
     m_parent->buildFaceGeometries();
 
-    // 更新空间索引
-    updateSpatialIndex();
     // 更新包围盒
     updateBoundingBoxGeometry();
+
+    if (!m_parent->mm_state()->isStateComplete())return;
+    // 绘制完成才建索引
+    // 更新空间索引
+    updateSpatialIndex();
 }
 
 // ============= 节点设置 =============
@@ -98,7 +101,7 @@ void GeoNodeManager::setOSGNode(osg::ref_ptr<osg::Node> node)
 
     // 检查是否为Group类型且有名字
     osg::Group* groupNode = dynamic_cast<osg::Group*>(node.get());
-    if (groupNode && !node->getName().empty()) {
+    if (groupNode && node->getName() == NodeTags3D::ROOT_GROUP) {
         // 有名字的Group → 按标记搜索组件
         LOG_INFO("检测到命名Group节点，搜索标记组件", "几何体管理");
         findAndAssignNodeComponents(node.get());
