@@ -89,3 +89,4 @@ private:
     osg::BoundingBox m_originalBoundingBox;
     bool m_updating;
 }; 
+

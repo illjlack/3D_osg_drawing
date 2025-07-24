@@ -55,7 +55,7 @@ void Line3D_Geo::buildEdgeGeometries()
     }
 
     // 收集所有控制点
-    std::vector<glm::vec3> allPoints;
+    std::vector<glm::dvec3> allPoints;
     for (auto& points : controlPointss)
         for (auto& point : points)
         {
@@ -103,3 +103,6 @@ void Line3D_Geo::buildFaceGeometries()
     mm_node()->clearFaceGeometry();
     // 线没有面
 }
+
+
+

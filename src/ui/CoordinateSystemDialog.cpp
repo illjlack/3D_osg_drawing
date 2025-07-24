@@ -929,3 +929,4 @@ void CoordinateSystemDialog::onResetClicked()
         updateFromCoordinateSystem();
     }
 } 
+

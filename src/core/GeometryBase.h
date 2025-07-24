@@ -106,3 +106,4 @@ protected:
     void setupManagers();
     void connectManagerSignals();
 };
+

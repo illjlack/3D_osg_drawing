@@ -26,3 +26,4 @@ void Ellipsoid3D_Geo::buildFaceGeometries()
 {
     mm_node()->clearFaceGeometry();
 } 
+

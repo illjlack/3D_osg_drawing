@@ -67,7 +67,7 @@ void ToolPanel3D::createCollapsibleDrawingSection(QVBoxLayout* parentLayout)
     sectionLayout->addWidget(titleLabel);
     
     // 选择工具单独放置
-    m_selectButton = createStyledButton("🔍", "选择", "选择和编辑对象", DrawSelect3D);
+    m_selectButton = createStyledButton("🔘", "选择", "选择和编辑对象", DrawSelect3D);
     m_selectButton->setChecked(true);
     sectionLayout->addWidget(m_selectButton);
     
@@ -107,7 +107,7 @@ void ToolPanel3D::createGeometryPage()
     basicLabel->setObjectName("subGroupLabel");
     layout->addWidget(basicLabel);
     
-    m_pointButton = createStyledButton("📍", "点", "绘制点", DrawPoint3D);
+    m_pointButton = createStyledButton("🔘", "点", "绘制点", DrawPoint3D);
     m_lineButton = createStyledButton("📏", "线", "绘制直线", DrawLine3D);
     m_arcButton = createStyledButton("🌙", "圆弧", "绘制圆弧", DrawArc3D);
     m_bezierButton = createStyledButton("〰️", "贝塞尔", "绘制贝塞尔曲线", DrawBezierCurve3D);
@@ -118,7 +118,7 @@ void ToolPanel3D::createGeometryPage()
     layout->addWidget(m_bezierButton);
     
     // 平面几何
-    QLabel* planeLabel = new QLabel("📐 平面图形");
+    QLabel* planeLabel = new QLabel("🔷 平面图形");
     planeLabel->setObjectName("subGroupLabel");
     layout->addWidget(planeLabel);
     
@@ -139,7 +139,7 @@ void ToolPanel3D::createGeometryPage()
     m_boxButton = createStyledButton("📦", "长方体", "绘制长方体", DrawBox3D);
     m_sphereButton = createStyledButton("⚪", "球体", "绘制球体", DrawSphere3D);
     m_cylinderButton = createStyledButton("🛢️", "圆柱", "绘制圆柱", DrawCylinder3D);
-    m_coneButton = createStyledButton("🍦", "圆锥", "绘制圆锥", DrawCone3D);
+    m_coneButton = createStyledButton("🦀", "圆锥", "绘制圆锥", DrawCone3D);
     m_torusButton = createStyledButton("🍩", "圆环", "绘制圆环", DrawTorus3D);
     
     layout->addWidget(m_cubeButton);
@@ -183,7 +183,7 @@ void ToolPanel3D::createBuildingPage()
     m_gableHouseButton = createStyledButton("🏘️", "人字房", "绘制人字形房屋", DrawGableHouse3D);
     m_spireHouseButton = createStyledButton("⛪", "尖顶房", "绘制尖顶房屋", DrawSpireHouse3D);
     m_domeHouseButton = createStyledButton("🕌", "穹顶房", "绘制穹顶房屋", DrawDomeHouse3D);
-    m_lHouseButton = createStyledButton("🏗️", "L型房", "绘制L型房屋", DrawLHouse3D);
+    m_lHouseButton = createStyledButton("🗗️", "L型房", "绘制L型房屋", DrawLHouse3D);
     
     layout->addWidget(m_flatHouseButton);
     layout->addWidget(m_gableHouseButton);
@@ -230,7 +230,7 @@ void ToolPanel3D::createCollapsibleViewSection(QVBoxLayout* parentLayout)
     
     m_resetViewButton = createActionButton("🔄", "重置视图", "重置相机到默认位置");
     m_fitViewButton = createActionButton("🔍", "适应窗口", "适应所有对象到窗口");
-    m_topViewButton = createActionButton("🔝", "俯视图", "切换到俯视图 (T)");
+    m_topViewButton = createActionButton("🔽", "俯视图", "切换到俯视图 (T)");
     m_frontViewButton = createActionButton("⬅️", "前视图", "切换到前视图 (1)");
     m_rightViewButton = createActionButton("➡️", "右视图", "切换到右视图 (3)");
     m_isometricViewButton = createActionButton("📐", "等轴测", "切换到等轴测图 (7)");
@@ -791,3 +791,5 @@ void ToolPanel3D::onSkyboxToggleClicked()
     m_skyboxContentWidget->setVisible(isExpanded);
     m_skyboxToggleButton->setText(isExpanded ? "▲" : "▼");
 }
+
+

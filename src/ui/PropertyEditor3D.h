@@ -1,4 +1,6 @@
 ﻿#pragma once
+#pragma execution_character_set("utf-8")
+
 #include <QWidget>
 #include <QGroupBox>
 #include <QComboBox>
@@ -85,3 +87,4 @@ private:
     QCheckBox* m_showEdgesCheck;
     QCheckBox* m_showFacesCheck;
 }; 
+

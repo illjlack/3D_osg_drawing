@@ -230,3 +230,4 @@ GeoType3D GeometryFactory::drawModeToGeoType(DrawMode3D mode)
     default: return Geo_UndefinedGeo3D;
     }
 } 
+

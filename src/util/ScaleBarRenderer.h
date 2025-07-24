@@ -69,3 +69,4 @@ private:
     QDateTime m_lastCalculation;   // 上次计算时间
     static const int CACHE_DURATION = 100; // 缓存持续时间（毫秒）
 }; 
+

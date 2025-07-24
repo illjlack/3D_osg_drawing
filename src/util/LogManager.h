@@ -370,3 +370,4 @@ private:
 
 #define LOG_STREAM(level, category) \
     LogStream(level, category, __FILE__, __LINE__, __FUNCTION__) 
+

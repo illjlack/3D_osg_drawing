@@ -298,7 +298,7 @@ void PropertyEditor3D::updateGlobalSettings()
 void PropertyEditor3D::updatePointUI()
 {
     PointShape3D shape = m_currentGeo ? m_currentGeo->getParameters().pointShape : GlobalPointShape3D;
-    float size = m_currentGeo ? m_currentGeo->getParameters().pointSize : GlobalPointSize3D;
+    double size = m_currentGeo ? m_currentGeo->getParameters().pointSize : GlobalPointSize3D;
     QColor color = m_currentGeo ? m_currentGeo->getParameters().pointColor.toQColor() : GlobalPointColor3D;
     
     // 更新控件
@@ -318,9 +318,9 @@ void PropertyEditor3D::updatePointUI()
 void PropertyEditor3D::updateLineUI()
 {
     LineStyle3D style = m_currentGeo ? m_currentGeo->getParameters().lineStyle : GlobalLineStyle3D;
-    float width = m_currentGeo ? m_currentGeo->getParameters().lineWidth : GlobalLineWidth3D;
+    double width = m_currentGeo ? m_currentGeo->getParameters().lineWidth : GlobalLineWidth3D;
     QColor color = m_currentGeo ? m_currentGeo->getParameters().lineColor.toQColor() : GlobalLineColor3D;
-    float dashPattern = m_currentGeo ? m_currentGeo->getParameters().lineDashPattern : GlobalLineDashPattern3D;
+    double dashPattern = m_currentGeo ? m_currentGeo->getParameters().lineDashPattern : GlobalLineDashPattern3D;
     NodeLineStyle3D nodeStyle = m_currentGeo ? m_currentGeo->getParameters().nodeLineStyle : GlobalNodeLineStyle3D;
     
     // 更新控件
@@ -372,8 +372,8 @@ void PropertyEditor3D::updateSurfaceUI()
 void PropertyEditor3D::updateMaterialUI()
 {
     MaterialType3D matType = m_currentGeo ? m_currentGeo->getParameters().material.type : GlobalMaterialType3D;
-    float shininess = m_currentGeo ? m_currentGeo->getParameters().material.shininess : GlobalShininess3D;
-    float transparency = m_currentGeo ? m_currentGeo->getParameters().material.transparency : GlobalTransparency3D;
+    double shininess = m_currentGeo ? m_currentGeo->getParameters().material.shininess : GlobalShininess3D;
+    double transparency = m_currentGeo ? m_currentGeo->getParameters().material.transparency : GlobalTransparency3D;
     
     // 更新控件
     for (int i = 0; i < m_materialTypeCombo->count(); ++i)
@@ -455,7 +455,7 @@ void PropertyEditor3D::onPointSizeChanged()
 {
     if (m_updating) return;
     
-    float size = static_cast<float>(m_pointSizeSpin->value());
+    double size = static_cast<double>(m_pointSizeSpin->value());
     
     if (!m_selectedGeos.empty())
     {
@@ -549,7 +549,7 @@ void PropertyEditor3D::onLineWidthChanged()
 {
     if (m_updating) return;
     
-    float width = static_cast<float>(m_lineWidthSpin->value());
+    double width = static_cast<double>(m_lineWidthSpin->value());
     
     if (m_currentGeo)
     {
@@ -610,7 +610,7 @@ void PropertyEditor3D::onLineDashPatternChanged()
 {
     if (m_updating) return;
     
-    float pattern = static_cast<float>(m_lineDashPatternSpin->value());
+    double pattern = static_cast<double>(m_lineDashPatternSpin->value());
     
     if (m_currentGeo)
     {
@@ -792,7 +792,7 @@ void PropertyEditor3D::onShininessChanged()
 {
     if (m_updating) return;
     
-    float shininess = static_cast<float>(m_shininessSlider->value());
+    double shininess = static_cast<double>(m_shininessSlider->value());
     
     if (m_currentGeo)
     {
@@ -812,7 +812,7 @@ void PropertyEditor3D::onTransparencyChanged()
 {
     if (m_updating) return;
     
-    float transparency = static_cast<float>(m_transparencySlider->value()) / 100.0f;
+    double transparency = static_cast<double>(m_transparencySlider->value()) / 100.0;
     
     if (m_currentGeo)
     {
@@ -952,3 +952,7 @@ void PropertyEditor3D::onShowFacesChanged()
     
     emit parametersChanged();
 }
+
+
+
+

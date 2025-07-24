@@ -173,3 +173,4 @@ GeoStateManager* GeoControlPointManager::getState() const
     assert(m_parent);
     return m_parent->mm_state();
 }
+

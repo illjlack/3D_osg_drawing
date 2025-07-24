@@ -55,7 +55,7 @@ void Triangle3D_Geo::buildEdgeGeometries()
     }
 
     // 收集所有控制点
-    std::vector<glm::vec3> allPoints;
+    std::vector<glm::dvec3> allPoints;
     for (auto& points : controlPointss)
         for (auto& point : points)
         {
@@ -113,7 +113,7 @@ void Triangle3D_Geo::buildFaceGeometries()
     }
 
     // 收集所有控制点
-    std::vector<glm::vec3> allPoints;
+    std::vector<glm::dvec3> allPoints;
     for (auto& points : controlPointss)
         for (auto& point : points)
         {
@@ -131,7 +131,7 @@ void Triangle3D_Geo::buildFaceGeometries()
     osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
     
     // 生成三角形顶点和法向量
-    glm::vec3 normal;
+    glm::dvec3 normal;
     auto triangleVertices = MathUtils::generateTriangleVertices(allPoints[0], allPoints[1], allPoints[2], normal);
     
     for (const auto& vertex : triangleVertices)
@@ -147,3 +147,7 @@ void Triangle3D_Geo::buildFaceGeometries()
     osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, vertices->size());
     geometry->addPrimitiveSet(drawArrays);
 }
+
+
+
+

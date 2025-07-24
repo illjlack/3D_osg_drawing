@@ -24,7 +24,7 @@ struct SceneObjectTag
     QString texture;        // 纹理信息
     bool visible;           // 是否可见
     bool selectable;        // 是否可选择
-    float opacity;          // 透明度
+    double opacity;          // 透明度
     int layer;              // 图层
     QDateTime createTime;   // 创建时间
     QDateTime modifyTime;   // 修改时间
@@ -32,7 +32,7 @@ struct SceneObjectTag
     SceneObjectTag()
         : visible(true)
         , selectable(true)
-        , opacity(1.0f)
+        , opacity(1.0)
         , layer(0)
     {}
 };
@@ -51,7 +51,7 @@ struct SceneData
     bool showGrid;          // 是否显示网格
     bool showAxis;          // 是否显示坐标轴
     bool showBoundingBox;   // 是否显示包围盒
-    float backgroundColor[4]; // 背景颜色
+    double backgroundColor[4]; // 背景颜色
     
     // 对象列表
     std::vector<Geo3D*> objects;
@@ -62,10 +62,10 @@ struct SceneData
         , showAxis(true)
         , showBoundingBox(false)
     {
-        backgroundColor[0] = 0.2f;
-        backgroundColor[1] = 0.2f;
-        backgroundColor[2] = 0.2f;
-        backgroundColor[3] = 1.0f;
+        backgroundColor[0] = 0.2;
+        backgroundColor[1] = 0.2;
+        backgroundColor[2] = 0.2;
+        backgroundColor[3] = 1.0;
     }
 };
 
@@ -114,3 +114,6 @@ private:
     // 相机设置优化建议
     static void suggestCameraSettings();
 }; 
+
+
+

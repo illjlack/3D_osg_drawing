@@ -93,3 +93,4 @@ BuildingType3D BuildingFactory::getBuildingType(const std::string& name)
     
     return Building_GableHouse3D;  // 默认返回人字形房屋
 } 
+

@@ -224,10 +224,10 @@ PickResult GeometryPickingSystem::analyzeFaceIntersection(const osgUtil::LineSeg
     result.hasResult = true;
     result.geometry = geometry;
     result.featureType = PickFeatureType::FACE;
-    result.worldPosition = glm::vec3(intersection.getWorldIntersectPoint().x(),
+    result.worldPosition = glm::dvec3(intersection.getWorldIntersectPoint().x(),
                                    intersection.getWorldIntersectPoint().y(),
                                    intersection.getWorldIntersectPoint().z());
-    result.surfaceNormal = glm::vec3(intersection.getWorldIntersectNormal().x(),
+    result.surfaceNormal = glm::dvec3(intersection.getWorldIntersectNormal().x(),
                                    intersection.getWorldIntersectNormal().y(),
                                    intersection.getWorldIntersectNormal().z());
     
@@ -262,7 +262,7 @@ PickResult GeometryPickingSystem::analyzePolytopeIntersection(const osgUtil::Pol
     result.hasResult = true;
     result.geometry = geometry;
     result.featureType = featureType;
-    result.worldPosition = glm::vec3(intersection.localIntersectionPoint.x(),
+    result.worldPosition = glm::dvec3(intersection.localIntersectionPoint.x(),
                                    intersection.localIntersectionPoint.y(),
                                    intersection.localIntersectionPoint.z());
     
@@ -293,19 +293,23 @@ unsigned int GeometryPickingSystem::getPickingMask() const
     return mask != 0 ? mask : NODE_MASK_ALL_GEOMETRY;
 }
 
-glm::vec2 GeometryPickingSystem::worldToScreen(const glm::vec3& worldPos)
+glm::dvec2 GeometryPickingSystem::worldToScreen(const glm::dvec3& worldPos)
 {
-    if (!m_camera) return glm::vec2(0.0f, 0.0f);
+    if (!m_camera) return glm::dvec2(0.0, 0.0);
     
     osg::Matrix VPW = m_camera->getViewMatrix() * 
                       m_camera->getProjectionMatrix() * 
                       m_camera->getViewport()->computeWindowMatrix();
     
     osg::Vec3 screenPos = osg::Vec3(worldPos.x, worldPos.y, worldPos.z) * VPW;
-    return glm::vec2(screenPos.x(), screenPos.y());
+    return glm::dvec2(screenPos.x(), screenPos.y());
 }
 
 void GeometryPickingSystem::setPickingCallback(std::function<void(const PickResult&)> callback)
 {
     m_pickingCallback = callback;
 }
+
+
+
+

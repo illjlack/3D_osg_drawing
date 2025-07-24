@@ -1191,3 +1191,5 @@ bool CameraController::getViewMatrixAsLookAt(osg::Vec3& eye, osg::Vec3& center, 
     
     return true;
 }
+
+

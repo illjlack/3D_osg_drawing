@@ -102,7 +102,7 @@ int main(int argc, char *argv[])
     //        background-color: #2b2b2b;
     //        color: #ffffff;
     //        titlebar-close-icon: url(close.png);
-    //        titlebar-normal-icon: url(float.png);
+    //        titlebar-normal-icon: url(double.png);
     //    }
     //    
     //    QDockWidget::title {
@@ -271,3 +271,6 @@ int main(int argc, char *argv[])
     
     return app.exec();
 }
+
+
+

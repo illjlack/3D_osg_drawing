@@ -126,3 +126,4 @@ private:
     // 更新标志
     bool m_updating;
 }; 
+

@@ -35,7 +35,7 @@ public:
         {}
         
         // 检查点是否在范围内
-        bool contains(const glm::vec3& point) const
+        bool contains(const glm::dvec3& point) const
         {
             return point.x >= minX && point.x <= maxX &&
                    point.y >= minY && point.y <= maxY &&
@@ -43,15 +43,15 @@ public:
         }
         
         // 获取范围大小
-        glm::vec3 size() const
+        glm::dvec3 size() const
         {
-            return glm::vec3(maxX - minX, maxY - minY, maxZ - minZ);
+            return glm::dvec3(maxX - minX, maxY - minY, maxZ - minZ);
         }
         
         // 获取中心点
-        glm::vec3 center() const
+        glm::dvec3 center() const
         {
-            return glm::vec3((minX + maxX) * 0.5, (minY + maxY) * 0.5, (minZ + maxZ) * 0.5);
+            return glm::dvec3((minX + maxX) * 0.5, (minY + maxY) * 0.5, (minZ + maxZ) * 0.5);
         }
         
         // 获取最大范围
@@ -95,19 +95,19 @@ public:
     const CoordinateRange& getSkyboxRange() const { return m_skyboxRange; }
     
     // 检查点是否在天空盒范围内
-    bool isPointInSkyboxRange(const glm::vec3& point) const;
+    bool isPointInSkyboxRange(const glm::dvec3& point) const;
     bool isPointInSkyboxRange(const osg::Vec3& point) const;
     
     // 限制点到天空盒范围
-    glm::vec3 clampPointToSkybox(const glm::vec3& point) const;
+    glm::dvec3 clampPointToSkybox(const glm::dvec3& point) const;
     osg::Vec3 clampPointToSkybox(const osg::Vec3& point) const;
     
     // 检查点是否在有效范围内
-    bool isValidPoint(const glm::vec3& point) const;
+    bool isValidPoint(const glm::dvec3& point) const;
     bool isValidPoint(const osg::Vec3& point) const;
     
     // 限制点到有效范围
-    glm::vec3 clampPoint(const glm::vec3& point) const;
+    glm::dvec3 clampPoint(const glm::dvec3& point) const;
     osg::Vec3 clampPoint(const osg::Vec3& point) const;
     
     // 获取范围信息
@@ -232,3 +232,6 @@ private:
     // 更新天空盒范围（当绑定启用时）
     void updateSkyboxRange();
 }; 
+
+
+

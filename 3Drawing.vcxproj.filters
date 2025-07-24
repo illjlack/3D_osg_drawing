@@ -343,6 +343,8 @@
     <QtMoc Include="src\ui\ToolPanel3D.h">
       <Filter>UI</Filter>
     </QtMoc>
-    <QtMoc Include="src\ui\ImportInfoDialog.h" />
+    <QtMoc Include="src\ui\ImportInfoDialog.h">
+      <Filter>UI</Filter>
+    </QtMoc>
   </ItemGroup>
 </Project>

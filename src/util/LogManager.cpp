@@ -436,3 +436,4 @@ int LogManager::getCurrentLogCount() const
 {
     return m_workerThread ? m_workerThread->getCurrentLogCount() : 0;
 } 
+

@@ -187,3 +187,5 @@ private:
     QString m_currentFilePath;
     bool m_modified;
 };
+
+

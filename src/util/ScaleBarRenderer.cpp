@@ -209,3 +209,4 @@ void ScaleBarRenderer::drawScaleText(QPainter& painter, const QRect& scaleRect, 
     QRect textRect = scaleRect.adjusted(5, barY + 10, -5, -5);
     painter.drawText(textRect, Qt::AlignCenter, text);
 } 
+

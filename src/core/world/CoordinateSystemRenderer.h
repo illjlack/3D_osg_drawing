@@ -64,3 +64,4 @@ private:
 private slots:
     void onCoordinateSystemChanged();
 }; 
+

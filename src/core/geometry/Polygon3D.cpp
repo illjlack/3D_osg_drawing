@@ -55,7 +55,7 @@ void Polygon3D_Geo::buildEdgeGeometries()
     }
 
     // 收集所有控制点
-    std::vector<glm::vec3> allPoints;
+    std::vector<glm::dvec3> allPoints;
     for (auto& points : controlPointss)
         for (auto& point : points)
         {
@@ -114,7 +114,7 @@ void Polygon3D_Geo::buildFaceGeometries()
     }
 
     // 收集所有控制点
-    std::vector<glm::vec3> allPoints;
+    std::vector<glm::dvec3> allPoints;
     for (auto& points : controlPointss)
         for (auto& point : points)
         {
@@ -132,7 +132,7 @@ void Polygon3D_Geo::buildFaceGeometries()
     osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
     
     // 计算多边形法向量
-    glm::vec3 normal = MathUtils::calculatePolygonNormal(allPoints);
+    glm::dvec3 normal = MathUtils::calculatePolygonNormal(allPoints);
     
     if (allPoints.size() == 3)
     {
@@ -146,7 +146,7 @@ void Polygon3D_Geo::buildFaceGeometries()
     else if (allPoints.size() == 4)
     {
         // 四边形，分解为两个三角形
-        std::vector<glm::vec3> quadNormals;
+        std::vector<glm::dvec3> quadNormals;
         auto quadVertices = MathUtils::generateQuadVertices(allPoints[0], allPoints[1], allPoints[2], allPoints[3], quadNormals);
         
         for (size_t i = 0; i < quadVertices.size(); ++i)
@@ -158,7 +158,7 @@ void Polygon3D_Geo::buildFaceGeometries()
     else
     {
         // 多边形：使用三角剖分（简化实现：扇形三角剖分）
-        glm::vec3 center = MathUtils::calculateCentroid(allPoints);
+        glm::dvec3 center = MathUtils::calculateCentroid(allPoints);
         
         for (size_t i = 0; i < allPoints.size(); ++i)
         {
@@ -168,7 +168,7 @@ void Polygon3D_Geo::buildFaceGeometries()
             vertices->push_back(MathUtils::glmToOsg(allPoints[(i + 1) % allPoints.size()]));
             
             // 为每个三角形计算法向量
-            glm::vec3 triNormal = MathUtils::calculateNormal(center, allPoints[i], allPoints[(i + 1) % allPoints.size()]);
+            glm::dvec3 triNormal = MathUtils::calculateNormal(center, allPoints[i], allPoints[(i + 1) % allPoints.size()]);
             normals->push_back(MathUtils::glmToOsg(triNormal));
             normals->push_back(MathUtils::glmToOsg(triNormal));
             normals->push_back(MathUtils::glmToOsg(triNormal));
@@ -182,3 +182,6 @@ void Polygon3D_Geo::buildFaceGeometries()
     osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, vertices->size());
     geometry->addPrimitiveSet(drawArrays);
 }
+
+
+

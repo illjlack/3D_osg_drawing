@@ -16,11 +16,11 @@ public:
     ~Skybox();
     
     // 创建天空盒
-    osg::ref_ptr<osg::Node> createSkybox(float size = 1000.0f);
+    osg::ref_ptr<osg::Node> createSkybox(double size = 1000.0);
     
     // 设置天空盒大小
-    void setSize(float size);
-    float getSize() const { return m_size; }
+    void setSize(double size);
+    double getSize() const { return m_size; }
     
     // 根据坐标范围自动设置大小
     void setSizeFromRange(double minX, double maxX, double minY, double maxY, double minZ, double maxZ);
@@ -48,9 +48,9 @@ public:
     osg::ref_ptr<osg::Node> getSkyboxNode() const { return m_skyboxNode; }
 
 private:
-    osg::ref_ptr<osg::Node> createCubeMapSkybox(float size);
-    osg::ref_ptr<osg::Node> createGradientSkybox(float size);
-    osg::ref_ptr<osg::Node> createSolidColorSkybox(float size);
+    osg::ref_ptr<osg::Node> createCubeMapSkybox(double size);
+    osg::ref_ptr<osg::Node> createGradientSkybox(double size);
+    osg::ref_ptr<osg::Node> createSolidColorSkybox(double size);
     
     osg::ref_ptr<osg::TextureCubeMap> createCubeMapTexture();
     osg::ref_ptr<osg::Texture2D> createGradientTexture();
@@ -71,6 +71,9 @@ private:
     bool m_useCubeMap;
     bool m_useGradient;
     bool m_useSolidColor;
-    float m_size;
+    double m_size;
     osg::Vec3 m_center;  // 天空盒中心位置
 }; 
+
+
+

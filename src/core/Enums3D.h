@@ -354,3 +354,4 @@ inline uint32_t toggleNodeMask(uint32_t currentMask, NodeMask3D toggleMask)
 {
     return currentMask ^ toggleMask;
 }
+

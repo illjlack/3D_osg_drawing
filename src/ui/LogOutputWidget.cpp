@@ -740,3 +740,4 @@ void LogOutputWidget::showContextMenu(const QPoint& pos)
     
     menu.exec(mapToGlobal(pos));
 } 
+

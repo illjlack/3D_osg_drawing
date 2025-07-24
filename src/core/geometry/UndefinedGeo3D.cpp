@@ -26,3 +26,5 @@ void UndefinedGeo3D_Geo::buildFaceGeometries()
 {
     mm_node()->clearFaceGeometry();
 }
+
+

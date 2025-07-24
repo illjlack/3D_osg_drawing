@@ -26,3 +26,4 @@ void Prism3D_Geo::buildFaceGeometries()
 {
     mm_node()->clearFaceGeometry();
 } 
+

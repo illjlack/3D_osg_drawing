@@ -54,3 +54,5 @@ void Point3D_Geo::buildFaceGeometries()
     mm_node()->clearFaceGeometry();
     // 点没有面
 }
+
+

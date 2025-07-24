@@ -59,3 +59,4 @@ public:
 private:
     GeometryFactory() = delete;  // 禁止实例化
 }; 
+

@@ -52,7 +52,7 @@ public:
     void initializeScene();
     void resetCamera();
     void fitAll();
-    void setViewDirection(const glm::vec3& direction, const glm::vec3& up = glm::vec3(0, 0, 1));
+    void setViewDirection(const glm::dvec3& direction, const glm::dvec3& up = glm::dvec3(0, 0, 1));
     
     // 显示模式
     void setWireframeMode(bool wireframe);
@@ -97,8 +97,8 @@ public:
     void setDrawMode(DrawMode3D mode);
     
     // 坐标转换（委托给CameraController）
-    glm::vec3 screenToWorld(int x, int y, float depth = 0.0f);
-    glm::vec2 worldToScreen(const glm::vec3& worldPos);
+    glm::dvec3 screenToWorld(int x, int y, double depth = 0.0);
+    glm::dvec2 worldToScreen(const glm::dvec3& worldPos);
     
     // 天空盒管理
     void enableSkybox(bool enabled);
@@ -123,12 +123,12 @@ public:
     
     // 右键菜单功能
     void deleteSelectedObjects();
-    void setCameraPosition(const glm::vec3& position, const glm::vec3& target = glm::vec3(0,0,0));
-    void movePointToCoordinate(Geo3D* geo, int pointIndex, const glm::vec3& newPosition);
+    void setCameraPosition(const glm::dvec3& position, const glm::dvec3& target = glm::dvec3(0,0,0));
+    void movePointToCoordinate(Geo3D* geo, int pointIndex, const glm::dvec3& newPosition);
 
 signals:
     void geoSelected(Geo3D* geo);
-    void mousePositionChanged(const glm::vec3& worldPos);
+    void mousePositionChanged(const glm::dvec3& worldPos);
     void screenPositionChanged(int x, int y);
     void simplePickingResult(const PickResult& result);
     void coordinateSystemSettingsRequested();
@@ -163,7 +163,7 @@ private:
     void setupSkybox();
     void setupCoordinateSystem();
     
-    void updateCurrentDrawing(const glm::vec3& worldPos);
+    void updateCurrentDrawing(const glm::dvec3& worldPos);
     void completeCurrentDrawing();
     void cancelCurrentDrawing();
     
@@ -195,11 +195,11 @@ private:
     bool m_isDraggingControlPoint;
     Geo3D* m_draggingGeo;
     int m_draggingControlPointIndex;
-    glm::vec3 m_dragStartPosition;
+    glm::dvec3 m_dragStartPosition;
     
     // 交互状态
     bool m_isDrawing;
-    glm::vec3 m_lastMouseWorldPos;
+    glm::dvec3 m_lastMouseWorldPos;
     
     // 拾取指示器
     osg::ref_ptr<PickingIndicator> m_pickingIndicator;
@@ -220,7 +220,7 @@ private:
     
     // 鼠标位置缓存 - 避免频繁的坐标转换
     QPoint m_lastMouseScreenPos;
-    glm::vec3 m_cachedMouseWorldPos;
+    glm::dvec3 m_cachedMouseWorldPos;
     bool m_mousePosCacheValid;
     QDateTime m_lastMouseCalculation;
     static const int MOUSE_CACHE_DURATION = 16;
@@ -234,3 +234,7 @@ private:
 
 private slots:
 }; 
+
+
+
+

@@ -20,9 +20,9 @@ enum class PickFeatureType {
 struct PickResult {
     bool hasResult = false;
     Geo3D* geometry = nullptr;
-    glm::vec3 worldPosition{0.0f};
-    glm::vec3 surfaceNormal{0.0f};
-    float distance = FLT_MAX;
+    glm::dvec3 worldPosition{0.0};
+    glm::dvec3 surfaceNormal{0.0};
+    double distance = FLT_MAX;
     int screenX = 0;
     int screenY = 0;
     
@@ -36,7 +36,7 @@ struct PickResult {
     
     // 捕捉信息
     bool isSnapped = false;
-    glm::vec3 snapPosition{0.0f};
+    glm::dvec3 snapPosition{0.0};
     
     // 构造函数
     PickResult() = default;
@@ -45,8 +45,8 @@ struct PickResult {
     void reset() {
         hasResult = false;
         geometry = nullptr;
-        worldPosition = glm::vec3(0.0f);
-        surfaceNormal = glm::vec3(0.0f);
+        worldPosition = glm::dvec3(0.0);
+        surfaceNormal = glm::dvec3(0.0);
         distance = FLT_MAX;
         screenX = 0;
         screenY = 0;
@@ -55,6 +55,10 @@ struct PickResult {
         osgGeometry = nullptr;
         osgPrimitiveIndex = -1;
         isSnapped = false;
-        snapPosition = glm::vec3(0.0f);
+        snapPosition = glm::dvec3(0.0);
     }
 }; 
+
+
+
+

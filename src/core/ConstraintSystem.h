@@ -45,83 +45,96 @@ namespace constraint
     
     /**
      * @brief 无约束函数
-     * @param inputPoint 输入点
+     * @param inputPoint 输入点P
      * @param points 相关控制点
-     * @return 未经约束的原始输入点
+     * @return 未经约束的原始输入点P
      */
     Point3D noConstraint(const Point3D& inputPoint, 
                         const std::vector<Point3D>& points);
     
     /**
      * @brief 平面约束函数
-     * 将输入点投影到前三个点构成的平面上
-     * @param inputPoint 输入点
-     * @param points 相关控制点（至少需要3个点构成平面）
-     * @return 投影到平面上的点
+     * 将输入点P投影到前三个点A、B、C构成的平面上
+     * @param inputPoint 输入点P
+     * @param points 相关控制点（points[0]=A, points[1]=B, points[2]=C，至少需要3个点）
+     * @return 投影到平面ABC上的点P'
      */
     Point3D planeConstraint(const Point3D& inputPoint, 
                            const std::vector<Point3D>& points);
     
     /**
      * @brief 线约束函数
-     * 将输入点投影到两点构成的直线上
-     * @param inputPoint 输入点
-     * @param points 相关控制点（至少需要2个点构成直线）
-     * @return 投影到直线上的点
+     * 将输入点P投影到两点A、B构成的直线上
+     * @param inputPoint 输入点P
+     * @param points 相关控制点（points[0]=A, points[1]=B，至少需要2个点）
+     * @return 投影到直线AB上的点P'
      */
     Point3D lineConstraint(const Point3D& inputPoint, 
                           const std::vector<Point3D>& points);
     
     /**
      * @brief Z平面约束函数
-     * 保持输入点的Z坐标为指定值（基于已有控制点）
-     * @param inputPoint 输入点
-     * @param points 相关控制点（使用第一个点的Z坐标作为约束）
-     * @return Z坐标被约束的点
+     * 保持输入点P的Z坐标与参考点A相同
+     * @param inputPoint 输入点P
+     * @param points 相关控制点（points[0]=A，使用A点的Z坐标作为约束平面）
+     * @return Z坐标被约束的点P'(Px, Py, Az)
      */
     Point3D zPlaneConstraint(const Point3D& inputPoint, 
                             const std::vector<Point3D>& points);
     
     /**
      * @brief 垂直于底面的约束函数
-     * 用于棱柱等3D体的高度确定，将点约束在垂直于底面的直线上
-     * @param inputPoint 输入点
-     * @param points 相关控制点（构成底面的点）
-     * @return 垂直约束后的点
+     * 将输入点P约束在垂直于底面的直线上
+     * 底面由多个点A、B、C...构成，P被约束到通过底面中心且垂直于底面的直线上
+     * @param inputPoint 输入点P
+     * @param points 相关控制点（points[0]=A, points[1]=B, points[2]=C...，构成底面的点）
+     * @return 垂直约束后的点P'，使得P'在过底面中心垂直于底面ABC...的直线上
      */
     Point3D verticalToBaseConstraint(const Point3D& inputPoint, 
                                     const std::vector<Point3D>& points);
     
     /**
      * @brief 垂直于前两点连线的约束函数
-     * 将输入点约束在垂直于前两点连线的平面上
-     * 即确保BC垂直于AB，其中A、B是前两个点，C是当前输入点
-     * @param inputPoint 输入点
-     * @param points 相关控制点（至少需要2个点作为参考线）
-     * @return 垂直约束后的点
+     * 将输入点P约束在过B点垂直于线段AB的平面上
+     * 确保BP垂直于AB，其中A、B是前两个点，P是当前输入点
+     * @param inputPoint 输入点P
+     * @param points 相关控制点（points[0]=A, points[1]=B，至少需要2个点作为参考线）
+     * @return 垂直约束后的点P'，满足BP'⊥AB (B点加垂直分量)
      */
     Point3D perpendicularToLastTwoPointsConstraint(const Point3D& inputPoint, 
                                                   const std::vector<Point3D>& points);
 
     /**
      * @brief 圆形约束函数
-     * 将输入点约束到以第一个点为中心、与第二个点等距的球面上
-     * 使得三点A、B、C满足|AB| = |AC|，从而能确定一个圆且都在圆的边上
-     * @param inputPoint 输入点
-     * @param points 相关控制点（第一个点A作为约束中心，第二个点B用于确定约束距离）
-     * @return 约束后的点C，满足|AC| = |AB|
+     * 将输入点P约束到以点A为中心、与点B等距的球面上
+     * 使得三点A、B、P满足|AB| = |AP|，从而能确定一个圆且都在圆的边上
+     * @param inputPoint 输入点P
+     * @param points 相关控制点（points[0]=A作为圆心，points[1]=B用于确定半径）
+     * @return 约束后的点P'，满足|AP'| = |AB|
      */
     Point3D circleConstraint(const Point3D& inputPoint, 
                             const std::vector<Point3D>& points);
 
     /**
      * @brief 垂直于圆平面的约束函数
-     * 将输入点约束在垂直于三点构成的圆平面且通过圆心的直线上
+     * 将输入点P约束在垂直于三点A、B、C构成的圆平面且通过圆心的直线上
      * 适用于圆锥的锥顶点约束，确保锥顶点在圆形底面的法向量方向上
-     * @param inputPoint 输入点（锥顶点候选）
-     * @param points 相关控制点（前三个点A、B、C确定圆，A是圆心）
-     * @return 约束到垂直直线上的点
+     * @param inputPoint 输入点P（锥顶点候选）
+     * @param points 相关控制点（points[0]=A是圆心，points[1]=B、points[2]=C确定圆）
+     * @return 约束到垂直直线上的点P'，使得P'在通过圆心A且垂直于圆平面ABC的直线上
      */
     Point3D perpendicularToCirclePlaneConstraint(const Point3D& inputPoint, 
                                                  const std::vector<Point3D>& points);
+
+    /**
+     * @brief 等长约束函数
+     * 将输入点P约束到使得两条线段长度相等的位置
+     * 确保|CP| = |AB|，其中A、B构成参考线段，C是新线段的起点，P是输入点
+     * @param inputPoint 输入点P
+     * @param points 相关控制点（points[0]=A, points[1]=B构成参考线段，points[2]=C是新线段起点）
+     * @return 约束后的点P'，满足|CP'| = |AB|
+     */
+    Point3D equalLengthConstraint(const Point3D& inputPoint, 
+                                 const std::vector<Point3D>& points);
 } 
+

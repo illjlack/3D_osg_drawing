@@ -855,7 +855,7 @@ void GeoOsgbIO::forceLoadPagedLODData(osg::Group* group, const QString& baseDir)
                     osg::ref_ptr<osg::Node> loadedNode = osgDB::readNodeFile(fullPath.toStdString());
                     if (loadedNode.valid()) {
                         // 将加载的节点添加为 PagedLOD 的子节点
-                        pagedLOD->addChild(loadedNode.get(), 0.0f, FLT_MAX);
+                        pagedLOD->addChild(loadedNode.get(), 0.0, FLT_MAX);
                         LOG_INFO(QString("成功强制加载 PagedLOD 文件: %1 (LOD级别: %2)").arg(fullPath).arg(lod), "文件IO");
                         
                         // 成功加载最精细的层级后，跳出循环，不再加载其他层级
@@ -892,16 +892,16 @@ void GeoOsgbIO::optimizeRenderingQuality(osg::Node* node)
     
     // 2. 设置更细的线条宽度
     osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth();
-    lineWidth->setWidth(1.0f); // 设置线条宽度为1像素
+    lineWidth->setWidth(1.0); // 设置线条宽度为1像素
     stateSet->setAttributeAndModes(lineWidth.get(), osg::StateAttribute::ON);
     
     // 3. 优化材质设置
     osg::ref_ptr<osg::Material> material = new osg::Material();
     material->setColorMode(osg::Material::AMBIENT_AND_DIFFUSE);
-    material->setAmbient(osg::Material::FRONT_AND_BACK, osg::Vec4(0.3f, 0.3f, 0.3f, 1.0f));
-    material->setDiffuse(osg::Material::FRONT_AND_BACK, osg::Vec4(0.8f, 0.8f, 0.8f, 1.0f));
-    material->setSpecular(osg::Material::FRONT_AND_BACK, osg::Vec4(0.2f, 0.2f, 0.2f, 1.0f));
-    material->setShininess(osg::Material::FRONT_AND_BACK, 32.0f);
+    material->setAmbient(osg::Material::FRONT_AND_BACK, osg::Vec4(0.3, 0.3, 0.3, 1.0));
+    material->setDiffuse(osg::Material::FRONT_AND_BACK, osg::Vec4(0.8, 0.8, 0.8, 1.0));
+    material->setSpecular(osg::Material::FRONT_AND_BACK, osg::Vec4(0.2, 0.2, 0.2, 1.0));
+    material->setShininess(osg::Material::FRONT_AND_BACK, 32.0);
     stateSet->setAttributeAndModes(material.get(), osg::StateAttribute::ON);
     
     // 4. 启用深度测试
@@ -964,3 +964,5 @@ void GeoOsgbIO::suggestCameraSettings()
     LOG_INFO("   - 设置环境光: viewer->getLight()->setAmbient(osg::Vec4(0.3, 0.3, 0.3, 1.0));", "文件IO");
     LOG_INFO("======================================================================", "文件IO");
 } 
+
+

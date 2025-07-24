@@ -26,13 +26,13 @@ class Geo3D;
 // 全局变量声明
 extern DrawMode3D GlobalDrawMode3D;
 extern PointShape3D GlobalPointShape3D;
-extern float GlobalPointSize3D;
+extern double GlobalPointSize3D;
 extern QColor GlobalPointColor3D;
 
 extern LineStyle3D GlobalLineStyle3D;
-extern float GlobalLineWidth3D;
+extern double GlobalLineWidth3D;
 extern QColor GlobalLineColor3D;
-extern float GlobalLineDashPattern3D;
+extern double GlobalLineDashPattern3D;
 extern NodeLineStyle3D GlobalNodeLineStyle3D;
 
 extern FillType3D GlobalFillType3D;
@@ -41,8 +41,8 @@ extern QColor GlobalBorderColor3D;
 extern bool GlobalShowBorder3D;
 
 extern MaterialType3D GlobalMaterialType3D;
-extern float GlobalShininess3D;
-extern float GlobalTransparency3D;
+extern double GlobalShininess3D;
+extern double GlobalTransparency3D;
 extern SubdivisionLevel3D GlobalSubdivisionLevel3D;
 
 // 显示控制全局变量
@@ -55,35 +55,35 @@ extern QStatusBar* GlobalStatusBar3D;
 // 三维点结构
 struct Point3D
 {
-    glm::vec3 position;
+    glm::dvec3 position;
     
-    Point3D() : position(0.0f, 0.0f, 0.0f) {}
-    Point3D(float x, float y, float z) : position(x, y, z) {}
-    Point3D(const glm::vec3& pos) : position(pos) {}
+    Point3D() : position(0.0, 0.0, 0.0) {}
+    Point3D(double x, double y, double z) : position(x, y, z) {}
+    Point3D(const glm::dvec3& pos) : position(pos) {}
     
-    float x() const { return position.x; }
-    float y() const { return position.y; }
-    float z() const { return position.z; }
+    double x() const { return position.x; }
+    double y() const { return position.y; }
+    double z() const { return position.z; }
     
-    void setX(float x) { position.x = x; }
-    void setY(float y) { position.y = y; }
-    void setZ(float z) { position.z = z; }
+    void setX(double x) { position.x = x; }
+    void setY(double y) { position.y = y; }
+    void setZ(double z) { position.z = z; }
 };
 
 // 颜色结构（扩展QColor以支持Alpha）
 struct Color3D
 {
-    float r, g, b, a;
+    double r, g, b, a;
     
-    Color3D() : r(1.0f), g(1.0f), b(1.0f), a(1.0f) {}
-    Color3D(float red, float green, float blue, float alpha = 1.0f) 
+    Color3D() : r(1.0), g(1.0), b(1.0), a(1.0) {}
+    Color3D(double red, double green, double blue, double alpha = 1.0) 
         : r(red), g(green), b(blue), a(alpha) {}
     Color3D(const QColor& color) 
         : r(color.redF()), g(color.greenF()), b(color.blueF()), a(color.alphaF()) {}
     
     QColor toQColor() const { return QColor::fromRgbF(r, g, b, a); }
-    glm::vec4 toGLM() const { return glm::vec4(r, g, b, a); }
-    glm::vec3 toGLM3() const { return glm::vec3(r, g, b); }
+    glm::dvec4 toGLM() const { return glm::dvec4(r, g, b, a); }
+    glm::dvec3 toGLM3() const { return glm::dvec3(r, g, b); }
     
     // 比较操作符
     bool operator==(const Color3D& other) const {
@@ -101,17 +101,17 @@ struct Material3D
     Color3D diffuse;      // 漫反射
     Color3D specular;     // 镜面反射
     Color3D emission;     // 自发光
-    float shininess;      // 光泽度
-    float transparency;   // 透明度
+    double shininess;      // 光泽度
+    double transparency;   // 透明度
     MaterialType3D type;  // 材质类型
     
     Material3D()
-        : ambient(0.2f, 0.2f, 0.2f, 1.0f)
-        , diffuse(0.8f, 0.8f, 0.8f, 1.0f)
-        , specular(1.0f, 1.0f, 1.0f, 1.0f)
-        , emission(0.0f, 0.0f, 0.0f, 1.0f)
-        , shininess(32.0f)
-        , transparency(1.0f)
+        : ambient(0.2, 0.2, 0.2, 1.0)
+        , diffuse(0.8, 0.8, 0.8, 1.0)
+        , specular(1.0, 1.0, 1.0, 1.0)
+        , emission(0.0, 0.0, 0.0, 1.0)
+        , shininess(32.0)
+        , transparency(1.0)
         , type(Material_Basic3D)
     {}
     
@@ -135,15 +135,15 @@ struct GeoParameters3D
 {
     // 点属性
     PointShape3D pointShape;
-    float pointSize;
+    double pointSize;
     Color3D pointColor;
     bool showPoints;  // 是否显示点
     
     // 线属性
     LineStyle3D lineStyle;
-    float lineWidth;
+    double lineWidth;
     Color3D lineColor;
-    float lineDashPattern;
+    double lineDashPattern;
     NodeLineStyle3D nodeLineStyle;
 
     bool showEdges;  // 是否显示边
@@ -170,26 +170,26 @@ struct GeoParameters3D
     // 一次性设置所有属性
     void setAllProperties(
         const PointShape3D& pShape = Point_Circle3D,
-        float pSize = 5.0f,
-        const Color3D& pColor = Color3D(1.0f, 0.0f, 0.0f, 1.0f),
+        double pSize = 5.0,
+        const Color3D& pColor = Color3D(1.0, 0.0, 0.0, 1.0),
         bool showPts = true,
         
         const LineStyle3D& lStyle = Line_Solid3D,
-        float lWidth = 2.0f,
-        const Color3D& lColor = Color3D(0.0f, 0.0f, 1.0f, 1.0f),
-        float lDashPattern = 1.0f,
+        double lWidth = 2.0,
+        const Color3D& lColor = Color3D(0.0, 0.0, 1.0, 1.0),
+        double lDashPattern = 1.0,
         const NodeLineStyle3D& nlStyle = NodeLine_Polyline3D,
         bool showEdgs = true,
         
         const FillType3D& fType = Fill_Solid3D,
-        const Color3D& fColor = Color3D(0.5f, 0.5f, 0.5f, 1.0f),
-        const Color3D& bColor = Color3D(0.0f, 0.0f, 0.0f, 1.0f),
+        const Color3D& fColor = Color3D(0.5, 0.5, 0.5, 1.0),
+        const Color3D& bColor = Color3D(0.0, 0.0, 0.0, 1.0),
         bool showBrd = true,
         bool showFcs = true,
         
         const MaterialType3D& mType = Material_Basic3D,
-        float shininess = 32.0f,
-        float transparency = 1.0f,
+        double shininess = 32.0,
+        double transparency = 1.0,
         const SubdivisionLevel3D& subLevel = Subdivision_Medium3D
     );
     
@@ -213,7 +213,7 @@ struct GeoParameters3D
     bool operator!=(const GeoParameters3D& other) const;
     
     // 参数混合（用于动画或渐变）
-    GeoParameters3D lerp(const GeoParameters3D& other, float t) const;
+    GeoParameters3D lerp(const GeoParameters3D& other, double t) const;
     
     // 保存/加载到字符串（用于配置文件）
     std::string toString() const;
@@ -255,21 +255,21 @@ private:
 // 变换矩阵
 struct Transform3D
 {
-    glm::vec3 translation;
-    glm::vec3 rotation;    // 欧拉角（度）
-    glm::vec3 scale;
+    glm::dvec3 translation;
+    glm::dvec3 rotation;    // 欧拉角（度）
+    glm::dvec3 scale;
     
     Transform3D()
-        : translation(0.0f), rotation(0.0f), scale(1.0f)
+        : translation(0.0), rotation(0.0), scale(1.0)
     {}
     
-    glm::mat4 getMatrix() const
+    glm::dmat4 getMatrix() const
     {
-        glm::mat4 t = glm::translate(glm::mat4(1.0f), translation);
-        glm::mat4 rx = glm::rotate(glm::mat4(1.0f), glm::radians(rotation.x), glm::vec3(1, 0, 0));
-        glm::mat4 ry = glm::rotate(glm::mat4(1.0f), glm::radians(rotation.y), glm::vec3(0, 1, 0));
-        glm::mat4 rz = glm::rotate(glm::mat4(1.0f), glm::radians(rotation.z), glm::vec3(0, 0, 1));
-        glm::mat4 s = glm::scale(glm::mat4(1.0f), scale);
+        glm::dmat4 t = glm::translate(glm::dmat4(1.0), translation);
+        glm::dmat4 rx = glm::rotate(glm::dmat4(1.0), glm::radians(rotation.x), glm::dvec3(1, 0, 0));
+        glm::dmat4 ry = glm::rotate(glm::dmat4(1.0), glm::radians(rotation.y), glm::dvec3(0, 1, 0));
+        glm::dmat4 rz = glm::rotate(glm::dmat4(1.0), glm::radians(rotation.z), glm::dvec3(0, 0, 1));
+        glm::dmat4 s = glm::scale(glm::dmat4(1.0), scale);
         
         return t * rz * ry * rx * s;
     }
@@ -278,13 +278,13 @@ struct Transform3D
 // 包围盒
 struct BoundingBox3D
 {
-    glm::vec3 min;
-    glm::vec3 max;
+    glm::dvec3 min;
+    glm::dvec3 max;
     
     BoundingBox3D() : min(FLT_MAX), max(-FLT_MAX) {}
-    BoundingBox3D(const glm::vec3& minPos, const glm::vec3& maxPos) : min(minPos), max(maxPos) {}
+    BoundingBox3D(const glm::dvec3& minPos, const glm::dvec3& maxPos) : min(minPos), max(maxPos) {}
     
-    void expand(const glm::vec3& point)
+    void expand(const glm::dvec3& point)
     {
         min = glm::min(min, point);
         max = glm::max(max, point);
@@ -296,21 +296,21 @@ struct BoundingBox3D
         max = glm::max(max, box.max);
     }
     
-    glm::vec3 center() const { return (min + max) * 0.5f; }
-    glm::vec3 size() const { return max - min; }
+    glm::dvec3 center() const { return (min + max) * 0.5; }
+    glm::dvec3 size() const { return max - min; }
     bool isValid() const { return min.x <= max.x && min.y <= max.y && min.z <= max.z; }
 };
 
 // 射线结构（用于拾取）
 struct Ray3D
 {
-    glm::vec3 origin;
-    glm::vec3 direction;
+    glm::dvec3 origin;
+    glm::dvec3 direction;
     
-    Ray3D() : origin(0.0f), direction(0.0f, 0.0f, -1.0f) {}
-    Ray3D(const glm::vec3& orig, const glm::vec3& dir) : origin(orig), direction(glm::normalize(dir)) {}
+    Ray3D() : origin(0.0), direction(0.0, 0.0, -1.0) {}
+    Ray3D(const glm::dvec3& orig, const glm::dvec3& dir) : origin(orig), direction(glm::normalize(dir)) {}
     
-    glm::vec3 pointAt(float t) const { return origin + t * direction; }
+    glm::dvec3 pointAt(double t) const { return origin + t * direction; }
 };
 
 /*
@@ -366,3 +366,7 @@ LineStyle3D stringToLineStyle3D(const QString& str);
 NodeLineStyle3D stringToNodeLineStyle3D(const QString& str);
 FillType3D stringToFillType3D(const QString& str);
 MaterialType3D stringToMaterialType3D(const QString& str); 
+
+
+
+

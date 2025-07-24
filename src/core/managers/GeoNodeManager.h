@@ -119,3 +119,4 @@ private:
     
     bool m_initialized;
 }; 
+

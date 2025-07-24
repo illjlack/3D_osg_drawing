@@ -27,7 +27,7 @@ public:
     void updateScreenCoordinates(int x, int y);
     
     // 更新空间坐标显示
-    void updateWorldCoordinates(const glm::vec3& pos);
+    void updateWorldCoordinates(const glm::dvec3& pos);
     
     // 更新模式显示
     void updateMode(const QString& mode);
@@ -105,3 +105,6 @@ private:
     // 临时消息定时器
     QTimer* m_messageTimer;
 }; 
+
+
+

@@ -9,7 +9,7 @@ GeoRenderManager::GeoRenderManager(Geo3D* parent)
     : m_parent(parent)
     , m_wireframeMode(false)
     , m_highlighted(false)
-    , m_highlightColor(1.0f, 1.0f, 0.0f, 1.0f)
+    , m_highlightColor(1.0, 1.0, 0.0, 1.0)
     , m_blendingEnabled(false)
 {
     initializeRender();
@@ -24,8 +24,8 @@ void GeoRenderManager::initializeRender()
     m_stateSet = new osg::StateSet();
     m_osgMaterial = new osg::Material();
     m_blendFunc = new osg::BlendFunc();
-    m_lineWidth = new osg::LineWidth(1.0f);  // 与根节点保持一致
-    m_pointSize = new osg::Point(3.0f);      // 与根节点保持一致
+    m_lineWidth = new osg::LineWidth(1.0);  // 与根节点保持一致
+    m_pointSize = new osg::Point(3.0);      // 与根节点保持一致
     
     // 1. 三套材质
     m_pointMaterial = new osg::Material(*m_osgMaterial);
@@ -143,24 +143,24 @@ void GeoRenderManager::setColor(const Color3D& color)
     m_material.diffuse = color;
 }
 
-void GeoRenderManager::setTransparency(float transparency)
+void GeoRenderManager::setTransparency(double transparency)
 {
-    transparency = std::max(0.0f, std::min(1.0f, transparency));
+    transparency = std::max(0.0, std::min(1.0, transparency));
     m_material.transparency = transparency;
     
-    if (transparency < 1.0f) {
+    if (transparency < 1.0) {
         m_blendingEnabled = true;
     }
 }
 
-void GeoRenderManager::setLineWidth(float width)
+void GeoRenderManager::setLineWidth(double width)
 {
     if (m_lineWidth.valid()) {
         m_lineWidth->setWidth(width);
     }
 }
 
-void GeoRenderManager::setPointSize(float size)
+void GeoRenderManager::setPointSize(double size)
 {
     if (m_pointSize.valid()) {
         m_pointSize->setSize(size);
@@ -192,38 +192,38 @@ void GeoRenderManager::applyMaterialPreset(MaterialType3D type)
 {
     switch (type) {
         case Material_Basic3D:
-            m_material.ambient = Color3D(0.2f, 0.2f, 0.2f, 1.0f);
-            m_material.diffuse = Color3D(0.8f, 0.8f, 0.8f, 1.0f);
-            m_material.specular = Color3D(0.0f, 0.0f, 0.0f, 1.0f);
-            m_material.shininess = 0.0f;
+            m_material.ambient = Color3D(0.2, 0.2, 0.2, 1.0);
+            m_material.diffuse = Color3D(0.8, 0.8, 0.8, 1.0);
+            m_material.specular = Color3D(0.0, 0.0, 0.0, 1.0);
+            m_material.shininess = 0.0;
             break;
             
         case Material_Phong3D:
-            m_material.ambient = Color3D(0.2f, 0.2f, 0.2f, 1.0f);
-            m_material.diffuse = Color3D(0.8f, 0.8f, 0.8f, 1.0f);
-            m_material.specular = Color3D(1.0f, 1.0f, 1.0f, 1.0f);
-            m_material.shininess = 32.0f;
+            m_material.ambient = Color3D(0.2, 0.2, 0.2, 1.0);
+            m_material.diffuse = Color3D(0.8, 0.8, 0.8, 1.0);
+            m_material.specular = Color3D(1.0, 1.0, 1.0, 1.0);
+            m_material.shininess = 32.0;
             break;
             
         case Material_Blinn3D:
-            m_material.ambient = Color3D(0.1f, 0.1f, 0.1f, 1.0f);
-            m_material.diffuse = Color3D(0.7f, 0.7f, 0.7f, 1.0f);
-            m_material.specular = Color3D(0.8f, 0.8f, 0.8f, 1.0f);
-            m_material.shininess = 64.0f;
+            m_material.ambient = Color3D(0.1, 0.1, 0.1, 1.0);
+            m_material.diffuse = Color3D(0.7, 0.7, 0.7, 1.0);
+            m_material.specular = Color3D(0.8, 0.8, 0.8, 1.0);
+            m_material.shininess = 64.0;
             break;
             
         case Material_Lambert3D:
-            m_material.ambient = Color3D(0.3f, 0.3f, 0.3f, 1.0f);
-            m_material.diffuse = Color3D(0.9f, 0.9f, 0.9f, 1.0f);
-            m_material.specular = Color3D(0.0f, 0.0f, 0.0f, 1.0f);
-            m_material.shininess = 0.0f;
+            m_material.ambient = Color3D(0.3, 0.3, 0.3, 1.0);
+            m_material.diffuse = Color3D(0.9, 0.9, 0.9, 1.0);
+            m_material.specular = Color3D(0.0, 0.0, 0.0, 1.0);
+            m_material.shininess = 0.0;
             break;
             
         case Material_PBR3D:
-            m_material.ambient = Color3D(0.04f, 0.04f, 0.04f, 1.0f);
-            m_material.diffuse = Color3D(0.5f, 0.5f, 0.5f, 1.0f);
-            m_material.specular = Color3D(0.04f, 0.04f, 0.04f, 1.0f);
-            m_material.shininess = 128.0f;
+            m_material.ambient = Color3D(0.04, 0.04, 0.04, 1.0);
+            m_material.diffuse = Color3D(0.5, 0.5, 0.5, 1.0);
+            m_material.specular = Color3D(0.04, 0.04, 0.04, 1.0);
+            m_material.shininess = 128.0;
             break;
     }
 } 
@@ -251,3 +251,7 @@ void GeoRenderManager::setFaceColor(const Color3D& color)
                                   osg::Vec4(color.r, color.g, color.b, color.a));
     }
 }
+
+
+
+

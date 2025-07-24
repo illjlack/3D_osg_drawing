@@ -405,11 +405,11 @@ void GeoNodeManager::updateBoundingBoxGeometry()
     if (boundingBox.valid()) {
         // 计算包围盒的尺寸，用于确定扩展量
         osg::Vec3 size = boundingBox.corner(7) - boundingBox.corner(0); // 对角线向量
-        float maxDimension = std::max({size.x(), size.y(), size.z()});
-        float expandAmount = maxDimension * 0.05f; // 扩展5%
+        double maxDimension = std::max({size.x(), size.y(), size.z()});
+        double expandAmount = maxDimension * 0.05; // 扩展5%
         
         // 确保最小扩展量，避免包围盒太小时看不清
-        expandAmount = std::max(expandAmount, 0.1f);
+        expandAmount = std::max(expandAmount, 0.1);
         
         // 向外扩展包围盒
         osg::BoundingBox expandedBox = boundingBox;
@@ -466,7 +466,7 @@ void GeoNodeManager::createBoundingBoxGeometry(const osg::BoundingBox& boundingB
 
     // 创建颜色数组（线框颜色）
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
-    colors->push_back(osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f)); // 黄色
+    colors->push_back(osg::Vec4(1.0, 1.0, 0.0, 1.0)); // 黄色
 
     // 创建线框索引
     osg::ref_ptr<osg::DrawElementsUInt> lines = new osg::DrawElementsUInt(osg::PrimitiveSet::LINES, 0);
@@ -697,3 +697,7 @@ void GeoNodeManager::identifyGeometryByCharacteristics(osg::Geometry* geometry)
         }
     }
 }
+
+
+
+

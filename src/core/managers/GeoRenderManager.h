@@ -28,11 +28,11 @@ public:
     void setMaterial(const Material3D& material);
     void setMaterialType(MaterialType3D type);
     void setColor(const Color3D& color);
-    void setTransparency(float transparency);
+    void setTransparency(double transparency);
 
     // 渲染属性设置
-    void setLineWidth(float width);
-    void setPointSize(float size);
+    void setLineWidth(double width);
+    void setPointSize(double size);
     void setWireframeMode(bool enable);
 
     // 高亮设置
@@ -73,3 +73,4 @@ private:
     Color3D m_highlightColor;
     bool m_blendingEnabled;
 }; 
+

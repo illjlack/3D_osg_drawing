@@ -25,3 +25,5 @@ void Torus3D_Geo::buildFaceGeometries()
 {
     mm_node()->clearFaceGeometry();
 }
+
+

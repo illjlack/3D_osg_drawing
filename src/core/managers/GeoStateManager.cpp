@@ -228,3 +228,4 @@ bool GeoStateManager::hasStateChanged(int oldState, int newState, int stateMask)
 {
     return (oldState & stateMask) != (newState & stateMask);
 }
+

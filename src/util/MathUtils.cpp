@@ -1,178 +1,181 @@
 ﻿#include "MathUtils.h"
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/geometric.hpp>
 #include <cmath>
 #include <algorithm>
-#include "../core/Common3D.h"
+#include <numeric>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/norm.hpp>
+#include <climits>
 
-float MathUtils::degToRad(float degrees)
-{
+// 常量已在头文件中定义为 constexpr，这里不需要重复定义
+
+double MathUtils::degToRad(double degrees) {
     return degrees * DEG_TO_RAD;
 }
 
-float MathUtils::radToDeg(float radians)
-{
-    return radians * RAD_TO_DEG;
-}
-
-glm::vec3 MathUtils::normalize(const glm::vec3& vec)
+glm::dvec3 MathUtils::normalize(const glm::dvec3& vec)
 {
     return glm::normalize(vec);
 }
 
-float MathUtils::distance(const glm::vec3& a, const glm::vec3& b)
+double MathUtils::distance(const glm::dvec3& a, const glm::dvec3& b)
 {
-    return glm::distance(a, b);
+    return glm::length(b - a);
 }
 
-float MathUtils::distanceSquared(const glm::vec3& a, const glm::vec3& b)
+double MathUtils::distanceSquared(const glm::dvec3& a, const glm::dvec3& b)
 {
-    glm::vec3 diff = b - a;
+    glm::dvec3 diff = b - a;
     return glm::dot(diff, diff);
 }
 
-glm::vec3 MathUtils::lerp(const glm::vec3& a, const glm::vec3& b, float t)
+glm::dvec3 MathUtils::lerp(const glm::dvec3& a, const glm::dvec3& b, double t)
 {
-    return glm::mix(a, b, t);
+    return a + t * (b - a);
 }
 
-glm::vec3 MathUtils::slerp(const glm::vec3& a, const glm::vec3& b, float t)
+glm::dvec3 MathUtils::slerp(const glm::dvec3& a, const glm::dvec3& b, double t)
 {
     // 球面线性插值
-    float dot = glm::dot(normalize(a), normalize(b));
-    dot = std::clamp(dot, -1.0f, 1.0f);
+    glm::dvec3 na = glm::normalize(a);
+    glm::dvec3 nb = glm::normalize(b);
     
-    float theta = std::acos(dot);
-    if (std::abs(theta) < EPSILON)
-        return lerp(a, b, t);
+    double dot = glm::dot(na, nb);
     
-    float sinTheta = std::sin(theta);
-    float w1 = std::sin((1.0f - t) * theta) / sinTheta;
-    float w2 = std::sin(t * theta) / sinTheta;
-    
-    return w1 * a + w2 * b;
-}
-
-glm::vec3 MathUtils::calculateNormal(const glm::vec3& a, const glm::vec3& b, const glm::vec3& c)
-{
-    glm::vec3 v1 = b - a;
-    glm::vec3 v2 = c - a;
-    glm::vec3 cross = glm::cross(v1, v2);
-    
-    // 检查三点是否共线
-    float crossLength = glm::length(cross);
-    if (crossLength < EPSILON) {
-        // 三点共线，无法确定平面，返回默认向上法向量
-        return glm::vec3(0.0f, 0.0f, 1.0f);
+    // 如果点积接近1，使用线性插值
+    if (std::abs(dot) > 0.9995) {
+        return glm::normalize(lerp(a, b, t));
     }
     
-    return cross / crossLength; // 手动标准化，避免normalize函数处理零向量
+    double theta = std::acos(std::abs(dot));
+    double sinTheta = std::sin(theta);
+    
+    double wa = std::sin((1.0 - t) * theta) / sinTheta;
+    double wb = std::sin(t * theta) / sinTheta;
+    
+    return wa * na + wb * nb;
 }
 
-glm::vec3 MathUtils::calculateCentroid(const std::vector<glm::vec3>& points)
+glm::dvec3 MathUtils::calculateNormal(const glm::dvec3& a, const glm::dvec3& b, const glm::dvec3& c)
 {
-    if (points.empty())
-        return glm::vec3(0.0f);
+    glm::dvec3 v1 = b - a;
+    glm::dvec3 v2 = c - a;
+    glm::dvec3 cross = glm::cross(v1, v2);
     
-    glm::vec3 sum(0.0f);
-    for (const auto& point : points)
-    {
+    if (glm::length(cross) < EPSILON) {
+        // 三点共线，返回默认法向量
+        return glm::dvec3(0.0, 0.0, 1.0);
+    }
+    
+    return glm::normalize(cross);
+}
+
+glm::dvec3 MathUtils::calculateCentroid(const std::vector<glm::dvec3>& points)
+{
+    if (points.empty()) {
+        return glm::dvec3(0.0);
+    }
+    
+    glm::dvec3 sum(0.0);
+    for (const auto& point : points) {
         sum += point;
     }
-    return sum / static_cast<float>(points.size());
+    
+    return sum / static_cast<double>(points.size());
 }
 
-float MathUtils::calculateArea(const std::vector<glm::vec3>& points)
+double MathUtils::calculateArea(const std::vector<glm::dvec3>& points)
 {
-    if (points.size() < 3)
-        return 0.0f;
-    
-    // 使用三角形面积公式
-    float area = 0.0f;
-    for (size_t i = 1; i < points.size() - 1; ++i)
-    {
-        glm::vec3 v1 = points[i] - points[0];
-        glm::vec3 v2 = points[i + 1] - points[0];
-        area += 0.5f * glm::length(glm::cross(v1, v2));
+    if (points.size() < 3) {
+        return 0.0;
     }
+    
+    double area = 0.0;
+    for (size_t i = 1; i < points.size() - 1; i++) {
+        glm::dvec3 v1 = points[i] - points[0];
+        glm::dvec3 v2 = points[i + 1] - points[0];
+        area += glm::length(glm::cross(v1, v2)) * 0.5;
+    }
+    
     return area;
 }
 
-float MathUtils::calculateVolume(const std::vector<glm::vec3>& points)
+double MathUtils::calculateVolume(const std::vector<glm::dvec3>& points)
 {
-    if (points.size() < 4)
-        return 0.0f;
-    
-    // 使用四面体体积公式
-    float volume = 0.0f;
-    for (size_t i = 1; i < points.size() - 2; ++i)
-    {
-        glm::vec3 v1 = points[i] - points[0];
-        glm::vec3 v2 = points[i + 1] - points[0];
-        glm::vec3 v3 = points[i + 2] - points[0];
-        volume += std::abs(glm::dot(v1, glm::cross(v2, v3))) / 6.0f;
+    if (points.size() < 4) {
+        return 0.0;
     }
-    return volume;
+    
+    double volume = 0.0;
+    for (size_t i = 1; i < points.size() - 2; i++) {
+        glm::dvec3 v1 = points[i] - points[0];
+        glm::dvec3 v2 = points[i + 1] - points[0];
+        glm::dvec3 v3 = points[i + 2] - points[0];
+        volume += glm::dot(v1, glm::cross(v2, v3)) / 6.0;
+    }
+    
+    return std::abs(volume);
 }
 
-osg::BoundingBox MathUtils::calculateBoundingBox(const std::vector<glm::vec3>& points)
+osg::BoundingBox MathUtils::calculateBoundingBox(const std::vector<glm::dvec3>& points)
 {
-    if (points.empty())
+    if (points.empty()) {
         return osg::BoundingBox();
+    }
     
     osg::BoundingBox bbox;
-    for (const auto& point : points)
-    {
-        bbox.expandBy(osg::Vec3(point.x, point.y, point.z));
+    for (const auto& point : points) {
+        bbox.expandBy(osg::Vec3(static_cast<double>(point.x), static_cast<double>(point.y), static_cast<double>(point.z)));
     }
+    
     return bbox;
 }
 
-glm::vec3 MathUtils::projectPointOnPlane(const glm::vec3& point, const glm::vec3& planeNormal, const glm::vec3& planePoint)
+glm::dvec3 MathUtils::projectPointOnPlane(const glm::dvec3& point, const glm::dvec3& planeNormal, const glm::dvec3& planePoint)
 {
-    glm::vec3 n = normalize(planeNormal);
-    float d = glm::dot(point - planePoint, n);
+    glm::dvec3 n = normalize(planeNormal);
+    double d = glm::dot(point - planePoint, n);
     return point - d * n;
 }
 
-glm::vec3 MathUtils::projectPointOnLine(const glm::vec3& point, const glm::vec3& lineStart, const glm::vec3& lineEnd)
+glm::dvec3 MathUtils::projectPointOnLine(const glm::dvec3& point, const glm::dvec3& lineStart, const glm::dvec3& lineEnd)
 {
-    glm::vec3 lineDir = lineEnd - lineStart;
-    float lineLengthSq = glm::dot(lineDir, lineDir);
+    glm::dvec3 lineDir = lineEnd - lineStart;
+    double lineLengthSq = glm::dot(lineDir, lineDir);
     
     if (lineLengthSq < EPSILON)
         return lineStart;
     
-    float t = glm::dot(point - lineStart, lineDir) / lineLengthSq;
-    t = std::clamp(t, 0.0f, 1.0f);
+    double t = glm::dot(point - lineStart, lineDir) / lineLengthSq;
+    t = std::clamp(t, 0.0, 1.0);
     
     return lineStart + t * lineDir;
 }
 
-bool MathUtils::rayIntersectsTriangle(const glm::vec3& rayOrigin, const glm::vec3& rayDir,
-                                     const glm::vec3& v0, const glm::vec3& v1, const glm::vec3& v2,
-                                     float& t, glm::vec3& intersectionPoint)
+bool MathUtils::rayIntersectsTriangle(const glm::dvec3& rayOrigin, const glm::dvec3& rayDir,
+                                     const glm::dvec3& v0, const glm::dvec3& v1, const glm::dvec3& v2,
+                                     double& t, glm::dvec3& intersectionPoint)
 {
     // Mller-Trumbore相交算法
-    glm::vec3 edge1 = v1 - v0;
-    glm::vec3 edge2 = v2 - v0;
-    glm::vec3 h = glm::cross(rayDir, edge2);
-    float a = glm::dot(edge1, h);
+    glm::dvec3 edge1 = v1 - v0;
+    glm::dvec3 edge2 = v2 - v0;
+    glm::dvec3 h = glm::cross(rayDir, edge2);
+    double a = glm::dot(edge1, h);
     
     if (a > -EPSILON && a < EPSILON)
         return false;
     
-    float f = 1.0f / a;
-    glm::vec3 s = rayOrigin - v0;
-    float u = f * glm::dot(s, h);
+    double f = 1.0 / a;
+    glm::dvec3 s = rayOrigin - v0;
+    double u = f * glm::dot(s, h);
     
-    if (u < 0.0f || u > 1.0f)
+    if (u < 0.0 || u > 1.0)
         return false;
     
-    glm::vec3 q = glm::cross(s, edge1);
-    float v = f * glm::dot(rayDir, q);
+    glm::dvec3 q = glm::cross(s, edge1);
+    double v = f * glm::dot(rayDir, q);
     
-    if (v < 0.0f || u + v > 1.0f)
+    if (v < 0.0 || u + v > 1.0)
         return false;
     
     t = f * glm::dot(edge2, q);
@@ -186,18 +189,18 @@ bool MathUtils::rayIntersectsTriangle(const glm::vec3& rayOrigin, const glm::vec
     return false;
 }
 
-bool MathUtils::rayIntersectsPlane(const glm::vec3& rayOrigin, const glm::vec3& rayDir,
-                                  const glm::vec3& planeNormal, const glm::vec3& planePoint,
-                                  float& t, glm::vec3& intersectionPoint)
+bool MathUtils::rayIntersectsPlane(const glm::dvec3& rayOrigin, const glm::dvec3& rayDir,
+                                  const glm::dvec3& planeNormal, const glm::dvec3& planePoint,
+                                  double& t, glm::dvec3& intersectionPoint)
 {
-    float denom = glm::dot(planeNormal, rayDir);
+    double denom = glm::dot(planeNormal, rayDir);
     
     if (std::abs(denom) < EPSILON)
         return false;
     
     t = glm::dot(planePoint - rayOrigin, planeNormal) / denom;
     
-    if (t >= 0.0f)
+    if (t >= 0.0)
     {
         intersectionPoint = rayOrigin + t * rayDir;
         return true;
@@ -206,38 +209,38 @@ bool MathUtils::rayIntersectsPlane(const glm::vec3& rayOrigin, const glm::vec3& 
     return false;
 }
 
-osg::Vec3 MathUtils::glmToOsg(const glm::vec3& vec)
+osg::Vec3 MathUtils::glmToOsg(const glm::dvec3& vec)
 {
-    return osg::Vec3(vec.x, vec.y, vec.z);
+    return osg::Vec3(static_cast<double>(vec.x), static_cast<double>(vec.y), static_cast<double>(vec.z));
 }
 
-glm::vec3 MathUtils::osgToGlm(const osg::Vec3& vec)
+glm::dvec3 MathUtils::osgToGlm(const osg::Vec3& vec)
 {
-    return glm::vec3(vec.x(), vec.y(), vec.z());
+    return glm::dvec3(vec.x(), vec.y(), vec.z());
 }
 
-MathUtils::ArcParameters MathUtils::calculateArcFromThreePoints(const glm::vec3& p1, const glm::vec3& p2, const glm::vec3& p3)
+MathUtils::ArcParameters MathUtils::calculateArcFromThreePoints(const glm::dvec3& p1, const glm::dvec3& p2, const glm::dvec3& p3)
 {
     ArcParameters params;
     
     // 计算法向量
-    glm::vec3 a = p2 - p1;
-    glm::vec3 b = p3 - p2;
+    glm::dvec3 a = p2 - p1;
+    glm::dvec3 b = p3 - p2;
     params.normal = normalize(glm::cross(a, b));
     
     // 计算圆心
-    glm::vec3 midAB = (p1 + p2) * 0.5f;
-    glm::vec3 midBC = (p2 + p3) * 0.5f;
+    glm::dvec3 midAB = (p1 + p2) * 0.5;
+    glm::dvec3 midBC = (p2 + p3) * 0.5;
     
-    glm::vec3 perpA = glm::cross(a, params.normal);
-    glm::vec3 perpB = glm::cross(b, params.normal);
+    glm::dvec3 perpA = glm::cross(a, params.normal);
+    glm::dvec3 perpB = glm::cross(b, params.normal);
     
     // 解线性方程组找圆心
-    float t = 0.0f;
+    double t = 0.0;
     if (glm::length(perpA) > EPSILON && glm::length(perpB) > EPSILON)
     {
-        glm::vec3 diff = midBC - midAB;
-        float denom = glm::dot(perpA, perpB);
+        glm::dvec3 diff = midBC - midAB;
+        double denom = glm::dot(perpA, perpB);
         if (std::abs(denom) > EPSILON)
         {
             t = glm::dot(diff, perpB) / denom;
@@ -248,23 +251,23 @@ MathUtils::ArcParameters MathUtils::calculateArcFromThreePoints(const glm::vec3&
     params.radius = glm::length(p1 - params.center);
     
     // 计算起始和结束角度
-    glm::vec3 ref = normalize(p1 - params.center);
-    glm::vec3 perpRef = normalize(glm::cross(params.normal, ref));
+    glm::dvec3 ref = normalize(p1 - params.center);
+    glm::dvec3 perpRef = normalize(glm::cross(params.normal, ref));
     
-    glm::vec3 v1 = normalize(p1 - params.center);
-    glm::vec3 v3 = normalize(p3 - params.center);
+    glm::dvec3 v1 = normalize(p1 - params.center);
+    glm::dvec3 v3 = normalize(p3 - params.center);
     
     params.startAngle = atan2(glm::dot(v1, perpRef), glm::dot(v1, ref));
     params.endAngle = atan2(glm::dot(v3, perpRef), glm::dot(v3, ref));
     
     // 确保角度范围正确
     if (params.endAngle < params.startAngle)
-        params.endAngle += 2.0f * PI;
+        params.endAngle += 2.0 * PI;
     
     // 计算扫掠角度
     params.sweepAngle = params.endAngle - params.startAngle;
     if (params.sweepAngle < 0)
-        params.sweepAngle += 2.0f * PI;
+        params.sweepAngle += 2.0 * PI;
     
     // 计算坐标轴
     params.uAxis = ref;
@@ -273,22 +276,22 @@ MathUtils::ArcParameters MathUtils::calculateArcFromThreePoints(const glm::vec3&
     return params;
 }
 
-std::vector<glm::vec3> MathUtils::generateArcPoints(const ArcParameters& params, int segments)
+std::vector<glm::dvec3> MathUtils::generateArcPoints(const ArcParameters& params, int segments)
 {
-    std::vector<glm::vec3> points;
+    std::vector<glm::dvec3> points;
     points.reserve(segments + 1);
     
     if (params.radius <= 0)
         return points;
     
-    float angleRange = params.sweepAngle;
+    double angleRange = params.sweepAngle;
     
     for (int i = 0; i <= segments; ++i)
     {
-        float t = static_cast<float>(i) / segments;
-        float angle = params.startAngle + t * angleRange;
+        double t = static_cast<double>(i) / segments;
+        double angle = params.startAngle + t * angleRange;
         
-        glm::vec3 point = params.center + params.radius * (
+        glm::dvec3 point = params.center + params.radius * (
             std::cos(angle) * params.uAxis + 
             std::sin(angle) * params.vAxis
         );
@@ -298,17 +301,17 @@ std::vector<glm::vec3> MathUtils::generateArcPoints(const ArcParameters& params,
     return points;
 }
 
-glm::vec3 MathUtils::evaluateBezierPoint(const std::vector<glm::vec3>& controlPoints, float t)
+glm::dvec3 MathUtils::evaluateBezierPoint(const std::vector<glm::dvec3>& controlPoints, double t)
 {
     if (controlPoints.empty())
-        return glm::vec3(0);
+        return glm::dvec3(0);
     
     // De Casteljau算法
-    std::vector<glm::vec3> tempPoints = controlPoints;
+    std::vector<glm::dvec3> tempPoints = controlPoints;
     
     while (tempPoints.size() > 1)
     {
-        std::vector<glm::vec3> newPoints;
+        std::vector<glm::dvec3> newPoints;
         for (size_t j = 0; j < tempPoints.size() - 1; ++j)
         {
             newPoints.push_back(glm::mix(tempPoints[j], tempPoints[j+1], t));
@@ -316,12 +319,12 @@ glm::vec3 MathUtils::evaluateBezierPoint(const std::vector<glm::vec3>& controlPo
         tempPoints = newPoints;
     }
     
-    return tempPoints.empty() ? glm::vec3(0) : tempPoints[0];
+    return tempPoints.empty() ? glm::dvec3(0) : tempPoints[0];
 }
 
-std::vector<glm::vec3> MathUtils::generateBezierCurve(const std::vector<glm::vec3>& controlPoints, int steps)
+std::vector<glm::dvec3> MathUtils::generateBezierCurve(const std::vector<glm::dvec3>& controlPoints, int steps)
 {
-    std::vector<glm::vec3> curvePoints;
+    std::vector<glm::dvec3> curvePoints;
     curvePoints.reserve(steps + 1);
     
     if (controlPoints.size() < 2)
@@ -329,15 +332,15 @@ std::vector<glm::vec3> MathUtils::generateBezierCurve(const std::vector<glm::vec
     
     for (int i = 0; i <= steps; ++i)
     {
-        float t = static_cast<float>(i) / steps;
-        glm::vec3 point = evaluateBezierPoint(controlPoints, t);
+        double t = static_cast<double>(i) / steps;
+        glm::dvec3 point = evaluateBezierPoint(controlPoints, t);
         curvePoints.push_back(point);
     }
     
     return curvePoints;
 }
 
-MathUtils::ConeParameters MathUtils::calculateConeParameters(const glm::vec3& base, const glm::vec3& apex, float radius)
+MathUtils::ConeParameters MathUtils::calculateConeParameters(const glm::dvec3& base, const glm::dvec3& apex, double radius)
 {
     ConeParameters params;
     params.base = base;
@@ -347,36 +350,36 @@ MathUtils::ConeParameters MathUtils::calculateConeParameters(const glm::vec3& ba
     params.height = distance(apex, base);
     
     // 计算垂直于轴的两个正交向量
-    if (std::abs(params.axis.z) < 0.9f)
+    if (std::abs(params.axis.z) < 0.9)
     {
-        params.uAxis = normalize(glm::cross(params.axis, glm::vec3(0, 0, 1)));
+        params.uAxis = normalize(glm::cross(params.axis, glm::dvec3(0, 0, 1)));
     }
     else
     {
-        params.uAxis = normalize(glm::cross(params.axis, glm::vec3(1, 0, 0)));
+        params.uAxis = normalize(glm::cross(params.axis, glm::dvec3(1, 0, 0)));
     }
     params.vAxis = normalize(glm::cross(params.axis, params.uAxis));
     
     return params;
 }
 
-float MathUtils::calculateConeVolume(const ConeParameters& params)
+double MathUtils::calculateConeVolume(const ConeParameters& params)
 {
-    return (1.0f / 3.0f) * PI * params.radius * params.radius * params.height;
+    return (1.0 / 3.0) * PI * params.radius * params.radius * params.height;
 }
 
-float MathUtils::calculateConeSurfaceArea(const ConeParameters& params)
+double MathUtils::calculateConeSurfaceArea(const ConeParameters& params)
 {
-    float slantHeight = std::sqrt(params.radius * params.radius + params.height * params.height);
+    double slantHeight = std::sqrt(params.radius * params.radius + params.height * params.height);
     return PI * params.radius * (params.radius + slantHeight);
 }
 
-glm::vec3 MathUtils::calculateConeCenter(const ConeParameters& params)
+glm::dvec3 MathUtils::calculateConeCenter(const ConeParameters& params)
 {
-    return (params.base + params.apex) * 0.5f;
+    return (params.base + params.apex) * 0.5;
 }
 
-MathUtils::SphereParameters MathUtils::calculateSphereParameters(const glm::vec3& center, float radius, int segments)
+MathUtils::SphereParameters MathUtils::calculateSphereParameters(const glm::dvec3& center, double radius, int segments)
 {
     SphereParameters params;
     params.center = center;
@@ -385,52 +388,52 @@ MathUtils::SphereParameters MathUtils::calculateSphereParameters(const glm::vec3
     return params;
 }
 
-float MathUtils::calculateSphereVolume(const SphereParameters& params)
+double MathUtils::calculateSphereVolume(const SphereParameters& params)
 {
-    return (4.0f / 3.0f) * PI * params.radius * params.radius * params.radius;
+    return (4.0 / 3.0) * PI * params.radius * params.radius * params.radius;
 }
 
-float MathUtils::calculateSphereSurfaceArea(const SphereParameters& params)
+double MathUtils::calculateSphereSurfaceArea(const SphereParameters& params)
 {
-    return 4.0f * PI * params.radius * params.radius;
+    return 4.0 * PI * params.radius * params.radius;
 }
 
-glm::vec3 MathUtils::calculateSphereCenter(const SphereParameters& params)
+glm::dvec3 MathUtils::calculateSphereCenter(const SphereParameters& params)
 {
     return params.center;
 }
 
-MathUtils::BoxParameters MathUtils::calculateBoxParameters(const glm::vec3& min, const glm::vec3& max)
+MathUtils::BoxParameters MathUtils::calculateBoxParameters(const glm::dvec3& min, const glm::dvec3& max)
 {
     BoxParameters params;
     params.min = min;
     params.max = max;
     params.size = max - min;
-    params.center = (min + max) * 0.5f;
+    params.center = (min + max) * 0.5;
     return params;
 }
 
-float MathUtils::calculateBoxVolume(const BoxParameters& params)
+double MathUtils::calculateBoxVolume(const BoxParameters& params)
 {
     return params.size.x * params.size.y * params.size.z;
 }
 
-float MathUtils::calculateBoxSurfaceArea(const BoxParameters& params)
+double MathUtils::calculateBoxSurfaceArea(const BoxParameters& params)
 {
-    return 2.0f * (params.size.x * params.size.y + params.size.y * params.size.z + params.size.z * params.size.x);
+    return 2.0 * (params.size.x * params.size.y + params.size.y * params.size.z + params.size.z * params.size.x);
 }
 
-glm::vec3 MathUtils::calculateBoxCenter(const BoxParameters& params)
+glm::dvec3 MathUtils::calculateBoxCenter(const BoxParameters& params)
 {
     return params.center;
 }
 
-glm::vec3 MathUtils::calculateBoxSize(const BoxParameters& params)
+glm::dvec3 MathUtils::calculateBoxSize(const BoxParameters& params)
 {
     return params.size;
 }
 
-MathUtils::CylinderParameters MathUtils::calculateCylinderParameters(const glm::vec3& base, const glm::vec3& top, float radius)
+MathUtils::CylinderParameters MathUtils::calculateCylinderParameters(const glm::dvec3& base, const glm::dvec3& top, double radius)
 {
     CylinderParameters params;
     params.base = base;
@@ -440,35 +443,35 @@ MathUtils::CylinderParameters MathUtils::calculateCylinderParameters(const glm::
     params.height = distance(top, base);
     
     // 计算垂直于轴的两个正交向量
-    if (std::abs(params.axis.z) < 0.9f)
+    if (std::abs(params.axis.z) < 0.9)
     {
-        params.uAxis = normalize(glm::cross(params.axis, glm::vec3(0, 0, 1)));
+        params.uAxis = normalize(glm::cross(params.axis, glm::dvec3(0, 0, 1)));
     }
     else
     {
-        params.uAxis = normalize(glm::cross(params.axis, glm::vec3(1, 0, 0)));
+        params.uAxis = normalize(glm::cross(params.axis, glm::dvec3(1, 0, 0)));
     }
     params.vAxis = normalize(glm::cross(params.axis, params.uAxis));
     
     return params;
 }
 
-float MathUtils::calculateCylinderVolume(const CylinderParameters& params)
+double MathUtils::calculateCylinderVolume(const CylinderParameters& params)
 {
     return PI * params.radius * params.radius * params.height;
 }
 
-float MathUtils::calculateCylinderSurfaceArea(const CylinderParameters& params)
+double MathUtils::calculateCylinderSurfaceArea(const CylinderParameters& params)
 {
-    return 2.0f * PI * params.radius * (params.radius + params.height);
+    return 2.0 * PI * params.radius * (params.radius + params.height);
 }
 
-glm::vec3 MathUtils::calculateCylinderCenter(const CylinderParameters& params)
+glm::dvec3 MathUtils::calculateCylinderCenter(const CylinderParameters& params)
 {
-    return (params.base + params.top) * 0.5f;
+    return (params.base + params.top) * 0.5;
 }
 
-MathUtils::TorusParameters MathUtils::calculateTorusParameters(const glm::vec3& center, float majorRadius, float minorRadius, const glm::vec3& axis)
+MathUtils::TorusParameters MathUtils::calculateTorusParameters(const glm::dvec3& center, double majorRadius, double minorRadius, const glm::dvec3& axis)
 {
     TorusParameters params;
     params.center = center;
@@ -477,77 +480,77 @@ MathUtils::TorusParameters MathUtils::calculateTorusParameters(const glm::vec3& 
     params.axis = normalize(axis);
     
     // 计算垂直于轴的两个正交向量
-    if (std::abs(params.axis.z) < 0.9f)
+    if (std::abs(params.axis.z) < 0.9)
     {
-        params.uAxis = normalize(glm::cross(params.axis, glm::vec3(0, 0, 1)));
+        params.uAxis = normalize(glm::cross(params.axis, glm::dvec3(0, 0, 1)));
     }
     else
     {
-        params.uAxis = normalize(glm::cross(params.axis, glm::vec3(1, 0, 0)));
+        params.uAxis = normalize(glm::cross(params.axis, glm::dvec3(1, 0, 0)));
     }
     params.vAxis = normalize(glm::cross(params.axis, params.uAxis));
     
     return params;
 }
 
-float MathUtils::calculateTorusVolume(const TorusParameters& params)
+double MathUtils::calculateTorusVolume(const TorusParameters& params)
 {
-    return 2.0f * PI * PI * params.majorRadius * params.minorRadius * params.minorRadius;
+    return 2.0 * PI * PI * params.majorRadius * params.minorRadius * params.minorRadius;
 }
 
-float MathUtils::calculateTorusSurfaceArea(const TorusParameters& params)
+double MathUtils::calculateTorusSurfaceArea(const TorusParameters& params)
 {
-    return 4.0f * PI * PI * params.majorRadius * params.minorRadius;
+    return 4.0 * PI * PI * params.majorRadius * params.minorRadius;
 }
 
-glm::vec3 MathUtils::calculateTorusCenter(const TorusParameters& params)
+glm::dvec3 MathUtils::calculateTorusCenter(const TorusParameters& params)
 {
     return params.center;
 }
 
-MathUtils::TriangleParameters MathUtils::calculateTriangleParameters(const glm::vec3& v1, const glm::vec3& v2, const glm::vec3& v3)
+MathUtils::TriangleParameters MathUtils::calculateTriangleParameters(const glm::dvec3& v1, const glm::dvec3& v2, const glm::dvec3& v3)
 {
     TriangleParameters params;
     params.v1 = v1;
     params.v2 = v2;
     params.v3 = v3;
-    params.center = (v1 + v2 + v3) / 3.0f;
+    params.center = (v1 + v2 + v3) / 3.0;
     params.normal = calculateNormal(v1, v2, v3);
     params.area = calculateTriangleArea(params);
     return params;
 }
 
-float MathUtils::calculateTriangleArea(const TriangleParameters& params)
+double MathUtils::calculateTriangleArea(const TriangleParameters& params)
 {
-    glm::vec3 edge1 = params.v2 - params.v1;
-    glm::vec3 edge2 = params.v3 - params.v1;
-    return 0.5f * glm::length(glm::cross(edge1, edge2));
+    glm::dvec3 edge1 = params.v2 - params.v1;
+    glm::dvec3 edge2 = params.v3 - params.v1;
+    return 0.5 * glm::length(glm::cross(edge1, edge2));
 }
 
-glm::vec3 MathUtils::calculateTriangleCenter(const TriangleParameters& params)
+glm::dvec3 MathUtils::calculateTriangleCenter(const TriangleParameters& params)
 {
     return params.center;
 }
 
-glm::vec3 MathUtils::calculateTriangleNormal(const TriangleParameters& params)
+glm::dvec3 MathUtils::calculateTriangleNormal(const TriangleParameters& params)
 {
     return params.normal;
 }
 
-MathUtils::QuadParameters MathUtils::calculateQuadParameters(const glm::vec3& v1, const glm::vec3& v2, const glm::vec3& v3, const glm::vec3& v4)
+MathUtils::QuadParameters MathUtils::calculateQuadParameters(const glm::dvec3& v1, const glm::dvec3& v2, const glm::dvec3& v3, const glm::dvec3& v4)
 {
     QuadParameters params;
     params.v1 = v1;
     params.v2 = v2;
     params.v3 = v3;
     params.v4 = v4;
-    params.center = (v1 + v2 + v3 + v4) / 4.0f;
+    params.center = (v1 + v2 + v3 + v4) / 4.0;
     params.normal = calculateNormal(v1, v2, v3);
     params.area = calculateQuadArea(params);
     return params;
 }
 
-float MathUtils::calculateQuadArea(const QuadParameters& params)
+double MathUtils::calculateQuadArea(const QuadParameters& params)
 {
     // 将四边形分解为两个三角形计算面积
     TriangleParameters tri1 = calculateTriangleParameters(params.v1, params.v2, params.v3);
@@ -555,17 +558,17 @@ float MathUtils::calculateQuadArea(const QuadParameters& params)
     return calculateTriangleArea(tri1) + calculateTriangleArea(tri2);
 }
 
-glm::vec3 MathUtils::calculateQuadCenter(const QuadParameters& params)
+glm::dvec3 MathUtils::calculateQuadCenter(const QuadParameters& params)
 {
     return params.center;
 }
 
-glm::vec3 MathUtils::calculateQuadNormal(const QuadParameters& params)
+glm::dvec3 MathUtils::calculateQuadNormal(const QuadParameters& params)
 {
     return params.normal;
 }
 
-MathUtils::PolygonParameters MathUtils::calculatePolygonParameters(const std::vector<glm::vec3>& vertices)
+MathUtils::PolygonParameters MathUtils::calculatePolygonParameters(const std::vector<glm::dvec3>& vertices)
 {
     PolygonParameters params;
     params.vertices = vertices;
@@ -576,20 +579,20 @@ MathUtils::PolygonParameters MathUtils::calculatePolygonParameters(const std::ve
     return params;
 }
 
-float MathUtils::calculatePolygonArea(const PolygonParameters& params)
+double MathUtils::calculatePolygonArea(const PolygonParameters& params)
 {
     if (params.vertices.size() < 3)
-        return 0.0f;
+        return 0.0;
     
     // 使用三角形分解计算面积
-    float area = 0.0f;
+    double area = 0.0;
     for (size_t i = 0; i < params.triangleIndices.size(); i += 3)
     {
         if (i + 2 < params.triangleIndices.size())
         {
-            glm::vec3 v1 = params.vertices[params.triangleIndices[i]];
-            glm::vec3 v2 = params.vertices[params.triangleIndices[i + 1]];
-            glm::vec3 v3 = params.vertices[params.triangleIndices[i + 2]];
+            glm::dvec3 v1 = params.vertices[params.triangleIndices[i]];
+            glm::dvec3 v2 = params.vertices[params.triangleIndices[i + 1]];
+            glm::dvec3 v3 = params.vertices[params.triangleIndices[i + 2]];
             
             TriangleParameters triParams = calculateTriangleParameters(v1, v2, v3);
             area += calculateTriangleArea(triParams);
@@ -598,21 +601,21 @@ float MathUtils::calculatePolygonArea(const PolygonParameters& params)
     return area;
 }
 
-glm::vec3 MathUtils::calculatePolygonCenter(const PolygonParameters& params)
+glm::dvec3 MathUtils::calculatePolygonCenter(const PolygonParameters& params)
 {
     return params.center;
 }
 
-glm::vec3 MathUtils::calculatePolygonNormal(const PolygonParameters& params)
+glm::dvec3 MathUtils::calculatePolygonNormal(const PolygonParameters& params)
 {
     if (params.vertices.size() < 3)
-        return glm::vec3(0, 0, 1);
+        return glm::dvec3(0, 0, 1);
     
     // 使用前三个点计算法向量
     return calculateNormal(params.vertices[0], params.vertices[1], params.vertices[2]);
 }
 
-std::vector<unsigned int> MathUtils::triangulatePolygon(const std::vector<glm::vec3>& vertices)
+std::vector<unsigned int> MathUtils::triangulatePolygon(const std::vector<glm::dvec3>& vertices)
 {
     std::vector<unsigned int> indices;
     if (vertices.size() < 3)
@@ -629,77 +632,77 @@ std::vector<unsigned int> MathUtils::triangulatePolygon(const std::vector<glm::v
     return indices;
 }
 
-MathUtils::LineParameters MathUtils::calculateLineParameters(const glm::vec3& start, const glm::vec3& end)
+MathUtils::LineParameters MathUtils::calculateLineParameters(const glm::dvec3& start, const glm::dvec3& end)
 {
     LineParameters params;
     params.start = start;
     params.end = end;
     params.direction = normalize(end - start);
     params.length = distance(start, end);
-    params.center = (start + end) * 0.5f;
+    params.center = (start + end) * 0.5;
     return params;
 }
 
-float MathUtils::calculateLineLength(const LineParameters& params)
+double MathUtils::calculateLineLength(const LineParameters& params)
 {
     return params.length;
 }
 
-glm::vec3 MathUtils::calculateLineCenter(const LineParameters& params)
+glm::dvec3 MathUtils::calculateLineCenter(const LineParameters& params)
 {
     return params.center;
 }
 
-glm::vec3 MathUtils::calculateLineDirection(const LineParameters& params)
+glm::dvec3 MathUtils::calculateLineDirection(const LineParameters& params)
 {
     return params.direction;
 }
 
-MathUtils::CubeParameters MathUtils::calculateCubeParameters(const glm::vec3& center, float size)
+MathUtils::CubeParameters MathUtils::calculateCubeParameters(const glm::dvec3& center, double size)
 {
     CubeParameters params;
     params.center = center;
     params.size = size;
-    float halfSize = size * 0.5f;
-    params.min = center - glm::vec3(halfSize);
-    params.max = center + glm::vec3(halfSize);
+    double halfSize = size * 0.5;
+    params.min = center - glm::dvec3(halfSize);
+    params.max = center + glm::dvec3(halfSize);
     return params;
 }
 
-float MathUtils::calculateCubeVolume(const CubeParameters& params)
+double MathUtils::calculateCubeVolume(const CubeParameters& params)
 {
     return params.size * params.size * params.size;
 }
 
-float MathUtils::calculateCubeSurfaceArea(const CubeParameters& params)
+double MathUtils::calculateCubeSurfaceArea(const CubeParameters& params)
 {
-    return 6.0f * params.size * params.size;
+    return 6.0 * params.size * params.size;
 }
 
-glm::vec3 MathUtils::calculateCubeCenter(const CubeParameters& params)
+glm::dvec3 MathUtils::calculateCubeCenter(const CubeParameters& params)
 {
     return params.center;
 }
 
-float MathUtils::calculateCubeSize(const CubeParameters& params)
+double MathUtils::calculateCubeSize(const CubeParameters& params)
 {
     return params.size;
 }
 
-glm::vec3 MathUtils::evaluateBezier(const std::vector<glm::vec3>& controlPoints, float t)
+glm::dvec3 MathUtils::evaluateBezier(const std::vector<glm::dvec3>& controlPoints, double t)
 {
     if (controlPoints.empty())
-        return glm::vec3(0.0f);
+        return glm::dvec3(0.0);
     
     if (controlPoints.size() == 1)
         return controlPoints[0];
     
     // De Casteljau算法
-    std::vector<glm::vec3> tempPoints = controlPoints;
+    std::vector<glm::dvec3> tempPoints = controlPoints;
     
     while (tempPoints.size() > 1)
     {
-        std::vector<glm::vec3> newPoints;
+        std::vector<glm::dvec3> newPoints;
         for (size_t i = 0; i < tempPoints.size() - 1; ++i)
         {
             newPoints.push_back(lerp(tempPoints[i], tempPoints[i + 1], t));
@@ -710,64 +713,64 @@ glm::vec3 MathUtils::evaluateBezier(const std::vector<glm::vec3>& controlPoints,
     return tempPoints[0];
 }
 
-glm::vec3 MathUtils::evaluateSpline(const std::vector<glm::vec3>& controlPoints, float t)
+glm::dvec3 MathUtils::evaluateSpline(const std::vector<glm::dvec3>& controlPoints, double t)
 {
     if (controlPoints.size() < 2)
-        return controlPoints.empty() ? glm::vec3(0.0f) : controlPoints[0];
+        return controlPoints.empty() ? glm::dvec3(0.0) : controlPoints[0];
     
     if (controlPoints.size() == 2)
         return lerp(controlPoints[0], controlPoints[1], t);
     
     // Catmull-Rom样条
     int n = static_cast<int>(controlPoints.size()) - 1;
-    float scaledT = t * n;
+    double scaledT = t * n;
     int i = static_cast<int>(scaledT);
-    float localT = scaledT - i;
+    double localT = scaledT - i;
     
     i = std::clamp(i, 0, n - 1);
     
-    glm::vec3 p0 = (i > 0) ? controlPoints[i - 1] : controlPoints[i];
-    glm::vec3 p1 = controlPoints[i];
-    glm::vec3 p2 = controlPoints[i + 1];
-    glm::vec3 p3 = (i + 2 < static_cast<int>(controlPoints.size())) ? controlPoints[i + 2] : controlPoints[i + 1];
+    glm::dvec3 p0 = (i > 0) ? controlPoints[i - 1] : controlPoints[i];
+    glm::dvec3 p1 = controlPoints[i];
+    glm::dvec3 p2 = controlPoints[i + 1];
+    glm::dvec3 p3 = (i + 2 < static_cast<int>(controlPoints.size())) ? controlPoints[i + 2] : controlPoints[i + 1];
     
-    float t2 = localT * localT;
-    float t3 = t2 * localT;
+    double t2 = localT * localT;
+    double t3 = t2 * localT;
     
-    return 0.5f * (
-        (2.0f * p1) +
+    return 0.5 * (
+        (2.0 * p1) +
         (-p0 + p2) * localT +
-        (2.0f * p0 - 5.0f * p1 + 4.0f * p2 - p3) * t2 +
-        (-p0 + 3.0f * p1 - 3.0f * p2 + p3) * t3
+        (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t2 +
+        (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * t3
     );
 }
 
-glm::mat4 MathUtils::createRotationMatrix(const glm::vec3& axis, float angle)
+glm::dmat4 MathUtils::createRotationMatrix(const glm::dvec3& axis, double angle)
 {
-    return glm::rotate(glm::mat4(1.0f), angle, axis);
+    return glm::rotate(glm::dmat4(1.0), angle, axis);
 }
 
-glm::mat4 MathUtils::createTranslationMatrix(const glm::vec3& translation)
+glm::dmat4 MathUtils::createTranslationMatrix(const glm::dvec3& translation)
 {
-    return glm::translate(glm::mat4(1.0f), translation);
+    return glm::translate(glm::dmat4(1.0), translation);
 }
 
-glm::mat4 MathUtils::createScaleMatrix(const glm::vec3& scale)
+glm::dmat4 MathUtils::createScaleMatrix(const glm::dvec3& scale)
 {
-    return glm::scale(glm::mat4(1.0f), scale);
+    return glm::scale(glm::dmat4(1.0), scale);
 }
 
-bool MathUtils::isEqual(float a, float b, float epsilon)
+bool MathUtils::isEqual(double a, double b, double epsilon)
 {
     return std::abs(a - b) < epsilon;
 }
 
-bool MathUtils::isZero(float value, float epsilon)
+bool MathUtils::isZero(double value, double epsilon)
 {
     return std::abs(value) < epsilon;
 }
 
-bool MathUtils::isEqual(const glm::vec3& a, const glm::vec3& b, float epsilon)
+bool MathUtils::isEqual(const glm::dvec3& a, const glm::dvec3& b, double epsilon)
 {
     return isEqual(a.x, b.x, epsilon) && isEqual(a.y, b.y, epsilon) && isEqual(a.z, b.z, epsilon);
 } 
@@ -775,88 +778,116 @@ bool MathUtils::isEqual(const glm::vec3& a, const glm::vec3& b, float epsilon)
 // ============= 基础几何计算函数 =============
 
 // 通过三点计算圆心和半径
-bool MathUtils::calculateCircleCenterAndRadius(const glm::vec3& p1, const glm::vec3& p2, const glm::vec3& p3, 
-                                               glm::vec3& center, float& radius)
+bool MathUtils::calculateCircleCenterAndRadius(const glm::dvec3& p1, const glm::dvec3& p2, const glm::dvec3& p3, 
+                                               glm::dvec3& center, double& radius)
 {
     // 计算两个向量
-    glm::vec3 v1 = p2 - p1;
-    glm::vec3 v2 = p3 - p1;
+    glm::dvec3 v1 = p2 - p1;
+    glm::dvec3 v2 = p3 - p1;
     
     // 检查三点是否共线
-    glm::vec3 cross = glm::cross(v1, v2);
+    glm::dvec3 cross = glm::cross(v1, v2);
     if (glm::length(cross) < EPSILON) {
         return false; // 三点共线，无法构成圆
     }
     
     // 计算平面法向量
-    glm::vec3 normal = glm::normalize(cross);
+    glm::dvec3 normal = glm::normalize(cross);
     
-    // 计算圆心
-    // 使用三点圆的几何方法
-    float d1 = glm::dot(p1, p1);
-    float d2 = glm::dot(p2, p2);
-    float d3 = glm::dot(p3, p3);
+    // 使用3D几何方法计算圆心
+    // 圆心位于三个点的垂直平分面的交线上
     
-    float denominator = 2.0f * (p1.x * (p2.y - p3.y) + p2.x * (p3.y - p1.y) + p3.x * (p1.y - p2.y));
+    // 计算中点
+    glm::dvec3 mid12 = (p1 + p2) * 0.5;
+    glm::dvec3 mid13 = (p1 + p3) * 0.5;
+    
+    // 计算垂直方向
+    glm::dvec3 perp12 = p2 - p1;
+    glm::dvec3 perp13 = p3 - p1;
+    
+    // 在三点构成的平面内建立2D坐标系
+    glm::dvec3 u = glm::normalize(v1);                    // 第一个轴
+    glm::dvec3 v = glm::normalize(v2 - glm::dot(v2, u) * u); // 第二个轴（正交化）
+    
+    // 将三点投影到2D平面
+    glm::dvec2 p1_2d = glm::dvec2(0.0, 0.0);  // p1作为原点
+    glm::dvec2 p2_2d = glm::dvec2(glm::dot(p2 - p1, u), glm::dot(p2 - p1, v));
+    glm::dvec2 p3_2d = glm::dvec2(glm::dot(p3 - p1, u), glm::dot(p3 - p1, v));
+    
+    // 在2D平面内计算圆心
+    double d1 = glm::dot(p1_2d, p1_2d);
+    double d2 = glm::dot(p2_2d, p2_2d);
+    double d3 = glm::dot(p3_2d, p3_2d);
+    
+    double denominator = 2.0 * (p1_2d.x * (p2_2d.y - p3_2d.y) + 
+                                p2_2d.x * (p3_2d.y - p1_2d.y) + 
+                                p3_2d.x * (p1_2d.y - p2_2d.y));
     
     if (std::abs(denominator) < EPSILON) {
         return false;
     }
     
-    center.x = (d1 * (p2.y - p3.y) + d2 * (p3.y - p1.y) + d3 * (p1.y - p2.y)) / denominator;
-    center.y = (d1 * (p3.x - p2.x) + d2 * (p1.x - p3.x) + d3 * (p2.x - p1.x)) / denominator;
+    glm::dvec2 center_2d;
+    center_2d.x = (d1 * (p2_2d.y - p3_2d.y) + d2 * (p3_2d.y - p1_2d.y) + d3 * (p1_2d.y - p2_2d.y)) / denominator;
+    center_2d.y = (d1 * (p3_2d.x - p2_2d.x) + d2 * (p1_2d.x - p3_2d.x) + d3 * (p2_2d.x - p1_2d.x)) / denominator;
     
-    // 对于3D情况，我们投影到最适合的平面
-    // 这里简化处理，假设z坐标为三点的平均值
-    center.z = (p1.z + p2.z + p3.z) / 3.0f;
+    // 将2D圆心转换回3D空间
+    center = p1 + center_2d.x * u + center_2d.y * v;
     
     // 计算半径
-    radius = glm::distance(center, p1);
+    radius = glm::length(p1 - center);
+    
+    // 验证计算结果
+    double r2 = glm::length(p2 - center);
+    double r3 = glm::length(p3 - center);
+    
+    assert(std::fabs(glm::dot(center - p1, normal)) < EPSILON && "圆心的位置都不在同平面上");
+    assert(std::abs(radius - r2) < EPSILON && std::abs(radius - r3) < EPSILON && "圆心计算错误");
     
     return true;
 }
 
 // 生成圆弧上的点
-std::vector<glm::vec3> MathUtils::generateArcPointsFromThreePoints(const glm::vec3& p1, const glm::vec3& p2, const glm::vec3& p3, int segments)
+std::vector<glm::dvec3> MathUtils::generateArcPointsFromThreePoints(const glm::dvec3& p1, const glm::dvec3& p2, const glm::dvec3& p3, int segments)
 {
-    std::vector<glm::vec3> points;
+    std::vector<glm::dvec3> points;
     
-    glm::vec3 center;
-    float radius;
+    glm::dvec3 center;
+    double radius;
     
     if (!calculateCircleCenterAndRadius(p1, p2, p3, center, radius)) {
         // 三点共线，返回直线段
         for (int i = 0; i <= segments; ++i) {
-            float t = static_cast<float>(i) / segments;
-            if (t <= 0.5f) {
-                points.push_back(lerp(p1, p2, t * 2.0f));
+            double t = static_cast<double>(i) / segments;
+            if (t <= 0.5) {
+                points.push_back(lerp(p1, p2, t * 2.0));
             } else {
-                points.push_back(lerp(p2, p3, (t - 0.5f) * 2.0f));
+                points.push_back(lerp(p2, p3, (t - 0.5) * 2.0));
             }
         }
         return points;
     }
     
     // 计算起始角度和结束角度
-    glm::vec3 v1 = glm::normalize(p1 - center);
-    glm::vec3 v2 = glm::normalize(p2 - center);
-    glm::vec3 v3 = glm::normalize(p3 - center);
+    glm::dvec3 v1 = glm::normalize(p1 - center);
+    glm::dvec3 v2 = glm::normalize(p2 - center);
+    glm::dvec3 v3 = glm::normalize(p3 - center);
     
     // 计算角度
-    float angle1 = std::atan2(v1.y, v1.x);
-    float angle2 = std::atan2(v2.y, v2.x);
-    float angle3 = std::atan2(v3.y, v3.x);
+    double angle1 = std::atan2(v1.y, v1.x);
+    double angle2 = std::atan2(v2.y, v2.x);
+    double angle3 = std::atan2(v3.y, v3.x);
     
     // 确保角度顺序正确
-    while (angle2 < angle1) angle2 += 2.0f * PI;
-    while (angle3 < angle2) angle3 += 2.0f * PI;
+    while (angle2 < angle1) angle2 += 2.0 * PI;
+    while (angle3 < angle2) angle3 += 2.0 * PI;
     
     // 生成圆弧点
     for (int i = 0; i <= segments; ++i) {
-        float t = static_cast<float>(i) / segments;
-        float angle = angle1 + t * (angle3 - angle1);
+        double t = static_cast<double>(i) / segments;
+        double angle = angle1 + t * (angle3 - angle1);
         
-        glm::vec3 point;
+        glm::dvec3 point;
         point.x = center.x + radius * std::cos(angle);
         point.y = center.y + radius * std::sin(angle);
         point.z = center.z; // 简化处理，保持z坐标不变
@@ -868,18 +899,18 @@ std::vector<glm::vec3> MathUtils::generateArcPointsFromThreePoints(const glm::ve
 }
 
 // 计算多边形的法向量
-glm::vec3 MathUtils::calculatePolygonNormal(const std::vector<glm::vec3>& vertices)
+glm::dvec3 MathUtils::calculatePolygonNormal(const std::vector<glm::dvec3>& vertices)
 {
     if (vertices.size() < 3) {
-        return glm::vec3(0.0f, 0.0f, 1.0f); // 默认向上
+        return glm::dvec3(0.0, 0.0, 1.0); // 默认向上
     }
     
-    glm::vec3 normal(0.0f);
+    glm::dvec3 normal(0.0);
     
     // 使用Newell方法计算法向量
     for (size_t i = 0; i < vertices.size(); ++i) {
-        const glm::vec3& v1 = vertices[i];
-        const glm::vec3& v2 = vertices[(i + 1) % vertices.size()];
+        const glm::dvec3& v1 = vertices[i];
+        const glm::dvec3& v2 = vertices[(i + 1) % vertices.size()];
         
         normal.x += (v1.y - v2.y) * (v1.z + v2.z);
         normal.y += (v1.z - v2.z) * (v1.x + v2.x);
@@ -887,43 +918,43 @@ glm::vec3 MathUtils::calculatePolygonNormal(const std::vector<glm::vec3>& vertic
     }
     
     // 检查法向量是否为零（所有顶点共线或重合）
-    float normalLength = glm::length(normal);
+    double normalLength = glm::length(normal);
     if (normalLength < EPSILON) {
         // 尝试使用前三个点的叉积计算法向量
         if (vertices.size() >= 3) {
             return calculateNormal(vertices[0], vertices[1], vertices[2]);
         }
-        return glm::vec3(0.0f, 0.0f, 1.0f); // 默认向上
+        return glm::dvec3(0.0, 0.0, 1.0); // 默认向上
     }
     
     return normal / normalLength; // 手动标准化
 }
 
 // 生成线段的顶点
-std::vector<glm::vec3> MathUtils::generateLineVertices(const glm::vec3& start, const glm::vec3& end)
+std::vector<glm::dvec3> MathUtils::generateLineVertices(const glm::dvec3& start, const glm::dvec3& end)
 {
     return {start, end};
 }
 
 // 生成矩形的顶点
-std::vector<glm::vec3> MathUtils::generateRectangleVertices(const glm::vec3& p1, const glm::vec3& p2, const glm::vec3& p3, const glm::vec3& p4)
+std::vector<glm::dvec3> MathUtils::generateRectangleVertices(const glm::dvec3& p1, const glm::dvec3& p2, const glm::dvec3& p3, const glm::dvec3& p4)
 {
     return {p1, p2, p3, p4};
 }
 
 // 生成三角形的顶点和法向量
-std::vector<glm::vec3> MathUtils::generateTriangleVertices(const glm::vec3& v1, const glm::vec3& v2, const glm::vec3& v3, glm::vec3& normal)
+std::vector<glm::dvec3> MathUtils::generateTriangleVertices(const glm::dvec3& v1, const glm::dvec3& v2, const glm::dvec3& v3, glm::dvec3& normal)
 {
     normal = calculateNormal(v1, v2, v3);
     return {v1, v2, v3};
 }
 
 // 生成四边形的顶点和法向量（三角化）
-std::vector<glm::vec3> MathUtils::generateQuadVertices(const glm::vec3& v1, const glm::vec3& v2, const glm::vec3& v3, const glm::vec3& v4, std::vector<glm::vec3>& normals)
+std::vector<glm::dvec3> MathUtils::generateQuadVertices(const glm::dvec3& v1, const glm::dvec3& v2, const glm::dvec3& v3, const glm::dvec3& v4, std::vector<glm::dvec3>& normals)
 {
     // 将四边形分成两个三角形
-    glm::vec3 normal1 = calculateNormal(v1, v2, v3);
-    glm::vec3 normal2 = calculateNormal(v1, v3, v4);
+    glm::dvec3 normal1 = calculateNormal(v1, v2, v3);
+    glm::dvec3 normal2 = calculateNormal(v1, v3, v4);
     
     normals = {normal1, normal1, normal1, normal2, normal2, normal2};
     
@@ -932,3 +963,7 @@ std::vector<glm::vec3> MathUtils::generateQuadVertices(const glm::vec3& v1, cons
 }
 
  
+
+
+
+

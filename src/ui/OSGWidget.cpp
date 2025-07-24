@@ -67,7 +67,7 @@ OSGWidget::OSGWidget(QWidget* parent)
     , m_currentDrawingGeo(nullptr)
     , m_selectedGeo(nullptr)
     , m_isDrawing(false)
-    , m_lastMouseWorldPos(0.0f)
+    , m_lastMouseWorldPos(0.0)
 
     , m_skybox(std::make_unique<Skybox>())
     , m_skyboxEnabled(true)
@@ -325,7 +325,7 @@ void OSGWidget::onSetEyePosition()
     }
     
     // 设置相机位置
-    setCameraPosition(glm::vec3(x, y, z), glm::vec3(tx, ty, tz));
+    setCameraPosition(glm::dvec3(x, y, z), glm::dvec3(tx, ty, tz));
     
     LOG_INFO(QString("设置眼点坐标: (%1, %2, %3) -> (%4, %5, %6)")
         .arg(x, 0, 'f', 3).arg(y, 0, 'f', 3).arg(z, 0, 'f', 3)
@@ -369,7 +369,7 @@ void OSGWidget::onMovePointToCoordinate()
     }
     
     // 移动点到新坐标
-    movePointToCoordinate(m_contextMenuGeo, m_contextMenuPointIndex, glm::vec3(x, y, z));
+    movePointToCoordinate(m_contextMenuGeo, m_contextMenuPointIndex, glm::dvec3(x, y, z));
     
     LOG_INFO(QString("移动控制点到新坐标: (%1, %2, %3)")
         .arg(x, 0, 'f', 3).arg(y, 0, 'f', 3).arg(z, 0, 'f', 3), "右键菜单");
@@ -400,7 +400,7 @@ void OSGWidget::onCenterObjectToView()
     double distance = radius * 2.5; // 距离为半径的2.5倍
     
     osg::Vec3 eye = center + osg::Vec3(distance, distance, distance);
-    setCameraPosition(glm::vec3(eye.x(), eye.y(), eye.z()), glm::vec3(center.x(), center.y(), center.z()));
+    setCameraPosition(glm::dvec3(eye.x(), eye.y(), eye.z()), glm::dvec3(center.x(), center.y(), center.z()));
     
     LOG_INFO("将对象居中显示", "右键菜单");
 }
@@ -424,7 +424,7 @@ void OSGWidget::deleteSelectedObjects()
     onDeleteSelectedObjects();
 }
 
-void OSGWidget::setCameraPosition(const glm::vec3& position, const glm::vec3& target)
+void OSGWidget::setCameraPosition(const glm::dvec3& position, const glm::dvec3& target)
 {
     if (!m_cameraController)
     {
@@ -443,7 +443,7 @@ void OSGWidget::setCameraPosition(const glm::vec3& position, const glm::vec3& ta
         .arg(target.x, 0, 'f', 3).arg(target.y, 0, 'f', 3).arg(target.z, 0, 'f', 3), "相机");
 }
 
-void OSGWidget::movePointToCoordinate(Geo3D* geo, int pointIndex, const glm::vec3& newPosition)
+void OSGWidget::movePointToCoordinate(Geo3D* geo, int pointIndex, const glm::dvec3& newPosition)
 {
     if (!geo || pointIndex < 0)
     {
@@ -530,20 +530,20 @@ void OSGWidget::initializeScene()
     // 3. 改进的多重采样抗锯齿设置
     osg::ref_ptr<osg::Multisample> rootMultisample = new osg::Multisample();
     rootMultisample->setHint(osg::Multisample::NICEST);  // 使用最高质量
-    rootMultisample->setCoverage(1.0f);  // 提高覆盖率到1.0
+    rootMultisample->setCoverage(1.0);  // 提高覆盖率到1.0
     rootMultisample->setInvert(false);
     rootStateSet->setAttributeAndModes(rootMultisample.get(), osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
     
     // 4. 优化线宽和点大小以获得更好的抗锯齿效果
     osg::ref_ptr<osg::LineWidth> rootLineWidth = new osg::LineWidth();
-    rootLineWidth->setWidth(1.5f);  // 稍微增加线宽以改善抗锯齿效果
+    rootLineWidth->setWidth(1.5);  // 稍微增加线宽以改善抗锯齿效果
     rootStateSet->setAttributeAndModes(rootLineWidth.get(), osg::StateAttribute::ON);
     
     osg::ref_ptr<osg::Point> rootPointSize = new osg::Point();
-    rootPointSize->setSize(4.0f);  // 稍微增加点大小
-    rootPointSize->setMinSize(2.0f);  // 设置最小点大小
-    rootPointSize->setMaxSize(8.0f);  // 设置最大点大小
-    rootPointSize->setDistanceAttenuation(osg::Vec3(1.0f, 0.0f, 0.0f));  // 距离衰减
+    rootPointSize->setSize(4.0);  // 稍微增加点大小
+    rootPointSize->setMinSize(2.0);  // 设置最小点大小
+    rootPointSize->setMaxSize(8.0);  // 设置最大点大小
+    rootPointSize->setDistanceAttenuation(osg::Vec3(1.0, 0.0, 0.0));  // 距离衰减
     rootStateSet->setAttributeAndModes(rootPointSize.get(), osg::StateAttribute::ON);
     
     // 5. 启用混合和深度测试
@@ -561,7 +561,7 @@ void OSGWidget::initializeScene()
     
     // 为几何体设置更精细的线宽
     osg::ref_ptr<osg::LineWidth> geoLineWidth = new osg::LineWidth();
-    geoLineWidth->setWidth(2.0f);  // 几何体使用稍粗的线条
+    geoLineWidth->setWidth(2.0);  // 几何体使用稍粗的线条
     geoStateSet->setAttributeAndModes(geoLineWidth.get(), osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
     
     viewer->setSceneData(m_rootNode);
@@ -591,7 +591,7 @@ void OSGWidget::setupCamera()
     stateSet->setMode(GL_BLEND, osg::StateAttribute::ON);
     
     // 设置背景色
-    camera->setClearColor(osg::Vec4(0.2f, 0.2f, 0.2f, 1.0f));
+    camera->setClearColor(osg::Vec4(0.2, 0.2, 0.2, 1.0));
     
     // 设置初始视点
     resetCamera();
@@ -602,11 +602,11 @@ void OSGWidget::setupLighting()
     // 创建光源
     osg::ref_ptr<osg::Light> light = new osg::Light();
     light->setLightNum(0);
-    light->setPosition(osg::Vec4(10.0f, 10.0f, 10.0f, 1.0f));
-    light->setDirection(osg::Vec3(-1.0f, -1.0f, -1.0f));
-    light->setAmbient(osg::Vec4(0.3f, 0.3f, 0.3f, 1.0f));
-    light->setDiffuse(osg::Vec4(0.8f, 0.8f, 0.8f, 1.0f));
-    light->setSpecular(osg::Vec4(1.0f, 1.0f, 1.0f, 1.0f));
+    light->setPosition(osg::Vec4(10.0, 10.0, 10.0, 1.0));
+    light->setDirection(osg::Vec3(-1.0, -1.0, -1.0));
+    light->setAmbient(osg::Vec4(0.3, 0.3, 0.3, 1.0));
+    light->setDiffuse(osg::Vec4(0.8, 0.8, 0.8, 1.0));
+    light->setSpecular(osg::Vec4(1.0, 1.0, 1.0, 1.0));
     
     osg::ref_ptr<osg::LightSource> lightSource = new osg::LightSource();
     lightSource->setLight(light.get());
@@ -765,7 +765,7 @@ void OSGWidget::fitAll()
     }
 }
 
-void OSGWidget::setViewDirection(const glm::vec3& direction, const glm::vec3& up)
+void OSGWidget::setViewDirection(const glm::dvec3& direction, const glm::dvec3& up)
 {
     if (!m_cameraController) return;
     
@@ -1081,9 +1081,9 @@ void OSGWidget::onSimplePickingResult(const PickResult& result)
 
 
 
-glm::vec3 OSGWidget::screenToWorld(int x, int y, float depth)
+glm::dvec3 OSGWidget::screenToWorld(int x, int y, double depth)
 {
-    if (!m_cameraController) return glm::vec3(0, 0, 0);
+    if (!m_cameraController) return glm::dvec3(0, 0, 0);
     
     // 检查鼠标位置缓存
     QPoint currentPos(x, y);
@@ -1097,7 +1097,7 @@ glm::vec3 OSGWidget::screenToWorld(int x, int y, float depth)
     
     // 直接委托给CameraController
     osg::Vec3d worldPoint = m_cameraController->screenToWorld(x, y, depth, width(), height());
-    glm::vec3 result(worldPoint.x(), worldPoint.y(), worldPoint.z());
+    glm::dvec3 result(worldPoint.x(), worldPoint.y(), worldPoint.z());
     
     // 更新缓存
     m_lastMouseScreenPos = currentPos;
@@ -1108,13 +1108,13 @@ glm::vec3 OSGWidget::screenToWorld(int x, int y, float depth)
     return result;
 }
 
-glm::vec2 OSGWidget::worldToScreen(const glm::vec3& worldPos)
+glm::dvec2 OSGWidget::worldToScreen(const glm::dvec3& worldPos)
 {
-    if (!m_cameraController) return glm::vec2(0, 0);
+    if (!m_cameraController) return glm::dvec2(0, 0);
     
     // 直接委托给CameraController
     osg::Vec2d screenPoint = m_cameraController->worldToScreen(osg::Vec3d(worldPos.x, worldPos.y, worldPos.z), width(), height());
-    return glm::vec2(screenPoint.x(), screenPoint.y());
+    return glm::dvec2(screenPoint.x(), screenPoint.y());
 }
 
 // OSGWidget 事件处理
@@ -1161,17 +1161,17 @@ void OSGWidget::mousePressEvent(QMouseEvent* event)
         return;
 
     PickResult pickResult = performSimplePicking(event->x(), height() - event->y());
-    glm::vec3 worldPos;
+    glm::dvec3 worldPos;
     if (pickResult.hasResult) 
     { 
         worldPos = pickResult.worldPosition; 
     }
     else 
     { 
-        worldPos= screenToWorld(event->x(), event->y(), 0.5f);
+        worldPos= screenToWorld(event->x(), event->y(), 0.5);
         // 坐标限制在坐标系内
         CoordinateSystem3D* coordSystem = CoordinateSystem3D::getInstance();
-        glm::vec3 clampedPos = coordSystem->clampPointToSkybox(worldPos);
+        glm::dvec3 clampedPos = coordSystem->clampPointToSkybox(worldPos);
         worldPos = clampedPos;
     }
 
@@ -1304,11 +1304,11 @@ void OSGWidget::mouseMoveEvent(QMouseEvent* event)
         else
         {
             // 如果没有拾取到对象，使用屏幕坐标转换
-            glm::vec3 worldPos = screenToWorld(event->x(), event->y(), 0.5f);
+            glm::dvec3 worldPos = screenToWorld(event->x(), event->y(), 0.5);
             
             // 应用坐标范围限制
             CoordinateSystem3D* coordSystem = CoordinateSystem3D::getInstance();
-            glm::vec3 clampedPos = coordSystem->clampPointToSkybox(worldPos);
+            glm::dvec3 clampedPos = coordSystem->clampPointToSkybox(worldPos);
             
             m_lastMouseWorldPos = clampedPos;
             emit mousePositionChanged(clampedPos);
@@ -1332,7 +1332,7 @@ void OSGWidget::mouseMoveEvent(QMouseEvent* event)
     {
         // 使用简化拾取获取世界坐标
         PickResult pickResult = performSimplePicking(event->x(), height() - event->y());
-        glm::vec3 drawingWorldPos;
+        glm::dvec3 drawingWorldPos;
         
         if (pickResult.hasResult)
         {
@@ -1375,7 +1375,7 @@ void OSGWidget::mouseDoubleClickEvent(QMouseEvent* event)
     
     // 执行拾取操作获取双击位置的世界坐标
     PickResult pickResult = performSimplePicking(event->x(), height() - event->y());
-    glm::vec3 worldPos;
+    glm::dvec3 worldPos;
     
     if (pickResult.hasResult) {
         // 如果拾取到了几何对象，使用拾取到的世界坐标
@@ -1386,11 +1386,11 @@ void OSGWidget::mouseDoubleClickEvent(QMouseEvent* event)
                  .arg(worldPos.z, 0, 'f', 2), "相机");
     } else {
         // 如果没有拾取到几何对象，使用屏幕坐标转换为世界坐标
-        worldPos = screenToWorld(event->x(), event->y(), 0.5f);
+        worldPos = screenToWorld(event->x(), event->y(), 0.5);
         
         // 坐标限制在坐标系内
         CoordinateSystem3D* coordSystem = CoordinateSystem3D::getInstance();
-        glm::vec3 clampedPos = coordSystem->clampPointToSkybox(worldPos);
+        glm::dvec3 clampedPos = coordSystem->clampPointToSkybox(worldPos);
         worldPos = clampedPos;
         
         LOG_INFO(QString("双击空白区域，转换世界坐标: (%1, %2, %3)")
@@ -1440,13 +1440,13 @@ void OSGWidget::wheelEvent(QWheelEvent* event)
     }
 }
 
-void OSGWidget::updateCurrentDrawing(const glm::vec3& worldPos)
+void OSGWidget::updateCurrentDrawing(const glm::dvec3& worldPos)
 {
     if (m_currentDrawingGeo)
     {
         // 应用天空盒范围限制，确保不会超出天空盒
         CoordinateSystem3D* coordSystem = CoordinateSystem3D::getInstance();
-        glm::vec3 clampedPos = coordSystem->clampPointToSkybox(worldPos);
+        glm::dvec3 clampedPos = coordSystem->clampPointToSkybox(worldPos);
         
         // 直接调用控制点管理器设置临时点
         auto controlPointManager = m_currentDrawingGeo->mm_controlPoint();
@@ -1537,7 +1537,7 @@ void OSGWidget::setupSkybox()
         m_skybox->setSizeFromRange(range.minX, range.maxX, range.minY, range.maxY, range.minZ, range.maxZ);
         
         // 设置天空盒中心为坐标原点
-        m_skybox->setCenter(osg::Vec3(0.0f, 0.0f, 0.0f));
+        m_skybox->setCenter(osg::Vec3(0.0, 0.0, 0.0));
         
         // 清除现有的天空盒
         m_skyboxNode->removeChildren(0, m_skyboxNode->getNumChildren());
@@ -1886,3 +1886,8 @@ void OSGWidget::onSetCameraPosition()
         .arg(newEye.y(), 0, 'f', 3)
         .arg(newEye.z(), 0, 'f', 3), "右键菜单");
 }
+
+
+
+
+

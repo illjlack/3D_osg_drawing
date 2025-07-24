@@ -18,7 +18,7 @@ class Geo3D;
 
 // 简化的拾取配置
 struct PickConfig {
-    float cylinderRadius = 10.0f;     // 圆柱形拾取半径（像素）
+    double cylinderRadius = 10.0;     // 圆柱形拾取半径（像素）
     bool enableVertexPicking = true;  // 启用顶点拾取
     bool enableEdgePicking = true;    // 启用边拾取  
     bool enableFacePicking = true;    // 启用面拾取
@@ -66,7 +66,7 @@ public:
     bool isInitialized() const { return m_initialized; }
     
     // 坐标转换（公开访问）
-    glm::vec2 worldToScreen(const glm::vec3& worldPos);
+    glm::dvec2 worldToScreen(const glm::dvec3& worldPos);
 
 private:
     // 选择最佳的单个结果 - 比较距离和优先级
@@ -98,3 +98,8 @@ private:
     // 单个拾取结果存储
     SinglePickingResults m_singleResults;
 };
+
+
+
+
+

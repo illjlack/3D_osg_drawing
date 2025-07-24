@@ -26,3 +26,4 @@ void SpireHouse3D_Geo::buildFaceGeometries()
 {
     mm_node()->clearFaceGeometry();
 } 
+

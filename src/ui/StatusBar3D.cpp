@@ -46,7 +46,7 @@ void StatusBar3D::setOSGWidget(OSGWidget* osgWidget)
     m_osgWidget = osgWidget;
     if (m_osgWidget) {
         connect(m_osgWidget, &OSGWidget::mousePositionChanged,
-                this, [this](const glm::vec3& pos) {
+                this, [this](const glm::dvec3& pos) {
                     updateWorldCoordinates(pos);
                 });
     }
@@ -163,7 +163,7 @@ void StatusBar3D::updateScreenCoordinates(int x, int y)
     }
 }
 
-void StatusBar3D::updateWorldCoordinates(const glm::vec3& pos)
+void StatusBar3D::updateWorldCoordinates(const glm::dvec3& pos)
 {
     if (m_worldCoordLabel) {
         m_worldCoordLabel->setText(tr("空间: (%1, %2, %3)")
@@ -243,3 +243,7 @@ void StatusBar3D::updatePerformanceInfo()
     updateFPS(60.0);
     updateMemoryUsage(512.0);
 } 
+
+
+
+

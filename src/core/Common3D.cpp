@@ -5,13 +5,13 @@
 // 全局变量定义
 DrawMode3D GlobalDrawMode3D = DrawSelect3D;
 PointShape3D GlobalPointShape3D = Point_Circle3D;
-float GlobalPointSize3D = 5.0f;
+double GlobalPointSize3D = 5.0;
 QColor GlobalPointColor3D = QColor(255, 0, 0);
 
 LineStyle3D GlobalLineStyle3D = Line_Solid3D;
-float GlobalLineWidth3D = 1.0f;  // 与根节点保持一致，更好地展示抗锯齿效果
+double GlobalLineWidth3D = 1.0;  // 与根节点保持一致，更好地展示抗锯齿效果
 QColor GlobalLineColor3D = QColor(0, 0, 255);
-float GlobalLineDashPattern3D = 1.0f;
+double GlobalLineDashPattern3D = 1.0;
 NodeLineStyle3D GlobalNodeLineStyle3D = NodeLine_Polyline3D;
 
 FillType3D GlobalFillType3D = Fill_Solid3D;
@@ -20,8 +20,8 @@ QColor GlobalBorderColor3D = QColor(0, 0, 0);
 bool GlobalShowBorder3D = true;
 
 MaterialType3D GlobalMaterialType3D = Material_Basic3D;
-float GlobalShininess3D = 32.0f;
-float GlobalTransparency3D = 1.0f;
+double GlobalShininess3D = 32.0;
+double GlobalTransparency3D = 1.0;
 SubdivisionLevel3D GlobalSubdivisionLevel3D = Subdivision_Medium3D;
 
 // 显示控制全局变量
@@ -252,14 +252,14 @@ MaterialType3D stringToMaterialType3D(const QString& str)
 // GeoParameters3D 新方法实现
 void GeoParameters3D::setAllProperties(
     const PointShape3D& pShape,
-    float pSize,
+    double pSize,
     const Color3D& pColor,
     bool showPts,
     
     const LineStyle3D& lStyle,
-    float lWidth,
+    double lWidth,
     const Color3D& lColor,
-    float lDashPattern,
+    double lDashPattern,
     const NodeLineStyle3D& nlStyle,
     bool showEdgs,
     
@@ -270,8 +270,8 @@ void GeoParameters3D::setAllProperties(
     bool showFcs,
     
     const MaterialType3D& mType,
-    float shininess,
-    float transparency,
+    double shininess,
+    double transparency,
     const SubdivisionLevel3D& subLevel)
 {
     // 设置点属性
@@ -324,8 +324,8 @@ GeoParameters3D GeoParameters3D::getWireframeStyle()
     params.showPoints = false;
     params.showEdges = true;
     params.showFaces = false;
-    params.lineWidth = 1.0f;
-    params.lineColor = Color3D(0.0f, 1.0f, 0.0f, 1.0f); // 绿色
+    params.lineWidth = 1.0;
+    params.lineColor = Color3D(0.0, 1.0, 0.0, 1.0); // 绿色
     return params;
 }
 
@@ -336,8 +336,8 @@ GeoParameters3D GeoParameters3D::getPointStyle()
     params.showPoints = true;
     params.showEdges = false;
     params.showFaces = false;
-    params.pointSize = 8.0f;
-    params.pointColor = Color3D(1.0f, 0.0f, 0.0f, 1.0f); // 红色
+    params.pointSize = 8.0;
+    params.pointColor = Color3D(1.0, 0.0, 0.0, 1.0); // 红色
     return params;
 }
 
@@ -348,11 +348,11 @@ GeoParameters3D GeoParameters3D::getHighlightStyle()
     params.showPoints = true;
     params.showEdges = true;
     params.showFaces = true;
-    params.pointSize = 10.0f;
-    params.lineWidth = 3.0f;
-    params.pointColor = Color3D(1.0f, 1.0f, 0.0f, 1.0f); // 黄色
-    params.lineColor = Color3D(1.0f, 1.0f, 0.0f, 1.0f); // 黄色
-    params.fillColor = Color3D(1.0f, 1.0f, 0.0f, 0.3f); // 半透明黄色
+    params.pointSize = 10.0;
+    params.lineWidth = 3.0;
+    params.pointColor = Color3D(1.0, 1.0, 0.0, 1.0); // 黄色
+    params.lineColor = Color3D(1.0, 1.0, 0.0, 1.0); // 黄色
+    params.fillColor = Color3D(1.0, 1.0, 0.0, 0.3); // 半透明黄色
     return params;
 }
 
@@ -360,8 +360,8 @@ GeoParameters3D GeoParameters3D::getTransparentStyle()
 {
     GeoParameters3D params;
     params.resetToGlobal();
-    params.material.transparency = 0.5f;
-    params.fillColor.a = 0.5f;
+    params.material.transparency = 0.5;
+    params.fillColor.a = 0.5;
     return params;
 }
 
@@ -371,7 +371,7 @@ GeoParameters3D GeoParameters3D::getHighQualityStyle()
     params.resetToGlobal();
     params.subdivisionLevel = Subdivision_High3D;
     params.material.type = Material_Phong3D;
-    params.material.shininess = 64.0f;
+    params.material.shininess = 64.0;
     return params;
 }
 
@@ -381,19 +381,19 @@ GeoParameters3D GeoParameters3D::getLowQualityStyle()
     params.resetToGlobal();
     params.subdivisionLevel = Subdivision_Low3D;
     params.material.type = Material_Basic3D;
-    params.material.shininess = 16.0f;
+    params.material.shininess = 16.0;
     return params;
 }
 
 bool GeoParameters3D::validateParameters() const
 {
     // 验证参数有效性
-    if (pointSize <= 0.0f || lineWidth <= 0.0f) return false;
-    if (pointColor.a < 0.0f || pointColor.a > 1.0f) return false;
-    if (lineColor.a < 0.0f || lineColor.a > 1.0f) return false;
-    if (fillColor.a < 0.0f || fillColor.a > 1.0f) return false;
-    if (material.transparency < 0.0f || material.transparency > 1.0f) return false;
-    if (material.shininess < 0.0f || material.shininess > 128.0f) return false;
+    if (pointSize <= 0.0 || lineWidth <= 0.0) return false;
+    if (pointColor.a < 0.0 || pointColor.a > 1.0) return false;
+    if (lineColor.a < 0.0 || lineColor.a > 1.0) return false;
+    if (fillColor.a < 0.0 || fillColor.a > 1.0) return false;
+    if (material.transparency < 0.0 || material.transparency > 1.0) return false;
+    if (material.shininess < 0.0 || material.shininess > 128.0) return false;
     
     return true;
 }
@@ -430,7 +430,7 @@ bool GeoParameters3D::operator!=(const GeoParameters3D& other) const
     return !(*this == other);
 }
 
-GeoParameters3D GeoParameters3D::lerp(const GeoParameters3D& other, float t) const
+GeoParameters3D GeoParameters3D::lerp(const GeoParameters3D& other, double t) const
 {
     GeoParameters3D result;
     
@@ -459,17 +459,17 @@ GeoParameters3D GeoParameters3D::lerp(const GeoParameters3D& other, float t) con
     result.material.shininess = material.shininess + (other.material.shininess - material.shininess) * t;
     
     // 枚举类型使用阈值切换
-    result.pointShape = (t < 0.5f) ? pointShape : other.pointShape;
-    result.lineStyle = (t < 0.5f) ? lineStyle : other.lineStyle;
-    result.fillType = (t < 0.5f) ? fillType : other.fillType;
-    result.material.type = (t < 0.5f) ? material.type : other.material.type;
-    result.subdivisionLevel = (t < 0.5f) ? subdivisionLevel : other.subdivisionLevel;
+    result.pointShape = (t < 0.5) ? pointShape : other.pointShape;
+    result.lineStyle = (t < 0.5) ? lineStyle : other.lineStyle;
+    result.fillType = (t < 0.5) ? fillType : other.fillType;
+    result.material.type = (t < 0.5) ? material.type : other.material.type;
+    result.subdivisionLevel = (t < 0.5) ? subdivisionLevel : other.subdivisionLevel;
     
     // 布尔类型使用阈值切换
-    result.showPoints = (t < 0.5f) ? showPoints : other.showPoints;
-    result.showEdges = (t < 0.5f) ? showEdges : other.showEdges;
-    result.showFaces = (t < 0.5f) ? showFaces : other.showFaces;
-    result.showBorder = (t < 0.5f) ? showBorder : other.showBorder;
+    result.showPoints = (t < 0.5) ? showPoints : other.showPoints;
+    result.showEdges = (t < 0.5) ? showEdges : other.showEdges;
+    result.showFaces = (t < 0.5) ? showFaces : other.showFaces;
+    result.showBorder = (t < 0.5) ? showBorder : other.showBorder;
     
     return result;
 }
@@ -655,7 +655,7 @@ bool GlobalParametersManager::loadGlobalSettings(const std::string& filename)
             GlobalPointShape3D = static_cast<PointShape3D>(std::stoi(value));
         }
         else if (key == "point_size") {
-            GlobalPointSize3D = std::stof(value);
+            GlobalPointSize3D = std::stod(value);
         }
         else if (key == "point_color_r") {
             int r = std::stoi(value);
@@ -677,7 +677,7 @@ bool GlobalParametersManager::loadGlobalSettings(const std::string& filename)
             GlobalLineStyle3D = static_cast<LineStyle3D>(std::stoi(value));
         }
         else if (key == "line_width") {
-            GlobalLineWidth3D = std::stof(value);
+            GlobalLineWidth3D = std::stod(value);
         }
         else if (key == "line_color_r") {
             int r = std::stoi(value);
@@ -696,7 +696,7 @@ bool GlobalParametersManager::loadGlobalSettings(const std::string& filename)
             GlobalLineColor3D.setAlpha(a);
         }
         else if (key == "line_dash_pattern") {
-            GlobalLineDashPattern3D = std::stof(value);
+            GlobalLineDashPattern3D = std::stod(value);
         }
         else if (key == "node_line_style") {
             GlobalNodeLineStyle3D = static_cast<NodeLineStyle3D>(std::stoi(value));
@@ -743,10 +743,10 @@ bool GlobalParametersManager::loadGlobalSettings(const std::string& filename)
             GlobalMaterialType3D = static_cast<MaterialType3D>(std::stoi(value));
         }
         else if (key == "shininess") {
-            GlobalShininess3D = std::stof(value);
+            GlobalShininess3D = std::stod(value);
         }
         else if (key == "transparency") {
-            GlobalTransparency3D = std::stof(value);
+            GlobalTransparency3D = std::stod(value);
         }
         else if (key == "subdivision_level") {
             GlobalSubdivisionLevel3D = static_cast<SubdivisionLevel3D>(std::stoi(value));
@@ -772,13 +772,13 @@ void GlobalParametersManager::resetToFactoryDefaults()
     // 恢复到出厂设置
     GlobalDrawMode3D = DrawSelect3D;
     GlobalPointShape3D = Point_Circle3D;
-    GlobalPointSize3D = 5.0f;
+    GlobalPointSize3D = 5.0;
     GlobalPointColor3D = QColor(255, 0, 0);
     
     GlobalLineStyle3D = Line_Solid3D;
-    GlobalLineWidth3D = 2.0f;
+    GlobalLineWidth3D = 2.0;
     GlobalLineColor3D = QColor(0, 0, 255);
-    GlobalLineDashPattern3D = 1.0f;
+    GlobalLineDashPattern3D = 1.0;
     GlobalNodeLineStyle3D = NodeLine_Polyline3D;
     
     GlobalFillType3D = Fill_Solid3D;
@@ -787,8 +787,8 @@ void GlobalParametersManager::resetToFactoryDefaults()
     GlobalShowBorder3D = true;
     
     GlobalMaterialType3D = Material_Basic3D;
-    GlobalShininess3D = 32.0f;
-    GlobalTransparency3D = 1.0f;
+    GlobalShininess3D = 32.0;
+    GlobalTransparency3D = 1.0;
     GlobalSubdivisionLevel3D = Subdivision_Medium3D;
     
     GlobalShowPoints3D = true;
@@ -826,3 +826,6 @@ std::vector<std::string> GlobalParametersManager::getPresetNames() const
     }
     return names;
 } 
+
+
+

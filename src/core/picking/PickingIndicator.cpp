@@ -84,7 +84,7 @@ void PickingIndicator::shutdown()
     }
 }
 
-void PickingIndicator::showIndicator(const glm::vec3& position, PickFeatureType featureType, const glm::vec3& normal)
+void PickingIndicator::showIndicator(const glm::dvec3& position, PickFeatureType featureType, const glm::dvec3& normal)
 {
     if (!m_initialized) return;
     
@@ -112,7 +112,7 @@ void PickingIndicator::showIndicator(const glm::vec3& position, PickFeatureType 
             // 为面指示器设置法向量旋转
             if (m_faceTransform) {
                 // 计算从默认Z轴到面法向量的旋转
-                osg::Vec3 defaultNormal(0.0f, 0.0f, 1.0f);
+                osg::Vec3 defaultNormal(0.0, 0.0, 1.0);
                 osg::Vec3 faceNormal(normal.x, normal.y, normal.z);
                 faceNormal.normalize();
                 
@@ -182,13 +182,13 @@ void PickingIndicator::createVertexIndicator()
     
     // 创建圆形（用多边形近似）- 使用像素半径作为基础大小
     const int segments = 16;
-    float radius = m_config.pickingPixelRadius;
+    double radius = m_config.pickingPixelRadius;
     
     for (int i = 0; i < segments; ++i) {
-        float angle = (2.0f * M_PI * i) / segments;
-        float x = radius * cos(angle);
-        float y = radius * sin(angle);
-        vertices->push_back(osg::Vec3(x, y, 0.0f));
+        double angle = (2.0 * M_PI * i) / segments;
+        double x = radius * cos(angle);
+        double y = radius * sin(angle);
+        vertices->push_back(osg::Vec3(x, y, 0.0));
         colors->push_back(osg::Vec4(m_config.color.r(), m_config.color.g(), m_config.color.b(), m_config.color.a()));
     }
     
@@ -232,13 +232,13 @@ void PickingIndicator::createEdgeIndicator()
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
-    float size = m_config.pickingPixelRadius; // 转换为合适的世界单位
+    double size = m_config.pickingPixelRadius; // 转换为合适的世界单位
     
     // 正方形的四个顶点
-    vertices->push_back(osg::Vec3(-size, -size, 0.0f));
-    vertices->push_back(osg::Vec3(size, -size, 0.0f));
-    vertices->push_back(osg::Vec3(size, size, 0.0f));
-    vertices->push_back(osg::Vec3(-size, size, 0.0f));
+    vertices->push_back(osg::Vec3(-size, -size, 0.0));
+    vertices->push_back(osg::Vec3(size, -size, 0.0));
+    vertices->push_back(osg::Vec3(size, size, 0.0));
+    vertices->push_back(osg::Vec3(-size, size, 0.0));
     
     for (int i = 0; i < 4; ++i) {
         colors->push_back(osg::Vec4(m_config.color.r(), m_config.color.g(), m_config.color.b(), m_config.color.a()));
@@ -287,10 +287,10 @@ void PickingIndicator::createFaceIndicator()
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
     
-    float size = m_config.pickingPixelRadius; // 转换为合适的世界单位（增大10倍）
-    vertices->push_back(osg::Vec3(0.0f, size, 0.0f));
-    vertices->push_back(osg::Vec3(-size * 0.866f, -size * 0.5f, 0.0f));
-    vertices->push_back(osg::Vec3(size * 0.866f, -size * 0.5f, 0.0f));
+    double size = m_config.pickingPixelRadius; // 转换为合适的世界单位（增大10倍）
+    vertices->push_back(osg::Vec3(0.0, size, 0.0));
+    vertices->push_back(osg::Vec3(-size * 0.866, -size * 0.5, 0.0));
+    vertices->push_back(osg::Vec3(size * 0.866, -size * 0.5, 0.0));
     
     for (int i = 0; i < 3; ++i) {
         colors->push_back(osg::Vec4(m_config.color.r(), m_config.color.g(), m_config.color.b(), m_config.color.a()));
@@ -329,9 +329,14 @@ void PickingIndicator::updateAnimation(double currentTime)
     double elapsed = currentTime - m_animationStartTime;
     
     // 简单的脉冲动画 - 通过修改几何体顶点实现动画效果
-    float animationScale = 1.0f + 0.2f * sin(elapsed * m_config.animationSpeed);
+    double animationScale = 1.0 + 0.2 * sin(elapsed * m_config.animationSpeed);
     
     // 注意：由于使用了AutoTransform，动画效果可能需要不同的实现方式
     // 这里暂时保留接口，可以在需要时实现具体的动画效果
 }
  
+
+
+
+
+

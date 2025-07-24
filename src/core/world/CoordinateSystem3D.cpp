@@ -96,7 +96,7 @@ void CoordinateSystem3D::setSkyboxRange(double xMin, double xMax, double yMin, d
     setSkyboxRange(CoordinateRange(xMin, xMax, yMin, yMax, zMin, zMax));
 }
 
-bool CoordinateSystem3D::isValidPoint(const glm::vec3& point) const
+bool CoordinateSystem3D::isValidPoint(const glm::dvec3& point) const
 {
     if (!m_rangeLimitEnabled)
         return true;
@@ -107,20 +107,20 @@ bool CoordinateSystem3D::isValidPoint(const glm::vec3& point) const
 
 bool CoordinateSystem3D::isValidPoint(const osg::Vec3& point) const
 {
-    return isValidPoint(glm::vec3(point.x(), point.y(), point.z()));
+    return isValidPoint(glm::dvec3(point.x(), point.y(), point.z()));
 }
 
-bool CoordinateSystem3D::isPointInSkyboxRange(const glm::vec3& point) const
+bool CoordinateSystem3D::isPointInSkyboxRange(const glm::dvec3& point) const
 {
     return m_skyboxRange.contains(point);
 }
 
 bool CoordinateSystem3D::isPointInSkyboxRange(const osg::Vec3& point) const
 {
-    return isPointInSkyboxRange(glm::vec3(point.x(), point.y(), point.z()));
+    return isPointInSkyboxRange(glm::dvec3(point.x(), point.y(), point.z()));
 }
 
-glm::vec3 CoordinateSystem3D::clampPoint(const glm::vec3& point) const
+glm::dvec3 CoordinateSystem3D::clampPoint(const glm::dvec3& point) const
 {
     if (!m_rangeLimitEnabled)
         return point;
@@ -131,22 +131,22 @@ glm::vec3 CoordinateSystem3D::clampPoint(const glm::vec3& point) const
 
 osg::Vec3 CoordinateSystem3D::clampPoint(const osg::Vec3& point) const
 {
-    glm::vec3 clamped = clampPoint(glm::vec3(point.x(), point.y(), point.z()));
+    glm::dvec3 clamped = clampPoint(glm::dvec3(point.x(), point.y(), point.z()));
     return osg::Vec3(clamped.x, clamped.y, clamped.z);
 }
 
-glm::vec3 CoordinateSystem3D::clampPointToSkybox(const glm::vec3& point) const
+glm::dvec3 CoordinateSystem3D::clampPointToSkybox(const glm::dvec3& point) const
 {
-    return glm::vec3(
-        std::max(static_cast<float>(m_skyboxRange.minX), std::min(static_cast<float>(m_skyboxRange.maxX), point.x)),
-        std::max(static_cast<float>(m_skyboxRange.minY), std::min(static_cast<float>(m_skyboxRange.maxY), point.y)),
-        std::max(static_cast<float>(m_skyboxRange.minZ), std::min(static_cast<float>(m_skyboxRange.maxZ), point.z))
+    return glm::dvec3(
+        std::max(static_cast<double>(m_skyboxRange.minX), std::min(static_cast<double>(m_skyboxRange.maxX), point.x)),
+        std::max(static_cast<double>(m_skyboxRange.minY), std::min(static_cast<double>(m_skyboxRange.maxY), point.y)),
+        std::max(static_cast<double>(m_skyboxRange.minZ), std::min(static_cast<double>(m_skyboxRange.maxZ), point.z))
     );
 }
 
 osg::Vec3 CoordinateSystem3D::clampPointToSkybox(const osg::Vec3& point) const
 {
-    glm::vec3 clamped = clampPointToSkybox(glm::vec3(point.x(), point.y(), point.z()));
+    glm::dvec3 clamped = clampPointToSkybox(glm::dvec3(point.x(), point.y(), point.z()));
     return osg::Vec3(clamped.x, clamped.y, clamped.z);
 }
 
@@ -412,3 +412,8 @@ bool CoordinateSystem3D::isGridPlaneVisible(GridPlane3D plane) const
         default: return false;
     }
 }
+
+
+
+
+

@@ -84,9 +84,9 @@ void Box3D_Geo::buildVertexGeometries()
             
             // 高度向量（从底面中心到高度点的向量）
             Point3D bottomCenter = Point3D(
-                (A.x() + B.x() + C.x() + D.x()) / 4.0f,
-                (A.y() + B.y() + C.y() + D.y()) / 4.0f,
-                (A.z() + B.z() + C.z() + D.z()) / 4.0f
+                (A.x() + B.x() + C.x() + D.x()) / 4.0,
+                (A.y() + B.y() + C.y() + D.y()) / 4.0,
+                (A.z() + B.z() + C.z() + D.z()) / 4.0
             );
             
             Point3D heightPoint = stage3[0];
@@ -199,9 +199,9 @@ void Box3D_Geo::buildEdgeGeometries()
             );
             
             Point3D bottomCenter = Point3D(
-                (A.x() + B.x() + C.x() + D.x()) / 4.0f,
-                (A.y() + B.y() + C.y() + D.y()) / 4.0f,
-                (A.z() + B.z() + C.z() + D.z()) / 4.0f
+                (A.x() + B.x() + C.x() + D.x()) / 4.0,
+                (A.y() + B.y() + C.y() + D.y()) / 4.0,
+                (A.z() + B.z() + C.z() + D.z()) / 4.0
             );
             
             Point3D heightPoint = stage3[0];
@@ -307,9 +307,9 @@ void Box3D_Geo::buildFaceGeometries()
             );
             
             Point3D bottomCenter = Point3D(
-                (A.x() + B.x() + C.x() + D.x()) / 4.0f,
-                (A.y() + B.y() + C.y() + D.y()) / 4.0f,
-                (A.z() + B.z() + C.z() + D.z()) / 4.0f
+                (A.x() + B.x() + C.x() + D.x()) / 4.0,
+                (A.y() + B.y() + C.y() + D.y()) / 4.0,
+                (A.z() + B.z() + C.z() + D.z()) / 4.0
             );
             
             Point3D heightPoint = stage3[0];
@@ -370,3 +370,6 @@ void Box3D_Geo::buildFaceGeometries()
     // 设置顶点数组
     geometry->setVertexArray(vertices);
 }
+
+
+

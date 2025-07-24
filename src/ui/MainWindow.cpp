@@ -91,7 +91,7 @@ MainWindow::MainWindow(QWidget* parent)
     if (m_osgWidget)
     {
         connect(m_osgWidget, &OSGWidget::mousePositionChanged,
-                this, [this](const glm::vec3& pos) {
+                this, [this](const glm::dvec3& pos) {
                     if (m_statusBar3D) {
                         m_statusBar3D->updateWorldCoordinates(pos);
                     }
@@ -483,7 +483,7 @@ void MainWindow::connectSignals()
     if (m_osgWidget)
     {
         connect(m_osgWidget, &OSGWidget::geoSelected, this, &MainWindow::onGeoSelected);
-        connect(m_osgWidget, &OSGWidget::mousePositionChanged, [this](const glm::vec3& pos) {
+        connect(m_osgWidget, &OSGWidget::mousePositionChanged, [this](const glm::dvec3& pos) {
             if (m_statusBar3D)
             {
                 m_statusBar3D->updateWorldCoordinates(pos);
@@ -784,7 +784,7 @@ void MainWindow::onFileSave()
                     tag.category = tr("几何体");
                     tag.visible = true;
                     tag.selectable = true;
-                    tag.opacity = 1.0f;
+                    tag.opacity = 1.0;
                     tag.layer = 0;
                     tag.createTime = QDateTime::currentDateTime();
                     tag.modifyTime = QDateTime::currentDateTime();
@@ -876,7 +876,7 @@ void MainWindow::onFileSaveAs()
                         tag.category = tr("几何体");
                         tag.visible = true;
                         tag.selectable = true;
-                        tag.opacity = 1.0f;
+                        tag.opacity = 1.0;
                         tag.layer = 0;
                         tag.createTime = QDateTime::currentDateTime();
                         tag.modifyTime = QDateTime::currentDateTime();
@@ -1003,7 +1003,7 @@ void MainWindow::onViewTop()
 {
     if (m_osgWidget)
     {
-        m_osgWidget->setViewDirection(glm::vec3(0, 0, -1), glm::vec3(0, 1, 0));
+        m_osgWidget->setViewDirection(glm::dvec3(0, 0, -1), glm::dvec3(0, 1, 0));
         updateStatusBar(tr("俯视图"));
         LOG_INFO("切换到俯视图", "视图");
     }
@@ -1013,7 +1013,7 @@ void MainWindow::onViewFront()
 {
     if (m_osgWidget)
     {
-        m_osgWidget->setViewDirection(glm::vec3(0, -1, 0), glm::vec3(0, 0, 1));
+        m_osgWidget->setViewDirection(glm::dvec3(0, -1, 0), glm::dvec3(0, 0, 1));
         updateStatusBar(tr("前视图"));
         LOG_INFO("切换到前视图", "视图");
     }
@@ -1023,7 +1023,7 @@ void MainWindow::onViewRight()
 {
     if (m_osgWidget)
     {
-        m_osgWidget->setViewDirection(glm::vec3(-1, 0, 0), glm::vec3(0, 0, 1));
+        m_osgWidget->setViewDirection(glm::dvec3(-1, 0, 0), glm::dvec3(0, 0, 1));
         updateStatusBar(tr("右视图"));
         LOG_INFO("切换到右视图", "视图");
     }
@@ -1033,7 +1033,7 @@ void MainWindow::onViewIsometric()
 {
     if (m_osgWidget)
     {
-        m_osgWidget->setViewDirection(glm::vec3(-1, -1, -1), glm::vec3(0, 0, 1));
+        m_osgWidget->setViewDirection(glm::dvec3(-1, -1, -1), glm::dvec3(0, 0, 1));
         updateStatusBar(tr("等轴测图"));
         LOG_INFO("切换到等轴测图", "视图");
     }
@@ -1579,3 +1579,7 @@ void MainWindow::onManipulatorTypeChanged()
     updateStatusBar(tr("相机操控器切换为: %1").arg(typeName));
     LOG_INFO(tr("相机操控器切换为: %1").arg(typeName), "相机");
 }
+
+
+
+

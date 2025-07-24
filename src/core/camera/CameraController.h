@@ -207,3 +207,4 @@ private:
     qint64 m_lastMoveTime;  // 上次移动时间
     bool m_isMoving;        // 是否正在移动
 }; 
+

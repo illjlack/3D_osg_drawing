@@ -32,15 +32,15 @@ Skybox::Skybox()
     , m_cubeMapTexture(nullptr)
     , m_gradientTexture(nullptr)
     , m_solidColorTexture(nullptr)
-    , m_topColor(0.5f, 0.7f, 1.0f, 1.0f)      // 默认顶部颜色（天蓝色）
-    , m_bottomColor(0.8f, 0.9f, 1.0f, 1.0f)   // 默认底部颜色（浅蓝色）
-    , m_solidColor(0.2f, 0.2f, 0.2f, 1.0f)    // 默认纯色（深灰色）
+    , m_topColor(0.5, 0.7, 1.0, 1.0)      // 默认顶部颜色（天蓝色）
+    , m_bottomColor(0.8, 0.9, 1.0, 1.0)   // 默认底部颜色（浅蓝色）
+    , m_solidColor(0.2, 0.2, 0.2, 1.0)    // 默认纯色（深灰色）
     , m_enabled(true)
     , m_useCubeMap(false)
     , m_useGradient(true)
     , m_useSolidColor(false)
-    , m_size(1000.0f)  // 默认大小改为1000，更适合坐标系统边界
-    , m_center(0.0f, 0.0f, 0.0f)  // 默认以原点为中心
+    , m_size(1000.0)  // 默认大小改为1000，更适合坐标系统边界
+    , m_center(0.0, 0.0, 0.0)  // 默认以原点为中心
 {
     // 默认使用渐变天空盒
     m_skyboxNode = createGradientSkybox(m_size);
@@ -50,7 +50,7 @@ Skybox::~Skybox()
 {
 }
 
-osg::ref_ptr<osg::Node> Skybox::createSkybox(float size)
+osg::ref_ptr<osg::Node> Skybox::createSkybox(double size)
 {
     if (m_useCubeMap)
     {
@@ -119,7 +119,7 @@ void Skybox::setSolidColorSkybox(const osg::Vec4& color)
     }
 }
 
-osg::ref_ptr<osg::Node> Skybox::createCubeMapSkybox(float size)
+osg::ref_ptr<osg::Node> Skybox::createCubeMapSkybox(double size)
 {
     // 创建立方体贴图纹理
     m_cubeMapTexture = createCubeMapTexture();
@@ -134,7 +134,7 @@ osg::ref_ptr<osg::Node> Skybox::createCubeMapSkybox(float size)
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
     osg::ref_ptr<osg::Vec2Array> texCoords = new osg::Vec2Array();
     
-    float halfSize = size * 0.5f;
+    double halfSize = size * 0.5;
     
     // 定义立方体的8个顶点（以指定中心为中心）
     std::vector<osg::Vec3> cubeVertices = {
@@ -161,12 +161,12 @@ osg::ref_ptr<osg::Node> Skybox::createCubeMapSkybox(float size)
     
     // 每个面的纹理坐标（标准立方体贴图映射）
     std::vector<std::vector<osg::Vec2>> faceTexCoords = {
-        {{1.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 1.0f}, {0.0f, 0.0f}}, // +X
-        {{1.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 1.0f}, {0.0f, 0.0f}}, // -X
-        {{1.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 1.0f}, {0.0f, 0.0f}}, // +Y
-        {{1.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 1.0f}, {0.0f, 0.0f}}, // -Y
-        {{1.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 1.0f}, {0.0f, 0.0f}}, // +Z
-        {{1.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 1.0f}, {0.0f, 0.0f}}  // -Z
+        {{1.0, 0.0}, {1.0, 1.0}, {0.0, 1.0}, {0.0, 0.0}}, // +X
+        {{1.0, 0.0}, {1.0, 1.0}, {0.0, 1.0}, {0.0, 0.0}}, // -X
+        {{1.0, 0.0}, {1.0, 1.0}, {0.0, 1.0}, {0.0, 0.0}}, // +Y
+        {{1.0, 0.0}, {1.0, 1.0}, {0.0, 1.0}, {0.0, 0.0}}, // -Y
+        {{1.0, 0.0}, {1.0, 1.0}, {0.0, 1.0}, {0.0, 0.0}}, // +Z
+        {{1.0, 0.0}, {1.0, 1.0}, {0.0, 1.0}, {0.0, 0.0}}  // -Z
     };
     
     // 添加每个面的顶点和纹理坐标
@@ -211,9 +211,9 @@ osg::ref_ptr<osg::Node> Skybox::createCubeMapSkybox(float size)
     
     // 设置材质
     osg::ref_ptr<osg::Material> material = new osg::Material();
-    material->setAmbient(osg::Material::FRONT_AND_BACK, osg::Vec4(1.0f, 1.0f, 1.0f, 1.0f));
-    material->setDiffuse(osg::Material::FRONT_AND_BACK, osg::Vec4(1.0f, 1.0f, 1.0f, 1.0f));
-    material->setEmission(osg::Material::FRONT_AND_BACK, osg::Vec4(1.0f, 1.0f, 1.0f, 1.0f));
+    material->setAmbient(osg::Material::FRONT_AND_BACK, osg::Vec4(1.0, 1.0, 1.0, 1.0));
+    material->setDiffuse(osg::Material::FRONT_AND_BACK, osg::Vec4(1.0, 1.0, 1.0, 1.0));
+    material->setEmission(osg::Material::FRONT_AND_BACK, osg::Vec4(1.0, 1.0, 1.0, 1.0));
     stateSet->setAttribute(material.get());
     
     // 禁用光照
@@ -235,7 +235,7 @@ osg::ref_ptr<osg::Node> Skybox::createCubeMapSkybox(float size)
     return geode;
 }
 
-osg::ref_ptr<osg::Node> Skybox::createGradientSkybox(float size)
+osg::ref_ptr<osg::Node> Skybox::createGradientSkybox(double size)
 {
     // 创建渐变纹理
     m_gradientTexture = createGradientTexture();
@@ -245,7 +245,7 @@ osg::ref_ptr<osg::Node> Skybox::createGradientSkybox(float size)
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
     osg::ref_ptr<osg::Vec2Array> texCoords = new osg::Vec2Array();
     
-    float halfSize = size * 0.5f;
+    double halfSize = size * 0.5;
     
     // 定义立方体的8个顶点（以指定中心为中心）
     std::vector<osg::Vec3> cubeVertices = {
@@ -271,12 +271,12 @@ osg::ref_ptr<osg::Node> Skybox::createGradientSkybox(float size)
     
     // 每个面的纹理坐标（渐变纹理映射）
     std::vector<std::vector<osg::Vec2>> faceTexCoords = {
-        {{0.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 1.0f}}, // 右面
-        {{0.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 1.0f}}, // 左面
-        {{0.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 1.0f}}, // 后面
-        {{0.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 1.0f}}, // 前面
-        {{0.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 1.0f}}, // 上面
-        {{0.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 1.0f}}  // 下面
+        {{0.0, 0.0}, {1.0, 0.0}, {1.0, 1.0}, {0.0, 1.0}}, // 右面
+        {{0.0, 0.0}, {1.0, 0.0}, {1.0, 1.0}, {0.0, 1.0}}, // 左面
+        {{0.0, 0.0}, {1.0, 0.0}, {1.0, 1.0}, {0.0, 1.0}}, // 后面
+        {{0.0, 0.0}, {1.0, 0.0}, {1.0, 1.0}, {0.0, 1.0}}, // 前面
+        {{0.0, 0.0}, {1.0, 0.0}, {1.0, 1.0}, {0.0, 1.0}}, // 上面
+        {{0.0, 0.0}, {1.0, 0.0}, {1.0, 1.0}, {0.0, 1.0}}  // 下面
     };
     
     // 添加每个面的顶点和纹理坐标
@@ -321,9 +321,9 @@ osg::ref_ptr<osg::Node> Skybox::createGradientSkybox(float size)
     
     // 设置材质
     osg::ref_ptr<osg::Material> material = new osg::Material();
-    material->setAmbient(osg::Material::FRONT_AND_BACK, osg::Vec4(1.0f, 1.0f, 1.0f, 1.0f));
-    material->setDiffuse(osg::Material::FRONT_AND_BACK, osg::Vec4(1.0f, 1.0f, 1.0f, 1.0f));
-    material->setEmission(osg::Material::FRONT_AND_BACK, osg::Vec4(1.0f, 1.0f, 1.0f, 1.0f));
+    material->setAmbient(osg::Material::FRONT_AND_BACK, osg::Vec4(1.0, 1.0, 1.0, 1.0));
+    material->setDiffuse(osg::Material::FRONT_AND_BACK, osg::Vec4(1.0, 1.0, 1.0, 1.0));
+    material->setEmission(osg::Material::FRONT_AND_BACK, osg::Vec4(1.0, 1.0, 1.0, 1.0));
     stateSet->setAttribute(material.get());
     
     // 禁用光照
@@ -345,7 +345,7 @@ osg::ref_ptr<osg::Node> Skybox::createGradientSkybox(float size)
     return geode;
 }
 
-osg::ref_ptr<osg::Node> Skybox::createSolidColorSkybox(float size)
+osg::ref_ptr<osg::Node> Skybox::createSolidColorSkybox(double size)
 {
     // 创建纯色纹理
     m_solidColorTexture = createSolidColorTexture();
@@ -355,7 +355,7 @@ osg::ref_ptr<osg::Node> Skybox::createSolidColorSkybox(float size)
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
     osg::ref_ptr<osg::Vec2Array> texCoords = new osg::Vec2Array();
     
-    float halfSize = size * 0.5f;
+    double halfSize = size * 0.5;
     
     // 定义立方体的8个顶点（以指定中心为中心）
     std::vector<osg::Vec3> cubeVertices = {
@@ -381,12 +381,12 @@ osg::ref_ptr<osg::Node> Skybox::createSolidColorSkybox(float size)
     
     // 每个面的纹理坐标
     std::vector<std::vector<osg::Vec2>> faceTexCoords = {
-        {{0.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 1.0f}}, // 右面
-        {{0.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 1.0f}}, // 左面
-        {{0.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 1.0f}}, // 后面
-        {{0.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 1.0f}}, // 前面
-        {{0.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 1.0f}}, // 上面
-        {{0.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 1.0f}}  // 下面
+        {{0.0, 0.0}, {1.0, 0.0}, {1.0, 1.0}, {0.0, 1.0}}, // 右面
+        {{0.0, 0.0}, {1.0, 0.0}, {1.0, 1.0}, {0.0, 1.0}}, // 左面
+        {{0.0, 0.0}, {1.0, 0.0}, {1.0, 1.0}, {0.0, 1.0}}, // 后面
+        {{0.0, 0.0}, {1.0, 0.0}, {1.0, 1.0}, {0.0, 1.0}}, // 前面
+        {{0.0, 0.0}, {1.0, 0.0}, {1.0, 1.0}, {0.0, 1.0}}, // 上面
+        {{0.0, 0.0}, {1.0, 0.0}, {1.0, 1.0}, {0.0, 1.0}}  // 下面
     };
     
     // 添加每个面的顶点和纹理坐标
@@ -431,9 +431,9 @@ osg::ref_ptr<osg::Node> Skybox::createSolidColorSkybox(float size)
     
     // 设置材质
     osg::ref_ptr<osg::Material> material = new osg::Material();
-    material->setAmbient(osg::Material::FRONT_AND_BACK, osg::Vec4(1.0f, 1.0f, 1.0f, 1.0f));
-    material->setDiffuse(osg::Material::FRONT_AND_BACK, osg::Vec4(1.0f, 1.0f, 1.0f, 1.0f));
-    material->setEmission(osg::Material::FRONT_AND_BACK, osg::Vec4(1.0f, 1.0f, 1.0f, 1.0f));
+    material->setAmbient(osg::Material::FRONT_AND_BACK, osg::Vec4(1.0, 1.0, 1.0, 1.0));
+    material->setDiffuse(osg::Material::FRONT_AND_BACK, osg::Vec4(1.0, 1.0, 1.0, 1.0));
+    material->setEmission(osg::Material::FRONT_AND_BACK, osg::Vec4(1.0, 1.0, 1.0, 1.0));
     stateSet->setAttribute(material.get());
     
     // 禁用光照
@@ -489,7 +489,7 @@ osg::ref_ptr<osg::TextureCubeMap> Skybox::createCubeMapTexture()
             image->allocateImage(256, 256, 1, GL_RGBA, GL_UNSIGNED_BYTE);
             
             // 设置默认颜色
-            osg::Vec4 color(0.5f, 0.7f, 1.0f, 1.0f);
+            osg::Vec4 color(0.5, 0.7, 1.0, 1.0);
             unsigned char* data = image->data();
             for (int j = 0; j < 256 * 256; ++j)
             {
@@ -525,10 +525,10 @@ osg::ref_ptr<osg::Texture2D> Skybox::createGradientTexture()
     unsigned char* data = image->data();
     for (int y = 0; y < height; ++y)
     {
-        float t = static_cast<float>(y) / (height - 1);
+        double t = static_cast<double>(y) / (height - 1);
         
         // 在顶部和底部颜色之间插值
-        osg::Vec4 color = m_topColor * (1.0f - t) + m_bottomColor * t;
+        osg::Vec4 color = m_topColor * (1.0 - t) + m_bottomColor * t;
         
         for (int x = 0; x < width; ++x)
         {
@@ -568,7 +568,7 @@ osg::ref_ptr<osg::Texture2D> Skybox::createSolidColorTexture()
     return texture;
 } 
 
-void Skybox::setSize(float size)
+void Skybox::setSize(double size)
 {
     if (m_size != size && size > 0)
     {
@@ -645,7 +645,7 @@ void Skybox::setSizeFromRange(double minX, double maxX, double minY, double maxY
         skyboxSize = std::max(skyboxSize, diagonalLength * 2.0);
     }
     
-    setSize(static_cast<float>(skyboxSize));
+    setSize(static_cast<double>(skyboxSize));
     
     // 输出调试信息
     qDebug() << "天空盒大小计算: 坐标范围最大值=" << maxRange 
@@ -674,3 +674,6 @@ void Skybox::setCenter(const osg::Vec3& center)
         }
     }
 }
+
+
+

@@ -34,3 +34,4 @@ public:
 private:
     BuildingFactory() = delete;  // 禁止实例化
 }; 
+

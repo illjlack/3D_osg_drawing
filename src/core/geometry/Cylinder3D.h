@@ -14,20 +14,20 @@ public:
     Cylinder3D_Geo();
     virtual ~Cylinder3D_Geo() = default;
 
-    // ==================== 多阶段绘制支持 ====================
-    
     // 获取圆柱体的阶段描述符
     virtual const StageDescriptors& getStageDescriptors() const
     {
+        using namespace constraint;
         static StageDescriptors stageDescriptors
         { 
-            //{"确定底面圆心", 1, 1, ConstraintSystem::flatDrawingConstraint()},
-            //{"确定底面半径", 1, 1, ConstraintSystem::flatDrawingConstraint()},
-            //{"确定圆柱高度", 1, 1, ConstraintSystem::verticalToBaseConstraint()} 
+            {"确定底面圆", 3, 3},
+            {"确定高", 1, 1, combineStageConstraints({
+                    createConstraintCall(perpendicularToLastTwoPointsConstraint, {{0,1}, {0,0}}),
+                    createConstraintCall(perpendicularToLastTwoPointsConstraint, {{0,2}, {0,0}})
+                })}
         };
-        // 第一阶段：确定底面圆心，使用平面约束
-        // 第二阶段：确定半径，保持在同一平面
-        // 第三阶段：确定高度，约束在垂直于底面的方向
+        // 第一阶段：基于圆上的三个点确定圆
+        // 第二阶段：确定高，垂直于底面,垂足（0，0）
         return stageDescriptors;
     }
 
@@ -40,3 +40,5 @@ private:
     
 private:
 };
+
+

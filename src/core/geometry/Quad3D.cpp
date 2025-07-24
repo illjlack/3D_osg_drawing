@@ -55,7 +55,7 @@ void Quad3D_Geo::buildEdgeGeometries()
     }
 
     // 收集所有控制点
-    std::vector<glm::vec3> allPoints;
+    std::vector<glm::dvec3> allPoints;
     for (auto& points : controlPointss)
         for (auto& point : points)
         {
@@ -130,7 +130,7 @@ void Quad3D_Geo::buildFaceGeometries()
     }
 
     // 收集所有控制点
-    std::vector<glm::vec3> allPoints;
+    std::vector<glm::dvec3> allPoints;
     for (auto& points : controlPointss)
         for (auto& point : points)
         {
@@ -150,7 +150,7 @@ void Quad3D_Geo::buildFaceGeometries()
     if (allPoints.size() == 3)
     {
         // 三点组成三角形
-        glm::vec3 normal;
+        glm::dvec3 normal;
         auto triangleVertices = MathUtils::generateTriangleVertices(allPoints[0], allPoints[1], allPoints[2], normal);
         
         for (const auto& vertex : triangleVertices)
@@ -162,7 +162,7 @@ void Quad3D_Geo::buildFaceGeometries()
     else if (allPoints.size() >= 4)
     {
         // 四点组成四边形（分解为两个三角形）
-        std::vector<glm::vec3> quadNormals;
+        std::vector<glm::dvec3> quadNormals;
         auto quadVertices = MathUtils::generateQuadVertices(allPoints[0], allPoints[1], allPoints[2], allPoints[3], quadNormals);
         
         for (size_t i = 0; i < quadVertices.size(); ++i)
@@ -179,3 +179,6 @@ void Quad3D_Geo::buildFaceGeometries()
     osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, vertices->size());
     geometry->addPrimitiveSet(drawArrays);
 } 
+
+
+

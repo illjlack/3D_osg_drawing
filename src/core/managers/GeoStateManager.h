@@ -72,3 +72,4 @@ private:
     Geo3D* m_parent;
     int m_geoState;
 }; 
+
