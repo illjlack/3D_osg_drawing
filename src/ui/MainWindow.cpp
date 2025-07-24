@@ -536,7 +536,11 @@ void MainWindow::connectSignals()
     // 属性编辑器信号连接
     if (m_propertyEditor)
     {
-        connect(m_propertyEditor, &PropertyEditor3D::parametersChanged, this, &MainWindow::onGeoParametersChanged);
+        // 连接PropertyEditor3D
+        connect(m_propertyEditor, &PropertyEditor3D::geometryRecalculationRequired, 
+                this, &MainWindow::onGeometryRecalculationRequired);
+        connect(m_propertyEditor, &PropertyEditor3D::renderingParametersChanged, 
+                this, &MainWindow::onRenderingParametersChanged);
     }
 }
 
@@ -1144,6 +1148,43 @@ void MainWindow::onGeoParametersChanged()
     }
     updateStatusBar(tr("属性已修改"));
     LOG_INFO("几何对象属性已修改", "属性");
+}
+
+void MainWindow::onGeometryRecalculationRequired()
+{
+    // 需要重新计算几何体的参数变化（点形状、细分级别等）
+    m_modified = true;
+    // QString title = windowTitle();
+    // if (!title.endsWith(" *"))
+    // {
+    //     setWindowTitle(title + " *");
+    // }
+    // updateStatusBar(tr("几何体已重新计算"));
+    // LOG_INFO("几何对象需要重新计算", "几何体重建");
+    
+    // 可以在这里添加更复杂的处理逻辑，比如：
+    // - 更新性能统计
+    // - 触发场景重新渲染
+    // - 通知其他相关组件
+    if (m_osgWidget) {
+        m_osgWidget->update();
+    }
+}
+
+void MainWindow::onRenderingParametersChanged()
+{
+    // 只需要渲染更新的参数变化（颜色、大小、透明度等）
+    m_modified = true;
+    // QString title = windowTitle();
+    // if (!title.endsWith(" *"))
+    // {
+    //     setWindowTitle(title + " *");
+    // }
+    // updateStatusBar(tr("渲染属性已更新"));
+    // LOG_INFO("几何对象渲染属性已更新", "渲染更新");
+    
+    // 这种变化通常很快，不需要特殊处理
+    // GeoRenderManager已经处理了所有必要的更新
 }
 
 void MainWindow::onSimplePickingResult(const PickResult& result)

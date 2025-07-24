@@ -33,16 +33,11 @@ extern LineStyle3D GlobalLineStyle3D;
 extern double GlobalLineWidth3D;
 extern QColor GlobalLineColor3D;
 extern double GlobalLineDashPattern3D;
-extern NodeLineStyle3D GlobalNodeLineStyle3D;
 
 extern FillType3D GlobalFillType3D;
 extern QColor GlobalFillColor3D;
-extern QColor GlobalBorderColor3D;
-extern bool GlobalShowBorder3D;
 
 extern MaterialType3D GlobalMaterialType3D;
-extern double GlobalShininess3D;
-extern double GlobalTransparency3D;
 extern SubdivisionLevel3D GlobalSubdivisionLevel3D;
 
 // 显示控制全局变量
@@ -136,26 +131,22 @@ struct GeoParameters3D
     // 点属性
     PointShape3D pointShape;
     double pointSize;
-    Color3D pointColor;
-    bool showPoints;  // 是否显示点
+    Color3D pointColor;  // 包含alpha透明度
+    bool showPoints;
     
     // 线属性
     LineStyle3D lineStyle;
     double lineWidth;
-    Color3D lineColor;
+    Color3D lineColor;   // 包含alpha透明度
     double lineDashPattern;
-    NodeLineStyle3D nodeLineStyle;
-
-    bool showEdges;  // 是否显示边
+    bool showEdges;
     
     // 面属性
     FillType3D fillType;
-    Color3D fillColor;
-    Color3D borderColor;
-    bool showBorder;
-    bool showFaces;  // 是否显示面
+    Color3D fillColor;   // 包含alpha透明度
+    bool showFaces;
     
-    // 材质属性
+    // 材质属性（简化）
     Material3D material;
     
     // 体属性
@@ -178,20 +169,18 @@ struct GeoParameters3D
         double lWidth = 2.0,
         const Color3D& lColor = Color3D(0.0, 0.0, 1.0, 1.0),
         double lDashPattern = 1.0,
-        const NodeLineStyle3D& nlStyle = NodeLine_Polyline3D,
         bool showEdgs = true,
         
         const FillType3D& fType = Fill_Solid3D,
         const Color3D& fColor = Color3D(0.5, 0.5, 0.5, 1.0),
-        const Color3D& bColor = Color3D(0.0, 0.0, 0.0, 1.0),
-        bool showBrd = true,
         bool showFcs = true,
         
         const MaterialType3D& mType = Material_Basic3D,
-        double shininess = 32.0,
-        double transparency = 1.0,
         const SubdivisionLevel3D& subLevel = Subdivision_Medium3D
     );
+    
+    // 显示约束：确保至少有一个组件可见
+    void enforceVisibilityConstraint();
     
     // 快速设置预设样式
     void setPresetStyle(const std::string& styleName);
@@ -200,7 +189,6 @@ struct GeoParameters3D
     static GeoParameters3D getDefaultStyle();
     static GeoParameters3D getWireframeStyle();
     static GeoParameters3D getPointStyle();
-    static GeoParameters3D getHighlightStyle();
     static GeoParameters3D getTransparentStyle();
     static GeoParameters3D getHighQualityStyle();
     static GeoParameters3D getLowQualityStyle();
@@ -356,14 +344,12 @@ void initializeGlobal3DSettings();
 QString drawMode3DToString(DrawMode3D mode);
 QString pointShape3DToString(PointShape3D shape);
 QString lineStyle3DToString(LineStyle3D style);
-QString nodeLineStyle3DToString(NodeLineStyle3D style);
 QString fillType3DToString(FillType3D type);
 QString materialType3DToString(MaterialType3D type);
 
 DrawMode3D stringToDrawMode3D(const QString& str);
 PointShape3D stringToPointShape3D(const QString& str);
 LineStyle3D stringToLineStyle3D(const QString& str);
-NodeLineStyle3D stringToNodeLineStyle3D(const QString& str);
 FillType3D stringToFillType3D(const QString& str);
 MaterialType3D stringToMaterialType3D(const QString& str); 
 

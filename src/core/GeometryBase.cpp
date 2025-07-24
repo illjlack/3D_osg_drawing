@@ -78,49 +78,31 @@ void Geo3D::connectManagerSignals()
     connect(m_stateManager.get(), &GeoStateManager::stateCompleted,
             m_nodeManager.get(), &GeoNodeManager::onDrawingCompleted);
     
-    // 编辑状态变化时通知渲染管理器
+    // 编辑状态变化时通知节点管理器
     connect(m_stateManager.get(), &GeoStateManager::editingStarted,
             this, [this]() {
-                if (m_renderManager) {
-                    m_renderManager->setHighlighted(true);
-                }
-                // 编辑开始时显示控制点
                 if (m_nodeManager) {
-                    m_nodeManager->setControlPointsVisible(true);
+                    m_nodeManager->setSelected(true);  // 编辑时选中（显示包围盒和控制点）
                 }
             });
     
     connect(m_stateManager.get(), &GeoStateManager::editingFinished,
             this, [this]() {
-                if (m_renderManager) {
-                    m_renderManager->setHighlighted(false);
-                }
-                // 编辑结束时隐藏控制点
-                if (m_nodeManager) {
-                    m_nodeManager->setControlPointsVisible(false);
-                }
+                // 编辑结束时保持选中状态，不改变显示
             });
     
-    // 选中状态变化时通知渲染管理器
+    // 选中状态变化时通知节点管理器
     connect(m_stateManager.get(), &GeoStateManager::stateSelected,
             this, [this]() {
-                if (m_renderManager) {
-                    m_renderManager->setHighlighted(true);
-                }
-                // 选中时显示包围盒
                 if (m_nodeManager) {
-                    m_nodeManager->updateBoundingBoxVisibility();
+                    m_nodeManager->setSelected(true);  // 选中时显示包围盒和控制点
                 }
             });
     
     connect(m_stateManager.get(), &GeoStateManager::stateDeselected,
             this, [this]() {
-                if (m_renderManager) {
-                    m_renderManager->setHighlighted(false);
-                }
-                // 取消选中时隐藏包围盒
                 if (m_nodeManager) {
-                    m_nodeManager->updateBoundingBoxVisibility();
+                    m_nodeManager->setSelected(false); // 取消选中时隐藏包围盒和控制点
                 }
             });
 
@@ -135,65 +117,38 @@ void Geo3D::connectManagerSignals()
 // ========================================= 参数管理 =========================================
 void Geo3D::setParameters(const GeoParameters3D& params)
 {
-    if (m_renderManager) {
-        if (m_parameters.pointColor != params.pointColor) {
-            m_renderManager->setPointColor(params.pointColor);
-        }
-        if (m_parameters.pointSize != params.pointSize) {
-            m_renderManager->setPointSize(params.pointSize);
-        }
-        if (m_parameters.pointShape != params.pointShape) {
-            
-        }
-        if (m_parameters.lineColor != params.lineColor) {
-            m_renderManager->setEdgeColor(params.lineColor);
-        }
-        if (m_parameters.lineWidth != params.lineWidth) {
-            m_renderManager->setLineWidth(params.lineWidth);
-        }
-        if (m_parameters.lineStyle != params.lineStyle) {
-            
-        }
-        if (m_parameters.lineDashPattern != params.lineDashPattern) {
-            
-        }
-        if (m_parameters.nodeLineStyle != params.nodeLineStyle) {
-            
-        }
-        if (m_parameters.fillColor != params.fillColor) {
-            m_renderManager->setFaceColor(params.fillColor);
-        }
-        if (m_parameters.fillType != params.fillType) {
-            
-        }
-        if (m_parameters.borderColor != params.borderColor) {
-            
-        }
-        if (m_parameters.showBorder != params.showBorder) {
-            
-        }
-        if (m_parameters.material!= params.material) {
-            m_renderManager->setMaterial(params.material);
-        }
+    GeoParameters3D constrainedParams = params;
+    
+    // 应用显示约束：确保至少有一个组件可见
+    constrainedParams.enforceVisibilityConstraint();
+    
+    // 检查是否有需要重新计算几何体的参数变化
+    bool needsGeometryRecalculation = false;
+    
+    if (m_parameters.pointShape != constrainedParams.pointShape) {
+        needsGeometryRecalculation = true;
     }
     
-    if (m_nodeManager) {
-        if (m_parameters.showPoints != params.showPoints) {
-            m_nodeManager->setVertexVisible(params.showPoints);
-        }
-        if (m_parameters.showEdges != params.showEdges) {
-            m_nodeManager->setEdgeVisible(params.showEdges);
-        }
-        if (m_parameters.showFaces != params.showFaces) {
-            m_nodeManager->setFaceVisible(params.showFaces);
-        }
-        // 细分等级变化需要重新计算
-        if (m_parameters.subdivisionLevel != params.subdivisionLevel) {
+    if (m_parameters.subdivisionLevel != constrainedParams.subdivisionLevel) {
+        needsGeometryRecalculation = true;
+    }
+    
+    // 如果需要重新计算几何体，先更新参数，然后重建几何体
+    if (needsGeometryRecalculation) {
+        m_parameters = constrainedParams;
+        if (m_nodeManager) {
             m_nodeManager->updateGeometries();
         }
+    } else {
+        // 只更新参数
+        m_parameters = constrainedParams;
     }
-
-    m_parameters = params;
+    
+    // 使用简化的渲染管理器接口更新所有渲染参数
+    if (m_renderManager) {
+        m_renderManager->updateRenderingParameters(constrainedParams);
+    }
+    
     m_parametersChanged = true;
 }
 

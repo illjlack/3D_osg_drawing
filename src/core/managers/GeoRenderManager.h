@@ -7,70 +7,49 @@
 #include <osg/BlendFunc>
 #include <osg/LineWidth>
 #include <osg/Point>
-#include <osg/PolygonMode>
+#include <osg/LineStipple>
 #include <osg/ref_ptr>
 
 // 前向声明
 class Geo3D;
 
 /**
- * @brief 渲染管理器
- * 直接设置几何对象的渲染状态和材质
+ * @brief 几何体渲染管理器
+ * 专注于几何体的渲染属性设置（颜色、大小、透明度、线型等）
+ * 选中状态显示由GeoNodeManager管理
  */
 class GeoRenderManager
 {
 public:
-
     explicit GeoRenderManager(Geo3D* parent);
     ~GeoRenderManager() = default;
 
-    // 材质设置
-    void setMaterial(const Material3D& material);
-    void setMaterialType(MaterialType3D type);
-    void setColor(const Color3D& color);
-    void setTransparency(double transparency);
-
-    // 渲染属性设置
-    void setLineWidth(double width);
-    void setPointSize(double size);
-    void setWireframeMode(bool enable);
-
-    // 高亮设置
-    void setHighlighted(bool highlighted);
-    void setHighlightColor(const Color3D& color);
-
-    void setPointColor(const Color3D& color);
-    void setEdgeColor(const Color3D& color);
-    void setFaceColor(const Color3D& color);
+    // 更新渲染参数
+    void updateRenderingParameters(const GeoParameters3D& params);
 
 private:
-    void initializeRender();
-    void applyMaterialPreset(MaterialType3D type);
+    void initializeRenderStates();
+    void updatePointRendering(const GeoParameters3D& params);
+    void updateLineRendering(const GeoParameters3D& params);
+    void updateSurfaceRendering(const GeoParameters3D& params);
+    void updateVisibilityStates(const GeoParameters3D& params);
+    
+    void applyLineStyle(LineStyle3D style, double dashPattern);
+    osg::Vec4 colorToOsgVec4(const Color3D& color) const;
 
 private:
     Geo3D* m_parent;
     
-    // 渲染状态
-    bool m_wireframeMode;
-    bool m_highlighted;
+
+    GeoParameters3D m_currentParams;
     
-    // 材质属性
-    Material3D m_material;
-    
-    // 三套材质
     osg::ref_ptr<osg::Material> m_pointMaterial;
-    osg::ref_ptr<osg::Material> m_edgeMaterial;
-    osg::ref_ptr<osg::Material> m_faceMaterial;
+    osg::ref_ptr<osg::Material> m_lineMaterial;
+    osg::ref_ptr<osg::Material> m_surfaceMaterial;
     
-    // OSG渲染状态
-    osg::ref_ptr<osg::StateSet> m_stateSet;
-    osg::ref_ptr<osg::Material> m_osgMaterial;
-    osg::ref_ptr<osg::BlendFunc> m_blendFunc;
-    osg::ref_ptr<osg::LineWidth> m_lineWidth;
     osg::ref_ptr<osg::Point> m_pointSize;
-    
-    // 高亮
-    Color3D m_highlightColor;
-    bool m_blendingEnabled;
+    osg::ref_ptr<osg::LineWidth> m_lineWidth;
+    osg::ref_ptr<osg::LineStipple> m_lineStipple;
+    osg::ref_ptr<osg::BlendFunc> m_blendFunc;
 }; 
 

@@ -5,6 +5,7 @@
 #include <osg/Material>
 #include <osg/LineWidth>
 #include <osg/Point>
+#include <osg/PolygonMode>
 #include <osg/NodeVisitor>
 #include <osg/ComputeBoundsVisitor>
 #include <osg/KdTree>
@@ -20,6 +21,7 @@ GeoNodeManager::GeoNodeManager(Geo3D* parent)
     : QObject(parent)
     , m_parent(parent)
     , m_initialized(false)
+    , m_selected(false)  // 初始状态为未选中
 {
     initializeNodes();
 }
@@ -29,15 +31,27 @@ void GeoNodeManager::initializeNodes()
     if (!m_initialized) {
         // 创建根节点和变换节点
         m_osgNode = new osg::Group();
+        m_osgNode->setName(NodeTags3D::ROOT_GROUP);
+        
         m_transformNode = new osg::MatrixTransform();
+        m_transformNode->setName(NodeTags3D::TRANSFORM_NODE);
         m_osgNode->addChild(m_transformNode.get());
         
-        // 创建几何体节点
+        // 创建几何体节点并设置标记
         m_vertexGeometry = new osg::Geometry();
+        m_vertexGeometry->setName(NodeTags3D::VERTEX_GEOMETRY);
+        
         m_edgeGeometry = new osg::Geometry();
+        m_edgeGeometry->setName(NodeTags3D::EDGE_GEOMETRY);
+        
         m_faceGeometry = new osg::Geometry();
+        m_faceGeometry->setName(NodeTags3D::FACE_GEOMETRY);
+        
         m_controlPointsGeometry = new osg::Geometry();
+        m_controlPointsGeometry->setName(NodeTags3D::CONTROL_POINTS_GEOMETRY);
+        
         m_boundingBoxGeometry = new osg::Geometry();
+        m_boundingBoxGeometry->setName(NodeTags3D::BOUNDING_BOX_GEOMETRY);
         
         // 设置用户数据，存储指向父几何体对象的指针
         m_vertexGeometry->setUserData(m_parent);
@@ -61,11 +75,12 @@ void GeoNodeManager::initializeNodes()
         // 设置初始状态
         m_controlPointsGeometry->setNodeMask(NODE_MASK_NONE);
         m_boundingBoxGeometry->setNodeMask(NODE_MASK_NONE);
+        
+        // 设置控制点和包围盒的渲染属性
+        setupControlPointsRendering();
+        setupBoundingBoxRendering();
 
         m_initialized = true;
-        
-        // 确保包围盒可见性状态正确
-        updateBoundingBoxVisibility();
     }
 }
 
@@ -190,121 +205,25 @@ bool GeoNodeManager::isVisible() const
     return m_transformNode.valid() ? m_transformNode->getNodeMask() != 0x0 : false;
 }
 
-void GeoNodeManager::setVertexVisible(bool visible)
-{
-    if (m_vertexGeometry.valid()) {
-        m_vertexGeometry->setNodeMask(visible ? NODE_MASK_VERTEX : NODE_MASK_NONE);
-    }
-}
+// 点线面可见性由GeoRenderManager管理
 
-void GeoNodeManager::setEdgeVisible(bool visible)
+void GeoNodeManager::setSelected(bool selected)
 {
-    if (m_edgeGeometry.valid()) {
-        m_edgeGeometry->setNodeMask(visible ? NODE_MASK_EDGE : NODE_MASK_NONE);
-    }
-}
-
-void GeoNodeManager::setFaceVisible(bool visible)
-{
-    if (m_faceGeometry.valid()) {
-        m_faceGeometry->setNodeMask(visible ? NODE_MASK_FACE : NODE_MASK_NONE);
-    }
-}
-
-void GeoNodeManager::setControlPointsVisible(bool visible)
-{
+    if (m_selected == selected) return;
+    
+    m_selected = selected;
+    
+    // 选中时显示包围盒和控制点，未选中时隐藏
     if (m_controlPointsGeometry.valid()) {
-        m_controlPointsGeometry->setNodeMask(visible ? NODE_MASK_CONTROL_POINTS : NODE_MASK_NONE);
+        m_controlPointsGeometry->setNodeMask(selected ? NODE_MASK_CONTROL_POINTS : NODE_MASK_NONE);
     }
-}
-
-void GeoNodeManager::setBoundingBoxVisible(bool visible)
-{
+    
     if (m_boundingBoxGeometry.valid()) {
-        m_boundingBoxGeometry->setNodeMask(visible ? NODE_MASK_BOUNDING_BOX : NODE_MASK_NONE);
+        m_boundingBoxGeometry->setNodeMask(selected ? NODE_MASK_BOUNDING_BOX : NODE_MASK_NONE);
     }
 }
 
-bool GeoNodeManager::isVertexVisible() const
-{
-    return m_vertexGeometry.valid() ? (m_vertexGeometry->getNodeMask() & NODE_MASK_VERTEX) != 0 : false;
-}
-
-bool GeoNodeManager::isEdgeVisible() const
-{
-    return m_edgeGeometry.valid() ? (m_edgeGeometry->getNodeMask() & NODE_MASK_EDGE) != 0 : false;
-}
-
-bool GeoNodeManager::isFaceVisible() const
-{
-    return m_faceGeometry.valid() ? (m_faceGeometry->getNodeMask() & NODE_MASK_FACE) != 0 : false;
-}
-
-bool GeoNodeManager::isControlPointsVisible() const
-{
-    return m_controlPointsGeometry.valid() ? (m_controlPointsGeometry->getNodeMask() & NODE_MASK_CONTROL_POINTS) != 0 : false;
-}
-
-bool GeoNodeManager::isBoundingBoxVisible() const
-{
-    return m_boundingBoxGeometry.valid() ? (m_boundingBoxGeometry->getNodeMask() & NODE_MASK_BOUNDING_BOX) != 0 : false;
-}
-
-void GeoNodeManager::setGeometryMask(unsigned int mask)
-{
-    // 根据mask设置各个几何体的可见性
-    if (m_vertexGeometry.valid()) {
-        m_vertexGeometry->setNodeMask((mask & NODE_MASK_VERTEX) ? NODE_MASK_VERTEX : NODE_MASK_NONE);
-    }
-    if (m_edgeGeometry.valid()) {
-        m_edgeGeometry->setNodeMask((mask & NODE_MASK_EDGE) ? NODE_MASK_EDGE : NODE_MASK_NONE);
-    }
-    if (m_faceGeometry.valid()) {
-        m_faceGeometry->setNodeMask((mask & NODE_MASK_FACE) ? NODE_MASK_FACE : NODE_MASK_NONE);
-    }
-    if (m_controlPointsGeometry.valid()) {
-        m_controlPointsGeometry->setNodeMask((mask & NODE_MASK_CONTROL_POINTS) ? NODE_MASK_CONTROL_POINTS : NODE_MASK_NONE);
-    }
-    if (m_boundingBoxGeometry.valid()) {
-        m_boundingBoxGeometry->setNodeMask((mask & NODE_MASK_BOUNDING_BOX) ? NODE_MASK_BOUNDING_BOX : NODE_MASK_NONE);
-    }
-}
-
-unsigned int GeoNodeManager::getGeometryMask() const
-{
-    unsigned int mask = 0;
-    if (isVertexVisible()) mask |= NODE_MASK_VERTEX;
-    if (isEdgeVisible()) mask |= NODE_MASK_EDGE;
-    if (isFaceVisible()) mask |= NODE_MASK_FACE;
-    if (isControlPointsVisible()) mask |= NODE_MASK_CONTROL_POINTS;
-    if (isBoundingBoxVisible()) mask |= NODE_MASK_BOUNDING_BOX;
-    return mask;
-}
-
-void GeoNodeManager::showOnlyVertices()
-{
-    setGeometryMask(NODE_MASK_VERTEX);
-}
-
-void GeoNodeManager::showOnlyEdges()
-{
-    setGeometryMask(NODE_MASK_EDGE);
-}
-
-void GeoNodeManager::showOnlyFaces()
-{
-    setGeometryMask(NODE_MASK_FACE);
-}
-
-void GeoNodeManager::showAllGeometries()
-{
-    setGeometryMask(NODE_MASK_ALL_GEOMETRY);
-}
-
-void GeoNodeManager::hideAllGeometries()
-{
-    setGeometryMask(0x0);
-}
+// 批量可见性控制已删除，由GeoRenderManager统一管理点线面可见性
 
 void GeoNodeManager::updateSpatialIndex()
 {
@@ -416,9 +335,6 @@ void GeoNodeManager::updateBoundingBoxGeometry()
         expandedBox.expandBy(osg::Vec3(expandAmount, expandAmount, expandAmount));
         
         createBoundingBoxGeometry(expandedBox);
-        
-        // 更新包围盒可见性状态
-        updateBoundingBoxVisibility();
     } else {
         clearBoundingBoxGeometry();
     }
@@ -429,20 +345,9 @@ void GeoNodeManager::updateGeometries()
     m_parent->updateGeometries();
     updateSpatialIndex();
     updateBoundingBoxGeometry();
-    updateBoundingBoxVisibility();
 }
 
-void GeoNodeManager::updateBoundingBoxVisibility()
-{
-    if (!m_boundingBoxGeometry.valid()) return;
-    
-    // 检查父对象是否被选中，如果是则显示包围盒
-    if (m_parent && m_parent->mm_state() && m_parent->mm_state()->isStateSelected()) {
-        setBoundingBoxVisible(true);
-    } else {
-        setBoundingBoxVisible(false);
-    }
-}
+// 包围盒可见性现在由setSelected方法统一管理
 
 void GeoNodeManager::createBoundingBoxGeometry(const osg::BoundingBox& boundingBox)
 {
@@ -508,37 +413,52 @@ void GeoNodeManager::onDrawingCompleted()
 void GeoNodeManager::setOSGNode(osg::ref_ptr<osg::Node> node)
 {
     if (!node.valid()) {
-        LogManager::getInstance()->info("尝试设置空的OSG节点", "几何体管理");
+        LOG_INFO("尝试设置空的OSG节点", "几何体管理");
         return;
     }
     
     // 设置节点的用户数据，指向父几何体对象
     node->setUserData(m_parent);
     
-    // 设置节点掩码为面拾取，使其可见且可拾取
+    // 设置节点掩码为可见且可拾取
     node->setNodeMask(NODE_MASK_ALL);
     
-    // 尝试在传入的节点下查找各种组件
-    findAndAssignNodeComponents(node.get());
-    
-    // 如果传入的是Group节点，将其设置为根节点
+    // 检查是否为Group节点且有名字
     osg::Group* groupNode = dynamic_cast<osg::Group*>(node.get());
-    if (groupNode) {
-        // 替换现有的根节点
-        m_osgNode = groupNode;
-        LogManager::getInstance()->info("将传入的Group节点设置为根节点", "几何体管理");
-    } else {
-        // 如果不是Group，将其添加到现有结构中
-        if (m_transformNode.valid()) {
-            m_transformNode->addChild(node.get());
-        } else if (m_osgNode.valid()) {
-            m_osgNode->addChild(node.get());
+    if (groupNode && !node->getName().empty()) {
+        // Group节点有名字，递归搜索标记组件
+        findAndAssignNodeComponents(node.get());
+        
+        // 如果名字匹配ROOT_GROUP，设置为根节点
+        if (node->getName() == NodeTags3D::ROOT_GROUP) {
+            m_osgNode = groupNode;
+            LOG_INFO("将传入的Group节点设置为根节点", "几何体管理");
+        } else {
+            // 其他命名Group节点，添加到现有结构中
+            if (m_transformNode.valid()) {
+                m_transformNode->addChild(node.get());
+            } else if (m_osgNode.valid()) {
+                m_osgNode->addChild(node.get());
+            }
+            LOG_INFO(QString("将命名Group节点添加到现有结构中: %1")
+                    .arg(QString::fromStdString(node->getName())), "几何体管理");
         }
-        LogManager::getInstance()->info("将传入节点添加到现有结构中", "几何体管理");
+    } else {
+        // 不是Group或没有名字，直接添加到变换节点下并标记为面节点
+        if (m_transformNode.valid()) {
+            // 设置面节点mask（用于拾取系统识别）
+            node->setNodeMask(NODE_MASK_FACE);
+            m_transformNode->addChild(node.get());
+            LOG_INFO("将节点添加到变换节点下并设置面几何体mask", "几何体管理");
+        } else if (m_osgNode.valid()) {
+            node->setNodeMask(NODE_MASK_FACE);
+            m_osgNode->addChild(node.get());
+            LOG_INFO("将节点添加到根节点下并设置面几何体mask", "几何体管理");
+        }
     }
     
-    LogManager::getInstance()->success(QString("成功设置外部节点到几何体，节点名称: %1")
-                                     .arg(QString::fromStdString(node->getName())), "几何体管理");
+    LOG_INFO(QString("成功设置外部节点，节点名称: %1")
+            .arg(QString::fromStdString(node->getName())), "几何体管理");
     
     // 更新几何体和空间索引
     updateGeometries();
@@ -551,52 +471,44 @@ void GeoNodeManager::findAndAssignNodeComponents(osg::Node* node)
 {
     if (!node) return;
     
-    // 检查节点类型和名称，尝试识别组件
+    // 直接根据节点名称标记识别组件
     std::string nodeName = node->getName();
     
     // 检查是否为变换节点
-    osg::MatrixTransform* transform = dynamic_cast<osg::MatrixTransform*>(node);
-    if (transform) {
-        m_transformNode = transform;
-        LogManager::getInstance()->info(QString("找到变换节点: %1").arg(QString::fromStdString(nodeName)), "几何体管理");
+    if (nodeName == NodeTags3D::TRANSFORM_NODE) {
+        osg::MatrixTransform* transform = dynamic_cast<osg::MatrixTransform*>(node);
+        if (transform) {
+            m_transformNode = transform;
+            LOG_INFO("找到变换节点", "几何体管理");
+        }
     }
     
     // 检查是否为几何体节点
     osg::Geometry* geometry = dynamic_cast<osg::Geometry*>(node);
     if (geometry) {
-        // 根据节点名称识别几何体类型
-        if (nodeName.find("vertex") != std::string::npos || 
-            nodeName.find("point") != std::string::npos ||
-            nodeName.find("Point") != std::string::npos) {
+        // 直接根据标记识别几何体类型
+        if (nodeName == NodeTags3D::VERTEX_GEOMETRY) {
             m_vertexGeometry = geometry;
-            LogManager::getInstance()->info("找到顶点几何体", "几何体管理");
+            LOG_INFO("找到顶点几何体", "几何体管理");
         }
-        else if (nodeName.find("edge") != std::string::npos || 
-                 nodeName.find("line") != std::string::npos ||
-                 nodeName.find("Line") != std::string::npos) {
+        else if (nodeName == NodeTags3D::EDGE_GEOMETRY) {
             m_edgeGeometry = geometry;
-            LogManager::getInstance()->info("找到边几何体", "几何体管理");
+            LOG_INFO("找到边几何体", "几何体管理");
         }
-        else if (nodeName.find("face") != std::string::npos || 
-                 nodeName.find("surface") != std::string::npos ||
-                 nodeName.find("Face") != std::string::npos) {
+        else if (nodeName == NodeTags3D::FACE_GEOMETRY) {
             m_faceGeometry = geometry;
-            LogManager::getInstance()->info("找到面几何体", "几何体管理");
+            LOG_INFO("找到面几何体", "几何体管理");
         }
-        else if (nodeName.find("control") != std::string::npos ||
-                 nodeName.find("Control") != std::string::npos) {
+        else if (nodeName == NodeTags3D::CONTROL_POINTS_GEOMETRY) {
             m_controlPointsGeometry = geometry;
-            LogManager::getInstance()->info("找到控制点几何体", "几何体管理");
+            LOG_INFO("找到控制点几何体", "几何体管理");
         }
-        else if (nodeName.find("bound") != std::string::npos ||
-                 nodeName.find("box") != std::string::npos ||
-                 nodeName.find("Box") != std::string::npos) {
+        else if (nodeName == NodeTags3D::BOUNDING_BOX_GEOMETRY) {
             m_boundingBoxGeometry = geometry;
-            LogManager::getInstance()->info("找到包围盒几何体", "几何体管理");
+            LOG_INFO("找到包围盒几何体", "几何体管理");
         }
         else {
-            // 如果没有明确的名称标识，根据几何体特征推断
-            identifyGeometryByCharacteristics(geometry);
+            LOG_INFO(QString("未识别的几何体节点: %1").arg(QString::fromStdString(nodeName)), "几何体管理");
         }
         
         // 设置几何体的用户数据
@@ -612,90 +524,73 @@ void GeoNodeManager::findAndAssignNodeComponents(osg::Node* node)
     }
 }
 
-void GeoNodeManager::identifyGeometryByCharacteristics(osg::Geometry* geometry)
+void GeoNodeManager::setupControlPointsRendering()
 {
-    if (!geometry) return;
+    if (!m_controlPointsGeometry.valid()) return;
     
-    // 检查图元类型来推断几何体类型
-    bool hasPoints = false;
-    bool hasLines = false;
-    bool hasTriangles = false;
+    // 创建控制点的渲染状态
+    auto stateSet = m_controlPointsGeometry->getOrCreateStateSet();
     
-    for (unsigned int i = 0; i < geometry->getNumPrimitiveSets(); ++i) {
-        osg::PrimitiveSet* primitiveSet = geometry->getPrimitiveSet(i);
-        if (primitiveSet) {
-            GLenum mode = primitiveSet->getMode();
-            switch (mode) {
-                case GL_POINTS:
-                    hasPoints = true;
-                    break;
-                case GL_LINES:
-                case GL_LINE_STRIP:
-                case GL_LINE_LOOP:
-                    hasLines = true;
-                    break;
-                case GL_TRIANGLES:
-                case GL_TRIANGLE_STRIP:
-                case GL_TRIANGLE_FAN:
-                case GL_QUADS:
-                case GL_QUAD_STRIP:
-                case GL_POLYGON:
-                    hasTriangles = true;
-                    break;
-            }
-        }
-    }
+    // 创建控制点材质 - 红色核心，黄色光晕
+    auto material = new osg::Material();
+    material->setDiffuse(osg::Material::FRONT_AND_BACK, osg::Vec4(1.0f, 0.0f, 0.0f, 1.0f));  // 红色核心
+    material->setAmbient(osg::Material::FRONT_AND_BACK, osg::Vec4(1.0f, 1.0f, 0.0f, 0.5f));  // 黄色光晕
+    material->setSpecular(osg::Material::FRONT_AND_BACK, osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f)); // 黄色高光
+    material->setShininess(osg::Material::FRONT_AND_BACK, 32.0f);
     
-    // 根据图元类型和顶点数量推断几何体类型
-    osg::Vec3Array* vertices = dynamic_cast<osg::Vec3Array*>(geometry->getVertexArray());
-    unsigned int vertexCount = vertices ? vertices->size() : 0;
+    stateSet->setAttributeAndModes(material, osg::StateAttribute::ON);
     
-    if (hasPoints && !hasLines && !hasTriangles) {
-        // 纯点几何体
-        if (vertexCount > 0 && vertexCount <= 100) {
-            // 少量点，可能是控制点
-            if (!m_controlPointsGeometry.valid()) {
-                m_controlPointsGeometry = geometry;
-                LogManager::getInstance()->info("根据特征识别为控制点几何体", "几何体管理");
-                return;
-            }
-        }
-        // 大量点，可能是顶点
-        if (!m_vertexGeometry.valid()) {
-            m_vertexGeometry = geometry;
-            LogManager::getInstance()->info("根据特征识别为顶点几何体", "几何体管理");
-        }
-    }
-    else if (hasLines && !hasTriangles) {
-        // 线几何体
-        if (vertexCount == 24 && geometry->getNumPrimitiveSets() == 1) {
-            // 可能是包围盒（12条边，24个顶点）
-            if (!m_boundingBoxGeometry.valid()) {
-                m_boundingBoxGeometry = geometry;
-                LogManager::getInstance()->info("根据特征识别为包围盒几何体", "几何体管理");
-                return;
-            }
-        }
-        // 普通边几何体
-        if (!m_edgeGeometry.valid()) {
-            m_edgeGeometry = geometry;
-            LogManager::getInstance()->info("根据特征识别为边几何体", "几何体管理");
-        }
-    }
-    else if (hasTriangles) {
-        // 面几何体
-        if (!m_faceGeometry.valid()) {
-            m_faceGeometry = geometry;
-            LogManager::getInstance()->info("根据特征识别为面几何体", "几何体管理");
-        }
-    }
-    else {
-        // 无法识别的几何体，默认作为面几何体处理
-        if (!m_faceGeometry.valid()) {
-            m_faceGeometry = geometry;
-            LogManager::getInstance()->info("无法识别几何体类型，默认作为面几何体处理", "几何体管理");
-        }
-    }
+    // 设置点大小 - 控制点比普通点大
+    auto pointSize = new osg::Point(8.0f);
+    stateSet->setAttributeAndModes(pointSize, osg::StateAttribute::ON);
+    
+    // 启用点平滑
+    stateSet->setMode(GL_POINT_SMOOTH, osg::StateAttribute::ON);
+    
+    // 关闭光照以获得更亮的颜色
+    stateSet->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+    
+    // 确保控制点总是在前面显示
+    stateSet->setMode(GL_DEPTH_TEST, osg::StateAttribute::ON);
+    stateSet->setRenderingHint(osg::StateSet::TRANSPARENT_BIN);
+    
+    LOG_INFO("控制点渲染设置完成", "节点管理");
+}
+
+void GeoNodeManager::setupBoundingBoxRendering()
+{
+    if (!m_boundingBoxGeometry.valid()) return;
+    
+    // 创建包围盒的渲染状态
+    auto stateSet = m_boundingBoxGeometry->getOrCreateStateSet();
+    
+    // 创建包围盒材质 - 黄色线框
+    auto material = new osg::Material();
+    material->setDiffuse(osg::Material::FRONT_AND_BACK, osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f));  // 黄色
+    material->setAmbient(osg::Material::FRONT_AND_BACK, osg::Vec4(1.0f, 1.0f, 0.0f, 0.3f));  // 暗黄色环境光
+    material->setEmission(osg::Material::FRONT_AND_BACK, osg::Vec4(0.2f, 0.2f, 0.0f, 1.0f)); // 微弱发光
+    
+    stateSet->setAttributeAndModes(material, osg::StateAttribute::ON);
+    
+    // 设置线宽
+    auto lineWidth = new osg::LineWidth(2.0f);
+    stateSet->setAttributeAndModes(lineWidth, osg::StateAttribute::ON);
+    
+    // 启用线平滑
+    stateSet->setMode(GL_LINE_SMOOTH, osg::StateAttribute::ON);
+    
+    // 关闭光照以获得更亮的颜色
+    stateSet->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+    
+    // 设置深度测试，确保包围盒正确显示
+    stateSet->setMode(GL_DEPTH_TEST, osg::StateAttribute::ON);
+    
+    // 设置为线框模式
+    auto polygonMode = new osg::PolygonMode();
+    polygonMode->setMode(osg::PolygonMode::FRONT_AND_BACK, osg::PolygonMode::LINE);
+    stateSet->setAttributeAndModes(polygonMode, osg::StateAttribute::ON);
+    
+    LOG_INFO("包围盒渲染设置完成", "节点管理");
 }
 
 

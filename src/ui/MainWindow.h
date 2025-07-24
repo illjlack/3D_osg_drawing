@@ -133,6 +133,8 @@ private slots:
     void onDrawModeChanged(DrawMode3D mode);
     void onGeoSelected(Geo3D* geo);
     void onGeoParametersChanged();
+    void onGeometryRecalculationRequired();
+    void onRenderingParametersChanged();
     void onSimplePickingResult(const PickResult& result);
 
 private:

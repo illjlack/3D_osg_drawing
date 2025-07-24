@@ -8,6 +8,8 @@
 #include <QPushButton>
 #include <QSlider>
 #include <QCheckBox>
+#include <QLabel>
+#include <QSpinBox>
 #include <vector>
 #include "../core/GeometryBase.h"
 
@@ -20,71 +22,73 @@ public:
     void setSelectedGeos(const std::vector<Geo3D*>& geos);
     void updateFromGeo();
     void updateGlobalSettings();
+    
 signals:
-    void parametersChanged();
+    void geometryRecalculationRequired();  // 需要重新计算几何体的参数变化
+    void renderingParametersChanged();     // 只需要更新渲染的参数变化
+
 private slots:
+    // 需要重新计算几何体的参数
     void onPointShapeChanged();
+    void onSubdivisionLevelChanged();
+    
+    // 只需要更新渲染的参数
     void onPointSizeChanged();
     void onPointColorChanged();
-    void onLineStyleChanged();
     void onLineWidthChanged();
     void onLineColorChanged();
+    void onLineStyleChanged();
     void onLineDashPatternChanged();
-    void onNodeLineStyleChanged();
-    void onFillTypeChanged();
     void onFillColorChanged();
-    void onBorderColorChanged();
-    void onShowBorderChanged();
-    void onMaterialTypeChanged();
-    void onShininessChanged();
-    void onTransparencyChanged();
-    void onSubdivisionLevelChanged();
     void onShowPointsChanged();
     void onShowEdgesChanged();
     void onShowFacesChanged();
+
 private:
     void setupUI();
-    void createPointGroup();
-    void createLineGroup();
-    void createSurfaceGroup();
-    void createMaterialGroup();
-    void createVolumeGroup();
-    void createDisplayGroup();
+    void setupStyles();
+    void createPointSection();
+    void createLineSection();
+    void createSurfaceSection();
+    void createDisplaySection();
     void updatePointUI();
     void updateLineUI();
     void updateSurfaceUI();
-    void updateMaterialUI();
-    void updateVolumeUI();
     void updateDisplayUI();
+    
     QPushButton* createColorButton(const QColor& color);
     void updateColorButton(QPushButton* button, const QColor& color);
+    QWidget* createCollapsibleSection(const QString& title, const QString& emoji, QWidget* content);
+    
     Geo3D* m_currentGeo;
     std::vector<Geo3D*> m_selectedGeos;
     bool m_updating;
+    
+    // 点属性控件
     QGroupBox* m_pointGroup;
-    QComboBox* m_pointShapeCombo;
-    QDoubleSpinBox* m_pointSizeSpin;
-    QPushButton* m_pointColorButton;
+    QComboBox* m_pointShapeCombo;      // 需要重新计算
+    QDoubleSpinBox* m_pointSizeSpin;   // 只需渲染更新
+    QPushButton* m_pointColorButton;   // 只需渲染更新
+    
+    // 线属性控件
     QGroupBox* m_lineGroup;
-    QComboBox* m_lineStyleCombo;
-    QDoubleSpinBox* m_lineWidthSpin;
-    QPushButton* m_lineColorButton;
-    QDoubleSpinBox* m_lineDashPatternSpin;
-    QComboBox* m_nodeLineStyleCombo;
+    QComboBox* m_lineStyleCombo;       // 只需渲染更新
+    QDoubleSpinBox* m_lineWidthSpin;   // 只需渲染更新
+    QPushButton* m_lineColorButton;    // 只需渲染更新
+    QDoubleSpinBox* m_lineDashPatternSpin; // 只需渲染更新（自定义虚线）
+    
+    // 面属性控件
     QGroupBox* m_surfaceGroup;
-    QComboBox* m_fillTypeCombo;
-    QPushButton* m_fillColorButton;
-    QPushButton* m_borderColorButton;
-    QCheckBox* m_showBorderCheck;
-    QGroupBox* m_materialGroup;
-    QComboBox* m_materialTypeCombo;
-    QSlider* m_shininessSlider;
-    QSlider* m_transparencySlider;
-    QGroupBox* m_volumeGroup;
-    QComboBox* m_subdivisionLevelCombo;
+    QPushButton* m_fillColorButton;    // 只需渲染更新（包含透明度）
+    
+    // 高级设置控件
+    QGroupBox* m_advancedGroup;
+    QComboBox* m_subdivisionLevelCombo;  // 需要重新计算
+    
+    // 显示控制控件
     QGroupBox* m_displayGroup;
-    QCheckBox* m_showPointsCheck;
-    QCheckBox* m_showEdgesCheck;
-    QCheckBox* m_showFacesCheck;
+    QCheckBox* m_showPointsCheck;      // 只需渲染更新
+    QCheckBox* m_showEdgesCheck;       // 只需渲染更新
+    QCheckBox* m_showFacesCheck;       // 只需渲染更新
 }; 
 

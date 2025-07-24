@@ -49,34 +49,16 @@ public:
     osg::Matrix getTransformMatrix() const;
     void resetTransform();
 
-    // 可见性管理
+    // 整体可见性管理
     void setVisible(bool visible);
     bool isVisible() const;
-    void setVertexVisible(bool visible);
-    void setEdgeVisible(bool visible);
-    void setFaceVisible(bool visible);
-    void setControlPointsVisible(bool visible);
-    void setBoundingBoxVisible(bool visible);
-    bool isVertexVisible() const;
-    bool isEdgeVisible() const;
-    bool isFaceVisible() const;
-    bool isControlPointsVisible() const;
-    bool isBoundingBoxVisible() const;
-
-    // 批量可见性控制 - 使用mask进行精细控制
-    void setGeometryMask(unsigned int mask);     // 设置几何体的组合mask
-    unsigned int getGeometryMask() const;        // 获取当前几何体的组合mask
-    void showOnlyVertices();                     // 只显示点
-    void showOnlyEdges();                        // 只显示线
-    void showOnlyFaces();                        // 只显示面
-    void showAllGeometries();                    // 显示所有主要几何体（点、线、面）
-    void hideAllGeometries();                    // 隐藏所有几何体
+    
+    // 选中状态管理（自动控制包围盒和控制点显示）
+    void setSelected(bool selected);
+    bool isSelected() const { return m_selected; }
 
     // 更新节点和包围盒、kdtree
     void updateGeometries();
-    
-    // 更新包围盒可见性状态
-    void updateBoundingBoxVisibility();
     
 public slots:
     // 处理绘制完成后的节点设置
@@ -94,9 +76,12 @@ private:
     void buildKdTreeForGeometry(osg::Geometry* geometry);
     void createBoundingBoxGeometry(const osg::BoundingBox& boundingBox);
     
-    // 查找并分配节点组件
+    // 控制点和包围盒渲染设置
+    void setupControlPointsRendering();
+    void setupBoundingBoxRendering();
+    
+    // 查找并分配节点组件（基于标记）
     void findAndAssignNodeComponents(osg::Node* node);
-    void identifyGeometryByCharacteristics(osg::Geometry* geometry);
 
     // 空间索引管理
     void updateSpatialIndex();
@@ -118,5 +103,6 @@ private:
     osg::ref_ptr<osg::Geometry> m_boundingBoxGeometry;
     
     bool m_initialized;
+    bool m_selected; // 新增：选中状态
 }; 
 

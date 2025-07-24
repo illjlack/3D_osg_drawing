@@ -1,244 +1,469 @@
 ﻿#include "PropertyEditor3D.h"
 #include <QVBoxLayout>
+#include <QHBoxLayout>
 #include <QFormLayout>
 #include <QColorDialog>
-#include <QMessageBox>
+#include <QScrollArea>
+#include <QFrame>
+#include <QSplitter>
 
-// ========================================= PropertyEditor3D 实现 =========================================
 PropertyEditor3D::PropertyEditor3D(QWidget* parent)
     : QWidget(parent)
     , m_currentGeo(nullptr)
     , m_updating(false)
 {
     setupUI();
+    setupStyles();
     updateGlobalSettings();
 }
 
 void PropertyEditor3D::setupUI()
 {
+    // 主布局
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
-    mainLayout->setSpacing(5);
-    mainLayout->setContentsMargins(5, 5, 5, 5);
+    mainLayout->setSpacing(0);
+    mainLayout->setContentsMargins(0, 0, 0, 0);
     
-    createPointGroup();
-    createLineGroup();
-    createSurfaceGroup();
-    createMaterialGroup();
-    createVolumeGroup();
-    createDisplayGroup();
+    // 创建滚动区域
+    QScrollArea* scrollArea = new QScrollArea();
+    scrollArea->setWidgetResizable(true);
+    scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    scrollArea->setFrameStyle(QFrame::NoFrame);
     
-    mainLayout->addWidget(m_pointGroup);
-    mainLayout->addWidget(m_lineGroup);
-    mainLayout->addWidget(m_surfaceGroup);
-    mainLayout->addWidget(m_materialGroup);
-    mainLayout->addWidget(m_volumeGroup);
-    mainLayout->addWidget(m_displayGroup);
-    mainLayout->addStretch();
+    // 内容widget
+    QWidget* contentWidget = new QWidget();
+    QVBoxLayout* contentLayout = new QVBoxLayout(contentWidget);
+    contentLayout->setSpacing(4);
+    contentLayout->setContentsMargins(6, 6, 6, 6);
+    
+    // 创建各个属性模块
+    createPointSection();
+    createLineSection();
+    createSurfaceSection();
+    createDisplaySection();
+    
+    contentLayout->addWidget(m_pointGroup);
+    contentLayout->addWidget(m_lineGroup);
+    contentLayout->addWidget(m_surfaceGroup);
+    contentLayout->addWidget(m_advancedGroup);
+    contentLayout->addWidget(m_displayGroup);
+    contentLayout->addStretch();
+    
+    scrollArea->setWidget(contentWidget);
+    mainLayout->addWidget(scrollArea);
 }
 
-void PropertyEditor3D::createPointGroup()
+void PropertyEditor3D::createPointSection()
 {
-    m_pointGroup = new QGroupBox("点属性", this);
+    m_pointGroup = new QGroupBox("🔘 点属性");
+    m_pointGroup->setObjectName("collapsibleSection");
     QFormLayout* layout = new QFormLayout(m_pointGroup);
+    layout->setSpacing(8);
+    layout->setContentsMargins(12, 15, 12, 12);
     
-    // 点形状
+    // 点形状 (需要重新计算)
     m_pointShapeCombo = new QComboBox();
-    m_pointShapeCombo->addItem("圆形", Point_Circle3D);
-    m_pointShapeCombo->addItem("方形", Point_Square3D);
-    m_pointShapeCombo->addItem("三角形", Point_Triangle3D);
-    m_pointShapeCombo->addItem("菱形", Point_Diamond3D);
-    m_pointShapeCombo->addItem("十字", Point_Cross3D);
-    m_pointShapeCombo->addItem("星形", Point_Star3D);
+    m_pointShapeCombo->setObjectName("propertyCombo");
+    m_pointShapeCombo->addItem("● 圆形", Point_Circle3D);
+    m_pointShapeCombo->addItem("■ 方形", Point_Square3D);
+    m_pointShapeCombo->addItem("▲ 三角形", Point_Triangle3D);
+    m_pointShapeCombo->addItem("◆ 菱形", Point_Diamond3D);
+    m_pointShapeCombo->addItem("✚ 十字", Point_Cross3D);
+    m_pointShapeCombo->addItem("★ 星形", Point_Star3D);
     connect(m_pointShapeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &PropertyEditor3D::onPointShapeChanged);
-    layout->addRow("形状:", m_pointShapeCombo);
     
-    // 点大小
+    QLabel* shapeLabel = new QLabel("形状:");
+    shapeLabel->setObjectName("propertyLabel");
+    layout->addRow(shapeLabel, m_pointShapeCombo);
+    
+    // 点大小 (只需渲染更新)
     m_pointSizeSpin = new QDoubleSpinBox();
-    m_pointSizeSpin->setRange(0.1, 100.0);
-    m_pointSizeSpin->setSingleStep(0.1);
+    m_pointSizeSpin->setObjectName("propertySpinBox");
+    m_pointSizeSpin->setRange(0.5, 50.0);
+    m_pointSizeSpin->setSingleStep(0.5);
     m_pointSizeSpin->setDecimals(1);
+    m_pointSizeSpin->setSuffix(" px");
     connect(m_pointSizeSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
             this, &PropertyEditor3D::onPointSizeChanged);
-    layout->addRow("大小:", m_pointSizeSpin);
     
-    // 点颜色
+    QLabel* sizeLabel = new QLabel("大小:");
+    sizeLabel->setObjectName("propertyLabel");
+    layout->addRow(sizeLabel, m_pointSizeSpin);
+    
+    // 点颜色 (只需渲染更新)
     m_pointColorButton = createColorButton(Qt::red);
     connect(m_pointColorButton, &QPushButton::clicked, this, &PropertyEditor3D::onPointColorChanged);
-    layout->addRow("颜色:", m_pointColorButton);
+    
+    QLabel* colorLabel = new QLabel("颜色:");
+    colorLabel->setObjectName("propertyLabel");
+    layout->addRow(colorLabel, m_pointColorButton);
 }
 
-void PropertyEditor3D::createLineGroup()
+void PropertyEditor3D::createLineSection()
 {
-    m_lineGroup = new QGroupBox("线属性", this);
+    m_lineGroup = new QGroupBox("📏 线属性");
+    m_lineGroup->setObjectName("collapsibleSection");
     QFormLayout* layout = new QFormLayout(m_lineGroup);
+    layout->setSpacing(8);
+    layout->setContentsMargins(12, 15, 12, 12);
     
-    // 线型
+    // 线型 (只需渲染更新)
     m_lineStyleCombo = new QComboBox();
-    m_lineStyleCombo->addItem("实线", Line_Solid3D);
-    m_lineStyleCombo->addItem("虚线", Line_Dashed3D);
-    m_lineStyleCombo->addItem("点线", Line_Dotted3D);
-    m_lineStyleCombo->addItem("点划线", Line_DashDot3D);
-    m_lineStyleCombo->addItem("双点划线", Line_DashDotDot3D);
-    m_lineStyleCombo->addItem("自定义", Line_Custom3D);
+    m_lineStyleCombo->setObjectName("propertyCombo");
+    m_lineStyleCombo->addItem("━━━ 实线", Line_Solid3D);
+    m_lineStyleCombo->addItem("┅┅┅ 虚线", Line_Dashed3D);
+    m_lineStyleCombo->addItem("········ 点线", Line_Dotted3D);
+    m_lineStyleCombo->addItem("┉┅┉┅ 点划线", Line_DashDot3D);
+    m_lineStyleCombo->addItem("┉┅┅┉ 双点划线", Line_DashDotDot3D);
+    m_lineStyleCombo->addItem("🎨 自定义", Line_Custom3D);
     connect(m_lineStyleCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &PropertyEditor3D::onLineStyleChanged);
-    layout->addRow("线型:", m_lineStyleCombo);
     
-    // 线宽
+    QLabel* styleLabel = new QLabel("线型:");
+    styleLabel->setObjectName("propertyLabel");
+    layout->addRow(styleLabel, m_lineStyleCombo);
+    
+    // 线宽 (只需渲染更新)
     m_lineWidthSpin = new QDoubleSpinBox();
-    m_lineWidthSpin->setRange(0.1, 20.0);
-    m_lineWidthSpin->setSingleStep(0.1);
+    m_lineWidthSpin->setObjectName("propertySpinBox");
+    m_lineWidthSpin->setRange(0.5, 20.0);
+    m_lineWidthSpin->setSingleStep(0.5);
     m_lineWidthSpin->setDecimals(1);
+    m_lineWidthSpin->setSuffix(" px");
     connect(m_lineWidthSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
             this, &PropertyEditor3D::onLineWidthChanged);
-    layout->addRow("线宽:", m_lineWidthSpin);
     
-    // 线颜色
+    QLabel* widthLabel = new QLabel("线宽:");
+    widthLabel->setObjectName("propertyLabel");
+    layout->addRow(widthLabel, m_lineWidthSpin);
+    
+    // 线颜色 (只需渲染更新)
     m_lineColorButton = createColorButton(Qt::black);
     connect(m_lineColorButton, &QPushButton::clicked, this, &PropertyEditor3D::onLineColorChanged);
-    layout->addRow("颜色:", m_lineColorButton);
     
-    // 虚线样式
+    QLabel* lineColorLabel = new QLabel("颜色:");
+    lineColorLabel->setObjectName("propertyLabel");
+    layout->addRow(lineColorLabel, m_lineColorButton);
+    
+    // 虚线样式 (只需渲染更新，仅在自定义线型时启用)
     m_lineDashPatternSpin = new QDoubleSpinBox();
+    m_lineDashPatternSpin->setObjectName("propertySpinBox");
     m_lineDashPatternSpin->setRange(1.0, 20.0);
     m_lineDashPatternSpin->setSingleStep(1.0);
     m_lineDashPatternSpin->setDecimals(1);
+    m_lineDashPatternSpin->setEnabled(false); // 默认禁用
     connect(m_lineDashPatternSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
             this, &PropertyEditor3D::onLineDashPatternChanged);
-    layout->addRow("虚线样式:", m_lineDashPatternSpin);
     
-    // 节点线型
-    m_nodeLineStyleCombo = new QComboBox();
-    m_nodeLineStyleCombo->addItem("折线", NodeLine_Polyline3D);
-    m_nodeLineStyleCombo->addItem("样条曲线", NodeLine_Spline3D);
-    m_nodeLineStyleCombo->addItem("贝塞尔曲线", NodeLine_Bezier3D);
-    m_nodeLineStyleCombo->addItem("圆弧", NodeLine_Arc3D);
-    m_nodeLineStyleCombo->addItem("三点弧", NodeLine_ThreePointArc3D);
-    m_nodeLineStyleCombo->addItem("流线", NodeLine_Streamline3D);
-    connect(m_nodeLineStyleCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
-            this, &PropertyEditor3D::onNodeLineStyleChanged);
-    layout->addRow("节点线型:", m_nodeLineStyleCombo);
+    QLabel* dashLabel = new QLabel("虚线间距:");
+    dashLabel->setObjectName("propertyLabel");
+    layout->addRow(dashLabel, m_lineDashPatternSpin);
 }
 
-void PropertyEditor3D::createSurfaceGroup()
+void PropertyEditor3D::createSurfaceSection()
 {
-    m_surfaceGroup = new QGroupBox("面属性", this);
+    m_surfaceGroup = new QGroupBox("🔷 面属性");
+    m_surfaceGroup->setObjectName("collapsibleSection");
     QFormLayout* layout = new QFormLayout(m_surfaceGroup);
+    layout->setSpacing(8);
+    layout->setContentsMargins(12, 15, 12, 12);
     
-    // 填充类型
-    m_fillTypeCombo = new QComboBox();
-    m_fillTypeCombo->addItem("无填充", Fill_None3D);
-    m_fillTypeCombo->addItem("实心填充", Fill_Solid3D);
-    m_fillTypeCombo->addItem("线框", Fill_Wireframe3D);
-    m_fillTypeCombo->addItem("点填充", Fill_Points3D);
-    m_fillTypeCombo->addItem("纹理填充", Fill_Texture3D);
-    connect(m_fillTypeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
-            this, &PropertyEditor3D::onFillTypeChanged);
-    layout->addRow("填充类型:", m_fillTypeCombo);
-    
-    // 填充颜色
-    m_fillColorButton = createColorButton(Qt::gray);
+    // 填充颜色（包含透明度）
+    m_fillColorButton = createColorButton(Qt::lightGray);
     connect(m_fillColorButton, &QPushButton::clicked, this, &PropertyEditor3D::onFillColorChanged);
-    layout->addRow("填充颜色:", m_fillColorButton);
     
-    // 边界颜色
-    m_borderColorButton = createColorButton(Qt::black);
-    connect(m_borderColorButton, &QPushButton::clicked, this, &PropertyEditor3D::onBorderColorChanged);
-    layout->addRow("边界颜色:", m_borderColorButton);
+    QLabel* fillLabel = new QLabel("填充颜色:");
+    fillLabel->setObjectName("propertyLabel");
+    layout->addRow(fillLabel, m_fillColorButton);
     
-    // 显示边界
-    m_showBorderCheck = new QCheckBox();
-    connect(m_showBorderCheck, &QCheckBox::toggled, this, &PropertyEditor3D::onShowBorderChanged);
-    layout->addRow("显示边界:", m_showBorderCheck);
-}
-
-void PropertyEditor3D::createMaterialGroup()
-{
-    m_materialGroup = new QGroupBox("材质属性", this);
-    QFormLayout* layout = new QFormLayout(m_materialGroup);
+    // 高级设置组
+    m_advancedGroup = new QGroupBox("⚙️ 高级设置");
+    m_advancedGroup->setObjectName("collapsibleSection");
+    QFormLayout* advLayout = new QFormLayout(m_advancedGroup);
+    advLayout->setSpacing(8);
+    advLayout->setContentsMargins(12, 15, 12, 12);
     
-    // 材质类型
-    m_materialTypeCombo = new QComboBox();
-    m_materialTypeCombo->addItem("基础材质", Material_Basic3D);
-    m_materialTypeCombo->addItem("Phong材质", Material_Phong3D);
-    m_materialTypeCombo->addItem("Blinn材质", Material_Blinn3D);
-    m_materialTypeCombo->addItem("Lambert材质", Material_Lambert3D);
-    m_materialTypeCombo->addItem("PBR材质", Material_PBR3D);
-    connect(m_materialTypeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
-            this, &PropertyEditor3D::onMaterialTypeChanged);
-    layout->addRow("材质类型:", m_materialTypeCombo);
-    
-    // 光泽度
-    m_shininessSlider = new QSlider(Qt::Horizontal);
-    m_shininessSlider->setRange(1, 128);
-    m_shininessSlider->setValue(32);
-    connect(m_shininessSlider, &QSlider::valueChanged, this, &PropertyEditor3D::onShininessChanged);
-    layout->addRow("光泽度:", m_shininessSlider);
-    
-    // 透明度
-    m_transparencySlider = new QSlider(Qt::Horizontal);
-    m_transparencySlider->setRange(0, 100);
-    m_transparencySlider->setValue(100);
-    connect(m_transparencySlider, &QSlider::valueChanged, this, &PropertyEditor3D::onTransparencyChanged);
-    layout->addRow("透明度:", m_transparencySlider);
-}
-
-void PropertyEditor3D::createVolumeGroup()
-{
-    m_volumeGroup = new QGroupBox("体属性", this);
-    QFormLayout* layout = new QFormLayout(m_volumeGroup);
-    
-    // 细分级别
+    // 细分级别 (需要重新计算)
     m_subdivisionLevelCombo = new QComboBox();
-    m_subdivisionLevelCombo->addItem("低", Subdivision_Low3D);
-    m_subdivisionLevelCombo->addItem("中", Subdivision_Medium3D);
-    m_subdivisionLevelCombo->addItem("高", Subdivision_High3D);
-    m_subdivisionLevelCombo->addItem("超高", Subdivision_Ultra3D);
+    m_subdivisionLevelCombo->setObjectName("propertyCombo");
+    m_subdivisionLevelCombo->addItem("🔘 低 (8段)", Subdivision_Low3D);
+    m_subdivisionLevelCombo->addItem("🔸 中 (16段)", Subdivision_Medium3D);
+    m_subdivisionLevelCombo->addItem("🔹 高 (32段)", Subdivision_High3D);
+    m_subdivisionLevelCombo->addItem("💎 超高 (64段)", Subdivision_Ultra3D);
     connect(m_subdivisionLevelCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &PropertyEditor3D::onSubdivisionLevelChanged);
-    layout->addRow("细分级别:", m_subdivisionLevelCombo);
+    
+    QLabel* subdivLabel = new QLabel("细分级别:");
+    subdivLabel->setObjectName("propertyLabel");
+    advLayout->addRow(subdivLabel, m_subdivisionLevelCombo);
 }
 
-void PropertyEditor3D::createDisplayGroup()
+void PropertyEditor3D::createDisplaySection()
 {
-    m_displayGroup = new QGroupBox("显示控制", this);
-    QFormLayout* layout = new QFormLayout(m_displayGroup);
+    m_displayGroup = new QGroupBox("👁️ 显示控制");
+    m_displayGroup->setObjectName("collapsibleSection");
+    QVBoxLayout* layout = new QVBoxLayout(m_displayGroup);
+    layout->setSpacing(8);
+    layout->setContentsMargins(12, 15, 12, 12);
     
-    // 显示点
-    m_showPointsCheck = new QCheckBox();
+    // 显示点 (只需渲染更新)
+    m_showPointsCheck = new QCheckBox("🔘 显示点");
+    m_showPointsCheck->setObjectName("propertyCheckBox");
     m_showPointsCheck->setChecked(true);
     connect(m_showPointsCheck, &QCheckBox::toggled, this, &PropertyEditor3D::onShowPointsChanged);
-    layout->addRow("显示点:", m_showPointsCheck);
+    layout->addWidget(m_showPointsCheck);
     
-    // 显示边
-    m_showEdgesCheck = new QCheckBox();
+    // 显示边 (只需渲染更新)
+    m_showEdgesCheck = new QCheckBox("📏 显示边");
+    m_showEdgesCheck->setObjectName("propertyCheckBox");
     m_showEdgesCheck->setChecked(true);
     connect(m_showEdgesCheck, &QCheckBox::toggled, this, &PropertyEditor3D::onShowEdgesChanged);
-    layout->addRow("显示边:", m_showEdgesCheck);
+    layout->addWidget(m_showEdgesCheck);
     
-    // 显示面
-    m_showFacesCheck = new QCheckBox();
+    // 显示面 (只需渲染更新)
+    m_showFacesCheck = new QCheckBox("🔷 显示面");
+    m_showFacesCheck->setObjectName("propertyCheckBox");
     m_showFacesCheck->setChecked(true);
     connect(m_showFacesCheck, &QCheckBox::toggled, this, &PropertyEditor3D::onShowFacesChanged);
-    layout->addRow("显示面:", m_showFacesCheck);
+    layout->addWidget(m_showFacesCheck);
+}
+
+void PropertyEditor3D::setupStyles()
+{
+    QString styleSheet = R"(
+        /* 整体面板样式 */
+        PropertyEditor3D {
+            background-color: #f8f9fa;
+            border: none;
+            font-family: "Microsoft YaHei", "SimHei", "Arial", sans-serif;
+        }
+        
+        /* 滚动区域 */
+        QScrollArea {
+            border: none;
+            background-color: transparent;
+        }
+        
+        /* 可折叠区域样式 */
+        QGroupBox#collapsibleSection {
+            background-color: white;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            margin: 2px;
+            font-family: "Microsoft YaHei", "SimHei", "Arial", sans-serif;
+            font-size: 16px;
+            font-weight: bold;
+            color: #2c3e50;
+            padding-top: 15px;
+        }
+        
+        QGroupBox#collapsibleSection::title {
+            subcontrol-origin: margin;
+            subcontrol-position: top left;
+            padding: 8px 12px 4px 12px;
+            margin-left: 10px;
+            color: #2c3e50;
+        }
+        
+        /* 属性标签样式 */
+        QLabel#propertyLabel {
+            font-family: "Microsoft YaHei", "SimHei", "Arial", sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            color: #495057;
+            min-width: 80px;
+        }
+        
+        /* 下拉框样式 */
+        QComboBox#propertyCombo {
+            background-color: #ffffff;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-family: "Microsoft YaHei", "SimHei", "Arial", sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            color: #495057;
+            min-height: 20px;
+        }
+        
+        QComboBox#propertyCombo:hover {
+            border-color: #adb5bd;
+        }
+        
+        QComboBox#propertyCombo:focus {
+            border-color: #007bff;
+            outline: none;
+        }
+        
+        QComboBox#propertyCombo::drop-down {
+            border: none;
+            width: 30px;
+        }
+        
+        QComboBox#propertyCombo::down-arrow {
+            image: none;
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-top: 5px solid #6c757d;
+            margin-right: 5px;
+        }
+        
+        QComboBox#propertyCombo QAbstractItemView {
+            background-color: #ffffff;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            font-family: "Microsoft YaHei", "SimHei", "Arial", sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            color: #495057;
+            selection-background-color: #007bff;
+            selection-color: white;
+            outline: none;
+        }
+        
+        QComboBox#propertyCombo QAbstractItemView::item {
+            padding: 10px 12px;
+            margin: 1px;
+        }
+        
+        QComboBox#propertyCombo QAbstractItemView::item:hover {
+            background-color: #f8f9fa;
+        }
+        
+        /* 数值输入框样式 */
+        QDoubleSpinBox#propertySpinBox, QSpinBox#propertySpinBox {
+            background-color: #ffffff;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-family: "Microsoft YaHei", "SimHei", "Arial", sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            color: #495057;
+            min-height: 20px;
+        }
+        
+        QDoubleSpinBox#propertySpinBox:hover, QSpinBox#propertySpinBox:hover {
+            border-color: #adb5bd;
+        }
+        
+        QDoubleSpinBox#propertySpinBox:focus, QSpinBox#propertySpinBox:focus {
+            border-color: #007bff;
+            outline: none;
+        }
+        
+        /* 颜色按钮样式 */
+        QPushButton#colorButton {
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            min-width: 60px;
+            min-height: 32px;
+            font-family: "Microsoft YaHei", "SimHei", "Arial", sans-serif;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        QPushButton#colorButton:hover {
+            border-color: #adb5bd;
+        }
+        
+        QPushButton#colorButton:pressed {
+            border-color: #007bff;
+        }
+        
+        /* 复选框样式 */
+        QCheckBox#propertyCheckBox {
+            font-family: "Microsoft YaHei", "SimHei", "Arial", sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            color: #495057;
+            spacing: 8px;
+        }
+        
+        QCheckBox#propertyCheckBox::indicator {
+            width: 18px;
+            height: 18px;
+            border: 2px solid #dee2e6;
+            border-radius: 4px;
+            background-color: white;
+        }
+        
+        QCheckBox#propertyCheckBox::indicator:checked {
+            background-color: #28a745;
+            border-color: #28a745;
+            image: none;
+        }
+        
+        QCheckBox#propertyCheckBox::indicator:checked:after {
+            content: "✓";
+            color: white;
+            font-weight: bold;
+        }
+        
+        QCheckBox#propertyCheckBox::indicator:hover {
+            border-color: #adb5bd;
+        }
+        
+        /* 滑块样式 */
+        QSlider#propertySlider {
+            height: 25px;
+        }
+        
+        QSlider#propertySlider::groove:horizontal {
+            height: 6px;
+            background-color: #dee2e6;
+            border-radius: 3px;
+        }
+        
+        QSlider#propertySlider::handle:horizontal {
+            background-color: #007bff;
+            border: 2px solid #007bff;
+            width: 20px;
+            height: 20px;
+            border-radius: 10px;
+            margin: -7px 0;
+        }
+        
+        QSlider#propertySlider::handle:horizontal:hover {
+            background-color: #0056b3;
+            border-color: #0056b3;
+        }
+        
+        QSlider#propertySlider::add-page:horizontal {
+            background-color: #dee2e6;
+            border-radius: 3px;
+        }
+        
+        QSlider#propertySlider::sub-page:horizontal {
+            background-color: #007bff;
+            border-radius: 3px;
+        }
+    )";
+    
+    this->setStyleSheet(styleSheet);
 }
 
 QPushButton* PropertyEditor3D::createColorButton(const QColor& color)
 {
     QPushButton* button = new QPushButton();
-    button->setFixedSize(50, 25);
+    button->setObjectName("colorButton");
+    button->setFixedSize(60, 32);
     updateColorButton(button, color);
     return button;
 }
 
 void PropertyEditor3D::updateColorButton(QPushButton* button, const QColor& color)
 {
-    QString style = QString("background-color: %1; border: 1px solid black;").arg(color.name());
-    button->setStyleSheet(style);
-    button->setToolTip(color.name());
+    QString style = QString("background-color: %1;").arg(color.name());
+    button->setStyleSheet(button->styleSheet() + style);
+    button->setToolTip(QString("颜色: %1").arg(color.name()));
+    button->setText("");
 }
 
+// 剩余部分保持与当前实现类似的逻辑，但简化了参数处理
 void PropertyEditor3D::setGeo(Geo3D* geo)
 {
     m_currentGeo = geo;
@@ -250,7 +475,7 @@ void PropertyEditor3D::setSelectedGeos(const std::vector<Geo3D*>& geos)
     m_selectedGeos = geos;
     if (!geos.empty())
     {
-        m_currentGeo = geos[0]; // 显示第一个对象的属性
+        m_currentGeo = geos[0];
     }
     else
     {
@@ -269,13 +494,9 @@ void PropertyEditor3D::updateFromGeo()
     
     m_updating = true;
     
-    const GeoParameters3D& params = m_currentGeo->getParameters();
-    
     updatePointUI();
     updateLineUI();
     updateSurfaceUI();
-    updateMaterialUI();
-    updateVolumeUI();
     updateDisplayUI();
     
     m_updating = false;
@@ -288,8 +509,6 @@ void PropertyEditor3D::updateGlobalSettings()
     updatePointUI();
     updateLineUI();
     updateSurfaceUI();
-    updateMaterialUI();
-    updateVolumeUI();
     updateDisplayUI();
     
     m_updating = false;
@@ -301,7 +520,6 @@ void PropertyEditor3D::updatePointUI()
     double size = m_currentGeo ? m_currentGeo->getParameters().pointSize : GlobalPointSize3D;
     QColor color = m_currentGeo ? m_currentGeo->getParameters().pointColor.toQColor() : GlobalPointColor3D;
     
-    // 更新控件
     for (int i = 0; i < m_pointShapeCombo->count(); ++i)
     {
         if (m_pointShapeCombo->itemData(i).toInt() == shape)
@@ -321,9 +539,7 @@ void PropertyEditor3D::updateLineUI()
     double width = m_currentGeo ? m_currentGeo->getParameters().lineWidth : GlobalLineWidth3D;
     QColor color = m_currentGeo ? m_currentGeo->getParameters().lineColor.toQColor() : GlobalLineColor3D;
     double dashPattern = m_currentGeo ? m_currentGeo->getParameters().lineDashPattern : GlobalLineDashPattern3D;
-    NodeLineStyle3D nodeStyle = m_currentGeo ? m_currentGeo->getParameters().nodeLineStyle : GlobalNodeLineStyle3D;
     
-    // 更新控件
     for (int i = 0; i < m_lineStyleCombo->count(); ++i)
     {
         if (m_lineStyleCombo->itemData(i).toInt() == style)
@@ -337,63 +553,17 @@ void PropertyEditor3D::updateLineUI()
     updateColorButton(m_lineColorButton, color);
     m_lineDashPatternSpin->setValue(dashPattern);
     
-    for (int i = 0; i < m_nodeLineStyleCombo->count(); ++i)
-    {
-        if (m_nodeLineStyleCombo->itemData(i).toInt() == nodeStyle)
-        {
-            m_nodeLineStyleCombo->setCurrentIndex(i);
-            break;
-        }
-    }
+    // 自定义虚线时才启用间距设置
+    m_lineDashPatternSpin->setEnabled(style == Line_Custom3D);
 }
 
 void PropertyEditor3D::updateSurfaceUI()
 {
-    FillType3D fillType = m_currentGeo ? m_currentGeo->getParameters().fillType : GlobalFillType3D;
     QColor fillColor = m_currentGeo ? m_currentGeo->getParameters().fillColor.toQColor() : GlobalFillColor3D;
-    QColor borderColor = m_currentGeo ? m_currentGeo->getParameters().borderColor.toQColor() : GlobalBorderColor3D;
-    bool showBorder = m_currentGeo ? m_currentGeo->getParameters().showBorder : GlobalShowBorder3D;
-    
-    // 更新控件
-    for (int i = 0; i < m_fillTypeCombo->count(); ++i)
-    {
-        if (m_fillTypeCombo->itemData(i).toInt() == fillType)
-        {
-            m_fillTypeCombo->setCurrentIndex(i);
-            break;
-        }
-    }
-    
-    updateColorButton(m_fillColorButton, fillColor);
-    updateColorButton(m_borderColorButton, borderColor);
-    m_showBorderCheck->setChecked(showBorder);
-}
-
-void PropertyEditor3D::updateMaterialUI()
-{
-    MaterialType3D matType = m_currentGeo ? m_currentGeo->getParameters().material.type : GlobalMaterialType3D;
-    double shininess = m_currentGeo ? m_currentGeo->getParameters().material.shininess : GlobalShininess3D;
-    double transparency = m_currentGeo ? m_currentGeo->getParameters().material.transparency : GlobalTransparency3D;
-    
-    // 更新控件
-    for (int i = 0; i < m_materialTypeCombo->count(); ++i)
-    {
-        if (m_materialTypeCombo->itemData(i).toInt() == matType)
-        {
-            m_materialTypeCombo->setCurrentIndex(i);
-            break;
-        }
-    }
-    
-    m_shininessSlider->setValue(static_cast<int>(shininess));
-    m_transparencySlider->setValue(static_cast<int>(transparency * 100));
-}
-
-void PropertyEditor3D::updateVolumeUI()
-{
     SubdivisionLevel3D level = m_currentGeo ? m_currentGeo->getParameters().subdivisionLevel : GlobalSubdivisionLevel3D;
     
-    // 更新控件
+    updateColorButton(m_fillColorButton, fillColor);
+    
     for (int i = 0; i < m_subdivisionLevelCombo->count(); ++i)
     {
         if (m_subdivisionLevelCombo->itemData(i).toInt() == level)
@@ -415,7 +585,8 @@ void PropertyEditor3D::updateDisplayUI()
     m_showFacesCheck->setChecked(showFaces);
 }
 
-// PropertyEditor3D 槽函数
+// ============= 需要重新计算几何体的参数变化 =============
+
 void PropertyEditor3D::onPointShapeChanged()
 {
     if (m_updating) return;
@@ -424,7 +595,6 @@ void PropertyEditor3D::onPointShapeChanged()
     
     if (!m_selectedGeos.empty())
     {
-        // 多选情况：应用到所有选中的对象
         for (auto* geo : m_selectedGeos)
         {
             if (geo)
@@ -437,29 +607,60 @@ void PropertyEditor3D::onPointShapeChanged()
     }
     else if (m_currentGeo)
     {
-        // 单选情况
         GeoParameters3D params = m_currentGeo->getParameters();
         params.pointShape = shape;
         m_currentGeo->setParameters(params);
     }
     else
     {
-        // 全局设置
         GlobalPointShape3D = shape;
     }
     
-    emit parametersChanged();
+    emit geometryRecalculationRequired();
 }
+
+void PropertyEditor3D::onSubdivisionLevelChanged()
+{
+    if (m_updating) return;
+    
+    SubdivisionLevel3D level = static_cast<SubdivisionLevel3D>(m_subdivisionLevelCombo->currentData().toInt());
+    
+    if (!m_selectedGeos.empty())
+    {
+        for (auto* geo : m_selectedGeos)
+        {
+            if (geo)
+            {
+                GeoParameters3D params = geo->getParameters();
+                params.subdivisionLevel = level;
+                geo->setParameters(params);
+            }
+        }
+    }
+    else if (m_currentGeo)
+    {
+        GeoParameters3D params = m_currentGeo->getParameters();
+        params.subdivisionLevel = level;
+        m_currentGeo->setParameters(params);
+    }
+    else
+    {
+        GlobalSubdivisionLevel3D = level;
+    }
+    
+    emit geometryRecalculationRequired();
+}
+
+// ============= 只需要更新渲染的参数变化 =============
 
 void PropertyEditor3D::onPointSizeChanged()
 {
     if (m_updating) return;
     
-    double size = static_cast<double>(m_pointSizeSpin->value());
+    double size = m_pointSizeSpin->value();
     
     if (!m_selectedGeos.empty())
     {
-        // 多选情况：应用到所有选中的对象
         for (auto* geo : m_selectedGeos)
         {
             if (geo)
@@ -472,86 +673,75 @@ void PropertyEditor3D::onPointSizeChanged()
     }
     else if (m_currentGeo)
     {
-        // 单选情况
         GeoParameters3D params = m_currentGeo->getParameters();
         params.pointSize = size;
         m_currentGeo->setParameters(params);
     }
     else
     {
-        // 全局设置
         GlobalPointSize3D = size;
     }
     
-    emit parametersChanged();
+    emit renderingParametersChanged();
 }
 
 void PropertyEditor3D::onPointColorChanged()
 {
     if (m_updating) return;
     
-    QColor color = QColorDialog::getColor(m_pointColorButton->palette().button().color(), this);
+    QColor currentColor = m_currentGeo ? m_currentGeo->getParameters().pointColor.toQColor() : GlobalPointColor3D;
+    QColor color = QColorDialog::getColor(currentColor, this, "选择点颜色");
+    
     if (color.isValid())
     {
         updateColorButton(m_pointColorButton, color);
         
         if (!m_selectedGeos.empty())
         {
-            // 多选情况：应用到所有选中的对象
             for (auto* geo : m_selectedGeos)
             {
                 if (geo)
                 {
                     GeoParameters3D params = geo->getParameters();
-                    params.pointColor = color; // 使用QColor直接赋值
+                    params.pointColor = color;
                     geo->setParameters(params);
                 }
             }
         }
         else if (m_currentGeo)
         {
-            // 单选情况
             GeoParameters3D params = m_currentGeo->getParameters();
-            params.pointColor = color; // 使用QColor直接赋值
+            params.pointColor = color;
             m_currentGeo->setParameters(params);
         }
         else
         {
-            // 全局设置
             GlobalPointColor3D = color;
         }
         
-        emit parametersChanged();
+        emit renderingParametersChanged();
     }
-}
-
-void PropertyEditor3D::onLineStyleChanged()
-{
-    if (m_updating) return;
-    
-    LineStyle3D style = static_cast<LineStyle3D>(m_lineStyleCombo->currentData().toInt());
-    
-    if (m_currentGeo)
-    {
-        GeoParameters3D params = m_currentGeo->getParameters();
-        params.lineStyle = style;
-        m_currentGeo->setParameters(params);
-    }
-    else
-    {
-        GlobalLineStyle3D = style;
-    }
-    
-    emit parametersChanged();
 }
 
 void PropertyEditor3D::onLineWidthChanged()
 {
     if (m_updating) return;
     
-    double width = static_cast<double>(m_lineWidthSpin->value());
+    double width = m_lineWidthSpin->value();
     
-    if (m_currentGeo)
+    if (!m_selectedGeos.empty())
+    {
+        for (auto* geo : m_selectedGeos)
+        {
+            if (geo)
+            {
+                GeoParameters3D params = geo->getParameters();
+                params.lineWidth = width;
+                geo->setParameters(params);
+            }
+        }
+    }
+    else if (m_currentGeo)
     {
         GeoParameters3D params = m_currentGeo->getParameters();
         params.lineWidth = width;
@@ -562,7 +752,7 @@ void PropertyEditor3D::onLineWidthChanged()
         GlobalLineWidth3D = width;
     }
     
-    emit parametersChanged();
+    emit renderingParametersChanged();
 }
 
 void PropertyEditor3D::onLineColorChanged()
@@ -578,41 +768,85 @@ void PropertyEditor3D::onLineColorChanged()
         
         if (!m_selectedGeos.empty())
         {
-            // 多选情况：应用到所有选中的对象
             for (auto* geo : m_selectedGeos)
             {
                 if (geo)
                 {
                     GeoParameters3D params = geo->getParameters();
-                    params.lineColor = color; // 使用QColor直接赋值
+                    params.lineColor = color;
                     geo->setParameters(params);
                 }
             }
         }
         else if (m_currentGeo)
         {
-            // 单选情况
             GeoParameters3D params = m_currentGeo->getParameters();
-            params.lineColor = color; // 使用QColor直接赋值
+            params.lineColor = color;
             m_currentGeo->setParameters(params);
         }
         else
         {
-            // 全局设置
             GlobalLineColor3D = color;
         }
         
-        emit parametersChanged();
+        emit renderingParametersChanged();
     }
+}
+
+void PropertyEditor3D::onLineStyleChanged()
+{
+    if (m_updating) return;
+    
+    LineStyle3D style = static_cast<LineStyle3D>(m_lineStyleCombo->currentData().toInt());
+    
+    // 启用/禁用自定义虚线间距
+    m_lineDashPatternSpin->setEnabled(style == Line_Custom3D);
+    
+    if (!m_selectedGeos.empty())
+    {
+        for (auto* geo : m_selectedGeos)
+        {
+            if (geo)
+            {
+                GeoParameters3D params = geo->getParameters();
+                params.lineStyle = style;
+                geo->setParameters(params);
+            }
+        }
+    }
+    else if (m_currentGeo)
+    {
+        GeoParameters3D params = m_currentGeo->getParameters();
+        params.lineStyle = style;
+        m_currentGeo->setParameters(params);
+    }
+    else
+    {
+        GlobalLineStyle3D = style;
+    }
+    
+    emit renderingParametersChanged();
 }
 
 void PropertyEditor3D::onLineDashPatternChanged()
 {
     if (m_updating) return;
     
-    double pattern = static_cast<double>(m_lineDashPatternSpin->value());
+    double pattern = m_lineDashPatternSpin->value();
     
-    if (m_currentGeo)
+    if (!m_selectedGeos.empty())
+    {
+        for (auto* geo : m_selectedGeos)
+        {
+            if (geo)
+            {
+                GeoParameters3D params = geo->getParameters();
+                params.lineDashPattern = pattern;
+                geo->setParameters(params);
+            }
+        }
+    }
+    else if (m_currentGeo)
     {
         GeoParameters3D params = m_currentGeo->getParameters();
         params.lineDashPattern = pattern;
@@ -623,47 +857,7 @@ void PropertyEditor3D::onLineDashPatternChanged()
         GlobalLineDashPattern3D = pattern;
     }
     
-    emit parametersChanged();
-}
-
-void PropertyEditor3D::onNodeLineStyleChanged()
-{
-    if (m_updating) return;
-    
-    NodeLineStyle3D style = static_cast<NodeLineStyle3D>(m_nodeLineStyleCombo->currentData().toInt());
-    
-    if (m_currentGeo)
-    {
-        GeoParameters3D params = m_currentGeo->getParameters();
-        params.nodeLineStyle = style;
-        m_currentGeo->setParameters(params);
-    }
-    else
-    {
-        GlobalNodeLineStyle3D = style;
-    }
-    
-    emit parametersChanged();
-}
-
-void PropertyEditor3D::onFillTypeChanged()
-{
-    if (m_updating) return;
-    
-    FillType3D fillType = static_cast<FillType3D>(m_fillTypeCombo->currentData().toInt());
-    
-    if (m_currentGeo)
-    {
-        GeoParameters3D params = m_currentGeo->getParameters();
-        params.fillType = fillType;
-        m_currentGeo->setParameters(params);
-    }
-    else
-    {
-        GlobalFillType3D = fillType;
-    }
-    
-    emit parametersChanged();
+    emit renderingParametersChanged();
 }
 
 void PropertyEditor3D::onFillColorChanged()
@@ -679,173 +873,29 @@ void PropertyEditor3D::onFillColorChanged()
         
         if (!m_selectedGeos.empty())
         {
-            // 多选情况：应用到所有选中的对象
             for (auto* geo : m_selectedGeos)
             {
                 if (geo)
                 {
                     GeoParameters3D params = geo->getParameters();
-                    params.fillColor = color; // 使用QColor直接赋值
+                    params.fillColor = color;
                     geo->setParameters(params);
                 }
             }
         }
         else if (m_currentGeo)
         {
-            // 单选情况
             GeoParameters3D params = m_currentGeo->getParameters();
-            params.fillColor = color; // 使用QColor直接赋值
+            params.fillColor = color;
             m_currentGeo->setParameters(params);
         }
         else
         {
-            // 全局设置
             GlobalFillColor3D = color;
         }
         
-        emit parametersChanged();
+        emit renderingParametersChanged();
     }
-}
-
-void PropertyEditor3D::onBorderColorChanged()
-{
-    if (m_updating) return;
-    
-    QColor currentColor = m_currentGeo ? m_currentGeo->getParameters().borderColor.toQColor() : GlobalBorderColor3D;
-    QColor color = QColorDialog::getColor(currentColor, this, "选择边界颜色");
-    
-    if (color.isValid())
-    {
-        updateColorButton(m_borderColorButton, color);
-        
-        if (!m_selectedGeos.empty())
-        {
-            // 多选情况：应用到所有选中的对象
-            for (auto* geo : m_selectedGeos)
-            {
-                if (geo)
-                {
-                    GeoParameters3D params = geo->getParameters();
-                    params.borderColor = color; // 使用QColor直接赋值
-                    geo->setParameters(params);
-                }
-            }
-        }
-        else if (m_currentGeo)
-        {
-            // 单选情况
-            GeoParameters3D params = m_currentGeo->getParameters();
-            params.borderColor = color; // 使用QColor直接赋值
-            m_currentGeo->setParameters(params);
-        }
-        else
-        {
-            // 全局设置
-            GlobalBorderColor3D = color;
-        }
-        
-        emit parametersChanged();
-    }
-}
-
-void PropertyEditor3D::onShowBorderChanged()
-{
-    if (m_updating) return;
-    
-    bool showBorder = m_showBorderCheck->isChecked();
-    
-    if (m_currentGeo)
-    {
-        GeoParameters3D params = m_currentGeo->getParameters();
-        params.showBorder = showBorder;
-        m_currentGeo->setParameters(params);
-    }
-    else
-    {
-        GlobalShowBorder3D = showBorder;
-    }
-    
-    emit parametersChanged();
-}
-
-void PropertyEditor3D::onMaterialTypeChanged()
-{
-    if (m_updating) return;
-    
-    MaterialType3D matType = static_cast<MaterialType3D>(m_materialTypeCombo->currentData().toInt());
-    
-    if (m_currentGeo)
-    {
-        GeoParameters3D params = m_currentGeo->getParameters();
-        params.material.type = matType;
-        m_currentGeo->setParameters(params);
-    }
-    else
-    {
-        GlobalMaterialType3D = matType;
-    }
-    
-    emit parametersChanged();
-}
-
-void PropertyEditor3D::onShininessChanged()
-{
-    if (m_updating) return;
-    
-    double shininess = static_cast<double>(m_shininessSlider->value());
-    
-    if (m_currentGeo)
-    {
-        GeoParameters3D params = m_currentGeo->getParameters();
-        params.material.shininess = shininess;
-        m_currentGeo->setParameters(params);
-    }
-    else
-    {
-        GlobalShininess3D = shininess;
-    }
-    
-    emit parametersChanged();
-}
-
-void PropertyEditor3D::onTransparencyChanged()
-{
-    if (m_updating) return;
-    
-    double transparency = static_cast<double>(m_transparencySlider->value()) / 100.0;
-    
-    if (m_currentGeo)
-    {
-        GeoParameters3D params = m_currentGeo->getParameters();
-        params.material.transparency = transparency;
-        m_currentGeo->setParameters(params);
-    }
-    else
-    {
-        GlobalTransparency3D = transparency;
-    }
-    
-    emit parametersChanged();
-}
-
-void PropertyEditor3D::onSubdivisionLevelChanged()
-{
-    if (m_updating) return;
-    
-    SubdivisionLevel3D level = static_cast<SubdivisionLevel3D>(m_subdivisionLevelCombo->currentData().toInt());
-    
-    if (m_currentGeo)
-    {
-        GeoParameters3D params = m_currentGeo->getParameters();
-        params.subdivisionLevel = level;
-        m_currentGeo->setParameters(params);
-    }
-    else
-    {
-        GlobalSubdivisionLevel3D = level;
-    }
-    
-    emit parametersChanged();
 }
 
 void PropertyEditor3D::onShowPointsChanged()
@@ -854,33 +904,48 @@ void PropertyEditor3D::onShowPointsChanged()
     
     bool show = m_showPointsCheck->isChecked();
     
+    // 显示约束：至少保持一个组件可见
+    if (!show && !m_showEdgesCheck->isChecked() && !m_showFacesCheck->isChecked()) {
+        // 如果要隐藏所有组件，强制显示线框
+        m_updating = true;
+        m_showEdgesCheck->setChecked(true);
+        m_updating = false;
+    }
+    
     if (!m_selectedGeos.empty())
     {
-        // 多选情况：应用到所有选中的对象
         for (auto* geo : m_selectedGeos)
         {
             if (geo)
             {
                 GeoParameters3D params = geo->getParameters();
                 params.showPoints = show;
+                // 如果强制显示了边，也要更新
+                if (!show && !params.showEdges && !params.showFaces) {
+                    params.showEdges = true;
+                }
                 geo->setParameters(params);
             }
         }
     }
     else if (m_currentGeo)
     {
-        // 单选情况
         GeoParameters3D params = m_currentGeo->getParameters();
         params.showPoints = show;
+        if (!show && !params.showEdges && !params.showFaces) {
+            params.showEdges = true;
+        }
         m_currentGeo->setParameters(params);
     }
     else
     {
-        // 全局设置
         GlobalShowPoints3D = show;
+        if (!show && !GlobalShowEdges3D && !GlobalShowFaces3D) {
+            GlobalShowEdges3D = true;
+        }
     }
     
-    emit parametersChanged();
+    emit renderingParametersChanged();
 }
 
 void PropertyEditor3D::onShowEdgesChanged()
@@ -889,33 +954,47 @@ void PropertyEditor3D::onShowEdgesChanged()
     
     bool show = m_showEdgesCheck->isChecked();
     
+    // 显示约束：至少保持一个组件可见
+    if (!show && !m_showPointsCheck->isChecked() && !m_showFacesCheck->isChecked()) {
+        // 如果要隐藏所有组件，强制显示点
+        m_updating = true;
+        m_showPointsCheck->setChecked(true);
+        m_updating = false;
+    }
+    
     if (!m_selectedGeos.empty())
     {
-        // 多选情况：应用到所有选中的对象
         for (auto* geo : m_selectedGeos)
         {
             if (geo)
             {
                 GeoParameters3D params = geo->getParameters();
                 params.showEdges = show;
+                if (!show && !params.showPoints && !params.showFaces) {
+                    params.showPoints = true;
+                }
                 geo->setParameters(params);
             }
         }
     }
     else if (m_currentGeo)
     {
-        // 单选情况
         GeoParameters3D params = m_currentGeo->getParameters();
         params.showEdges = show;
+        if (!show && !params.showPoints && !params.showFaces) {
+            params.showPoints = true;
+        }
         m_currentGeo->setParameters(params);
     }
     else
     {
-        // 全局设置
         GlobalShowEdges3D = show;
+        if (!show && !GlobalShowPoints3D && !GlobalShowFaces3D) {
+            GlobalShowPoints3D = true;
+        }
     }
     
-    emit parametersChanged();
+    emit renderingParametersChanged();
 }
 
 void PropertyEditor3D::onShowFacesChanged()
@@ -924,33 +1003,47 @@ void PropertyEditor3D::onShowFacesChanged()
     
     bool show = m_showFacesCheck->isChecked();
     
+    // 显示约束：至少保持一个组件可见
+    if (!show && !m_showPointsCheck->isChecked() && !m_showEdgesCheck->isChecked()) {
+        // 如果要隐藏所有组件，强制显示线框
+        m_updating = true;
+        m_showEdgesCheck->setChecked(true);
+        m_updating = false;
+    }
+    
     if (!m_selectedGeos.empty())
     {
-        // 多选情况：应用到所有选中的对象
         for (auto* geo : m_selectedGeos)
         {
             if (geo)
             {
                 GeoParameters3D params = geo->getParameters();
                 params.showFaces = show;
+                if (!show && !params.showPoints && !params.showEdges) {
+                    params.showEdges = true;
+                }
                 geo->setParameters(params);
             }
         }
     }
     else if (m_currentGeo)
     {
-        // 单选情况
         GeoParameters3D params = m_currentGeo->getParameters();
         params.showFaces = show;
+        if (!show && !params.showPoints && !params.showEdges) {
+            params.showEdges = true;
+        }
         m_currentGeo->setParameters(params);
     }
     else
     {
-        // 全局设置
         GlobalShowFaces3D = show;
+        if (!show && !GlobalShowPoints3D && !GlobalShowEdges3D) {
+            GlobalShowEdges3D = true;
+        }
     }
     
-    emit parametersChanged();
+    emit renderingParametersChanged();
 }
 
 

@@ -2,6 +2,7 @@
 #pragma execution_character_set("utf-8")
 
 #include <cstdint>
+#include <string>
 
 // 三维绘图系统枚举定义
 
@@ -78,25 +79,10 @@ enum LineStyle3D
     EndLineStyle3D
 };
 
-// 节点线型（用于复杂线条）
-enum NodeLineStyle3D
-{
-    BeginNodeLineStyle3D = EndLineStyle3D,
-    
-    NodeLine_Polyline3D,       // 折线
-    NodeLine_Spline3D,         // 样条曲线
-    NodeLine_Bezier3D,         // 贝塞尔曲线
-    NodeLine_Arc3D,            // 圆弧
-    NodeLine_ThreePointArc3D,  // 三点弧
-    NodeLine_Streamline3D,     // 流线
-    
-    EndNodeLineStyle3D
-};
-
 // 几何对象类型
 enum GeoType3D
 {
-    BeginGeoType3D = EndNodeLineStyle3D,
+    BeginGeoType3D = EndLineStyle3D,
     
     Geo_Undefined3D,
     
@@ -161,8 +147,6 @@ enum FillType3D
     Fill_None3D,           // 无填充
     Fill_Solid3D,          // 实心填充
     Fill_Wireframe3D,      // 线框
-    Fill_Points3D,         // 点填充
-    Fill_Texture3D,        // 纹理填充
     
     EndFillType3D
 };
@@ -174,9 +158,6 @@ enum MaterialType3D
     
     Material_Basic3D,      // 基础材质
     Material_Phong3D,      // Phong材质
-    Material_Blinn3D,      // Blinn材质
-    Material_Lambert3D,    // Lambert材质
-    Material_PBR3D,        // PBR材质
     
     EndMaterialType3D
 };
@@ -296,6 +277,18 @@ enum BuildingType3D
     EndBuildingType3D
 };
 
+// 节点标记常量 - 用于从文件加载时的节点识别
+namespace NodeTags3D
+{
+    const std::string VERTEX_GEOMETRY = "3D_VERTEX_GEOM";
+    const std::string EDGE_GEOMETRY = "3D_EDGE_GEOM";
+    const std::string FACE_GEOMETRY = "3D_FACE_GEOM";
+    const std::string CONTROL_POINTS_GEOMETRY = "3D_CONTROL_POINTS_GEOM";
+    const std::string BOUNDING_BOX_GEOMETRY = "3D_BOUNDING_BOX_GEOM";
+    const std::string TRANSFORM_NODE = "3D_TRANSFORM_NODE";
+    const std::string ROOT_GROUP = "3D_ROOT_GROUP";
+}
+
 // 节点掩码定义 - 用于OSG节点的显示/隐藏和拾取控制
 // 每个组件使用独立的位标识，显示时通过位组合控制，不可见时置0
 enum NodeMask3D : uint32_t
@@ -318,9 +311,6 @@ enum NodeMask3D : uint32_t
     NODE_MASK_DEBUG_INFO        = 0x00000080,  // 调试信息
     NODE_MASK_SKYBOX            = 0x00000100,  // 天空盒
     NODE_MASK_COORDINATE_SYSTEM = 0x08000200,  // 坐标系统
-
-
-    // 
     
     // 常用组合掩码（通过位组合实现）
     NODE_MASK_ALL_GEOMETRY = NODE_MASK_VERTEX | NODE_MASK_EDGE | NODE_MASK_FACE,  // 所有主要几何体
