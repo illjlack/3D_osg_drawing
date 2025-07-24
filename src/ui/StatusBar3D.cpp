@@ -197,7 +197,7 @@ void StatusBar3D::updateCoordinateRange(const QString& range)
 void StatusBar3D::updateCameraSpeed(double speed)
 {
     if (m_cameraSpeedLabel) {
-        m_cameraSpeedLabel->setText(tr("相机速度: %1").arg(speed, 0, 'f', 0));
+        m_cameraSpeedLabel->setText(tr("相机速度: %1").arg(speed, 0, 'f', 2));
     }
 }
 

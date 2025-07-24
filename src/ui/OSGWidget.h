@@ -38,6 +38,7 @@ signals:
     void simplePickingResult(const PickResult& result);
     void coordinateSystemSettingsRequested();
     void drawModeChanged(DrawMode3D mode);
+    void cameraSpeedChanged(double speed);
 
 protected:
     // 事件处理
@@ -76,8 +77,12 @@ private:
     void handleKeyPress(QKeyEvent* event);
     void handleKeyRelease(QKeyEvent* event);
     
+    // 键盘移动处理
+    void processKeyboardMovement();
+    double calculateMoveSpeed(int keyCode);
+    
     // 绘制辅助函数
-    void updateCurrentDrawing(const glm::dvec3& worldPos);
+    glm::dvec3 screenToWorld(int x, int y, double depth = 0.0);
     void completeCurrentDrawing();
     void cancelCurrentDrawing();
     void onSimplePickingResult(const PickResult& result);
@@ -85,9 +90,6 @@ private:
     // 事件传递控制
     void setMousePassToOSG(bool shouldPass);
     
-    // 坐标转换辅助函数
-    glm::dvec3 screenToWorld(int x, int y, double depth = 0.0);
-
 private:
     // 核心系统
     std::unique_ptr<SceneManager3D> m_sceneManager;
@@ -112,6 +114,15 @@ private:
     
     // 渲染循环
     QTimer* m_updateTimer;
+    
+    // 键盘移动加速控制变量
+    double m_initialSpeed = 0.1;        // 起始速度
+    double m_acceleration = 0.01;        // 加速度
+    int m_speedCounter = 0;          // 速度计数器
+    int m_maxCount = 10000;              // 最大计数
+    
+    // 按键状态跟踪
+    bool m_keyPressed[512];              // 按键状态数组，512足够覆盖所有按键
 }; 
 
 

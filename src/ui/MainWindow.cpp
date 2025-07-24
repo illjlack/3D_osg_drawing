@@ -501,6 +501,12 @@ void MainWindow::connectSignals()
         connect(m_osgWidget, &OSGWidget::simplePickingResult, this, &MainWindow::onSimplePickingResult);
         connect(m_osgWidget, &OSGWidget::coordinateSystemSettingsRequested, this, &MainWindow::onCoordinateSystemSettings);
         connect(m_osgWidget, &OSGWidget::drawModeChanged, this, &MainWindow::onDrawModeChangedFromOSG);
+        // 连接键盘移动时的相机速度变化
+        connect(m_osgWidget, &OSGWidget::cameraSpeedChanged, this, [this](double speed) {
+            if (m_statusBar3D) {
+                m_statusBar3D->updateCameraSpeed(speed);
+            }
+        });
         // 连接相机操控器类型变化 - 直接连接CameraController
         connect(m_osgWidget->getCameraController(), &CameraController::manipulatorTypeChanged, this, [this](ManipulatorType type) {
             if (m_manipulatorCombo) {
