@@ -73,7 +73,6 @@ OSGWidget::OSGWidget(QWidget* parent)
     , m_skyboxEnabled(true)
     , m_coordinateSystemRenderer(std::make_unique<CoordinateSystemRenderer>())
     , m_coordinateSystemEnabled(true)
-    , m_scaleBarRenderer(std::make_unique<ScaleBarRenderer>())
     , m_updateTimer(new QTimer(this))
     , m_mousePosCacheValid(false)
     , m_multiSelectMode(false)
@@ -92,9 +91,6 @@ OSGWidget::OSGWidget(QWidget* parent)
     
     // 连接初始化完成信号
     connect(this, &osgQOpenGLWidget::initialized, this, &OSGWidget::initializeScene);
-    
-    // 设置比例尺渲染器的相机控制器
-    m_scaleBarRenderer->setCameraController(m_cameraController.get());
     
     // 设置渲染循环
     m_updateTimer->start(16);
@@ -1127,13 +1123,6 @@ void OSGWidget::paintEvent(QPaintEvent* event)
     if (m_cameraController && m_cameraController->isMoving()) {
         m_cameraController->updateCameraPosition();
     }
-    
-    // 绘制比例尺 - 使用ScaleBarRenderer
-    if (m_scaleBarRenderer && m_scaleBarRenderer->isEnabled())
-    {
-        QPainter painter(this);
-        m_scaleBarRenderer->drawScaleBar(painter, width(), height());
-    }
 }
 
 void OSGWidget::resizeEvent(QResizeEvent* event)
@@ -1813,9 +1802,6 @@ void OSGWidget::keyReleaseEvent(QKeyEvent* event)
     
     event->accept();
 }
-
-// ========================================= 比例尺相关方法已移至ScaleBarRenderer =========================================
-// 现在通过getScaleBarRenderer()访问比例尺功能
 
 // ========================================= 投影模式相关方法已移至CameraController =========================================
 // 现在直接通过getCameraController()访问投影模式功能

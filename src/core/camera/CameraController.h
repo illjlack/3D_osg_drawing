@@ -192,7 +192,7 @@ private:
     mutable osg::Vec3d m_cachedUp;
     mutable bool m_directionCacheValid;
 
-    // 摄像机移动控制（从OSGWidget转移）
+    // 摄像机移动控制
     double m_cameraMoveSpeed;
     double m_wheelMoveSensitivity;
     bool m_cameraMoveKeys[6]; // up, down, left, right, forward, backward

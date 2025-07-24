@@ -1424,13 +1424,10 @@ void MainWindow::onDisplaySettings()
     QVBoxLayout* coordinateLayout = new QVBoxLayout(coordinateGroup);
     
     QCheckBox* coordinateSystemCheck = new QCheckBox(tr("显示坐标系统"), coordinateGroup);
-    QCheckBox* scaleBarCheck = new QCheckBox(tr("显示比例尺"), coordinateGroup);
     
     coordinateSystemCheck->setChecked(m_osgWidget ? m_osgWidget->isCoordinateSystemEnabled() : true);
-    scaleBarCheck->setChecked(m_osgWidget ? m_osgWidget->getScaleBarRenderer()->isEnabled() : true);
     
     coordinateLayout->addWidget(coordinateSystemCheck);
-    coordinateLayout->addWidget(scaleBarCheck);
     
     // 按钮
     QHBoxLayout* buttonLayout = new QHBoxLayout();
@@ -1487,12 +1484,6 @@ void MainWindow::onDisplaySettings()
     connect(coordinateSystemCheck, &QCheckBox::toggled, [this](bool enabled) {
         if (m_osgWidget) {
             m_osgWidget->enableCoordinateSystem(enabled);
-        }
-    });
-    
-    connect(scaleBarCheck, &QCheckBox::toggled, [this](bool enabled) {
-        if (m_osgWidget) {
-            m_osgWidget->getScaleBarRenderer()->setEnabled(enabled);
         }
     });
     

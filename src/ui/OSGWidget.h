@@ -8,7 +8,6 @@
 #include "../core/camera/CameraController.h"
 #include "../core/picking/PickingIndicator.h"
 #include "../core/picking/GeometryPickingSystem.h"
-#include "../util/ScaleBarRenderer.h"
 #include <osgViewer/Viewer>
 #include <osgViewer/CompositeViewer>
 #include <osgViewer/ViewerEventHandlers>
@@ -118,9 +117,6 @@ public:
     // 摄像机控制器接口（直接访问，不再提供委托方法）
     CameraController* getCameraController() const { return m_cameraController.get(); }
     
-    // 比例尺渲染器接口
-    ScaleBarRenderer* getScaleBarRenderer() const { return m_scaleBarRenderer.get(); }
-    
     // 右键菜单功能
     void deleteSelectedObjects();
     void setCameraPosition(const glm::dvec3& position, const glm::dvec3& target = glm::dvec3(0,0,0));
@@ -214,9 +210,6 @@ private:
     // 坐标系
     std::unique_ptr<CoordinateSystemRenderer> m_coordinateSystemRenderer;
     bool m_coordinateSystemEnabled;
-    
-    // 比例尺渲染器
-    std::unique_ptr<ScaleBarRenderer> m_scaleBarRenderer;
     
     // 鼠标位置缓存 - 避免频繁的坐标转换
     QPoint m_lastMouseScreenPos;

@@ -135,9 +135,6 @@
     <ClCompile Include="src\core\GeometryBase.cpp">
       <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="src\ui\StatusBar3D.cpp">
-      <Filter>UI</Filter>
-    </ClCompile>
     <ClCompile Include="src\core\buildings\BuildingFactory.cpp">
       <Filter>Core\buildings</Filter>
     </ClCompile>
@@ -173,9 +170,6 @@
     </ClCompile>
     <ClCompile Include="src\core\picking\GeometryPickingSystem.cpp">
       <Filter>Core\Picking</Filter>
-    </ClCompile>
-    <ClCompile Include="src\util\ScaleBarRenderer.cpp">
-      <Filter>Util</Filter>
     </ClCompile>
     <ClCompile Include="src\ui\ImportInfoDialog.cpp">
       <Filter>UI</Filter>
@@ -295,9 +289,6 @@
     </ClInclude>
     <ClInclude Include="src\core\picking\GeometryPickingSystem.h">
       <Filter>Core\Picking</Filter>
-    </ClInclude>
-    <ClInclude Include="src\util\ScaleBarRenderer.h">
-      <Filter>Util</Filter>
     </ClInclude>
     <ClInclude Include="src\core\ConstraintSystem.h">
       <Filter>Core</Filter>
