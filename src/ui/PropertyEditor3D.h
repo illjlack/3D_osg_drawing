@@ -18,8 +18,8 @@ class PropertyEditor3D : public QWidget
     Q_OBJECT
 public:
     explicit PropertyEditor3D(QWidget* parent = nullptr);
-    void setGeo(Geo3D* geo);
-    void setSelectedGeos(const std::vector<Geo3D*>& geos);
+    void setGeo(osg::ref_ptr<Geo3D> geo);
+    void setSelectedGeos(const std::vector<osg::ref_ptr<Geo3D>>& geos);
     void updateFromGeo();
     void updateGlobalSettings();
     
@@ -60,8 +60,8 @@ private:
     void updateColorButton(QPushButton* button, const QColor& color);
     QWidget* createCollapsibleSection(const QString& title, const QString& emoji, QWidget* content);
     
-    Geo3D* m_currentGeo;
-    std::vector<Geo3D*> m_selectedGeos;
+    osg::ref_ptr<Geo3D> m_currentGeo;
+    std::vector<osg::ref_ptr<Geo3D>> m_selectedGeos;
     bool m_updating;
     
     // 点属性控件

@@ -5,7 +5,7 @@
 #include "FlatHouse3D.h"
 #include "LHouse3D.h"
 
-Geo3D* BuildingFactory::createBuilding(BuildingType3D type)
+osg::ref_ptr<Geo3D> BuildingFactory::createBuilding(BuildingType3D type)
 {
     switch (type)
     {

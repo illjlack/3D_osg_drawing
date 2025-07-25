@@ -147,7 +147,7 @@ PickResult GeometryPickingSystem::pickGeometry(int mouseX, int mouseY)
     return result;
 }
 
-Geo3D* GeometryPickingSystem::findGeometryFromNodePath(const osg::NodePath& nodePath)
+osg::ref_ptr<Geo3D> GeometryPickingSystem::findGeometryFromNodePath(const osg::NodePath& nodePath)
 {
     // 从最后一个节点开始查找，通常几何体信息存储在叶子节点中
     
@@ -158,7 +158,7 @@ Geo3D* GeometryPickingSystem::findGeometryFromNodePath(const osg::NodePath& node
         if (node->getUserData()) {
             // 尝试将用户数据转换为Geo3D指针
             if (Geo3D* geometry = dynamic_cast<Geo3D*>(node->getUserData())) {
-                return geometry;
+                return osg::ref_ptr<Geo3D>(geometry);
             }
         }
     }
@@ -218,7 +218,7 @@ PickResult GeometryPickingSystem::analyzeFaceIntersection(const osgUtil::LineSeg
 {
     PickResult result;
     
-    Geo3D* geometry = findGeometryFromNodePath(intersection.nodePath);
+    osg::ref_ptr<Geo3D> geometry = findGeometryFromNodePath(intersection.nodePath);
     if (!geometry) return result;
     
     result.hasResult = true;
@@ -256,7 +256,7 @@ PickResult GeometryPickingSystem::analyzePolytopeIntersection(const osgUtil::Pol
 {
     PickResult result;
     
-    Geo3D* geometry = findGeometryFromNodePath(intersection.nodePath);
+    osg::ref_ptr<Geo3D> geometry = findGeometryFromNodePath(intersection.nodePath);
     if (!geometry) return result;
     
     result.hasResult = true;

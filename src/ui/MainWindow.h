@@ -131,7 +131,7 @@ private slots:
     void onHelpAbout();
     
     void onDrawModeChanged(DrawMode3D mode);
-    void onGeoSelected(Geo3D* geo);
+    void onGeoSelected(osg::ref_ptr<Geo3D> geo);
     void onGeoParametersChanged();
     void onGeometryRecalculationRequired();
     void onRenderingParametersChanged();

@@ -13,17 +13,17 @@ CameraController::CameraController()
     , m_currentManipulatorType(ManipulatorType::Trackball)
     , m_projectionMode(ProjectionMode::Perspective)
     , m_fov(45.0)
-    , m_near(0.1)
-    , m_far(1000.0)
+    , m_near(0.001)
+    , m_far(10000.0)
     , m_left(-10.0)
     , m_right(10.0)
     , m_bottom(-10.0)
     , m_top(10.0)
     , m_directionCacheValid(false)
-    , m_cameraMoveSpeed(1.0)
-    , m_wheelMoveSensitivity(1.0)
-    , m_accelerationRate(1.5)
-    , m_maxAccelerationSpeed(10.0)
+    , m_cameraMoveSpeed(0.2)
+    , m_wheelMoveSensitivity(0.3)
+    , m_accelerationRate(1.2)
+    , m_maxAccelerationSpeed(5.0)
     , m_updateTimer(new QTimer(this))
     , m_lastMoveTime(0)
     , m_isMoving(false)
@@ -866,12 +866,11 @@ void CameraController::updateProjectionMatrix(int viewportWidth, int viewportHei
         double aspectRatio = static_cast<double>(viewportWidth) / static_cast<double>(viewportHeight);
         camera->setProjectionMatrixAsPerspective(m_fov, aspectRatio, m_near, m_far);
         
-        // 注释掉频繁的DEBUG日志
-        // LOG_DEBUG(QString("更新透视投影矩阵: FOV=%1°, 宽高比=%2, 近平面=%3, 远平面=%4")
-        //           .arg(m_fov, 0, 'f', 1)
-        //           .arg(aspectRatio, 0, 'f', 3)
-        //           .arg(m_near, 0, 'f', 2)
-        //           .arg(m_far, 0, 'f', 2), "相机");
+         LOG_DEBUG(QString("更新透视投影矩阵: FOV=%1°, 宽高比=%2, 近平面=%3, 远平面=%4")
+                   .arg(m_fov, 0, 'f', 1)
+                   .arg(aspectRatio, 0, 'f', 3)
+                   .arg(m_near, 0, 'f', 2)
+                   .arg(m_far, 0, 'f', 2), "相机");
     }
     else
     {

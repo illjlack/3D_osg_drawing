@@ -28,11 +28,12 @@ class GeometryFactory
 {
 public:
     // 根据绘制模式创建几何体
-    static Geo3D* createGeometry(DrawMode3D mode);
+    static osg::ref_ptr<Geo3D> createGeometry(DrawMode3D mode);
     
     // 根据几何体类型创建几何体
-    static Geo3D* createGeometry(GeoType3D type);
+    static osg::ref_ptr<Geo3D> createGeometry(GeoType3D type);
     
+private:
     // 创建具体类型的几何体
     static Point3D_Geo* createPoint();
     static Line3D_Geo* createLine();

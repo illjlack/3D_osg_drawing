@@ -1,7 +1,7 @@
 ﻿#include "GeoStateManager.h"
 #include "../GeometryBase.h"
 
-GeoStateManager::GeoStateManager(Geo3D* parent)
+GeoStateManager::GeoStateManager(osg::ref_ptr<Geo3D> parent)
     : QObject(parent)
     , m_parent(parent)
     , m_geoState(0)

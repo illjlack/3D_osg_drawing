@@ -2,6 +2,7 @@
 #pragma execution_character_set("utf-8")
 
 #include "../core/Common3D.h"
+#include "../core/GeometryBase.h"  // 包含Geo3D的完整定义，Qt MOC需要
 #include "../core/world/Skybox.h"
 #include "../core/world/CoordinateSystem3D.h"
 #include "../core/world/CoordinateSystemRenderer.h"
@@ -34,9 +35,7 @@
 #include <QDateTime>
 
 // 前向声明
-class Geo3D;
 class SimplePickingIndicatorManager;
-class GeometryPickingSystem;
 
 // OSG视图组件
 class OSGWidget : public osgQOpenGLWidget
@@ -59,27 +58,27 @@ public:
     void setPointMode(bool point);
     
     // 几何对象管理
-    void addGeo(Geo3D* geo);
-    void removeGeo(Geo3D* geo);
+    void addGeo(osg::ref_ptr<Geo3D> geo);
+    void removeGeo(osg::ref_ptr<Geo3D> geo);
     void removeAllGeos();
-    void selectGeo(Geo3D* geo);
+    void selectGeo(osg::ref_ptr<Geo3D> geo);
     void deselectAll();
-    Geo3D* getSelectedGeo() const;
+    osg::ref_ptr<Geo3D> getSelectedGeo() const;
     const std::vector<osg::ref_ptr<Geo3D>>& getAllGeos() const;
     
     // 多选功能
-    void addToSelection(Geo3D* geo);
-    void removeFromSelection(Geo3D* geo);
+    void addToSelection(osg::ref_ptr<Geo3D> geo);
+    void removeFromSelection(osg::ref_ptr<Geo3D> geo);
     void clearSelection();
-    const std::vector<Geo3D*>& getSelectedGeos() const;
-    bool isSelected(Geo3D* geo) const;
+    const std::vector<osg::ref_ptr<Geo3D>>& getSelectedGeos() const;
+    bool isSelected(osg::ref_ptr<Geo3D> geo) const;
     int getSelectionCount() const;
     
     // 拖动控制点功能
-    void startDraggingControlPoint(Geo3D* geo, int controlPointIndex);
+    void startDraggingControlPoint(osg::ref_ptr<Geo3D> geo, int controlPointIndex);
     void stopDraggingControlPoint();
     bool isDraggingControlPoint() const { return m_isDraggingControlPoint; }
-    Geo3D* getDraggingGeo() const { return m_draggingGeo; }
+    osg::ref_ptr<Geo3D> getDraggingGeo() const { return m_draggingGeo; }
     int getDraggingControlPointIndex() const { return m_draggingControlPointIndex; }
     
     // 高亮管理
@@ -120,10 +119,10 @@ public:
     // 右键菜单功能
     void deleteSelectedObjects();
     void setCameraPosition(const glm::dvec3& position, const glm::dvec3& target = glm::dvec3(0,0,0));
-    void movePointToCoordinate(Geo3D* geo, int pointIndex, const glm::dvec3& newPosition);
+    void movePointToCoordinate(osg::ref_ptr<Geo3D> geo, int pointIndex, const glm::dvec3& newPosition);
 
 signals:
-    void geoSelected(Geo3D* geo);
+    void geoSelected(osg::ref_ptr<Geo3D> geo);
     void mousePositionChanged(const glm::dvec3& worldPos);
     void screenPositionChanged(int x, int y);
     void simplePickingResult(const PickResult& result);
@@ -184,12 +183,12 @@ private:
     osg::ref_ptr<Geo3D> m_selectedGeo;
     
     // 多选功能
-    std::vector<Geo3D*> m_selectedGeos;  // 选中的几何对象列表
+    std::vector<osg::ref_ptr<Geo3D>> m_selectedGeos;  // 选中的几何对象列表
     bool m_multiSelectMode;               // 是否处于多选模式
     
     // 拖动控制点功能
     bool m_isDraggingControlPoint;
-    Geo3D* m_draggingGeo;
+    osg::ref_ptr<Geo3D> m_draggingGeo;
     int m_draggingControlPointIndex;
     glm::dvec3 m_dragStartPosition;
     
@@ -220,7 +219,7 @@ private:
     
     // 右键菜单相关
     QPoint m_lastContextMenuPos;
-    Geo3D* m_contextMenuGeo;
+    osg::ref_ptr<Geo3D> m_contextMenuGeo;
     int m_contextMenuPointIndex; // 16ms缓存时间（约60FPS）
     
     QTimer* m_updateTimer;

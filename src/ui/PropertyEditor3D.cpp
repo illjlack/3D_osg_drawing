@@ -464,13 +464,13 @@ void PropertyEditor3D::updateColorButton(QPushButton* button, const QColor& colo
 }
 
 // 剩余部分保持与当前实现类似的逻辑，但简化了参数处理
-void PropertyEditor3D::setGeo(Geo3D* geo)
+void PropertyEditor3D::setGeo(osg::ref_ptr<Geo3D> geo)
 {
     m_currentGeo = geo;
     updateFromGeo();
 }
 
-void PropertyEditor3D::setSelectedGeos(const std::vector<Geo3D*>& geos)
+void PropertyEditor3D::setSelectedGeos(const std::vector<osg::ref_ptr<Geo3D>>& geos)
 {
     m_selectedGeos = geos;
     if (!geos.empty())
@@ -595,7 +595,7 @@ void PropertyEditor3D::onPointShapeChanged()
     
     if (!m_selectedGeos.empty())
     {
-        for (auto* geo : m_selectedGeos)
+        for (auto& geo : m_selectedGeos)
         {
             if (geo)
             {
@@ -627,7 +627,7 @@ void PropertyEditor3D::onSubdivisionLevelChanged()
     
     if (!m_selectedGeos.empty())
     {
-        for (auto* geo : m_selectedGeos)
+        for (auto& geo : m_selectedGeos)
         {
             if (geo)
             {
@@ -661,7 +661,7 @@ void PropertyEditor3D::onPointSizeChanged()
     
     if (!m_selectedGeos.empty())
     {
-        for (auto* geo : m_selectedGeos)
+        for (auto& geo : m_selectedGeos)
         {
             if (geo)
             {
@@ -698,7 +698,7 @@ void PropertyEditor3D::onPointColorChanged()
         
         if (!m_selectedGeos.empty())
         {
-            for (auto* geo : m_selectedGeos)
+            for (auto& geo : m_selectedGeos)
             {
                 if (geo)
                 {
@@ -731,7 +731,7 @@ void PropertyEditor3D::onLineWidthChanged()
     
     if (!m_selectedGeos.empty())
     {
-        for (auto* geo : m_selectedGeos)
+        for (auto& geo : m_selectedGeos)
         {
             if (geo)
             {
@@ -768,7 +768,7 @@ void PropertyEditor3D::onLineColorChanged()
         
         if (!m_selectedGeos.empty())
         {
-            for (auto* geo : m_selectedGeos)
+            for (auto& geo : m_selectedGeos)
             {
                 if (geo)
                 {
@@ -804,7 +804,7 @@ void PropertyEditor3D::onLineStyleChanged()
     
     if (!m_selectedGeos.empty())
     {
-        for (auto* geo : m_selectedGeos)
+        for (auto& geo : m_selectedGeos)
         {
             if (geo)
             {
@@ -836,7 +836,7 @@ void PropertyEditor3D::onLineDashPatternChanged()
     
     if (!m_selectedGeos.empty())
     {
-        for (auto* geo : m_selectedGeos)
+        for (auto& geo : m_selectedGeos)
         {
             if (geo)
             {
@@ -873,7 +873,7 @@ void PropertyEditor3D::onFillColorChanged()
         
         if (!m_selectedGeos.empty())
         {
-            for (auto* geo : m_selectedGeos)
+            for (auto& geo : m_selectedGeos)
             {
                 if (geo)
                 {
@@ -914,7 +914,7 @@ void PropertyEditor3D::onShowPointsChanged()
     
     if (!m_selectedGeos.empty())
     {
-        for (auto* geo : m_selectedGeos)
+        for (auto& geo : m_selectedGeos)
         {
             if (geo)
             {
@@ -964,7 +964,7 @@ void PropertyEditor3D::onShowEdgesChanged()
     
     if (!m_selectedGeos.empty())
     {
-        for (auto* geo : m_selectedGeos)
+        for (auto& geo : m_selectedGeos)
         {
             if (geo)
             {
@@ -1013,7 +1013,7 @@ void PropertyEditor3D::onShowFacesChanged()
     
     if (!m_selectedGeos.empty())
     {
-        for (auto* geo : m_selectedGeos)
+        for (auto& geo : m_selectedGeos)
         {
             if (geo)
             {

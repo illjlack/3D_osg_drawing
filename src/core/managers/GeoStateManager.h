@@ -16,7 +16,7 @@ class GeoStateManager : public QObject
     Q_OBJECT
 
 public:
-    explicit GeoStateManager(Geo3D* parent);
+    explicit GeoStateManager(osg::ref_ptr<Geo3D> parent);
     ~GeoStateManager() = default;
 
     // 状态查询
@@ -69,7 +69,7 @@ private:
     bool hasStateChanged(int oldState, int newState, int stateMask) const;
 
 private:
-    Geo3D* m_parent;
+    osg::ref_ptr<Geo3D> m_parent;
     int m_geoState;
 }; 
 

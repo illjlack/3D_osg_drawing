@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <sstream> // Added for serialization/deserialization
 
-GeoControlPointManager::GeoControlPointManager(Geo3D* parent)
+GeoControlPointManager::GeoControlPointManager(osg::ref_ptr<Geo3D> parent)
     : QObject(parent)
     , m_parent(parent)
 {

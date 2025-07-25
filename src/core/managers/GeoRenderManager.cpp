@@ -6,7 +6,7 @@
 #include <osg/Depth>
 #include <osg/BlendFunc>
 
-GeoRenderManager::GeoRenderManager(Geo3D* parent)
+GeoRenderManager::GeoRenderManager(osg::ref_ptr<Geo3D> parent)
     : m_parent(parent),
       m_pointMaterial(new osg::Material()),
       m_lineMaterial(new osg::Material()),

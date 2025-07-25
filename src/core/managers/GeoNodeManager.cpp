@@ -9,6 +9,7 @@
 #include <osg/NodeVisitor>
 #include <osg/ComputeBoundsVisitor>
 #include <osg/KdTree>
+#include <osg/PagedLOD>
 #include <osg/Geode>
 #include <osg/Geometry>
 #include <osg/Array>
@@ -19,7 +20,7 @@
 
 // ============= 构造函数 =============
 
-GeoNodeManager::GeoNodeManager(Geo3D* parent)
+GeoNodeManager::GeoNodeManager(osg::ref_ptr<Geo3D> parent)
     : QObject(parent)
     , m_parent(parent)
     , m_initialized(false)
@@ -110,15 +111,25 @@ void GeoNodeManager::setOSGNode(osg::ref_ptr<osg::Node> node)
         if (m_transformNode.valid()) {
             // 设置面节点mask（用于拾取系统识别）
             node->setNodeMask(NODE_MASK_FACE);
+            node->setUserData(m_parent);
             m_transformNode->addChild(node.get());
             LOG_INFO("将节点添加到变换节点下并设置面几何体mask", "几何体管理");
         } else if (m_osgNode.valid()) {
             node->setNodeMask(NODE_MASK_FACE);
+            node->setUserData(m_parent);
             m_osgNode->addChild(node.get());
             LOG_INFO("将节点添加到根节点下并设置面几何体mask", "几何体管理");
         }
     }
     LOG_INFO("OSG节点设置完成", "几何体管理");
+
+    // 外部对象加载的时候不会触发节点的重计算,包围盒也就没有算
+
+    // 设置控制点和包围盒的渲染属性
+    setupControlPointsRendering();
+    setupBoundingBoxRendering();
+
+    updateBoundingBoxGeometry();
 }
 
 // ============= 选中状态管理 =============
@@ -240,6 +251,7 @@ void GeoNodeManager::findAndAssignNodeComponents(osg::Node* node)
 
         virtual void apply(osg::Group& group) override
         {
+            group.setUserData(m_manager->m_parent);
             const std::string& name = group.getName();
             if (name == NodeTags3D::ROOT_GROUP) {
                 // 找到根节点，直接赋值给m_osgNode
@@ -251,6 +263,7 @@ void GeoNodeManager::findAndAssignNodeComponents(osg::Node* node)
 
         virtual void apply(osg::MatrixTransform& transform) override
         {
+            transform.setUserData(m_manager->m_parent);
             const std::string& name = transform.getName();
             if (name == NodeTags3D::TRANSFORM_NODE) {
                 // 找到变换节点
@@ -262,6 +275,7 @@ void GeoNodeManager::findAndAssignNodeComponents(osg::Node* node)
 
         virtual void apply(osg::Geometry& geometry) override
         {
+            geometry.setUserData(m_manager->m_parent);
             const std::string& name = geometry.getName();
             if (name == NodeTags3D::VERTEX_GEOMETRY) {
                 m_manager->m_vertexGeometry = &geometry;
@@ -301,6 +315,11 @@ void GeoNodeManager::findAndAssignNodeComponents(osg::Node* node)
     * 总会持有。。。。好像又解释了为什么之前一关程序就崩溃，重复析构了。。)
     * 
     * 其实我要保存的是一个普通的独占数据，用键值对setUserValue就行。
+    * 
+    * 
+    * 所有对同一个 osg::Referenced 对象调用的 ref()／unref()，都作用在它内部那一个 _refCount 上，无论这些调用是来自你手动用 ref_ptr，还是来自 OSG 的各种容器或*setter API。
+    * 所以用setUserData这个也没用问题
+    * 问题在于裸指针和ref_ptr()混用
     */
 }
 
@@ -343,9 +362,18 @@ void GeoNodeManager::updateBoundingBoxGeometry()
 {
     if (!m_transformNode.valid()) return;
 
-    // 计算包围盒
+
     osg::ComputeBoundsVisitor visitor;
+
+    // 指定在“剔除”阶段遍历，这样 PagedLOD 会加载它自己
+    visitor.setVisitorType(osg::NodeVisitor::CULL_VISITOR);
+    // 遍历所有子节点（包括 Group、Geode、Geometry…）
+    visitor.setTraversalMode(osg::NodeVisitor::TRAVERSE_ALL_CHILDREN);
+    // 设置遍历mask为所有节点，确保不会因为mask问题跳过节点
+    visitor.setTraversalMask(0xFFFFFFFF);
+
     m_transformNode->accept(visitor);
+
     osg::BoundingBox boundingBox = visitor.getBoundingBox();
 
     if (boundingBox.valid()) {

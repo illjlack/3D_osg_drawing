@@ -18,7 +18,7 @@ class BuildingFactory
 {
 public:
     // 根据建筑类型创建建筑
-    static Geo3D* createBuilding(BuildingType3D type);
+    static osg::ref_ptr<Geo3D> createBuilding(BuildingType3D type);
     
     // 创建具体类型的建筑
     static GableHouse3D_Geo* createGableHouse();

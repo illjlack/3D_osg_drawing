@@ -645,12 +645,12 @@ void MainWindow::onFileOpen()
             m_osgWidget->removeAllGeos();
             
             // 使用新的简化接口加载几何体列表
-            std::vector<Geo3D*> loadedGeos = GeoOsgbIO::loadGeoList(fileName);
+            std::vector<osg::ref_ptr<Geo3D>> loadedGeos = GeoOsgbIO::loadGeoList(fileName);
             if (!loadedGeos.empty())
             {
                 // 成功加载几何体
                 LOG_INFO(QString("开始添加 %1 个几何对象到场景").arg(loadedGeos.size()), "文件");
-                for (Geo3D* geo : loadedGeos)
+                for (osg::ref_ptr<Geo3D> geo : loadedGeos)
                 {
                     if (geo)
                     {
@@ -702,8 +702,8 @@ void MainWindow::onFileSave()
         // 获取所有几何对象
         const auto& allGeos = m_osgWidget->getAllGeos();
         
-        // 转换为std::vector<Geo3D*>
-        std::vector<Geo3D*> geoList;
+        // 转换为std::vector<osg::ref_ptr<Geo3D>>
+        std::vector<osg::ref_ptr<Geo3D>> geoList;
         for (const auto& geoRef : allGeos)
         {
             if (geoRef)
@@ -745,8 +745,8 @@ void MainWindow::onFileSaveAs()
             // 获取所有几何对象
             const auto& allGeos = m_osgWidget->getAllGeos();
             
-            // 转换为std::vector<Geo3D*>
-            std::vector<Geo3D*> geoList;
+            // 转换为std::vector<osg::ref_ptr<Geo3D>>
+            std::vector<osg::ref_ptr<Geo3D>> geoList;
             for (const auto& geoRef : allGeos)
             {
                 if (geoRef)
@@ -942,7 +942,7 @@ void MainWindow::onDrawModeChanged(DrawMode3D mode)
     LOG_INFO(tr("切换到绘制模式: %1").arg(drawMode3DToString(mode)), "模式");
 }
 
-void MainWindow::onGeoSelected(Geo3D* geo)
+void MainWindow::onGeoSelected(osg::ref_ptr<Geo3D> geo)
 {
     if (m_propertyEditor)
     {

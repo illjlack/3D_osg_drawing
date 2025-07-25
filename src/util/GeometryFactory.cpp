@@ -24,7 +24,7 @@
 #include "../core/buildings/FlatHouse3D.h"
 #include "../core/buildings/LHouse3D.h"
 
-Geo3D* GeometryFactory::createGeometry(DrawMode3D mode)
+osg::ref_ptr<Geo3D> GeometryFactory::createGeometry(DrawMode3D mode)
 {
     switch (mode)
     {
@@ -76,7 +76,7 @@ Geo3D* GeometryFactory::createGeometry(DrawMode3D mode)
     }
 }
 
-Geo3D* GeometryFactory::createGeometry(GeoType3D type)
+osg::ref_ptr<Geo3D> GeometryFactory::createGeometry(GeoType3D type)
 {
     return createGeometry(geoTypeToDrawMode(type));
 }

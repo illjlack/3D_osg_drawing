@@ -43,7 +43,7 @@ class GeoControlPointManager : public QObject
     Q_OBJECT
 
 public:
-    explicit GeoControlPointManager(Geo3D* parent);
+    explicit GeoControlPointManager(osg::ref_ptr<Geo3D> parent);
     ~GeoControlPointManager() = default;
 
     /**
@@ -112,7 +112,7 @@ private:
     GeoStateManager* getState() const;
 
 private:
-    Geo3D* m_parent;
+    osg::ref_ptr<Geo3D> m_parent;
  
     Stages m_stages;
     Stages m_stagesTemp;

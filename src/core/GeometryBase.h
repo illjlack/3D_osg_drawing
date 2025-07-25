@@ -40,9 +40,6 @@
 // 前向声明
 class Geo3D;
 
-// 几何对象工厂
-Geo3D* createGeo3D(DrawMode3D mode);
-
 // 三维几何对象基类
 class Geo3D : public QObject, public osg::Referenced
 {

@@ -53,6 +53,7 @@
 #include <QInputDialog>
 #include <QMessageBox>
 #include "ImportInfoDialog.h"
+#include "../util/GeometryFactory.h"
 
 // ========================================= OSGWidget 实现 =========================================
 OSGWidget::OSGWidget(QWidget* parent)
@@ -222,9 +223,9 @@ void OSGWidget::onDeleteSelectedObjects()
     if (!m_selectedGeos.empty())
     {
         // 删除所有选中的对象
-        std::vector<Geo3D*> objectsToDelete = m_selectedGeos; // 复制列表避免迭代时修改
+        std::vector<osg::ref_ptr<Geo3D>> objectsToDelete = m_selectedGeos; // 复制列表避免迭代时修改
         
-        for (Geo3D* geo : objectsToDelete)
+        for (osg::ref_ptr<Geo3D> geo : objectsToDelete)
         {
             if (geo)
             {
@@ -439,7 +440,7 @@ void OSGWidget::setCameraPosition(const glm::dvec3& position, const glm::dvec3& 
         .arg(target.x, 0, 'f', 3).arg(target.y, 0, 'f', 3).arg(target.z, 0, 'f', 3), "相机");
 }
 
-void OSGWidget::movePointToCoordinate(Geo3D* geo, int pointIndex, const glm::dvec3& newPosition)
+void OSGWidget::movePointToCoordinate(osg::ref_ptr<Geo3D> geo, int pointIndex, const glm::dvec3& newPosition)
 {
     if (!geo || pointIndex < 0)
     {
@@ -812,7 +813,7 @@ void OSGWidget::setPointMode(bool point)
     }
 }
 
-void OSGWidget::addGeo(Geo3D* geo)
+void OSGWidget::addGeo(osg::ref_ptr<Geo3D> geo)
 {
     if (geo && m_geoNode.valid())
     {
@@ -837,7 +838,7 @@ void OSGWidget::addGeo(Geo3D* geo)
     }
 }
 
-void OSGWidget::removeGeo(Geo3D* geo)
+void OSGWidget::removeGeo(osg::ref_ptr<Geo3D> geo)
 {
     if (geo && m_geoNode.valid())
     {
@@ -867,7 +868,7 @@ void OSGWidget::removeAllGeos()
     }
 }
 
-void OSGWidget::selectGeo(Geo3D* geo)
+void OSGWidget::selectGeo(osg::ref_ptr<Geo3D> geo)
 {
     if (m_selectedGeo)
     {
@@ -889,7 +890,7 @@ void OSGWidget::deselectAll()
 }
 
 // 多选功能实现
-void OSGWidget::addToSelection(Geo3D* geo)
+void OSGWidget::addToSelection(osg::ref_ptr<Geo3D> geo)
 {
     if (!geo) return;
     
@@ -917,7 +918,7 @@ void OSGWidget::addToSelection(Geo3D* geo)
     }
 }
 
-void OSGWidget::removeFromSelection(Geo3D* geo)
+void OSGWidget::removeFromSelection(osg::ref_ptr<Geo3D> geo)
 {
     if (!geo) return;
     
@@ -951,7 +952,7 @@ void OSGWidget::removeFromSelection(Geo3D* geo)
 void OSGWidget::clearSelection()
 {
     // 清除所有选中对象的状态
-    for (auto* geo : m_selectedGeos)
+    for (auto& geo : m_selectedGeos)
     {
         if (geo)
         {
@@ -974,12 +975,12 @@ void OSGWidget::clearSelection()
     LOG_INFO("清除所有选择", "选择");
 }
 
-const std::vector<Geo3D*>& OSGWidget::getSelectedGeos() const
+const std::vector<osg::ref_ptr<Geo3D>>& OSGWidget::getSelectedGeos() const
 {
     return m_selectedGeos;
 }
 
-bool OSGWidget::isSelected(Geo3D* geo) const
+bool OSGWidget::isSelected(osg::ref_ptr<Geo3D> geo) const
 {
     if (!geo) return false;
     return std::find(m_selectedGeos.begin(), m_selectedGeos.end(), geo) != m_selectedGeos.end();
@@ -991,7 +992,7 @@ int OSGWidget::getSelectionCount() const
 }
 
 // 拖动控制点功能实现
-void OSGWidget::startDraggingControlPoint(Geo3D* geo, int controlPointIndex)
+void OSGWidget::startDraggingControlPoint(osg::ref_ptr<Geo3D> geo, int controlPointIndex)
 {
     if (!geo || controlPointIndex < 0) return;
     
@@ -1037,7 +1038,7 @@ void OSGWidget::highlightSelectedObjects()
     //     return;
     
     // 为每个选中的对象创建高亮和显示包围盒
-    // for (auto* geo : m_selectedGeos)
+    // for (auto& geo : m_selectedGeos)
     // {
     //     if (geo)
     //     {
@@ -1182,7 +1183,7 @@ void OSGWidget::mousePressEvent(QMouseEvent* event)
     {
         if (pickResult.hasResult && pickResult.geometry)
         {
-            Geo3D* pickedGeo = pickResult.geometry;
+            osg::ref_ptr<Geo3D> pickedGeo = pickResult.geometry;
 
             if (QApplication::keyboardModifiers() & Qt::ControlModifier)
             {
@@ -1231,7 +1232,7 @@ void OSGWidget::mousePressEvent(QMouseEvent* event)
         if (!m_isDrawing)
         {
             // 开始新的绘制
-            Geo3D* newGeo = createGeo3D(GlobalDrawMode3D);
+            osg::ref_ptr<Geo3D> newGeo = GeometryFactory::createGeometry(GlobalDrawMode3D);
             if (newGeo)
             {
                 m_currentDrawingGeo = newGeo;
@@ -1793,7 +1794,7 @@ void OSGWidget::keyReleaseEvent(QKeyEvent* event)
 
 // ========================================= 几何对象查询方法 =========================================
 
-Geo3D* OSGWidget::getSelectedGeo() const
+osg::ref_ptr<Geo3D> OSGWidget::getSelectedGeo() const
 {
     return m_selectedGeo.get();
 }

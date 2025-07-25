@@ -316,15 +316,3 @@ void Geo3D::restoreFromFileNode(osg::ref_ptr<osg::Node> node)
     LOG_INFO("文件节点恢复完成，对象状态已完全恢复", "文件加载");
 }
 
-// ============================================================================
-// 工厂函数（临时实现）
-// ============================================================================
-
-#include "../util/GeometryFactory.h"
-
-Geo3D* createGeo3D(DrawMode3D mode)
-{
-    return GeometryFactory::createGeometry(mode);
-}
-
-

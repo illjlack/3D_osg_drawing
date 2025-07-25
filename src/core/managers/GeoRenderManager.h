@@ -21,7 +21,7 @@ class Geo3D;
 class GeoRenderManager
 {
 public:
-    explicit GeoRenderManager(Geo3D* parent);
+    explicit GeoRenderManager(osg::ref_ptr<Geo3D> parent);
     ~GeoRenderManager() = default;
 
     // 更新渲染参数
@@ -41,7 +41,7 @@ private:
     osg::Vec4 colorToOsgVec4(const Color3D& color) const;
 
 private:
-    Geo3D* m_parent;
+    osg::ref_ptr<Geo3D> m_parent;
     
 
     GeoParameters3D m_currentParams;

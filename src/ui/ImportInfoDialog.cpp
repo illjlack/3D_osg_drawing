@@ -9,7 +9,7 @@
 #include <osg/ComputeBoundsVisitor>
 #include <cmath>
 
-ImportInfoDialog::ImportInfoDialog(Geo3D* importedGeo, QWidget* parent)
+ImportInfoDialog::ImportInfoDialog(osg::ref_ptr<Geo3D> importedGeo, QWidget* parent)
     : QDialog(parent)
     , m_geometry(importedGeo)
     , m_updating(false)

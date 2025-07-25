@@ -1,5 +1,6 @@
 ﻿#include "StatusBar3D.h"
 #include "OSGWidget.h"
+#include "../core/GeometryBase.h"  // 包含Geo3D的完整定义
 #include <QApplication>
 #include <QScreen>
 #include <QStyle>

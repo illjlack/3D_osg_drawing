@@ -79,7 +79,7 @@ private:
     PickResult analyzePolytopeIntersection(const osgUtil::PolytopeIntersector::Intersection& intersection, PickFeatureType featureType);
     
     // 几何体匹配 - 通过遍历节点路径查找
-    Geo3D* findGeometryFromNodePath(const osg::NodePath& nodePath);
+    osg::ref_ptr<Geo3D> findGeometryFromNodePath(const osg::NodePath& nodePath);
     
     // NodeMask 获取
     unsigned int getPickingMask() const;

@@ -19,7 +19,7 @@ enum class PickFeatureType {
 // 拾取结果
 struct PickResult {
     bool hasResult = false;
-    Geo3D* geometry = nullptr;
+    osg::ref_ptr<Geo3D> geometry = nullptr;
     glm::dvec3 worldPosition{0.0};
     glm::dvec3 surfaceNormal{0.0};
     double distance = FLT_MAX;
