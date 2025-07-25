@@ -73,6 +73,11 @@ public:
     
     // 6. 获得所有控制点
     const std::vector<std::vector<Point3D>>& getAllStageControlPoints();
+    
+    // 用于文件加载
+    // 序列化和反序列化控制点数据
+    std::string serializeControlPoints() const;
+    bool deserializeControlPoints(const std::string& data);
 
 signals:
     void controlPointChanged();

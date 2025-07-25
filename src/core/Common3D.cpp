@@ -1,6 +1,9 @@
 ﻿#include "Common3D.h"
+#include "../util/LogManager.h"
 #include <fstream>
 #include <string>
+#include <sstream> // Required for std::ostringstream and std::istringstream
+#include <vector> // Required for std::vector
 
 // 全局变量定义
 DrawMode3D GlobalDrawMode3D = DrawSelect3D;
@@ -402,14 +405,122 @@ GeoParameters3D GeoParameters3D::lerp(const GeoParameters3D& other, double t) co
 // 保存/加载到字符串（用于配置文件）
 std::string GeoParameters3D::toString() const
 {
-    // 实现序列化逻辑
-    return ""; // 占位符
+    // 使用分号分隔各个参数
+    std::ostringstream oss;
+    
+    // 点属性
+    oss << static_cast<int>(pointShape) << ";" << pointSize << ";" 
+        << pointColor.r << ";" << pointColor.g << ";" << pointColor.b << ";" << pointColor.a << ";"
+        << (showPoints ? 1 : 0) << ";";
+    
+    // 线属性  
+    oss << static_cast<int>(lineStyle) << ";" << lineWidth << ";"
+        << lineColor.r << ";" << lineColor.g << ";" << lineColor.b << ";" << lineColor.a << ";"
+        << lineDashPattern << ";" << (showEdges ? 1 : 0) << ";";
+    
+    // 面属性
+    oss << static_cast<int>(fillType) << ";"
+        << fillColor.r << ";" << fillColor.g << ";" << fillColor.b << ";" << fillColor.a << ";"
+        << (showFaces ? 1 : 0) << ";";
+    
+    // 材质属性
+    oss << static_cast<int>(material.type) << ";" << material.transparency << ";";
+    
+    // 体属性
+    oss << static_cast<int>(subdivisionLevel);
+    
+    return oss.str();
 }
 
 bool GeoParameters3D::fromString(const std::string& str)
 {
-    // 实现反序列化逻辑
-    return true; // 占位符
+    if (str.empty()) {
+        // 如果字符串为空，使用默认参数
+        *this = getDefaultStyle();
+        return true;
+    }
+    
+    std::istringstream iss(str);
+    std::string token;
+    std::vector<std::string> tokens;
+    
+    // 分割字符串
+    while (std::getline(iss, token, ';')) {
+        tokens.push_back(token);
+    }
+    
+    // 检查token数量（应该有24个参数）
+    if (tokens.size() < 24) {
+        LOG_WARNING("参数数据不完整，使用默认值补充", "参数反序列化");
+        *this = getDefaultStyle();
+        
+        // 尝试解析可用的参数
+        size_t idx = 0;
+        try {
+            if (idx < tokens.size()) pointShape = static_cast<PointShape3D>(std::stoi(tokens[idx++]));
+            if (idx < tokens.size()) pointSize = std::stod(tokens[idx++]);
+            if (idx < tokens.size()) pointColor.r = std::stod(tokens[idx++]);
+            if (idx < tokens.size()) pointColor.g = std::stod(tokens[idx++]);
+            if (idx < tokens.size()) pointColor.b = std::stod(tokens[idx++]);
+            if (idx < tokens.size()) pointColor.a = std::stod(tokens[idx++]);
+            if (idx < tokens.size()) showPoints = (std::stoi(tokens[idx++]) != 0);
+        } catch (const std::exception& e) {
+            LOG_WARNING("部分参数解析失败，使用默认值", "参数反序列化");
+        }
+        return true;
+    }
+    
+    try {
+        size_t idx = 0;
+        
+        // 点属性
+        pointShape = static_cast<PointShape3D>(std::stoi(tokens[idx++]));
+        pointSize = std::stod(tokens[idx++]);
+        pointColor.r = std::stod(tokens[idx++]);
+        pointColor.g = std::stod(tokens[idx++]);
+        pointColor.b = std::stod(tokens[idx++]);
+        pointColor.a = std::stod(tokens[idx++]);
+        showPoints = (std::stoi(tokens[idx++]) != 0);
+        
+        // 线属性
+        lineStyle = static_cast<LineStyle3D>(std::stoi(tokens[idx++]));
+        lineWidth = std::stod(tokens[idx++]);
+        lineColor.r = std::stod(tokens[idx++]);
+        lineColor.g = std::stod(tokens[idx++]);
+        lineColor.b = std::stod(tokens[idx++]);
+        lineColor.a = std::stod(tokens[idx++]);
+        lineDashPattern = std::stod(tokens[idx++]);
+        showEdges = (std::stoi(tokens[idx++]) != 0);
+        
+        // 面属性
+        fillType = static_cast<FillType3D>(std::stoi(tokens[idx++]));
+        fillColor.r = std::stod(tokens[idx++]);
+        fillColor.g = std::stod(tokens[idx++]);
+        fillColor.b = std::stod(tokens[idx++]);
+        fillColor.a = std::stod(tokens[idx++]);
+        showFaces = (std::stoi(tokens[idx++]) != 0);
+        
+        // 材质属性
+        material.type = static_cast<MaterialType3D>(std::stoi(tokens[idx++]));
+        material.transparency = std::stod(tokens[idx++]);
+        
+        // 体属性
+        subdivisionLevel = static_cast<SubdivisionLevel3D>(std::stoi(tokens[idx++]));
+        
+        // 验证参数有效性
+        if (!validateParameters()) {
+            LOG_WARNING("反序列化的参数无效，重置为默认值", "参数反序列化");
+            *this = getDefaultStyle();
+            return false;
+        }
+        
+        return true;
+        
+    } catch (const std::exception& e) {
+        LOG_ERROR("参数反序列化失败，使用默认值", "参数反序列化");
+        *this = getDefaultStyle();
+        return false;
+    }
 }
 
 void GeoParameters3D::setPresetStyle(const std::string& styleName)

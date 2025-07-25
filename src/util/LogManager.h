@@ -5,7 +5,6 @@
 #include <QString>
 #include <QDateTime>
 #include <QThread>
-#include <queue>
 #include <list>
 #include <sstream>
 
@@ -185,77 +184,13 @@ struct LogConfig
 {
     int maxLogCount = 1000;              // 最大日志条数
     bool enableConsoleOutput = true;      // 启用控制台输出
-    bool enableFileOutput = false;        // 启用文件输出
+    bool enableFileOutput = true;        // 启用文件输出
     QString logFilePath = "";             // 日志文件路径
     LogLevel minLogLevel = LogLevel::Debug; // 最小日志级别
     bool enableLevelFilter = false;       // 启用日志级别过滤
 };
 
-// 日志工作线程类
-class LogWorkerThread : public QThread
-{
-    Q_OBJECT
-
-public:
-    explicit LogWorkerThread(QObject* parent = nullptr);
-    ~LogWorkerThread();
-
-    // 添加日志到队列
-    void addLog(const LogEntry& entry);
-    
-    // 配置管理
-    void setConfig(const LogConfig& config);
-    LogConfig getConfig() const;
-    
-    // 设置输出选项
-    void setConsoleOutput(bool enabled);
-    void setFileOutput(bool enabled);
-    void setLogFilePath(const QString& path);
-    void setMaxLogCount(int count);
-
-    // 获取日志列表
-    std::list<LogEntry> getLogs() const;
-    
-    // 清空日志
-    void clearLogs();
-    
-    // 获取待处理日志数量
-    int getPendingLogCount() const;
-    
-    // 获取当前日志数量
-    int getCurrentLogCount() const;
-    
-    // 线程控制
-    void requestExit();
-
-signals:
-    void logAdded(const LogEntry& entry);
-    void logsCleared();
-
-protected:
-    void run() override;
-
-private:
-    void writeToFile(const LogEntry& entry);
-    QString formatLogMessage(const LogEntry& entry) const;
-    void emitLogAdded(const LogEntry& entry);
-    bool shouldAcceptLog(const LogEntry& entry) const;
-
-    // 日志队列
-    std::queue<LogEntry> m_logQueue;
-    
-    // 日志存储
-    std::list<LogEntry> m_logs;
-    
-    // 配置
-    LogConfig m_config;
-    
-    // 控制标志
-    bool m_running;
-    bool m_shouldExit;
-};
-
-// 日志管理器类（主线程接口）
+// 日志管理器类（主线程使用，其他线程不应该调用，不处理其他线程竞争问题）
 class LogManager : public QObject
 {
     Q_OBJECT
@@ -297,8 +232,11 @@ public:
     QString getLogFilePath() const;
     
     // 统计信息
-    int getPendingLogCount() const;
+    int getPendingLogCount() const;  // 主线程实现中总是返回0
     int getCurrentLogCount() const;
+    
+    // 获取日志列表
+    std::list<LogEntry> getLogs() const;
 
 signals:
     // 日志添加信号
@@ -311,13 +249,23 @@ private:
     LogManager();
     ~LogManager();
     
-    // 这些是线程不安全的，但是应该不影响
+    // 处理日志
+    void processLog(const LogEntry& entry);
+    
+    // 日志格式化和输出
+    void writeToFile(const LogEntry& entry);
+    QString formatLogMessage(const LogEntry& entry) const;
+    bool shouldAcceptLog(const LogEntry& entry) const;
+    
+    // 确保日志目录存在
+    void ensureLogDirectory();
+
     static LogManager* s_instance;
-    LogWorkerThread* m_workerThread;
     LogConfig m_config;
+    std::list<LogEntry> m_logs;  // 日志存储
 };
 
-// 日志辅助类（支持流式输出）
+// 日志辅助类
 class LogStream
 {
 public:

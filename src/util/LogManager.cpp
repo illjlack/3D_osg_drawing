@@ -4,185 +4,191 @@
 #include <QFile>
 #include <QTextStream>
 #include <QCoreApplication>
-#include <QMetaObject>
 #include <QFileInfo>
 #include <algorithm>
 
-// ==================== LogWorkerThread 实现 ====================
+// ==================== LogManager 实现 ====================
 
-LogWorkerThread::LogWorkerThread(QObject* parent)
-    : QThread(parent)
-    , m_running(false)
-    , m_shouldExit(false)
+LogManager* LogManager::s_instance = nullptr;
+
+LogManager::LogManager()
 {
-    // 设置默认配置
+    // 初始化默认配置
     m_config.maxLogCount = 1000;
     m_config.enableConsoleOutput = true;
-    m_config.enableFileOutput = false;
+    m_config.enableFileOutput = true;
     m_config.logFilePath = "";
     m_config.minLogLevel = LogLevel::Debug;
     m_config.enableLevelFilter = false;
     
-    // 初始化日志目录
+    // 设置默认日志文件路径
     QString appDir = QCoreApplication::applicationDirPath();
     m_config.logFilePath = appDir + "/logs/app.log";
-    QDir logDir(QFileInfo(m_config.logFilePath).absolutePath());
-    if (!logDir.exists()) {
-        logDir.mkpath(".");
-    }
-}
-
-LogWorkerThread::~LogWorkerThread()
-{
-    // 设置退出标志
-    m_shouldExit = true;
-    m_running = false;
     
-    // 等待线程退出
-    if (isRunning()) {
-        quit();
-        if (!wait(3000)) {  // 等待3秒
-            terminate();
-            wait(1000);  // 再等待1秒
-        }
-    }
+    // 确保日志目录存在
+    ensureLogDirectory();
 }
 
-void LogWorkerThread::addLog(const LogEntry& entry)
+LogManager::~LogManager()
 {
-    // 快速过滤
-    if (!shouldAcceptLog(entry)) {
-        return;
+}
+
+LogManager* LogManager::getInstance()
+{
+    if (!s_instance) {
+        s_instance = new LogManager();
     }
+    return s_instance;
+}
+
+void LogManager::log(LogLevel level, const QString& message, const QString& category,
+                    const QString& fileName, int lineNumber, const QString& functionName)
+{
+    // 创建日志条目
+    LogEntry entry(level, message, category, fileName, lineNumber, functionName);
     
-    // 如果队列过满，丢弃旧的日志
-    if (m_logQueue.size() > m_config.maxLogCount * 2) {
-        while (m_logQueue.size() > m_config.maxLogCount) {
-            m_logQueue.pop();
-        }
-    }
-    
-    m_logQueue.push(entry);
+    // 直接在主线程处理
+    processLog(entry);
 }
 
-void LogWorkerThread::setConfig(const LogConfig& config)
+void LogManager::debug(const QString& message, const QString& category,
+                      const QString& fileName, int lineNumber, const QString& functionName)
 {
-    m_config = config;
-    
-    // 更新日志目录
-    if (!m_config.logFilePath.isEmpty()) {
-        QDir logDir(QFileInfo(m_config.logFilePath).absolutePath());
-        if (!logDir.exists()) {
-            logDir.mkpath(".");
-        }
-    }
+    log(LogLevel::Debug, message, category, fileName, lineNumber, functionName);
 }
 
-LogConfig LogWorkerThread::getConfig() const
+void LogManager::info(const QString& message, const QString& category,
+                     const QString& fileName, int lineNumber, const QString& functionName)
 {
-    return m_config;
+    log(LogLevel::Info, message, category, fileName, lineNumber, functionName);
 }
 
-void LogWorkerThread::setConsoleOutput(bool enabled)
+void LogManager::warning(const QString& message, const QString& category,
+                        const QString& fileName, int lineNumber, const QString& functionName)
 {
-    m_config.enableConsoleOutput = enabled;
+    log(LogLevel::Warning, message, category, fileName, lineNumber, functionName);
 }
 
-void LogWorkerThread::setFileOutput(bool enabled)
+void LogManager::error(const QString& message, const QString& category,
+                      const QString& fileName, int lineNumber, const QString& functionName)
 {
-    m_config.enableFileOutput = enabled;
+    log(LogLevel::Error, message, category, fileName, lineNumber, functionName);
 }
 
-void LogWorkerThread::setLogFilePath(const QString& path)
+void LogManager::success(const QString& message, const QString& category,
+                        const QString& fileName, int lineNumber, const QString& functionName)
 {
-    m_config.logFilePath = path;
-    if (!path.isEmpty()) {
-        QDir logDir(QFileInfo(path).absolutePath());
-        if (!logDir.exists()) {
-            logDir.mkpath(".");
-        }
-    }
+    log(LogLevel::Success, message, category, fileName, lineNumber, functionName);
 }
 
-void LogWorkerThread::setMaxLogCount(int count)
-{
-    m_config.maxLogCount = count;
-}
-
-std::list<LogEntry> LogWorkerThread::getLogs() const
-{
-    return m_logs;
-}
-
-void LogWorkerThread::clearLogs()
+void LogManager::clearLogs()
 {
     m_logs.clear();
     emit logsCleared();
 }
 
-int LogWorkerThread::getPendingLogCount() const
+void LogManager::setConfig(const LogConfig& config)
 {
-    return static_cast<int>(m_logQueue.size());
+    m_config = config;
+    ensureLogDirectory();
 }
 
-int LogWorkerThread::getCurrentLogCount() const
+LogConfig LogManager::getConfig() const
+{
+    return m_config;
+}
+
+void LogManager::setMaxLogCount(int count)
+{
+    m_config.maxLogCount = count;
+}
+
+int LogManager::getMaxLogCount() const
+{
+    return m_config.maxLogCount;
+}
+
+void LogManager::setConsoleOutput(bool enabled)
+{
+    m_config.enableConsoleOutput = enabled;
+}
+
+bool LogManager::isConsoleOutputEnabled() const
+{
+    return m_config.enableConsoleOutput;
+}
+
+void LogManager::setFileOutput(bool enabled)
+{
+    m_config.enableFileOutput = enabled;
+    if (enabled) {
+        ensureLogDirectory();
+    }
+}
+
+bool LogManager::isFileOutputEnabled() const
+{
+    return m_config.enableFileOutput;
+}
+
+void LogManager::setLogFilePath(const QString& path)
+{
+    m_config.logFilePath = path;
+    ensureLogDirectory();
+}
+
+QString LogManager::getLogFilePath() const
+{
+    return m_config.logFilePath;
+}
+
+int LogManager::getPendingLogCount() const
+{
+    // 主线程实现中没有待处理队列，总是返回0
+    return 0;
+}
+
+int LogManager::getCurrentLogCount() const
 {
     return static_cast<int>(m_logs.size());
 }
 
-void LogWorkerThread::requestExit()
+std::list<LogEntry> LogManager::getLogs() const
 {
-    m_shouldExit = true;
+    return m_logs;
 }
 
-void LogWorkerThread::run()
+void LogManager::processLog(const LogEntry& entry)
 {
-    m_running = true;
-    
-    while (m_running && !m_shouldExit) {
-        LogEntry entry;
-        bool hasEntry = false;
-        
-        if (!m_logQueue.empty()) {
-            entry = m_logQueue.front();
-            m_logQueue.pop();
-            hasEntry = true;
-        } else {
-            // 检查线程是否应该退出
-            if (m_shouldExit) {
-                break;
-            }
-            // 直接继续循环，Qt事件循环会自动处理CPU占用
-            continue;
-        }
-        
-        if (hasEntry) {
-            // 处理日志
-            m_logs.push_back(entry);
-            
-            // 如果日志数量超过限制，删除最旧的
-            if (m_logs.size() > m_config.maxLogCount) {
-                m_logs.pop_front();
-            }
-            
-            // 控制台输出
-            if (m_config.enableConsoleOutput) {
-                QString msg = formatLogMessage(entry);
-                qDebug().noquote() << msg;
-            }
-            
-            // 文件输出
-            if (m_config.enableFileOutput && !m_config.logFilePath.isEmpty()) {
-                writeToFile(entry);
-            }
-            
-            // 发送信号
-            emitLogAdded(entry);
-        }
+    // 检查是否应该接受这个日志
+    if (!shouldAcceptLog(entry)) {
+        return;
     }
+    
+    // 添加到日志列表
+    m_logs.push_back(entry);
+    
+    // 如果日志数量超过限制，删除最旧的
+    if (m_logs.size() > static_cast<size_t>(m_config.maxLogCount)) {
+        m_logs.pop_front();
+    }
+    
+    // 控制台输出
+    if (m_config.enableConsoleOutput) {
+        QString msg = formatLogMessage(entry);
+        qDebug().noquote() << msg;
+    }
+    
+    // 文件输出
+    if (m_config.enableFileOutput && !m_config.logFilePath.isEmpty()) {
+        writeToFile(entry);
+    }
+    
+    // 发送信号
+    emit logAdded(entry);
 }
 
-void LogWorkerThread::writeToFile(const LogEntry& entry)
+void LogManager::writeToFile(const LogEntry& entry)
 {
     QFile file(m_config.logFilePath);
     if (file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
@@ -193,7 +199,7 @@ void LogWorkerThread::writeToFile(const LogEntry& entry)
     }
 }
 
-QString LogWorkerThread::formatLogMessage(const LogEntry& entry) const
+QString LogManager::formatLogMessage(const LogEntry& entry) const
 {
     QString levelStr;
     switch (entry.level) {
@@ -229,14 +235,7 @@ QString LogWorkerThread::formatLogMessage(const LogEntry& entry) const
     return message;
 }
 
-void LogWorkerThread::emitLogAdded(const LogEntry& entry)
-{
-    QMetaObject::invokeMethod(this, [this, entry]() {
-        emit logAdded(entry);
-    }, Qt::QueuedConnection);
-}
-
-bool LogWorkerThread::shouldAcceptLog(const LogEntry& entry) const
+bool LogManager::shouldAcceptLog(const LogEntry& entry) const
 {
     // 级别过滤
     if (m_config.enableLevelFilter) {
@@ -248,192 +247,13 @@ bool LogWorkerThread::shouldAcceptLog(const LogEntry& entry) const
     return true;
 }
 
-// ==================== LogManager 实现 ====================
-
-LogManager* LogManager::s_instance = nullptr;
-
-LogManager::LogManager()
-    : m_workerThread(nullptr)
+void LogManager::ensureLogDirectory()
 {
-    // 初始化默认配置
-    m_config.maxLogCount = 1000;
-    m_config.enableConsoleOutput = true;
-    m_config.enableFileOutput = false;
-    m_config.logFilePath = "";
-    m_config.minLogLevel = LogLevel::Debug;
-    m_config.enableLevelFilter = false;
-    
-    m_workerThread = new LogWorkerThread(this);
-    connect(m_workerThread, &LogWorkerThread::logAdded, this, &LogManager::logAdded);
-    connect(m_workerThread, &LogWorkerThread::logsCleared, this, &LogManager::logsCleared);
-    
-    m_workerThread->setConfig(m_config);
-    m_workerThread->start();
-}
-
-LogManager::~LogManager()
-{
-    if (m_workerThread) {
-        qDebug() << "LogManager destructor: stopping worker thread";
-        
-        // 请求线程退出
-        m_workerThread->requestExit();
-        
-        // 停止线程
-        m_workerThread->quit();
-        
-        // 等待线程退出
-        if (!m_workerThread->wait(3000)) {
-            qDebug() << "LogManager destructor: force terminating worker thread";
-            m_workerThread->terminate();
-            m_workerThread->wait(1000);
+    if (!m_config.logFilePath.isEmpty()) {
+        QDir logDir(QFileInfo(m_config.logFilePath).absolutePath());
+        if (!logDir.exists()) {
+            logDir.mkpath(".");
         }
-        
-        qDebug() << "LogManager destructor: deleting worker thread";
-        delete m_workerThread;
-        m_workerThread = nullptr;
     }
-}
-
-LogManager* LogManager::getInstance()
-{
-    if (!s_instance) {
-        s_instance = new LogManager();
-    }
-    return s_instance;
-}
-
-void LogManager::log(LogLevel level, const QString& message, const QString& category,
-                    const QString& fileName, int lineNumber, const QString& functionName)
-{
-    if (m_workerThread) {
-        // 当前调用线程构造对象
-        LogEntry entry(level, message, category, fileName, lineNumber, functionName);
-        
-        // 捕获 entry，并将其推入日志线程中执行（拷贝entry）
-        QMetaObject::invokeMethod(m_workerThread, [this, entry]() {
-            m_workerThread->addLog(entry);
-            }, Qt::QueuedConnection);
-    }
-}
-
-void LogManager::debug(const QString& message, const QString& category,
-                      const QString& fileName, int lineNumber, const QString& functionName)
-{
-    log(LogLevel::Debug, message, category, fileName, lineNumber, functionName);
-}
-
-void LogManager::info(const QString& message, const QString& category,
-                     const QString& fileName, int lineNumber, const QString& functionName)
-{
-    log(LogLevel::Info, message, category, fileName, lineNumber, functionName);
-}
-
-void LogManager::warning(const QString& message, const QString& category,
-                        const QString& fileName, int lineNumber, const QString& functionName)
-{
-    log(LogLevel::Warning, message, category, fileName, lineNumber, functionName);
-}
-
-void LogManager::error(const QString& message, const QString& category,
-                      const QString& fileName, int lineNumber, const QString& functionName)
-{
-    log(LogLevel::Error, message, category, fileName, lineNumber, functionName);
-}
-
-void LogManager::success(const QString& message, const QString& category,
-                        const QString& fileName, int lineNumber, const QString& functionName)
-{
-    log(LogLevel::Success, message, category, fileName, lineNumber, functionName);
-}
-
-void LogManager::clearLogs()
-{
-    if (m_workerThread) {
-        QMetaObject::invokeMethod(m_workerThread, &LogWorkerThread::clearLogs, Qt::QueuedConnection);
-    }
-}
-
-void LogManager::setConfig(const LogConfig& config)
-{
-    m_config = config;
-    if (m_workerThread) {
-        QMetaObject::invokeMethod(m_workerThread, [this, config]() {
-            m_workerThread->setConfig(config);
-        }, Qt::QueuedConnection);
-    }
-}
-
-LogConfig LogManager::getConfig() const
-{
-    return m_config;
-}
-
-void LogManager::setMaxLogCount(int count)
-{
-    m_config.maxLogCount = count;
-    
-    if (m_workerThread) {
-        QMetaObject::invokeMethod(m_workerThread, [this, count]() {
-            m_workerThread->setMaxLogCount(count);
-        }, Qt::QueuedConnection);
-    }
-}
-
-int LogManager::getMaxLogCount() const
-{
-    return m_config.maxLogCount;
-}
-
-void LogManager::setConsoleOutput(bool enabled)
-{
-    if (m_workerThread) {
-        QMetaObject::invokeMethod(m_workerThread, [this, enabled]() {
-            m_workerThread->setConsoleOutput(enabled);
-        }, Qt::QueuedConnection);
-    }
-}
-
-bool LogManager::isConsoleOutputEnabled() const
-{
-    return m_workerThread ? true : false;
-}
-
-void LogManager::setFileOutput(bool enabled)
-{
-    if (m_workerThread) {
-        QMetaObject::invokeMethod(m_workerThread, [this, enabled]() {
-            m_workerThread->setFileOutput(enabled);
-        }, Qt::QueuedConnection);
-    }
-}
-
-bool LogManager::isFileOutputEnabled() const
-{
-    return m_workerThread ? true : false;
-}
-
-void LogManager::setLogFilePath(const QString& path)
-{
-    if (m_workerThread) {
-        QMetaObject::invokeMethod(m_workerThread, [this, path]() {
-            m_workerThread->setLogFilePath(path);
-        }, Qt::QueuedConnection);
-    }
-}
-
-QString LogManager::getLogFilePath() const
-{
-    return m_workerThread ? m_workerThread->getConfig().logFilePath : "";
-}
-
-int LogManager::getPendingLogCount() const
-{
-    return m_workerThread ? m_workerThread->getPendingLogCount() : 0;
-}
-
-int LogManager::getCurrentLogCount() const
-{
-    return m_workerThread ? m_workerThread->getCurrentLogCount() : 0;
 } 
 

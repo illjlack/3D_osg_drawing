@@ -2,6 +2,7 @@
 #include "../GeometryBase.h"
 #include <stdexcept>
 #include <algorithm>
+#include <sstream> // Added for serialization/deserialization
 
 GeoControlPointManager::GeoControlPointManager(Geo3D* parent)
     : QObject(parent)
@@ -172,5 +173,112 @@ GeoStateManager* GeoControlPointManager::getState() const
 {
     assert(m_parent);
     return m_parent->mm_state();
+}
+
+std::string GeoControlPointManager::serializeControlPoints() const
+{
+    std::ostringstream oss;
+    
+    // 保存阶段数量（只保存已完成的阶段，不保存当前正在进行的空阶段）
+    size_t completedStages = m_stages.size();
+    if (!m_stages.empty() && m_stages.back().empty()) {
+        completedStages--; // 不保存最后的空阶段
+    }
+    
+    oss << completedStages;
+    
+    // 保存每个阶段的控制点
+    for (size_t stageIdx = 0; stageIdx < completedStages; ++stageIdx) {
+        const auto& stage = m_stages[stageIdx];
+        oss << ";" << stage.size(); // 该阶段的点数量
+        
+        for (const auto& point : stage) {
+            oss << ";" << point.x() << "," << point.y() << "," << point.z();
+        }
+    }
+    
+    return oss.str();
+}
+
+bool GeoControlPointManager::deserializeControlPoints(const std::string& data)
+{
+    if (data.empty()) {
+        // 空数据，保持默认状态（一个空阶段）
+        return true;
+    }
+    
+    std::istringstream iss(data);
+    std::string token;
+    std::vector<std::string> tokens;
+    
+    // 分割字符串
+    while (std::getline(iss, token, ';')) {
+        tokens.push_back(token);
+    }
+    
+    if (tokens.empty()) {
+        return false;
+    }
+    
+    try {
+        // 读取阶段数量
+        size_t stageCount = std::stoull(tokens[0]);
+        
+        // 清空现有数据
+        m_stages.clear();
+        
+        size_t tokenIdx = 1;
+        
+        // 读取每个阶段的数据
+        for (size_t stageIdx = 0; stageIdx < stageCount; ++stageIdx) {
+            if (tokenIdx >= tokens.size()) {
+                return false; // 数据不完整
+            }
+            
+            // 读取该阶段的点数量
+            size_t pointCount = std::stoull(tokens[tokenIdx++]);
+            
+            std::vector<Point3D> stagePoints;
+            
+            // 读取该阶段的所有点
+            for (size_t pointIdx = 0; pointIdx < pointCount; ++pointIdx) {
+                if (tokenIdx >= tokens.size()) {
+                    return false; // 数据不完整
+                }
+                
+                // 解析点坐标 "x,y,z"
+                std::string pointStr = tokens[tokenIdx++];
+                std::istringstream pointStream(pointStr);
+                std::string coord;
+                std::vector<std::string> coords;
+                
+                while (std::getline(pointStream, coord, ',')) {
+                    coords.push_back(coord);
+                }
+                
+                if (coords.size() != 3) {
+                    return false; // 坐标格式错误
+                }
+                
+                double x = std::stod(coords[0]);
+                double y = std::stod(coords[1]);
+                double z = std::stod(coords[2]);
+                
+                stagePoints.emplace_back(x, y, z);
+            }
+            
+            m_stages.push_back(stagePoints);
+        }
+
+        // 不重新触发计算，因为保存在节点里，省的发生什么错误
+        // emit controlPointChanged();
+        return true;
+        
+    } catch (const std::exception& e) {
+        // 解析失败，恢复默认状态
+        m_stages.clear();
+        m_stages.emplace_back();
+        return false;
+    }
 }
 

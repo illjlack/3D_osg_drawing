@@ -26,6 +26,9 @@ public:
 
     // 更新渲染参数
     void updateRenderingParameters(const GeoParameters3D& params);
+    
+    // 重新初始化渲染状态（用于从外部加载节点后）
+    void reinitializeRenderStates();
 
 private:
     void initializeRenderStates();

@@ -118,9 +118,6 @@ void GeoNodeManager::setOSGNode(osg::ref_ptr<osg::Node> node)
             LOG_INFO("将节点添加到根节点下并设置面几何体mask", "几何体管理");
         }
     }
-
-    // 更新整体状态
-    updateGeometries();
     LOG_INFO("OSG节点设置完成", "几何体管理");
 }
 
@@ -162,6 +159,9 @@ void GeoNodeManager::onDrawingCompleted()
         m_osgNode->setNodeMask(NODE_MASK_ALL_VISIBLE);
         LOG_INFO("绘制完成，节点已可拾取", "几何体管理");
     }
+
+    // 第一次建立索引
+    updateSpatialIndex();
 }
 
 // ============= 私有函数：初始化 =============
@@ -238,6 +238,28 @@ void GeoNodeManager::findAndAssignNodeComponents(osg::Node* node)
             : osg::NodeVisitor(osg::NodeVisitor::TRAVERSE_ALL_CHILDREN)
             , m_manager(manager) {}
 
+        virtual void apply(osg::Group& group) override
+        {
+            const std::string& name = group.getName();
+            if (name == NodeTags3D::ROOT_GROUP) {
+                // 找到根节点，直接赋值给m_osgNode
+                m_manager->m_osgNode = &group;
+                LOG_INFO("找到并分配根节点组", "几何体管理");
+            }
+            traverse(group);
+        }
+
+        virtual void apply(osg::MatrixTransform& transform) override
+        {
+            const std::string& name = transform.getName();
+            if (name == NodeTags3D::TRANSFORM_NODE) {
+                // 找到变换节点
+                m_manager->m_transformNode = &transform;
+                LOG_INFO("找到并分配变换节点", "几何体管理");
+            }
+            traverse(transform);
+        }
+
         virtual void apply(osg::Geometry& geometry) override
         {
             const std::string& name = geometry.getName();
@@ -265,15 +287,21 @@ void GeoNodeManager::findAndAssignNodeComponents(osg::Node* node)
 
     ComponentFinder finder(this);
     node->accept(finder);
-
-    // 将整个节点添加到我们的场景图中
-    if (m_transformNode.valid()) {
-        m_transformNode->addChild(node);
-        LOG_INFO("外部节点已添加到变换节点", "几何体管理");
-    } else if (m_osgNode.valid()) {
-        m_osgNode->addChild(node);
-        LOG_INFO("外部节点已添加到根节点", "几何体管理");
-    }
+    
+    /**
+    * 关于继承public osg::Referenced导致的bug:
+    * 这个是在对象内部维护一个计数，对于特定api的调用，会ref和unref计数。目的是osg节点等对象自动析构（因为他们都是用特定api绑定的）。
+    * 
+    * 然后setUserData就是其中一个api, 在节点上挂载一个自定义的用户数据，用来共享并自动析构。
+    * 
+    * 因为Geo3D持有多个node节点，我需要 在场景树（node的）中拾取功能能通过node找到Geo3D。
+    * 然后就使用了setUserData保存对象指针。但是在这里，因为所有节点都析构更换，所以最后Geo3D也就被析构了。
+    * 
+    * (!所以这又有一个bug, 我说怎么拾取不了（没全部更换的没用触发析构，程序还能运行），更换节点的节点忘设置对象的指针了，不然这里应该不会被析构，
+    * 总会持有。。。。好像又解释了为什么之前一关程序就崩溃，重复析构了。。)
+    * 
+    * 其实我要保存的是一个普通的独占数据，用键值对setUserValue就行。
+    */
 }
 
 // ============= 私有函数：空间索引管理 =============

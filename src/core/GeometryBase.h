@@ -75,6 +75,9 @@ public:
     virtual QString serialize() const;           // 序列化对象数据为字符串
     virtual bool deserialize(const QString& data); // 从字符串反序列化对象数据
     
+    // 从文件加载完整恢复对象状态（按正确顺序：参数->节点->控制点->渲染）
+    void restoreFromFileNode(osg::ref_ptr<osg::Node> node);
+    
     // =============================== 控制点绘制相关 ==============================
     // 获取该几何图形的阶段描述符
     // 控制点管理器依据这个控制绘制阶段

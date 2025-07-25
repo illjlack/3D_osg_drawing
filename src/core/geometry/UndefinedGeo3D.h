@@ -13,7 +13,7 @@ public:
     // 获取未定义几何体的阶段描述符
     virtual const StageDescriptors& getStageDescriptors() const
     {
-        static StageDescriptors stageDescriptors{};
+        static StageDescriptors stageDescriptors{ {}};
         return stageDescriptors;
     }
 
@@ -21,6 +21,7 @@ protected:
     virtual void buildVertexGeometries() override;
     virtual void buildEdgeGeometries() override;
     virtual void buildFaceGeometries() override;
+    virtual void buildControlPointGeometries() override;
 
 private:
     

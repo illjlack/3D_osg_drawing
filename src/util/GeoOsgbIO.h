@@ -31,7 +31,10 @@ private:
     
     // 从OSG节点中读取Geo3D对象信息
     static Geo3D* loadGeoDataFromNode(osg::Node* node);
+    
+    // 打印场景树信息（深搜遍历）
+    static void printSceneTreeInfo(osg::Node* node, int depth = 0);
+    
+    // 预处理加载的场景
+    static void preprocessSceneForPicking(osg::Node* rootNode, const QString& filePath);
 }; 
-
-
-

@@ -1,53 +1,53 @@
 ﻿#include "GeoRenderManager.h"
 #include "../GeometryBase.h"
 #include "GeoNodeManager.h"
+#include "../../util/LogManager.h"
 #include <osg/PolygonMode>
 #include <osg/Depth>
 #include <osg/BlendFunc>
 
 GeoRenderManager::GeoRenderManager(Geo3D* parent)
-    : m_parent(parent)
+    : m_parent(parent),
+      m_pointMaterial(new osg::Material()),
+      m_lineMaterial(new osg::Material()),
+      m_surfaceMaterial(new osg::Material()),
+      m_pointSize(new osg::Point(5.0)),
+      m_lineWidth(new osg::LineWidth(2.0)),
+      m_lineStipple(new osg::LineStipple()),
+      m_blendFunc(new osg::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA))
 {
+    // 绑定到节点的steteSet
     initializeRenderStates();
 }
 
 void GeoRenderManager::initializeRenderStates()
 {
     if (!m_parent || !m_parent->mm_node()) return;
-    
-    // 创建渲染状态对象
-    m_pointMaterial = new osg::Material();
-    m_lineMaterial = new osg::Material();
-    m_surfaceMaterial = new osg::Material();
-    
-    m_pointSize = new osg::Point(5.0);
-    m_lineWidth = new osg::LineWidth(2.0);
-    m_lineStipple = new osg::LineStipple();
-    m_blendFunc = new osg::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    
+
+
     // 设置默认渲染状态
     auto nodeManager = m_parent->mm_node();
     
     // 为点几何设置状态
     if (auto pointGeom = nodeManager->getVertexGeometry()) {
         auto stateSet = pointGeom->getOrCreateStateSet();
-        stateSet->setAttributeAndModes(m_pointMaterial.get(), osg::StateAttribute::ON);
-        stateSet->setAttributeAndModes(m_pointSize.get(), osg::StateAttribute::ON);
+        stateSet->setAttributeAndModes(m_pointMaterial, osg::StateAttribute::ON);
+        stateSet->setAttributeAndModes(m_pointSize, osg::StateAttribute::ON);
         stateSet->setMode(GL_POINT_SMOOTH, osg::StateAttribute::ON);
     }
     
     // 为线几何设置状态
     if (auto lineGeom = nodeManager->getEdgeGeometry()) {
         auto stateSet = lineGeom->getOrCreateStateSet();
-        stateSet->setAttributeAndModes(m_lineMaterial.get(), osg::StateAttribute::ON);
-        stateSet->setAttributeAndModes(m_lineWidth.get(), osg::StateAttribute::ON);
+        stateSet->setAttributeAndModes(m_lineMaterial, osg::StateAttribute::ON);
+        stateSet->setAttributeAndModes(m_lineWidth, osg::StateAttribute::ON);
         stateSet->setMode(GL_LINE_SMOOTH, osg::StateAttribute::ON);
     }
     
     // 为面几何设置状态
     if (auto faceGeom = nodeManager->getFaceGeometry()) {
         auto stateSet = faceGeom->getOrCreateStateSet();
-        stateSet->setAttributeAndModes(m_surfaceMaterial.get(), osg::StateAttribute::ON);
+        stateSet->setAttributeAndModes(m_surfaceMaterial, osg::StateAttribute::ON);
     }
 }
 
@@ -65,9 +65,25 @@ void GeoRenderManager::updateRenderingParameters(const GeoParameters3D& params)
     updateVisibilityStates(params);
 }
 
+void GeoRenderManager::reinitializeRenderStates()
+{
+    LOG_INFO("开始重新初始化渲染状态", "渲染管理");
+    assert(this);
+    assert(m_parent);
+    assert(m_parent && m_parent->mm_node());
+    // 当节点全部更换时，直接重新初始化即可
+    // 旧的StateSet已经废弃，不需要清理
+    initializeRenderStates();
+    
+    // 应用当前参数
+    updateRenderingParameters(m_currentParams);
+    
+    LOG_INFO("渲染状态重新初始化完成", "渲染管理");
+}
+
 void GeoRenderManager::updatePointRendering(const GeoParameters3D& params)
 {
-    if (!m_pointMaterial.valid() || !m_pointSize.valid()) return;
+    if (!m_pointMaterial || !m_pointSize) return;
     
     // 设置点颜色（包含透明度）
     osg::Vec4 pointColor = colorToOsgVec4(params.pointColor);
@@ -82,7 +98,7 @@ void GeoRenderManager::updatePointRendering(const GeoParameters3D& params)
         auto nodeManager = m_parent->mm_node();
         if (auto pointGeom = nodeManager->getVertexGeometry()) {
             auto stateSet = pointGeom->getOrCreateStateSet();
-            stateSet->setAttributeAndModes(m_blendFunc.get(), osg::StateAttribute::ON);
+            stateSet->setAttributeAndModes(m_blendFunc, osg::StateAttribute::ON);
             stateSet->setMode(GL_BLEND, osg::StateAttribute::ON);
             stateSet->setRenderingHint(osg::StateSet::TRANSPARENT_BIN);
         }
@@ -91,7 +107,7 @@ void GeoRenderManager::updatePointRendering(const GeoParameters3D& params)
 
 void GeoRenderManager::updateLineRendering(const GeoParameters3D& params)
 {
-    if (!m_lineMaterial.valid() || !m_lineWidth.valid()) return;
+    if (!m_lineMaterial || !m_lineWidth) return;
     
     auto nodeManager = m_parent->mm_node();
     auto lineGeom = nodeManager->getEdgeGeometry();
@@ -112,7 +128,7 @@ void GeoRenderManager::updateLineRendering(const GeoParameters3D& params)
     
     // 处理透明度
     if (params.lineColor.a < 1.0) {
-        stateSet->setAttributeAndModes(m_blendFunc.get(), osg::StateAttribute::ON);
+        stateSet->setAttributeAndModes(m_blendFunc, osg::StateAttribute::ON);
         stateSet->setMode(GL_BLEND, osg::StateAttribute::ON);
         stateSet->setRenderingHint(osg::StateSet::TRANSPARENT_BIN);
     }
@@ -135,7 +151,7 @@ void GeoRenderManager::updateSurfaceRendering(const GeoParameters3D& params)
     
     // 处理透明度
     if (params.fillColor.a < 1.0) {
-        stateSet->setAttributeAndModes(m_blendFunc.get(), osg::StateAttribute::ON);
+        stateSet->setAttributeAndModes(m_blendFunc, osg::StateAttribute::ON);
         stateSet->setMode(GL_BLEND, osg::StateAttribute::ON);
         stateSet->setRenderingHint(osg::StateSet::TRANSPARENT_BIN);
     }
@@ -199,25 +215,25 @@ void GeoRenderManager::applyLineStyle(LineStyle3D style, double dashPattern)
         case Line_Dashed3D:
             m_lineStipple->setPattern(0xF0F0);  // 短虚线
             m_lineStipple->setFactor(1);
-            stateSet->setAttributeAndModes(m_lineStipple.get(), osg::StateAttribute::ON);
+            stateSet->setAttributeAndModes(m_lineStipple, osg::StateAttribute::ON);
             break;
             
         case Line_Dotted3D:
             m_lineStipple->setPattern(0xAAAA);  // 点线
             m_lineStipple->setFactor(1);
-            stateSet->setAttributeAndModes(m_lineStipple.get(), osg::StateAttribute::ON);
+            stateSet->setAttributeAndModes(m_lineStipple, osg::StateAttribute::ON);
             break;
             
         case Line_DashDot3D:
             m_lineStipple->setPattern(0xFF18);  // 点划线
             m_lineStipple->setFactor(1);
-            stateSet->setAttributeAndModes(m_lineStipple.get(), osg::StateAttribute::ON);
+            stateSet->setAttributeAndModes(m_lineStipple, osg::StateAttribute::ON);
             break;
             
         case Line_DashDotDot3D:
             m_lineStipple->setPattern(0xFE38);  // 双点划线
             m_lineStipple->setFactor(1);
-            stateSet->setAttributeAndModes(m_lineStipple.get(), osg::StateAttribute::ON);
+            stateSet->setAttributeAndModes(m_lineStipple, osg::StateAttribute::ON);
             break;
             
         case Line_Custom3D:
@@ -226,7 +242,7 @@ void GeoRenderManager::applyLineStyle(LineStyle3D style, double dashPattern)
                 int factor = static_cast<int>(std::max(1.0, dashPattern));
                 m_lineStipple->setPattern(0xF0F0);  // 基础虚线模式
                 m_lineStipple->setFactor(factor);
-                stateSet->setAttributeAndModes(m_lineStipple.get(), osg::StateAttribute::ON);
+                stateSet->setAttributeAndModes(m_lineStipple, osg::StateAttribute::ON);
             }
             break;
             

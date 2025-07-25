@@ -20,6 +20,7 @@
 #include <osg/PositionAttitudeTransform>
 #include <osg/NodeVisitor>
 #include <osg/UserDataContainer>
+#include <osg/ValueObject>
 #include <osg/Timer>
 #include <osgViewer/Viewer>
 #include <osg/LineSegment>
@@ -195,10 +196,11 @@ void Geo3D::buildControlPointGeometries()
 
 QString Geo3D::serialize() const
 {
-    // 序列化格式：几何体类型|参数数据
+    // 序列化格式：几何体类型|参数数据|控制点数据
     QString result;
     result += QString::number(static_cast<int>(m_geoType)) + "|";
-    result += QString::fromStdString(m_parameters.toString());
+    result += QString::fromStdString(m_parameters.toString()) + "|";
+    result += QString::fromStdString(mm_controlPoint()->serializeControlPoints());
     return result;
 }
 
@@ -221,13 +223,97 @@ bool Geo3D::deserialize(const QString& data)
     m_geoType = static_cast<GeoType3D>(geoTypeInt);
     
     // 恢复参数数据
-    QString paramData = parts.mid(1).join("|"); // 重新组合参数部分
-    if (!m_parameters.fromString(paramData.toStdString())) {
+    if (!m_parameters.fromString(parts[1].toStdString())) {
         LOG_ERROR("反序列化参数数据失败", "几何体");
         return false;
     }
     
+    // 恢复控制点数据（如果存在）- 新格式支持
+    if (parts.size() >= 3) {
+        QString controlPointData = parts[2];
+        if (!mm_controlPoint()->deserializeControlPoints(controlPointData.toStdString())) {
+            LOG_WARNING("反序列化控制点数据失败，使用默认控制点", "几何体");
+            // 不返回false，继续使用默认控制点
+        } else {
+            LOG_INFO("成功反序列化控制点数据", "几何体");
+        }
+    } else {
+        LOG_INFO("旧格式数据，使用默认控制点", "几何体");
+    }
+    
+    // 重新构建几何体（基于恢复的控制点和参数）
+    if (mm_state()->isStateComplete()) {
+        mm_node()->updateGeometries();
+        LOG_INFO("基于反序列化数据重新构建几何体", "几何体");
+    }
+    
     return true;
+}
+
+void Geo3D::restoreFromFileNode(osg::ref_ptr<osg::Node> node)
+{
+    if (!node.valid()) {
+        LOG_ERROR("传入的节点为空，无法恢复对象状态", "文件加载");
+        return;
+    }
+    
+    LOG_INFO("开始从文件节点恢复对象状态", "文件加载");
+    
+    // 0. 首先从节点恢复对象内部数据（参数+控制点） 
+    osg::UserDataContainer* userData = node->getUserDataContainer();
+    if (userData) {
+        osg::Object* geoDataObj = userData->getUserObject("GeoData");
+        osg::StringValueObject* geoDataValue = dynamic_cast<osg::StringValueObject*>(geoDataObj);
+        if (geoDataValue) {
+            QString internalData = QString::fromStdString(geoDataValue->getValue());
+            LOG_INFO(QString("读取到内部数据: '%1'").arg(internalData), "文件加载");
+            
+            // 分割内部数据：参数|控制点
+            QStringList parts = internalData.split("|");
+            if (parts.size() >= 2) {
+                // 恢复参数数据
+                if (!m_parameters.fromString(parts[0].toStdString())) {
+                    LOG_WARNING("恢复参数数据失败，使用默认参数", "文件加载");
+                } else {
+                    LOG_INFO("步骤0a: 参数数据恢复成功", "文件加载");
+                }
+                
+                // 恢复控制点数据
+                QString controlPointData = parts.mid(1).join("|"); // 重新组合控制点部分
+                if (!mm_controlPoint()->deserializeControlPoints(controlPointData.toStdString())) {
+                    LOG_WARNING("恢复控制点数据失败，使用默认控制点", "文件加载");
+                } else {
+                    LOG_INFO("步骤0b: 控制点数据恢复成功", "文件加载");
+                }
+            } else {
+                LOG_WARNING("内部数据格式不正确，使用默认值", "文件加载");
+            }
+        } else {
+            LOG_WARNING("节点没有内部数据，使用默认值", "文件加载");
+        }
+    } else {
+        LOG_WARNING("节点没有用户数据容器，使用默认值", "文件加载");
+    }
+    assert(this);
+    // 1. 设置OSG节点（这会解析节点结构并分配各个几何体组件）
+    mm_node()->setOSGNode(node);
+    LOG_INFO("步骤1: OSG节点设置完成", "文件加载");
+    
+    // 2. 重新初始化渲染状态（解决材质悬空问题）
+    assert(this->mm_node());
+    if (mm_render()) {
+        mm_render()->reinitializeRenderStates();
+        LOG_INFO("步骤2: 渲染状态重新初始化完成", "文件加载");
+    }
+    
+    if (mm_render()) {
+        mm_render()->updateRenderingParameters(m_parameters);
+        LOG_INFO("步骤3: 渲染参数应用完成", "文件加载");
+    }
+    
+    // 直接构建完成
+    mm_state()->setStateComplete();
+    LOG_INFO("文件节点恢复完成，对象状态已完全恢复", "文件加载");
 }
 
 // ============================================================================
