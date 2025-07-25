@@ -3,9 +3,6 @@
 
 #include "../core/Common3D.h"
 #include "../core/GeometryBase.h"  // 包含Geo3D的完整定义，Qt MOC需要
-#include "../core/world/Skybox.h"
-#include "../core/world/CoordinateSystem3D.h"
-#include "../core/world/CoordinateSystemRenderer.h"
 #include "../core/camera/CameraController.h"
 #include "../core/picking/PickingIndicator.h"
 #include "../core/picking/GeometryPickingSystem.h"
@@ -98,21 +95,6 @@ public:
     glm::dvec3 screenToWorld(int x, int y, double depth = 0.0);
     glm::dvec2 worldToScreen(const glm::dvec3& worldPos);
     
-    // 天空盒管理
-    void enableSkybox(bool enabled);
-    bool isSkyboxEnabled() const;
-    void setSkyboxGradient(const osg::Vec4& topColor, const osg::Vec4& bottomColor);
-    void setSkyboxSolidColor(const osg::Vec4& color);
-    void setSkyboxCubeMap(const std::string& positiveX, const std::string& negativeX,
-                         const std::string& positiveY, const std::string& negativeY,
-                         const std::string& positiveZ, const std::string& negativeZ);
-    void refreshSkybox();
-    
-    // 坐标系管理
-    void enableCoordinateSystem(bool enabled);
-    bool isCoordinateSystemEnabled() const;
-    void refreshCoordinateSystem();
-    
     // 摄像机控制器接口（直接访问，不再提供委托方法）
     CameraController* getCameraController() const { return m_cameraController.get(); }
     
@@ -126,7 +108,6 @@ signals:
     void mousePositionChanged(const glm::dvec3& worldPos);
     void screenPositionChanged(int x, int y);
     void simplePickingResult(const PickResult& result);
-    void coordinateSystemSettingsRequested();
 
 protected:
     virtual void paintEvent(QPaintEvent* event) override;
@@ -155,8 +136,6 @@ private:
     void setupLighting();
     void setupEventHandlers();
     void setupPickingSystem();
-    void setupSkybox();
-    void setupCoordinateSystem();
     
     void updateCurrentDrawing(const glm::dvec3& worldPos);
     void completeCurrentDrawing();
@@ -172,7 +151,6 @@ private:
     osg::ref_ptr<osg::Group> m_geoNode;
     osg::ref_ptr<osg::Group> m_lightNode;
     osg::ref_ptr<osg::Group> m_pickingIndicatorNode;  // 拾取指示器节点
-    osg::ref_ptr<osg::Group> m_skyboxNode;            // 天空盒节点
     
     // 摄像机控制器
     std::unique_ptr<CameraController> m_cameraController;
@@ -201,14 +179,6 @@ private:
     
     // 几何拾取系统
     osg::ref_ptr<GeometryPickingSystem> m_geometryPickingSystem;
-    
-    // 天空盒
-    std::unique_ptr<Skybox> m_skybox;
-    bool m_skyboxEnabled;
-    
-    // 坐标系
-    std::unique_ptr<CoordinateSystemRenderer> m_coordinateSystemRenderer;
-    bool m_coordinateSystemEnabled;
     
     // 鼠标位置缓存 - 避免频繁的坐标转换
     QPoint m_lastMouseScreenPos;

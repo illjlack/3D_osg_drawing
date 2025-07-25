@@ -53,7 +53,6 @@
 #include <QOpenGLWidget>
 
 #include "OSGWidget.h"
-#include "CoordinateSystemDialog.h"
 
 #include "LogOutputWidget.h"
 #include "StatusBar3D.h"
@@ -110,16 +109,6 @@ private slots:
     // 相机操控器相关
     void onManipulatorTypeChanged();
     
-    // 天空盒相关
-    void onViewSkybox();
-    void onToolPanelSkyboxEnabled(bool enabled);
-    void onSkyboxGradient();
-    void onSkyboxSolid();
-    void onSkyboxCustom();
-    
-    // 坐标系统相关
-    void onCoordinateSystemSettings();
-    
     // 拾取系统相关
     void onPickingSystemSettings();
     
@@ -147,7 +136,6 @@ private:
     
     void updateStatusBar(const QString& message);
     void updateDrawModeUI();
-    void updateCoordinateRangeLabel();
     void updateObjectCount();
 
 private:

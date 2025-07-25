@@ -22,9 +22,6 @@
     <Filter Include="Util">
       <UniqueIdentifier>{util-filter-guid}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Core\World">
-      <UniqueIdentifier>{9429a5c3-2197-4b7a-a4c1-0ccdafd4b03b}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Core\Camera">
       <UniqueIdentifier>{ebe8fdc1-9f0a-4443-83ec-c66ddecf9a8f}</UniqueIdentifier>
     </Filter>
@@ -93,18 +90,6 @@
     <ClCompile Include="src\util\MathUtils.cpp">
       <Filter>Util</Filter>
     </ClCompile>
-    <ClCompile Include="src\ui\CoordinateSystemDialog.cpp">
-      <Filter>UI</Filter>
-    </ClCompile>
-    <ClCompile Include="src\core\world\CoordinateSystem3D.cpp">
-      <Filter>Core\World</Filter>
-    </ClCompile>
-    <ClCompile Include="src\core\world\CoordinateSystemRenderer.cpp">
-      <Filter>Core\World</Filter>
-    </ClCompile>
-    <ClCompile Include="src\core\world\Skybox.cpp">
-      <Filter>Core\World</Filter>
-    </ClCompile>
     <ClCompile Include="src\core\camera\CameraController.cpp">
       <Filter>Core\Camera</Filter>
     </ClCompile>
@@ -171,9 +156,6 @@
     <ClCompile Include="src\core\picking\GeometryPickingSystem.cpp">
       <Filter>Core\Picking</Filter>
     </ClCompile>
-    <ClCompile Include="src\ui\ImportInfoDialog.cpp">
-      <Filter>UI</Filter>
-    </ClCompile>
     <ClCompile Include="src\core\ConstraintSystem.cpp">
       <Filter>Core</Filter>
     </ClCompile>
@@ -236,9 +218,6 @@
     </ClInclude>
     <ClInclude Include="src\util\MathUtils.h">
       <Filter>Util</Filter>
-    </ClInclude>
-    <ClInclude Include="src\core\world\Skybox.h">
-      <Filter>Core\World</Filter>
     </ClInclude>
     <ClInclude Include="src\util\GeoOsgbIO.h">
       <Filter>Util</Filter>
@@ -305,15 +284,6 @@
     <QtMoc Include="src\ui\OSGWidget.h">
       <Filter>UI</Filter>
     </QtMoc>
-    <QtMoc Include="src\ui\CoordinateSystemDialog.h">
-      <Filter>UI</Filter>
-    </QtMoc>
-    <QtMoc Include="src\core\world\CoordinateSystem3D.h">
-      <Filter>Core\World</Filter>
-    </QtMoc>
-    <QtMoc Include="src\core\world\CoordinateSystemRenderer.h">
-      <Filter>Core\World</Filter>
-    </QtMoc>
     <QtMoc Include="src\core\camera\CameraController.h">
       <Filter>Core\Camera</Filter>
     </QtMoc>
@@ -333,9 +303,6 @@
       <Filter>UI</Filter>
     </QtMoc>
     <QtMoc Include="src\ui\ToolPanel3D.h">
-      <Filter>UI</Filter>
-    </QtMoc>
-    <QtMoc Include="src\ui\ImportInfoDialog.h">
       <Filter>UI</Filter>
     </QtMoc>
   </ItemGroup>

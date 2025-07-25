@@ -21,10 +21,6 @@ public:
 
 signals:
     void drawModeChanged(DrawMode3D mode);
-    void skyboxEnabled(bool enabled);
-    void skyboxGradientRequested();
-    void skyboxSolidRequested();
-    void skyboxCustomRequested();
     void resetViewRequested();
     void fitViewRequested();
     void topViewRequested();
@@ -33,16 +29,11 @@ signals:
     void isometricViewRequested();
     void clearSceneRequested();
     void exportImageRequested();
-    void coordinateSystemRequested();
     void pickingSystemRequested();
     void displaySettingsRequested();
 
 public slots:
     void onDrawModeButtonClicked();
-    void onSkyboxEnabledChanged(bool enabled);
-    void onSkyboxGradientClicked();
-    void onSkyboxSolidClicked();
-    void onSkyboxCustomClicked();
     void onResetViewClicked();
     void onFitViewClicked();
     void onTopViewClicked();
@@ -51,13 +42,11 @@ public slots:
     void onIsometricViewClicked();
     void onClearSceneClicked();
     void onExportImageClicked();
-    void onCoordinateSystemClicked();
     void onPickingSystemClicked();
     void onDisplaySettingsClicked();
     void onDrawingModeChanged(int index);
     void onViewToggleClicked();
     void onUtilityToggleClicked();
-    void onSkyboxToggleClicked();
 
 private:
     void setupUI();
@@ -67,7 +56,6 @@ private:
     void createCollapsibleDrawingSection(QVBoxLayout* parentLayout);
     void createCollapsibleViewSection(QVBoxLayout* parentLayout);
     void createCollapsibleUtilitySection(QVBoxLayout* parentLayout);
-    void createCollapsibleSkyboxSection(QVBoxLayout* parentLayout);
     void createBasicToolsPage();
     void createGeometryPage();
     void createBuildingPage();
@@ -120,16 +108,7 @@ private:
     QWidget* m_utilityContentWidget;
     QPushButton* m_clearSceneButton;
     QPushButton* m_exportImageButton;
-    QPushButton* m_coordinateSystemButton;
     QPushButton* m_pickingSystemButton;
     QPushButton* m_displaySettingsButton;
-    
-    // 天空盒相关
-    QPushButton* m_skyboxToggleButton;
-    QWidget* m_skyboxContentWidget;
-    QCheckBox* m_skyboxEnabledCheck;
-    QPushButton* m_skyboxGradientButton;
-    QPushButton* m_skyboxSolidButton;
-    QPushButton* m_skyboxCustomButton;
 }; 
 

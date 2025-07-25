@@ -44,7 +44,6 @@ void ToolPanel3D::setupUI()
     createCollapsibleDrawingSection(contentLayout);
     createCollapsibleViewSection(contentLayout);
     createCollapsibleUtilitySection(contentLayout);
-    createCollapsibleSkyboxSection(contentLayout);
     
     contentLayout->addStretch();
     
@@ -291,13 +290,11 @@ void ToolPanel3D::createCollapsibleUtilitySection(QVBoxLayout* parentLayout)
     
     m_clearSceneButton = createActionButton("🗑️", "清空场景", "删除所有对象");
     m_exportImageButton = createActionButton("📸", "导出图像", "导出当前视图为图像");
-    m_coordinateSystemButton = createActionButton("📊", "坐标系统", "设置坐标系统参数");
     m_pickingSystemButton = createActionButton("🎯", "拾取设置", "设置拾取系统参数");
     m_displaySettingsButton = createActionButton("⚙️", "显示设置", "设置显示参数");
     
     utilityLayout->addWidget(m_clearSceneButton);
     utilityLayout->addWidget(m_exportImageButton);
-    utilityLayout->addWidget(m_coordinateSystemButton);
     utilityLayout->addWidget(m_pickingSystemButton);
     utilityLayout->addWidget(m_displaySettingsButton);
     
@@ -310,69 +307,8 @@ void ToolPanel3D::createCollapsibleUtilitySection(QVBoxLayout* parentLayout)
     connect(m_utilityToggleButton, &QPushButton::clicked, this, &ToolPanel3D::onUtilityToggleClicked);
     connect(m_clearSceneButton, &QPushButton::clicked, this, &ToolPanel3D::onClearSceneClicked);
     connect(m_exportImageButton, &QPushButton::clicked, this, &ToolPanel3D::onExportImageClicked);
-    connect(m_coordinateSystemButton, &QPushButton::clicked, this, &ToolPanel3D::onCoordinateSystemClicked);
     connect(m_pickingSystemButton, &QPushButton::clicked, this, &ToolPanel3D::onPickingSystemClicked);
     connect(m_displaySettingsButton, &QPushButton::clicked, this, &ToolPanel3D::onDisplaySettingsClicked);
-}
-
-void ToolPanel3D::createCollapsibleSkyboxSection(QVBoxLayout* parentLayout)
-{
-    // 天空盒折叠组
-    QFrame* sectionFrame = new QFrame();
-    sectionFrame->setObjectName("collapsibleSection");
-    QVBoxLayout* sectionLayout = new QVBoxLayout(sectionFrame);
-    sectionLayout->setSpacing(2);
-    sectionLayout->setContentsMargins(4, 4, 4, 4);
-    
-    // 标题和展开/折叠按钮
-    QHBoxLayout* titleLayout = new QHBoxLayout();
-    QLabel* titleLabel = new QLabel("🌅 天空盒设置");
-    titleLabel->setObjectName("sectionTitle");
-    
-    m_skyboxToggleButton = new QPushButton("▼");
-    m_skyboxToggleButton->setObjectName("toggleButton");
-    m_skyboxToggleButton->setFixedSize(20, 20);
-    m_skyboxToggleButton->setCheckable(true);
-    m_skyboxToggleButton->setChecked(false);
-    
-    titleLayout->addWidget(titleLabel);
-    titleLayout->addStretch();
-    titleLayout->addWidget(m_skyboxToggleButton);
-    
-    sectionLayout->addLayout(titleLayout);
-    
-    // 创建内容区域
-    m_skyboxContentWidget = new QWidget();
-    QVBoxLayout* skyboxLayout = new QVBoxLayout(m_skyboxContentWidget);
-    skyboxLayout->setSpacing(3);
-    skyboxLayout->setContentsMargins(0, 0, 0, 0);
-    
-    // 启用开关
-    m_skyboxEnabledCheck = new QCheckBox("✅ 启用天空盒");
-    m_skyboxEnabledCheck->setChecked(true);
-    m_skyboxEnabledCheck->setObjectName("enableCheck");
-    skyboxLayout->addWidget(m_skyboxEnabledCheck);
-    
-    // 样式按钮
-    m_skyboxGradientButton = createActionButton("🌈", "渐变天空", "设置渐变天空盒");
-    m_skyboxSolidButton = createActionButton("🎨", "纯色天空", "设置纯色天空盒");
-    m_skyboxCustomButton = createActionButton("🖼️", "自定义贴图", "设置自定义立方体贴图");
-    
-    skyboxLayout->addWidget(m_skyboxGradientButton);
-    skyboxLayout->addWidget(m_skyboxSolidButton);
-    skyboxLayout->addWidget(m_skyboxCustomButton);
-    
-    m_skyboxContentWidget->setVisible(false); // 默认折叠
-    sectionLayout->addWidget(m_skyboxContentWidget);
-    
-    parentLayout->addWidget(sectionFrame);
-    
-    // 连接信号
-    connect(m_skyboxToggleButton, &QPushButton::clicked, this, &ToolPanel3D::onSkyboxToggleClicked);
-    connect(m_skyboxEnabledCheck, &QCheckBox::toggled, this, &ToolPanel3D::onSkyboxEnabledChanged);
-    connect(m_skyboxGradientButton, &QPushButton::clicked, this, &ToolPanel3D::onSkyboxGradientClicked);
-    connect(m_skyboxSolidButton, &QPushButton::clicked, this, &ToolPanel3D::onSkyboxSolidClicked);
-    connect(m_skyboxCustomButton, &QPushButton::clicked, this, &ToolPanel3D::onSkyboxCustomClicked);
 }
 
 QPushButton* ToolPanel3D::createStyledButton(const QString& emoji, const QString& text, const QString& tooltip, DrawMode3D mode)
@@ -685,27 +621,6 @@ void ToolPanel3D::onDrawModeButtonClicked()
     emit drawModeChanged(mode);
 }
 
-// 天空盒相关槽函数
-void ToolPanel3D::onSkyboxEnabledChanged(bool enabled)
-{
-    emit skyboxEnabled(enabled);
-}
-
-void ToolPanel3D::onSkyboxGradientClicked()
-{
-    emit skyboxGradientRequested();
-}
-
-void ToolPanel3D::onSkyboxSolidClicked()
-{
-    emit skyboxSolidRequested();
-}
-
-void ToolPanel3D::onSkyboxCustomClicked()
-{
-    emit skyboxCustomRequested();
-}
-
 // 视图工具相关槽函数
 void ToolPanel3D::onResetViewClicked()
 {
@@ -748,11 +663,6 @@ void ToolPanel3D::onExportImageClicked()
     emit exportImageRequested();
 }
 
-void ToolPanel3D::onCoordinateSystemClicked()
-{
-    emit coordinateSystemRequested();
-}
-
 void ToolPanel3D::onPickingSystemClicked()
 {
     emit pickingSystemRequested();
@@ -783,13 +693,6 @@ void ToolPanel3D::onUtilityToggleClicked()
     bool isExpanded = m_utilityToggleButton->isChecked();
     m_utilityContentWidget->setVisible(isExpanded);
     m_utilityToggleButton->setText(isExpanded ? "▲" : "▼");
-}
-
-void ToolPanel3D::onSkyboxToggleClicked()
-{
-    bool isExpanded = m_skyboxToggleButton->isChecked();
-    m_skyboxContentWidget->setVisible(isExpanded);
-    m_skyboxToggleButton->setText(isExpanded ? "▲" : "▼");
 }
 
 

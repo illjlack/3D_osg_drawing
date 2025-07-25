@@ -243,7 +243,6 @@ bool LogManager::shouldAcceptLog(const LogEntry& entry) const
             return false;
         }
     }
-    
     return true;
 }
 
