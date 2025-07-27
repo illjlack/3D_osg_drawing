@@ -11,8 +11,8 @@ GeoRenderManager::GeoRenderManager(osg::ref_ptr<Geo3D> parent)
       m_pointMaterial(new osg::Material()),
       m_lineMaterial(new osg::Material()),
       m_surfaceMaterial(new osg::Material()),
-      m_pointSize(new osg::Point(5.0)),
-      m_lineWidth(new osg::LineWidth(2.0)),
+      m_pointSize(new osg::Point(2.0)),
+      m_lineWidth(new osg::LineWidth(1.0)),
       m_lineStipple(new osg::LineStipple()),
       m_blendFunc(new osg::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA))
 {
@@ -24,16 +24,13 @@ void GeoRenderManager::initializeRenderStates()
 {
     if (!m_parent || !m_parent->mm_node()) return;
 
-
     // 设置默认渲染状态
     auto nodeManager = m_parent->mm_node();
     
-    // 为点几何设置状态
+    // 为点几何设置状态（自定义形状点实际上是三角形面片，和面一样处理）
     if (auto pointGeom = nodeManager->getVertexGeometry()) {
         auto stateSet = pointGeom->getOrCreateStateSet();
         stateSet->setAttributeAndModes(m_pointMaterial, osg::StateAttribute::ON);
-        stateSet->setAttributeAndModes(m_pointSize, osg::StateAttribute::ON);
-        stateSet->setMode(GL_POINT_SMOOTH, osg::StateAttribute::ON);
     }
     
     // 为线几何设置状态
@@ -41,7 +38,8 @@ void GeoRenderManager::initializeRenderStates()
         auto stateSet = lineGeom->getOrCreateStateSet();
         stateSet->setAttributeAndModes(m_lineMaterial, osg::StateAttribute::ON);
         stateSet->setAttributeAndModes(m_lineWidth, osg::StateAttribute::ON);
-        stateSet->setMode(GL_LINE_SMOOTH, osg::StateAttribute::ON);
+        // 禁用LINE_SMOOTH以确保线宽设置生效
+        stateSet->setMode(GL_LINE_SMOOTH, osg::StateAttribute::OFF);
     }
     
     // 为面几何设置状态
@@ -83,25 +81,24 @@ void GeoRenderManager::reinitializeRenderStates()
 
 void GeoRenderManager::updatePointRendering(const GeoParameters3D& params)
 {
-    if (!m_pointMaterial || !m_pointSize) return;
+    if (!m_pointMaterial) return;
     
-    // 设置点颜色（包含透明度）
+    auto nodeManager = m_parent->mm_node();
+    auto pointGeom = nodeManager->getVertexGeometry();
+    if (!pointGeom) return;
+    
+    auto stateSet = pointGeom->getOrCreateStateSet();
+    
+    // 设置点颜色（包含透明度）- 和面几何体完全一样的处理方式
     osg::Vec4 pointColor = colorToOsgVec4(params.pointColor);
     m_pointMaterial->setDiffuse(osg::Material::FRONT_AND_BACK, pointColor);
     m_pointMaterial->setAmbient(osg::Material::FRONT_AND_BACK, pointColor * 0.3f);
     
-    // 设置点大小
-    m_pointSize->setSize(static_cast<float>(params.pointSize));
-    
-    // 处理透明度
+    // 处理透明度（和面几何体一样）
     if (params.pointColor.a < 1.0) {
-        auto nodeManager = m_parent->mm_node();
-        if (auto pointGeom = nodeManager->getVertexGeometry()) {
-            auto stateSet = pointGeom->getOrCreateStateSet();
-            stateSet->setAttributeAndModes(m_blendFunc, osg::StateAttribute::ON);
-            stateSet->setMode(GL_BLEND, osg::StateAttribute::ON);
-            stateSet->setRenderingHint(osg::StateSet::TRANSPARENT_BIN);
-        }
+        stateSet->setAttributeAndModes(m_blendFunc, osg::StateAttribute::ON);
+        stateSet->setMode(GL_BLEND, osg::StateAttribute::ON);
+        stateSet->setRenderingHint(osg::StateSet::TRANSPARENT_BIN);
     }
 }
 
@@ -122,6 +119,9 @@ void GeoRenderManager::updateLineRendering(const GeoParameters3D& params)
     
     // 设置线宽
     m_lineWidth->setWidth(static_cast<float>(params.lineWidth));
+    
+    // 确保LINE_SMOOTH被禁用以保证线宽生效
+    stateSet->setMode(GL_LINE_SMOOTH, osg::StateAttribute::OFF);
     
     // 设置线型
     applyLineStyle(params.lineStyle, params.lineDashPattern);

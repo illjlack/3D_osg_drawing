@@ -7,8 +7,8 @@
 
 // 全局变量定义
 DrawMode3D GlobalDrawMode3D = DrawSelect3D;
-PointShape3D GlobalPointShape3D = Point_Circle3D;
-double GlobalPointSize3D = 5.0;
+PointShape3D GlobalPointShape3D = Point_Dot3D;
+double GlobalPointSize3D = 2.0;
 QColor GlobalPointColor3D = QColor(255, 0, 0);
 
 LineStyle3D GlobalLineStyle3D = Line_Solid3D;
@@ -103,6 +103,7 @@ QString pointShape3DToString(PointShape3D shape)
 {
     switch (shape)
     {
+        case Point_Dot3D: return "圆点";
         case Point_Circle3D: return "圆形";
         case Point_Square3D: return "方形";
         case Point_Triangle3D: return "三角形";
@@ -178,13 +179,14 @@ DrawMode3D stringToDrawMode3D(const QString& str)
 
 PointShape3D stringToPointShape3D(const QString& str)
 {
+    if (str == "圆点") return Point_Dot3D;
     if (str == "圆形") return Point_Circle3D;
     if (str == "方形") return Point_Square3D;
     if (str == "三角形") return Point_Triangle3D;
     if (str == "菱形") return Point_Diamond3D;
     if (str == "十字") return Point_Cross3D;
     if (str == "星形") return Point_Star3D;
-    return Point_Circle3D;
+    return Point_Dot3D;
 }
 
 LineStyle3D stringToLineStyle3D(const QString& str)
@@ -593,8 +595,8 @@ bool GlobalParametersManager::loadGlobalSettings(const std::string& filename)
 void GlobalParametersManager::resetToFactoryDefaults()
 {
     GlobalDrawMode3D = DrawSelect3D;
-    GlobalPointShape3D = Point_Circle3D;
-    GlobalPointSize3D = 5.0;
+    GlobalPointShape3D = Point_Dot3D;
+    GlobalPointSize3D = 2.0;
     GlobalPointColor3D = QColor(255, 0, 0);
     
     GlobalLineStyle3D = Line_Solid3D;

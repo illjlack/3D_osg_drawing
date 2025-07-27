@@ -54,6 +54,7 @@ enum PointShape3D
 {
     BeginPointShape3D = EndDrawMode3D,
     
+    Point_Dot3D,           // 简单圆点（默认）
     Point_Circle3D,        // 圆形
     Point_Square3D,        // 方形
     Point_Triangle3D,      // 三角形

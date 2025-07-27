@@ -21,10 +21,10 @@ public:
     {
         static StageDescriptors stageDescriptors
         { 
-            //{"确定椭球中心", 1, 1, ConstraintSystem::noConstraint},
-            //{"确定第一轴端点", 1, 1, ConstraintSystem::noConstraint},
-            //{"确定第二轴端点", 1, 1, ConstraintSystem::noConstraint},
-            //{"确定第三轴端点", 1, 1, ConstraintSystem::noConstraint} 
+            {"确定椭球中心", 1, 1},
+            {"确定第一轴端点", 1, 1},
+            {"确定第二轴端点", 1, 1},
+            {"确定第三轴端点", 1, 1} 
         };
         // 第一阶段：确定椭球中心，无约束
         // 第二阶段：确定第一轴（长轴）的端点，无约束

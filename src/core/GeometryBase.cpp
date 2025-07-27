@@ -47,6 +47,7 @@ Geo3D::Geo3D()
     , m_parametersChanged(false)
 {
     setupManagers();
+
     initialize();
 }
 
@@ -71,6 +72,11 @@ void Geo3D::connectManagerSignals()
 {
     // 状态完成时通知控制点管理器
     connect(m_stateManager.get(), &GeoStateManager::stateCompleted,
+            this, [this]() {
+
+            });
+
+    connect(m_stateManager.get(), &GeoStateManager::stateInitialized,
             this, [this]() {
 
             });
@@ -130,6 +136,10 @@ void Geo3D::setParameters(const GeoParameters3D& params)
         needsGeometryRecalculation = true;
     }
     
+    if (m_parameters.pointSize != constrainedParams.pointSize) {
+        needsGeometryRecalculation = true;
+    }
+    
     if (m_parameters.subdivisionLevel != constrainedParams.subdivisionLevel) {
         needsGeometryRecalculation = true;
     }
@@ -158,6 +168,9 @@ void Geo3D::initialize()
 {
     // 获得此时的全局参数
     m_parameters.resetToGlobal();
+    if (m_renderManager) {
+        m_renderManager->updateRenderingParameters(m_parameters);
+    }
     mm_state()->setStateInitialized();
 }
 

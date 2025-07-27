@@ -65,6 +65,7 @@ void PropertyEditor3D::createPointSection()
     // 点形状 (需要重新计算)
     m_pointShapeCombo = new QComboBox();
     m_pointShapeCombo->setObjectName("propertyCombo");
+    m_pointShapeCombo->addItem("∙ 圆点", Point_Dot3D);
     m_pointShapeCombo->addItem("● 圆形", Point_Circle3D);
     m_pointShapeCombo->addItem("■ 方形", Point_Square3D);
     m_pointShapeCombo->addItem("▲ 三角形", Point_Triangle3D);
@@ -81,7 +82,7 @@ void PropertyEditor3D::createPointSection()
     // 点大小 (只需渲染更新)
     m_pointSizeSpin = new QDoubleSpinBox();
     m_pointSizeSpin->setObjectName("propertySpinBox");
-    m_pointSizeSpin->setRange(0.5, 50.0);
+    m_pointSizeSpin->setRange(0.5, 15.0);
     m_pointSizeSpin->setSingleStep(0.5);
     m_pointSizeSpin->setDecimals(1);
     m_pointSizeSpin->setSuffix(" px");
@@ -459,8 +460,19 @@ void PropertyEditor3D::updateColorButton(QPushButton* button, const QColor& colo
 {
     QString style = QString("background-color: %1;").arg(color.name());
     button->setStyleSheet(button->styleSheet() + style);
-    button->setToolTip(QString("颜色: %1").arg(color.name()));
-    button->setText("");
+    
+    // 包含透明度信息的提示
+    QString tooltip = QString("颜色: %1\n透明度: %2%")
+                     .arg(color.name())
+                     .arg(qRound(color.alphaF() * 100));
+    button->setToolTip(tooltip);
+    
+    // 在按钮上显示透明度百分比
+    if (color.alphaF() < 1.0) {
+        button->setText(QString("%1%").arg(qRound(color.alphaF() * 100)));
+    } else {
+        button->setText("");
+    }
 }
 
 // 剩余部分保持与当前实现类似的逻辑，但简化了参数处理
@@ -690,7 +702,7 @@ void PropertyEditor3D::onPointColorChanged()
     if (m_updating) return;
     
     QColor currentColor = m_currentGeo ? m_currentGeo->getParameters().pointColor.toQColor() : GlobalPointColor3D;
-    QColor color = QColorDialog::getColor(currentColor, this, "选择点颜色");
+    QColor color = QColorDialog::getColor(currentColor, this, "选择点颜色", QColorDialog::ShowAlphaChannel);
     
     if (color.isValid())
     {
@@ -760,7 +772,7 @@ void PropertyEditor3D::onLineColorChanged()
     if (m_updating) return;
     
     QColor currentColor = m_currentGeo ? m_currentGeo->getParameters().lineColor.toQColor() : GlobalLineColor3D;
-    QColor color = QColorDialog::getColor(currentColor, this, "选择线颜色");
+    QColor color = QColorDialog::getColor(currentColor, this, "选择线颜色", QColorDialog::ShowAlphaChannel);
     
     if (color.isValid())
     {
@@ -865,7 +877,7 @@ void PropertyEditor3D::onFillColorChanged()
     if (m_updating) return;
     
     QColor currentColor = m_currentGeo ? m_currentGeo->getParameters().fillColor.toQColor() : GlobalFillColor3D;
-    QColor color = QColorDialog::getColor(currentColor, this, "选择填充颜色");
+    QColor color = QColorDialog::getColor(currentColor, this, "选择填充颜色", QColorDialog::ShowAlphaChannel);
     
     if (color.isValid())
     {

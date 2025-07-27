@@ -160,7 +160,7 @@ struct GeoParameters3D
     
     // 一次性设置所有属性
     void setAllProperties(
-        const PointShape3D& pShape = Point_Circle3D,
+        const PointShape3D& pShape = Point_Dot3D,
         double pSize = 5.0,
         const Color3D& pColor = Color3D(1.0, 0.0, 0.0, 1.0),
         bool showPts = true,

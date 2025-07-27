@@ -19,8 +19,8 @@ public:
     {
         static StageDescriptors stageDescriptors
         { 
-            //{"确定基座", 3, 3, ConstraintSystem::noConstraint},
-            //{"确定穹顶高度", 1, 1, ConstraintSystem::verticalToBaseConstraint} 
+            {"确定基座", 3, 3},
+            {"确定穹顶高度", 1, 1} 
         };
         // 第一阶段：确定圆形基座,三点确定一个圆
         // 第三阶段：确定穹顶高度，垂直于基座平面，形成半球形穹顶

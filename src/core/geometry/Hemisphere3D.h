@@ -19,9 +19,9 @@ public:
     {
         static StageDescriptors stageDescriptors
         { 
-            //{"确定底面圆心", 1, 1, ConstraintSystem::flatDrawingConstraint()},
-            //{"确定半径", 1, 1, ConstraintSystem::flatDrawingConstraint()},
-            //{"确定半球朝向", 1, 1, ConstraintSystem::verticalToBaseConstraint()} 
+            {"确定底面圆心", 1, 1},
+            {"确定半径", 1, 1},
+            {"确定半球朝向", 1, 1} 
         };
         // 第一阶段：确定底面圆心，使用平面约束
         // 第二阶段：确定半径，保持在同一平面

@@ -438,7 +438,7 @@ void GeoNodeManager::setupControlPointsRendering()
     osg::ref_ptr<osg::StateSet> stateSet = m_controlPointsGeometry->getOrCreateStateSet();
     
     // 设置点的大小和颜色
-    osg::ref_ptr<osg::Point> pointSize = new osg::Point(8.0f);
+    osg::ref_ptr<osg::Point> pointSize = new osg::Point(4.0f);
     stateSet->setAttributeAndModes(pointSize.get(), osg::StateAttribute::ON);
     
     // 设置材质

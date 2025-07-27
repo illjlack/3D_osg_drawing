@@ -3,12 +3,26 @@
 #include <osg/Geometry>
 #include <osg/Array>
 #include <osg/PrimitiveSet>
+#include "../../util/VertexShapeUtils.h"
 
 Box3D_Geo::Box3D_Geo()
 {
     m_geoType = Geo_Box3D;
     // 确保基类正确初始化
     initialize();
+    
+    // 立体几何特定的可见性设置：显示线面
+    GeoParameters3D params = getParameters();
+    params.showPoints = false;
+    params.showEdges = true;
+    params.showFaces = true;
+    
+    // 更新渲染参数
+    if (mm_render()) {
+        mm_render()->updateRenderingParameters(params);
+    }
+    // 同步参数到基类
+    setParameters(params);
 }
 
 void Box3D_Geo::buildVertexGeometries()
@@ -116,12 +130,36 @@ void Box3D_Geo::buildVertexGeometries()
         }
     }
     
-    // 设置顶点数组
-    geometry->setVertexArray(vertices);
-    
-    // 添加点绘制原语
-    if (vertices->size() > 0) {
-        geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::POINTS, 0, vertices->size()));
+    // 使用顶点形状工具创建几何体
+    if (vertices->size() > 0) 
+    {
+        // 从参数中获取点的显示属性
+        const GeoParameters3D& params = getParameters();
+        PointShape3D pointShape = params.pointShape;
+        double pointSize = params.pointSize;
+
+        // 使用顶点形状工具创建几何体
+        osg::ref_ptr<osg::Geometry> shapeGeometry = 
+            VertexShapeUtils::createVertexShapeGeometry(vertices, pointShape, pointSize);
+        
+        if (shapeGeometry.valid())
+        {
+            // 复制生成的几何体数据到现有几何体
+            geometry->setVertexArray(shapeGeometry->getVertexArray());
+            
+            // 复制图元集合
+            geometry->removePrimitiveSet(0, geometry->getNumPrimitiveSets());
+            for (unsigned int i = 0; i < shapeGeometry->getNumPrimitiveSets(); ++i)
+            {
+                geometry->addPrimitiveSet(shapeGeometry->getPrimitiveSet(i));
+            }
+            
+            // 复制渲染状态
+            if (shapeGeometry->getStateSet())
+            {
+                geometry->setStateSet(shapeGeometry->getStateSet());
+            }
+        }
     }
 }
 

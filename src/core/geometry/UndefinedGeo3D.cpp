@@ -9,7 +9,21 @@ UndefinedGeo3D_Geo::UndefinedGeo3D_Geo()
 {
     m_geoType = Geo_UndefinedGeo3D;
     // 确保基类正确初始化
+    initialize();
     LOG_INFO("创建未定义几何体对象", "几何体");
+    
+    // 未定义几何特定的可见性设置：只显示面
+    GeoParameters3D params = getParameters();
+    params.showPoints = false;
+    params.showEdges = false;
+    params.showFaces = true;
+    
+    // 更新渲染参数
+    if (mm_render()) {
+        mm_render()->updateRenderingParameters(params);
+    }
+    // 同步参数到基类
+    setParameters(params);
 }
 
 void UndefinedGeo3D_Geo::buildVertexGeometries()

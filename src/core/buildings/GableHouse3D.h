@@ -15,19 +15,18 @@ public:
     {
         static StageDescriptors stageDescriptors
         { 
-            //{"确定基座第一角点", 1, 1, ConstraintSystem::flatDrawingConstraint},
-            //{"确定基座对角点", 1, 1, ConstraintSystem::flatDrawingConstraint()},
-            //{"确定房屋高度", 1, 1, ConstraintSystem::verticalToBaseConstraint()},
-            //{"确定屋脊高度", 1, 1, ConstraintSystem::verticalToBaseConstraint()} 
+            {"底面ABCD", 4, 4},
+            {"屋脊E", 1, 1},
+            {"屋脊F", 1, 1}
         };
-        // 第一阶段：确定基座的第一个角点，使用平面约束
-        // 第二阶段：确定基座的对角点，保持在同一平面，形成矩形基座
-        // 第三阶段：确定房屋墙体高度，垂直于基座平面
-        // 第四阶段：确定屋脊高度，垂直于基座平面，形成人字形屋顶
+        // 第一阶段, ABCD连接成四边形
+        // 第二阶段, ABCD连接到E
+        // 第三阶段, CD连接到F
         return stageDescriptors;
     }
 
 protected:
+    //不需要顶点
     virtual void buildVertexGeometries() override;
     virtual void buildEdgeGeometries() override;
     virtual void buildFaceGeometries() override;

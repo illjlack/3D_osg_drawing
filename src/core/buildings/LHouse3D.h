@@ -15,10 +15,10 @@ public:
     {
         static StageDescriptors stageDescriptors
         { 
-            //{"确定主体基座第一角点", 1, 1, ConstraintSystem::flatDrawingConstraint()},
-            //{"确定主体基座对角点", 1, 1, ConstraintSystem::flatDrawingConstraint()},
-            //{"确定扩展部分位置", 1, 1, ConstraintSystem::flatDrawingConstraint()},
-            //{"确定房屋高度", 1, 1, ConstraintSystem::verticalToBaseConstraint()} 
+            {"确定主体基座第一角点", 1, 1},
+            {"确定主体基座对角点", 1, 1},
+            {"确定扩展部分位置", 1, 1},
+            {"确定房屋高度", 1, 1} 
         };
         // 第一阶段：确定主体矩形基座的第一个角点，使用平面约束
         // 第二阶段：确定主体基座的对角点，保持在同一平面，形成主体矩形

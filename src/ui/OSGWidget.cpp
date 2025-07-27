@@ -371,47 +371,22 @@ void OSGWidget::initializeScene()
     
     m_pickingIndicatorNode->setNodeMask(NODE_MASK_PICKING_INDICATOR);
     
+    // 简化全局渲染设置，只保留最基础的功能，避免干扰osgb文件的原始渲染状态
     osg::StateSet* rootStateSet = m_rootNode->getOrCreateStateSet();
     
-    rootStateSet->setMode(GL_LINE_SMOOTH, osg::StateAttribute::ON);
-    rootStateSet->setMode(GL_POINT_SMOOTH, osg::StateAttribute::ON);
-    rootStateSet->setMode(GL_POLYGON_SMOOTH, osg::StateAttribute::ON);
+    // 必要的基础设置（不使用OVERRIDE，避免覆盖模型原始状态）
+    rootStateSet->setMode(GL_DEPTH_TEST, osg::StateAttribute::ON);
+    rootStateSet->setMode(GL_BLEND, osg::StateAttribute::ON);
     rootStateSet->setMode(GL_MULTISAMPLE, osg::StateAttribute::ON);
     
-    osg::ref_ptr<osg::BlendFunc> rootBlendFunc = new osg::BlendFunc();
-    rootBlendFunc->setSource(osg::BlendFunc::SRC_ALPHA);
-    rootBlendFunc->setDestination(osg::BlendFunc::ONE_MINUS_SRC_ALPHA);
-    rootStateSet->setAttributeAndModes(rootBlendFunc.get(), osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
+    // 全局透明度混合设置（不使用OVERRIDE）
+    osg::ref_ptr<osg::BlendFunc> blendFunc = new osg::BlendFunc();
+    blendFunc->setSource(osg::BlendFunc::SRC_ALPHA);
+    blendFunc->setDestination(osg::BlendFunc::ONE_MINUS_SRC_ALPHA);
+    rootStateSet->setAttributeAndModes(blendFunc.get(), osg::StateAttribute::ON);
     
-    osg::ref_ptr<osg::Multisample> rootMultisample = new osg::Multisample();
-    rootMultisample->setHint(osg::Multisample::NICEST);
-    rootMultisample->setCoverage(1.0);
-    rootMultisample->setInvert(false);
-    rootStateSet->setAttributeAndModes(rootMultisample.get(), osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
-    
-    osg::ref_ptr<osg::LineWidth> rootLineWidth = new osg::LineWidth();
-    rootLineWidth->setWidth(1.5);
-    rootStateSet->setAttributeAndModes(rootLineWidth.get(), osg::StateAttribute::ON);
-    
-    osg::ref_ptr<osg::Point> rootPointSize = new osg::Point();
-    rootPointSize->setSize(4.0);
-    rootPointSize->setMinSize(2.0);
-    rootPointSize->setMaxSize(8.0);
-    rootPointSize->setDistanceAttenuation(osg::Vec3(1.0, 0.0, 0.0));
-    rootStateSet->setAttributeAndModes(rootPointSize.get(), osg::StateAttribute::ON);
-    
-    rootStateSet->setMode(GL_BLEND, osg::StateAttribute::ON);
-    rootStateSet->setMode(GL_DEPTH_TEST, osg::StateAttribute::ON);
-    rootStateSet->setMode(GL_NORMALIZE, osg::StateAttribute::ON);
-    
-    osg::StateSet* geoStateSet = m_geoNode->getOrCreateStateSet();
-    geoStateSet->setMode(GL_LINE_SMOOTH, osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
-    geoStateSet->setMode(GL_POINT_SMOOTH, osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
-    geoStateSet->setMode(GL_POLYGON_SMOOTH, osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
-    
-    osg::ref_ptr<osg::LineWidth> geoLineWidth = new osg::LineWidth();
-    geoLineWidth->setWidth(2.0);
-    geoStateSet->setAttributeAndModes(geoLineWidth.get(), osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
+    // 移除所有几何体节点的全局渲染设置，让每个几何体或文件保持原始状态
+    // (不再设置geoStateSet的任何强制属性)
     
     viewer->setSceneData(m_rootNode);
     
