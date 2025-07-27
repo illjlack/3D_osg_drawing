@@ -16,12 +16,7 @@ Arc3D_Geo::Arc3D_Geo()
     params.showPoints = false;
     params.showEdges = true;
     params.showFaces = false;
-    
-    // 更新渲染参数
-    if (mm_render()) {
-        mm_render()->updateRenderingParameters(params);
-    }
-    // 同步参数到基类
+ 
     setParameters(params);
 }
 
@@ -133,7 +128,8 @@ void Arc3D_Geo::buildEdgeGeometries()
         // 至少3个点，可以绘制圆弧
         if (allPoints.size() == 3)
         {
-            // 精确的三点圆弧，使用细分级别参数
+            // 精确的三点圆弧，AC是端点，经过B
+            // 重新排列点：A=allPoints[0], C=allPoints[2] 作为端点，B=allPoints[1] 作为中间点
             auto arcVertices = MathUtils::generateArcPointsFromThreePoints(allPoints[0], allPoints[1], allPoints[2], subdivisionLevel);
             for (const auto& vertex : arcVertices)
             {

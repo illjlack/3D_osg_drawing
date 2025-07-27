@@ -18,11 +18,6 @@ Hemisphere3D_Geo::Hemisphere3D_Geo()
     params.showEdges = true;
     params.showFaces = true;
     
-    // 更新渲染参数
-    if (mm_render()) {
-        mm_render()->updateRenderingParameters(params);
-    }
-    // 同步参数到基类
     setParameters(params);
 }
 
@@ -260,7 +255,7 @@ void Hemisphere3D_Geo::buildEdgeGeometries()
             int longitudes = 16;
             
             // 生成半球的所有顶点
-            // 底面圆周点
+            // 底面圆周点（第0层）
             for (int lng = 0; lng < longitudes; ++lng) {
                 double theta = 2.0 * M_PI * lng / longitudes;
                 double x = center.x() + radius * std::cos(theta);
@@ -269,30 +264,29 @@ void Hemisphere3D_Geo::buildEdgeGeometries()
                 vertices->push_back(osg::Vec3(x, y, z));
             }
             
-            // 半球表面点
-            for (int lat = 1; lat <= latitudes; ++lat) {
+            // 半球表面点（第1层到第latitudes-1层）
+            for (int lat = 1; lat < latitudes; ++lat) {
                 double phi = M_PI * lat / (2 * latitudes);
                 if (!upward) phi = -phi;
                 
                 double cosLat = std::cos(phi);
                 double sinLat = std::sin(phi);
                 
-                if (lat == latitudes) {
-                    // 顶点
-                    double x = center.x();
-                    double y = center.y();
-                    double z = center.z() + (upward ? radius : -radius);
+                for (int lng = 0; lng < longitudes; ++lng) {
+                    double theta = 2.0 * M_PI * lng / longitudes;
+                    double x = center.x() + radius * cosLat * std::cos(theta);
+                    double y = center.y() + radius * cosLat * std::sin(theta);
+                    double z = center.z() + radius * sinLat;
                     vertices->push_back(osg::Vec3(x, y, z));
-                } else {
-                    for (int lng = 0; lng < longitudes; ++lng) {
-                        double theta = 2.0 * M_PI * lng / longitudes;
-                        double x = center.x() + radius * cosLat * std::cos(theta);
-                        double y = center.y() + radius * cosLat * std::sin(theta);
-                        double z = center.z() + radius * sinLat;
-                        vertices->push_back(osg::Vec3(x, y, z));
-                    }
                 }
             }
+            
+            // 顶点（第latitudes层，只有一个点）
+            double x = center.x();
+            double y = center.y();
+            double z = center.z() + (upward ? radius : -radius);
+            vertices->push_back(osg::Vec3(x, y, z));
+            int topIndex = vertices->size() - 1; // 顶点索引
             
             // 添加底面圆周线
             for (int i = 0; i < longitudes; ++i) {
@@ -301,10 +295,8 @@ void Hemisphere3D_Geo::buildEdgeGeometries()
             }
             
             // 添加经线（从底面到顶点）
-            int topIndex = vertices->size() - 1; // 顶点索引
             for (int lng = 0; lng < longitudes; ++lng) {
-                int baseIndex = lng;
-                int prevRingIndex = baseIndex;
+                int prevRingIndex = lng; // 底面圆周点索引
                 
                 // 连接各层
                 for (int lat = 1; lat < latitudes; ++lat) {

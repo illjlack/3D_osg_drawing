@@ -94,15 +94,26 @@ namespace constraint
                                     const std::vector<Point3D>& points);
     
     /**
-     * @brief 垂直于前两点连线的约束函数
+     * @brief 垂直于底面的约束函数（智能版本）
+     * 如果有3个或更多点，将输入点约束在垂直于底面平面的直线上
+     * 如果只有2个点，则降级为垂直于连线的约束
+     * @param inputPoint 输入点P
+     * @param points 相关控制点（至少需要2个点，优先使用前3个点确定底面）
+     * @return 垂直约束后的点P'
+     */
+    Point3D perpendicularToLastTwoPointsConstraint(const Point3D& inputPoint, 
+                                                  const std::vector<Point3D>& points);
+
+    /**
+     * @brief 垂直于两点连线的约束函数
      * 将输入点P约束在过B点垂直于线段AB的平面上
      * 确保BP垂直于AB，其中A、B是前两个点，P是当前输入点
      * @param inputPoint 输入点P
      * @param points 相关控制点（points[0]=A, points[1]=B，至少需要2个点作为参考线）
      * @return 垂直约束后的点P'，满足BP'⊥AB (B点加垂直分量)
      */
-    Point3D perpendicularToLastTwoPointsConstraint(const Point3D& inputPoint, 
-                                                  const std::vector<Point3D>& points);
+    Point3D perpendicularToTwoPointsConstraint(const Point3D& inputPoint, 
+                                              const std::vector<Point3D>& points);
 
     /**
      * @brief 圆形约束函数

@@ -16,12 +16,7 @@ SpireHouse3D_Geo::SpireHouse3D_Geo()
     params.showPoints = true;
     params.showEdges = true;
     params.showFaces = false;
-    
-    // 更新渲染参数
-    if (mm_render()) {
-        mm_render()->updateRenderingParameters(params);
-    }
-    // 同步参数到基类
+
     setParameters(params);
 }
 

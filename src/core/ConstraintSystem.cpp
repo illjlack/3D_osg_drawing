@@ -113,6 +113,49 @@ Point3D verticalToBaseConstraint(const Point3D& inputPoint,
 Point3D perpendicularToLastTwoPointsConstraint(const Point3D& inputPoint, 
                                               const std::vector<Point3D>& points)
 {
+    // 检查是否有至少3个点来确定底面平面
+    if (points.size() >= 3) {
+        // 获取前三个点来确定底面平面
+        glm::dvec3 p1 = glm::dvec3(points[0].x(), points[0].y(), points[0].z());
+        glm::dvec3 p2 = glm::dvec3(points[1].x(), points[1].y(), points[1].z());
+        glm::dvec3 p3 = glm::dvec3(points[2].x(), points[2].y(), points[2].z());
+        
+        // 计算底面的法向量
+        glm::dvec3 v1 = p2 - p1;
+        glm::dvec3 v2 = p3 - p1;
+        glm::dvec3 normal = glm::cross(v1, v2);
+        
+        if (glm::length(normal) < 1e-6) {
+            // 三点共线，降级为原来的两点约束
+            return perpendicularToTwoPointsConstraint(inputPoint, points);
+        }
+        
+        normal = glm::normalize(normal);
+        
+        // 选择一个底面参考点（使用第一个点）
+        glm::dvec3 basePoint = p1;
+        
+        // 计算输入点到底面的投影
+        glm::dvec3 inputVec = glm::dvec3(inputPoint.x(), inputPoint.y(), inputPoint.z());
+        glm::dvec3 toInput = inputVec - basePoint;
+        
+        // 计算沿着法向量方向的分量（垂直分量）
+        double perpComponent = glm::dot(toInput, normal);
+        glm::dvec3 constrainedPoint = basePoint + perpComponent * normal;
+        
+        return Point3D(constrainedPoint.x, constrainedPoint.y, constrainedPoint.z);
+    }
+    else if (points.size() >= 2) {
+        // 降级为两点约束
+        return perpendicularToTwoPointsConstraint(inputPoint, points);
+    }
+    
+    return inputPoint; // 如果无法构成约束条件，返回原点
+}
+
+Point3D perpendicularToTwoPointsConstraint(const Point3D& inputPoint, 
+                                          const std::vector<Point3D>& points)
+{
     // 检查是否有至少2个点
     if (points.size() >= 2) {
         // 获取前两个点A和B
@@ -128,7 +171,6 @@ Point3D perpendicularToLastTwoPointsConstraint(const Point3D& inputPoint,
         glm::dvec3 BC = vecC - vecB;
         
         // 检查AB是否为零向量
-        assert(glm::length(AB) > 1e-6 && "这样会出问题的");
         if (glm::length(AB) < 1e-6) {
             return inputPoint; // AB向量太小，无法约束
         }
@@ -140,14 +182,10 @@ Point3D perpendicularToLastTwoPointsConstraint(const Point3D& inputPoint,
         
         // 计算垂直于AB的BC分量
         glm::dvec3 perpendicularBC = BC - projectionOnAB;
-        assert(std::fabs(glm::dot(perpendicularBC, ABNormalized)) < 1e-6 && "真的垂直吗");
 
         // 约束后的点C = B + 垂直分量
         glm::dvec3 constrainedPoint = vecB + perpendicularBC;
         
-        // BC'垂直BA
-        assert(std::fabs(glm::dot(constrainedPoint - vecB, ABNormalized)) < 1e-6 && "看来还是要使用双精度啊");
-
         return Point3D(constrainedPoint.x, constrainedPoint.y, constrainedPoint.z);
     }
     

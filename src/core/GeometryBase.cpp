@@ -319,6 +319,7 @@ void Geo3D::restoreFromFileNode(osg::ref_ptr<osg::Node> node)
         LOG_INFO("步骤2: 渲染状态重新初始化完成", "文件加载");
     }
     
+    // 3. 更新渲染参数
     if (mm_render()) {
         mm_render()->updateRenderingParameters(m_parameters);
         LOG_INFO("步骤3: 渲染参数应用完成", "文件加载");

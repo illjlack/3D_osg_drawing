@@ -7,6 +7,9 @@
 #include <osg/PrimitiveSet>
 #include <vector>
 
+// 前向声明
+class CameraController;
+
 /**
  * @brief 顶点形状工具类
  * 用于生成不同形状的顶点几何体（圆形、方形、三角形、菱形、十字、星形）
@@ -14,6 +17,23 @@
 class VertexShapeUtils
 {
 public:
+    /**
+     * @brief 设置全局相机控制器引用
+     * 
+     * 设置一个全局的相机控制器引用，供calculateCameraFacingVectors使用。
+     * 这样就不需要在每次调用顶点形状生成函数时都传递相机控制器参数。
+     * 
+     * @param cameraController 相机控制器指针（可以为nullptr清除引用）
+     * @note 这是一个静态函数，设置的是全局状态
+     * @note 通常在OSGWidget初始化时调用，在析构时传入nullptr清理
+     */
+    static void setCameraController(CameraController* cameraController);
+    
+    /**
+     * @brief 获取全局相机控制器引用
+     * @return 当前设置的全局相机控制器指针，可能为nullptr
+     */
+    static CameraController* getCameraController();
     /**
      * @brief 为给定的顶点位置数组生成形状几何体
      * @param vertices 顶点位置数组
@@ -132,9 +152,17 @@ private:
     );
 
     /**
-     * @brief 计算相机朝向的方向向量
-     * @param center 中心位置
-     * @return 朝向摄像机的上向量和右向量
+     * @brief 计算面向相机的方向向量
+     * 
+     * 该函数计算用于生成面向相机的2D形状（如点的可视化）的正交向量对。
+     * 这些向量确保生成的形状始终面向观察者，无论相机的角度如何。
+     * 
+     * @param center 形状的中心位置（世界坐标）
+     * @param cameraController 相机控制器指针（可选，如果为空则使用全局相机控制器）
+     * @return 一对正交向量（上向量，右向量），用于在屏幕空间中定位形状顶点
+     * 
+     * @note 如果没有可用的相机控制器，函数会降级为使用默认的固定方向
+     * @note 返回的向量已经标准化并且相互正交
      */
-    static std::pair<osg::Vec3, osg::Vec3> calculateCameraFacingVectors(const osg::Vec3& center);
+    static std::pair<osg::Vec3, osg::Vec3> calculateCameraFacingVectors(const osg::Vec3& center, class CameraController* cameraController = nullptr);
 }; 

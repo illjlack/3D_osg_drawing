@@ -76,11 +76,6 @@ Sphere3D_Geo::Sphere3D_Geo()
     params.showEdges = true;
     params.showFaces = true;
     
-    // 更新渲染参数
-    if (mm_render()) {
-        mm_render()->updateRenderingParameters(params);
-    }
-    // 同步参数到基类
     setParameters(params);
 }
 

@@ -4,6 +4,7 @@
 #include "../core/picking/PickingIndicator.h"
 #include "../util/LogManager.h"
 #include "../util/GeometryFactory.h"
+#include "../util/VertexShapeUtils.h"
 
 #include <osgViewer/Viewer>
 #include <osgViewer/ViewerEventHandlers>
@@ -62,6 +63,9 @@ OSGWidget::OSGWidget(QWidget* parent)
     connect(m_updateTimer, &QTimer::timeout, this, [this]() { update(); });
     connect(this, &osgQOpenGLWidget::initialized, this, &OSGWidget::initializeScene);
     
+    // 设置全局相机控制器，以便VertexShapeUtils可以获取真实的相机方向
+    VertexShapeUtils::setCameraController(m_cameraController.get());
+    
     m_updateTimer->start(16);
     LOG_INFO("OSGWidget初始化完成", "系统");
 }
@@ -76,6 +80,9 @@ OSGWidget::~OSGWidget()
         m_geometryPickingSystem->shutdown();
         m_geometryPickingSystem = nullptr;
     }
+    
+    // 清理全局相机控制器引用
+    VertexShapeUtils::setCameraController(nullptr);
 }
 
 void OSGWidget::contextMenuEvent(QContextMenuEvent* event)

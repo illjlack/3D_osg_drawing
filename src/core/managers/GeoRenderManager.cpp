@@ -89,13 +89,60 @@ void GeoRenderManager::updatePointRendering(const GeoParameters3D& params)
     
     auto stateSet = pointGeom->getOrCreateStateSet();
     
-    // 设置点颜色（包含透明度）- 和面几何体完全一样的处理方式
+    // 检查primitive类型来判断是点还是面（三角网）
+    bool isRealPoint = false;
+    bool isTriangleMesh = false;
+    
+    for (unsigned int i = 0; i < pointGeom->getNumPrimitiveSets(); ++i) {
+        osg::PrimitiveSet* ps = pointGeom->getPrimitiveSet(i);
+        if (ps) {
+            if (ps->getMode() == GL_POINTS) {
+                isRealPoint = true;
+            } else if (ps->getMode() == GL_TRIANGLES || ps->getMode() == GL_TRIANGLE_STRIP || ps->getMode() == GL_TRIANGLE_FAN) {
+                isTriangleMesh = true;
+            }
+        }
+    }
+    
+    if (isRealPoint) {
+        // 设置真正的点参数
+        setupPointParameters(params, stateSet);
+    } else if (isTriangleMesh) {
+        // 设置面（三角网）参数
+        setupTriangleMeshParameters(params, stateSet);
+    }
+}
+
+void GeoRenderManager::setupPointParameters(const GeoParameters3D& params, osg::StateSet* stateSet)
+{
+    // 设置点颜色（使用参数中的点颜色）
     osg::Vec4 pointColor = colorToOsgVec4(params.pointColor);
     m_pointMaterial->setDiffuse(osg::Material::FRONT_AND_BACK, pointColor);
     m_pointMaterial->setAmbient(osg::Material::FRONT_AND_BACK, pointColor * 0.3f);
     
-    // 处理透明度（和面几何体一样）
+    // 设置点大小
+    if (m_pointSize) {
+        m_pointSize->setSize(static_cast<float>(params.pointSize));
+        stateSet->setAttributeAndModes(m_pointSize, osg::StateAttribute::ON);
+    }
+    
+    // 处理透明度
     if (params.pointColor.a < 1.0) {
+        stateSet->setAttributeAndModes(m_blendFunc, osg::StateAttribute::ON);
+        stateSet->setMode(GL_BLEND, osg::StateAttribute::ON);
+        stateSet->setRenderingHint(osg::StateSet::TRANSPARENT_BIN);
+    }
+}
+
+void GeoRenderManager::setupTriangleMeshParameters(const GeoParameters3D& params, osg::StateSet* stateSet)
+{
+    // 设置面颜色（使用参数中的填充颜色）
+    osg::Vec4 meshColor = colorToOsgVec4(params.fillColor);
+    m_pointMaterial->setDiffuse(osg::Material::FRONT_AND_BACK, meshColor);
+    m_pointMaterial->setAmbient(osg::Material::FRONT_AND_BACK, meshColor * 0.3f);
+    
+    // 处理透明度
+    if (params.fillColor.a < 1.0) {
         stateSet->setAttributeAndModes(m_blendFunc, osg::StateAttribute::ON);
         stateSet->setMode(GL_BLEND, osg::StateAttribute::ON);
         stateSet->setRenderingHint(osg::StateSet::TRANSPARENT_BIN);

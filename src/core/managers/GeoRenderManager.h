@@ -24,7 +24,7 @@ public:
     explicit GeoRenderManager(osg::ref_ptr<Geo3D> parent);
     ~GeoRenderManager() = default;
 
-    // 更新渲染参数
+
     void updateRenderingParameters(const GeoParameters3D& params);
     
     // 重新初始化渲染状态（用于从外部加载节点后）
@@ -39,7 +39,10 @@ private:
     
     void applyLineStyle(LineStyle3D style, double dashPattern);
     osg::Vec4 colorToOsgVec4(const Color3D& color) const;
-
+    
+    void setupPointParameters(const GeoParameters3D& params, osg::StateSet* stateSet);
+    void setupTriangleMeshParameters(const GeoParameters3D& params, osg::StateSet* stateSet);
+    
 private:
     osg::ref_ptr<Geo3D> m_parent;
     

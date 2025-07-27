@@ -237,9 +237,6 @@
     <QtMoc Include="src\core\managers\GeoNodeManager.h">
       <Filter>Core\Managers</Filter>
     </QtMoc>
-    <QtMoc Include="src\core\managers\GeoRenderManager.h">
-      <Filter>Core\Managers</Filter>
-    </QtMoc>
     <ClInclude Include="src\core\buildings\BuildingFactory.h">
       <Filter>Core\buildings</Filter>
     </ClInclude>
@@ -281,6 +278,9 @@
     </ClInclude>
     <ClInclude Include="src\core\geometry\Hemisphere3D.h">
       <Filter>Core\Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\managers\GeoRenderManager.h">
+      <Filter>Core\Managers</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

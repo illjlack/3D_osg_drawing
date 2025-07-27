@@ -41,7 +41,7 @@
 class Geo3D;
 
 // 三维几何对象基类
-class Geo3D : public QObject, public osg::Referenced
+class Geo3D : public QObject, public osg::Group
 {
     Q_OBJECT
 public:
@@ -51,6 +51,12 @@ public:
     // 反射类型
     GeoType3D getGeoType() const { return m_geoType; }
     void setGeoType(GeoType3D type) { m_geoType = type; }
+
+    // 场景图管理方法
+    void setParentNode(osg::Group* parentNode);
+    void removeFromParent();
+    osg::Group* getParentNode() const;
+    bool isInScene() const;
 
     // 管理器直接访问接口(mm_开头：成员、管理器)
     /**

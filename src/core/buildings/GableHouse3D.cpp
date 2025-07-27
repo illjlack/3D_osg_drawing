@@ -17,11 +17,6 @@ GableHouse3D_Geo::GableHouse3D_Geo()
     params.showEdges = true;
     params.showFaces = false;
     
-    // 更新渲染参数
-    if (mm_render()) {
-        mm_render()->updateRenderingParameters(params);
-    }
-    // 同步参数到基类
     setParameters(params);
 }
 

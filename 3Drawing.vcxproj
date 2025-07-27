@@ -306,9 +306,9 @@
     <QtMoc Include="src\core\managers\GeoNodeManager.h">
       <Filter>Core\Managers</Filter>
     </QtMoc>
-    <QtMoc Include="src\core\managers\GeoRenderManager.h">
+    <ClInclude Include="src\core\managers\GeoRenderManager.h">
       <Filter>Core\Managers</Filter>
-    </QtMoc>
+    </ClInclude>
     <ClInclude Include="src\core\picking\GeometryPickingSystem.h" />
     <ClInclude Include="src\core\picking\PickingIndicator.h">
       <Filter>Core\Picking</Filter>

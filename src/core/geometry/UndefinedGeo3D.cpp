@@ -17,12 +17,7 @@ UndefinedGeo3D_Geo::UndefinedGeo3D_Geo()
     params.showPoints = false;
     params.showEdges = false;
     params.showFaces = true;
-    
-    // 更新渲染参数
-    if (mm_render()) {
-        mm_render()->updateRenderingParameters(params);
-    }
-    // 同步参数到基类
+
     setParameters(params);
 }
 

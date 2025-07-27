@@ -1,4 +1,5 @@
 #include "VertexShapeUtils.h"
+#include "../core/camera/CameraController.h"
 #include <osg/StateSet>
 #include <osg/PolygonMode>
 #include <osg/LineWidth>
@@ -7,6 +8,19 @@
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
+
+// 静态相机控制器指针（暂时用）
+static CameraController* s_cameraController = nullptr;
+
+void VertexShapeUtils::setCameraController(CameraController* cameraController)
+{
+    s_cameraController = cameraController;
+}
+
+CameraController* VertexShapeUtils::getCameraController()
+{
+    return s_cameraController;
+}
 
 osg::ref_ptr<osg::Geometry> VertexShapeUtils::createVertexShapeGeometry(
     const osg::Vec3Array* vertices,
@@ -305,12 +319,43 @@ void VertexShapeUtils::generateStarVertices(
     }
 }
 
-std::pair<osg::Vec3, osg::Vec3> VertexShapeUtils::calculateCameraFacingVectors(const osg::Vec3& center)
+std::pair<osg::Vec3, osg::Vec3> VertexShapeUtils::calculateCameraFacingVectors(const osg::Vec3& center, CameraController* cameraController)
 {
-    // 简化版本：假设相机朝向Z轴负方向，上向量为Y轴正方向
-    // 在实际应用中，应该从相机控制器获取真实的视图方向
-    osg::Vec3 up(0.0, 1.0, 0.0);
-    osg::Vec3 right(1.0, 0.0, 0.0);
+    // 优先使用传入的相机控制器，否则使用全局相机控制器
+    CameraController* controller = cameraController ? cameraController : s_cameraController;
     
-    return std::make_pair(up, right);
+    if (controller) {
+        // 从相机控制器获取真实的视图信息
+        osg::Vec3d eyePos = controller->getEyePosition();
+        osg::Vec3d upVector = controller->getUpVector();
+        osg::Vec3d rightVector = controller->getRightVector();
+        
+        // 计算从中心点到相机的方向向量（前向量）
+        osg::Vec3d centerToEye = eyePos - osg::Vec3d(center.x(), center.y(), center.z());
+        centerToEye.normalize();
+        
+        // 重新计算与视图平面平行的上向量和右向量
+        // 确保这些向量在屏幕空间中是正交的
+        osg::Vec3d viewRight = rightVector;
+        osg::Vec3d viewUp = upVector;
+        
+        // 使用Gram-Schmidt正交化过程确保向量正交
+        viewRight = viewRight - centerToEye * (viewRight * centerToEye);
+        viewRight.normalize();
+        
+        viewUp = viewUp - centerToEye * (viewUp * centerToEye) - viewRight * (viewUp * viewRight);
+        viewUp.normalize();
+        
+        // 转换为OSG Vec3类型
+        osg::Vec3 up(viewUp.x(), viewUp.y(), viewUp.z());
+        osg::Vec3 right(viewRight.x(), viewRight.y(), viewRight.z());
+        
+        return std::make_pair(up, right);
+    } else {
+        // 降级为默认方向：假设相机朝向Z轴负方向，上向量为Y轴正方向
+        osg::Vec3 up(0.0, 1.0, 0.0);
+        osg::Vec3 right(1.0, 0.0, 0.0);
+        
+        return std::make_pair(up, right);
+    }
 } 
