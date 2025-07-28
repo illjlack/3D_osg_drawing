@@ -129,6 +129,9 @@ private slots:
     void onResetCamera();
     void onFitAll();
     void onCenterObjectToView();
+    
+    // 几何体状态管理槽函数
+    void onGeoStateInvalidated();
 
 private:
     void setupCamera();

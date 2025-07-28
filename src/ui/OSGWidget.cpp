@@ -743,6 +743,54 @@ void OSGWidget::addGeo(osg::ref_ptr<Geo3D> geo)
         } else {
         }
         
+        // 连接几何体状态无效信号
+        if (geo->mm_state()) {
+            connect(geo->mm_state(), &GeoStateManager::stateInvalidated, 
+                    this, &OSGWidget::onGeoStateInvalidated);
+        }
+    }
+}
+
+void OSGWidget::onGeoStateInvalidated()
+{
+    // 获取发送信号的GeoStateManager
+    GeoStateManager* stateManager = qobject_cast<GeoStateManager*>(sender());
+    if (!stateManager) {
+        LOG_WARNING("无法获取状态管理器", "几何体状态");
+        return;
+    }
+    
+    // 查找对应的几何体并移除
+    for (auto it = m_geoList.begin(); it != m_geoList.end(); ++it) {
+        osg::ref_ptr<Geo3D> geo = *it;
+        if (geo && geo->mm_state() == stateManager) {
+            LOG_INFO(QString("移除状态无效的几何体: %1").arg(geo->getGeoType()), "几何体状态");
+            
+            // 从OSG场景图中移除
+            if (geo->mm_node() && geo->mm_node()->getOSGNode()) {
+                m_geoNode->removeChild(geo->mm_node()->getOSGNode().get());
+            }
+            
+            // 从选择列表中移除
+            removeFromSelection(geo);
+            
+            // 如果是当前选中的几何体，清除选择
+            if (m_selectedGeo == geo) {
+                m_selectedGeo = nullptr;
+            }
+            
+            // 如果是当前绘制的几何体，停止绘制
+            if (m_currentDrawingGeo == geo) {
+                m_currentDrawingGeo = nullptr;
+                m_isDrawing = false;
+            }
+            
+            // 从列表中移除
+            m_geoList.erase(it);
+            
+            LOG_SUCCESS("已自动移除状态无效的几何体", "几何体状态");
+            break;
+        }
     }
 }
 
@@ -754,6 +802,12 @@ void OSGWidget::removeGeo(osg::ref_ptr<Geo3D> geo)
             [geo](const osg::ref_ptr<Geo3D>& ref) { return ref.get() == geo; });
         if (it != m_geoList.end())
         {
+            // 断开状态信号连接
+            if (geo->mm_state()) {
+                disconnect(geo->mm_state(), &GeoStateManager::stateInvalidated, 
+                          this, &OSGWidget::onGeoStateInvalidated);
+            }
+            
             m_geoNode->removeChild(geo->mm_node()->getOSGNode().get());
             m_geoList.erase(it);
         }
@@ -764,6 +818,14 @@ void OSGWidget::removeAllGeos()
 {
     if (m_geoNode.valid())
     {
+        // 断开所有几何体的状态信号连接
+        for (auto& geo : m_geoList) {
+            if (geo && geo->mm_state()) {
+                disconnect(geo->mm_state(), &GeoStateManager::stateInvalidated, 
+                          this, &OSGWidget::onGeoStateInvalidated);
+            }
+        }
+        
         m_geoNode->removeChildren(0, m_geoNode->getNumChildren());
         m_geoList.clear();
         m_selectedGeo = nullptr;
