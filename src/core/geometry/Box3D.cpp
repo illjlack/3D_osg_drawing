@@ -91,18 +91,12 @@ void Box3D_Geo::buildVertexGeometries()
                 A.z() + (C.z() - B.z())
             );
             
-            // 高度向量（从底面中心到高度点的向量）
-            Point3D bottomCenter = Point3D(
-                (A.x() + B.x() + C.x() + D.x()) / 4.0,
-                (A.y() + B.y() + C.y() + D.y()) / 4.0,
-                (A.z() + B.z() + C.z() + D.z()) / 4.0
-            );
-            
+            // 高度向量（从第一个顶点A到高度点的向量）
             Point3D heightPoint = stage3[0];
             Point3D heightVector = Point3D(
-                heightPoint.x() - bottomCenter.x(),
-                heightPoint.y() - bottomCenter.y(),
-                heightPoint.z() - bottomCenter.z()
+                heightPoint.x() - A.x(),
+                heightPoint.y() - A.y(),
+                heightPoint.z() - A.z()
             );
             
             // 计算顶面4个顶点
@@ -231,17 +225,11 @@ void Box3D_Geo::buildEdgeGeometries()
                 A.z() + (C.z() - B.z())
             );
             
-            Point3D bottomCenter = Point3D(
-                (A.x() + B.x() + C.x() + D.x()) / 4.0,
-                (A.y() + B.y() + C.y() + D.y()) / 4.0,
-                (A.z() + B.z() + C.z() + D.z()) / 4.0
-            );
-            
             Point3D heightPoint = stage3[0];
             Point3D heightVector = Point3D(
-                heightPoint.x() - bottomCenter.x(),
-                heightPoint.y() - bottomCenter.y(),
-                heightPoint.z() - bottomCenter.z()
+                heightPoint.x() - A.x(),
+                heightPoint.y() - A.y(),
+                heightPoint.z() - A.z()
             );
             
             Point3D A2 = Point3D(A.x() + heightVector.x(), A.y() + heightVector.y(), A.z() + heightVector.z());
@@ -313,14 +301,19 @@ void Box3D_Geo::buildFaceGeometries()
                 A.z() + (C.z() - B.z())
             );
             
-            // 添加底面四边形顶点（按逆时针顺序）
+            // 添加底面四边形顶点（分解为两个三角形）
+            // 三角形1: A, B, C
             vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
             vertices->push_back(osg::Vec3(B.x(), B.y(), B.z()));
             vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));
+            
+            // 三角形2: A, C, D
+            vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
+            vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));
             vertices->push_back(osg::Vec3(D.x(), D.y(), D.z()));
             
-            // 添加底面
-            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::QUADS, 0, 4));
+            // 添加底面三角形
+            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, 6));
         }
     }
     else if (allStagePoints.size() >= 3) {
@@ -339,17 +332,11 @@ void Box3D_Geo::buildFaceGeometries()
                 A.z() + (C.z() - B.z())
             );
             
-            Point3D bottomCenter = Point3D(
-                (A.x() + B.x() + C.x() + D.x()) / 4.0,
-                (A.y() + B.y() + C.y() + D.y()) / 4.0,
-                (A.z() + B.z() + C.z() + D.z()) / 4.0
-            );
-            
             Point3D heightPoint = stage3[0];
             Point3D heightVector = Point3D(
-                heightPoint.x() - bottomCenter.x(),
-                heightPoint.y() - bottomCenter.y(),
-                heightPoint.z() - bottomCenter.z()
+                heightPoint.x() - A.x(),
+                heightPoint.y() - A.y(),
+                heightPoint.z() - A.z()
             );
             
             Point3D A2 = Point3D(A.x() + heightVector.x(), A.y() + heightVector.y(), A.z() + heightVector.z());
@@ -357,46 +344,68 @@ void Box3D_Geo::buildFaceGeometries()
             Point3D C2 = Point3D(C.x() + heightVector.x(), C.y() + heightVector.y(), C.z() + heightVector.z());
             Point3D D2 = Point3D(D.x() + heightVector.x(), D.y() + heightVector.y(), D.z() + heightVector.z());
             
-            // 底面 (A, B, C, D)
+            // 底面 (A, B, C, D) - 分解为两个三角形
+            // 三角形1: A, B, C
             vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
             vertices->push_back(osg::Vec3(B.x(), B.y(), B.z()));
             vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));
+            // 三角形2: A, C, D
+            vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
+            vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));
             vertices->push_back(osg::Vec3(D.x(), D.y(), D.z()));
             
-            // 顶面 (A2, D2, C2, B2) - 反向顺序保证法向量正确
+            // 顶面 (A2, D2, C2, B2) - 分解为两个三角形
+            // 三角形1: A2, D2, C2  
             vertices->push_back(osg::Vec3(A2.x(), A2.y(), A2.z()));
             vertices->push_back(osg::Vec3(D2.x(), D2.y(), D2.z()));
             vertices->push_back(osg::Vec3(C2.x(), C2.y(), C2.z()));
+            // 三角形2: A2, C2, B2
+            vertices->push_back(osg::Vec3(A2.x(), A2.y(), A2.z()));
+            vertices->push_back(osg::Vec3(C2.x(), C2.y(), C2.z()));
             vertices->push_back(osg::Vec3(B2.x(), B2.y(), B2.z()));
             
-            // 前面 (A, B, B2, A2)
+            // 前面 (A, B, B2, A2) - 分解为两个三角形
+            // 三角形1: A, B, B2
             vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
             vertices->push_back(osg::Vec3(B.x(), B.y(), B.z()));
             vertices->push_back(osg::Vec3(B2.x(), B2.y(), B2.z()));
+            // 三角形2: A, B2, A2
+            vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
+            vertices->push_back(osg::Vec3(B2.x(), B2.y(), B2.z()));
             vertices->push_back(osg::Vec3(A2.x(), A2.y(), A2.z()));
             
-            // 右面 (B, C, C2, B2)
+            // 右面 (B, C, C2, B2) - 分解为两个三角形
+            // 三角形1: B, C, C2
             vertices->push_back(osg::Vec3(B.x(), B.y(), B.z()));
             vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));
             vertices->push_back(osg::Vec3(C2.x(), C2.y(), C2.z()));
+            // 三角形2: B, C2, B2
+            vertices->push_back(osg::Vec3(B.x(), B.y(), B.z()));
+            vertices->push_back(osg::Vec3(C2.x(), C2.y(), C2.z()));
             vertices->push_back(osg::Vec3(B2.x(), B2.y(), B2.z()));
             
-            // 后面 (C, D, D2, C2)
+            // 后面 (C, D, D2, C2) - 分解为两个三角形
+            // 三角形1: C, D, D2
             vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));
             vertices->push_back(osg::Vec3(D.x(), D.y(), D.z()));
             vertices->push_back(osg::Vec3(D2.x(), D2.y(), D2.z()));
+            // 三角形2: C, D2, C2
+            vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));
+            vertices->push_back(osg::Vec3(D2.x(), D2.y(), D2.z()));
             vertices->push_back(osg::Vec3(C2.x(), C2.y(), C2.z()));
             
-            // 左面 (D, A, A2, D2)
+            // 左面 (D, A, A2, D2) - 分解为两个三角形
+            // 三角形1: D, A, A2
             vertices->push_back(osg::Vec3(D.x(), D.y(), D.z()));
             vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
             vertices->push_back(osg::Vec3(A2.x(), A2.y(), A2.z()));
+            // 三角形2: D, A2, D2
+            vertices->push_back(osg::Vec3(D.x(), D.y(), D.z()));
+            vertices->push_back(osg::Vec3(A2.x(), A2.y(), A2.z()));
             vertices->push_back(osg::Vec3(D2.x(), D2.y(), D2.z()));
             
-            // 添加6个四边形面
-            for (int i = 0; i < 6; i++) {
-                geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::QUADS, i * 4, 4));
-            }
+            // 添加所有三角形面片（6个面 × 2个三角形 = 12个三角形）
+            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, 36));
         }
     }
     

@@ -18,13 +18,10 @@ public:
         static StageDescriptors stageDescriptors
          { 
             {"确定多边形顶点", 3, INT_INF, createConstraintCall(planeConstraint, {{0,0}, {0,1},{0,2}})},
-            {"确定高", 1, 1, combineStageConstraints({
-                    createConstraintCall(perpendicularToLastTwoPointsConstraint, {{0,1}, {0,0}}),
-                    createConstraintCall(perpendicularToLastTwoPointsConstraint, {{0,2}, {0,0}})
-                })}
+            {"确定高", 1, 1, createConstraintCall(perpendicularToLastTwoPointsConstraint, {{0,0}, {0,1}, {0,2}})}
         };
         // 第一阶段使用2D平面绘制约束，确保底面在同一平面
-        // 第二阶段使用3D立体约束，确保高度点在垂直方向上
+        // 第二阶段：确定高，垂直于三点确定的底面平面（直接使用平面法向量约束）
         return stageDescriptors;
     }
 

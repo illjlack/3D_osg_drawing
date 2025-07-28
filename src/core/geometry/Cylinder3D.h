@@ -21,13 +21,10 @@ public:
         static StageDescriptors stageDescriptors
         { 
             {"确定底面圆", 3, 3},
-            {"确定高", 1, 1, combineStageConstraints({
-                    createConstraintCall(perpendicularToLastTwoPointsConstraint, {{0,1}, {0,0}}),
-                    createConstraintCall(perpendicularToLastTwoPointsConstraint, {{0,2}, {0,0}})
-                })}
+            {"确定高", 1, 1, createConstraintCall(perpendicularToLastTwoPointsConstraint, {{0,0}, {0,1}, {0,2}})}
         };
         // 第一阶段：基于圆上的三个点确定圆
-        // 第二阶段：确定高，垂直于底面,垂足（0，0）
+        // 第二阶段：确定高，垂直于三点确定的圆平面（直接使用平面法向量约束）
         return stageDescriptors;
     }
 

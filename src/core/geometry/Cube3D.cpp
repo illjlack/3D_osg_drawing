@@ -339,49 +339,35 @@ void Cube3D_Geo::buildFaceGeometries()
                 vertices->push_back(osg::Vec3(v6.x, v6.y, v6.z)); // 6
                 vertices->push_back(osg::Vec3(v7.x, v7.y, v7.z)); // 7
                 
-                // 立方体的6个面，每个面用4个顶点的四边形
+                // 立方体的6个面，每个面分解为2个三角形
+                osg::ref_ptr<osg::DrawElementsUInt> triangleIndices = 
+                    new osg::DrawElementsUInt(osg::PrimitiveSet::TRIANGLES);
                 
-                // 底面：v0,v1,v3,v2
-                osg::ref_ptr<osg::DrawElementsUInt> bottomFace = 
-                    new osg::DrawElementsUInt(osg::PrimitiveSet::QUADS);
-                bottomFace->push_back(0); bottomFace->push_back(1); 
-                bottomFace->push_back(3); bottomFace->push_back(2);
-                geometry->addPrimitiveSet(bottomFace);
+                // 底面：v0,v1,v3,v2 -> 三角形(v0,v1,v3) + 三角形(v0,v3,v2)
+                triangleIndices->push_back(0); triangleIndices->push_back(1); triangleIndices->push_back(3);
+                triangleIndices->push_back(0); triangleIndices->push_back(3); triangleIndices->push_back(2);
                 
-                // 顶面：v4,v6,v7,v5
-                osg::ref_ptr<osg::DrawElementsUInt> topFace = 
-                    new osg::DrawElementsUInt(osg::PrimitiveSet::QUADS);
-                topFace->push_back(4); topFace->push_back(6); 
-                topFace->push_back(7); topFace->push_back(5);
-                geometry->addPrimitiveSet(topFace);
+                // 顶面：v4,v6,v7,v5 -> 三角形(v4,v6,v7) + 三角形(v4,v7,v5)
+                triangleIndices->push_back(4); triangleIndices->push_back(6); triangleIndices->push_back(7);
+                triangleIndices->push_back(4); triangleIndices->push_back(7); triangleIndices->push_back(5);
                 
-                // 前面：v0,v4,v5,v1
-                osg::ref_ptr<osg::DrawElementsUInt> frontFace = 
-                    new osg::DrawElementsUInt(osg::PrimitiveSet::QUADS);
-                frontFace->push_back(0); frontFace->push_back(4); 
-                frontFace->push_back(5); frontFace->push_back(1);
-                geometry->addPrimitiveSet(frontFace);
+                // 前面：v0,v4,v5,v1 -> 三角形(v0,v4,v5) + 三角形(v0,v5,v1)
+                triangleIndices->push_back(0); triangleIndices->push_back(4); triangleIndices->push_back(5);
+                triangleIndices->push_back(0); triangleIndices->push_back(5); triangleIndices->push_back(1);
                 
-                // 后面：v2,v3,v7,v6
-                osg::ref_ptr<osg::DrawElementsUInt> backFace = 
-                    new osg::DrawElementsUInt(osg::PrimitiveSet::QUADS);
-                backFace->push_back(2); backFace->push_back(3); 
-                backFace->push_back(7); backFace->push_back(6);
-                geometry->addPrimitiveSet(backFace);
+                // 后面：v2,v3,v7,v6 -> 三角形(v2,v3,v7) + 三角形(v2,v7,v6)
+                triangleIndices->push_back(2); triangleIndices->push_back(3); triangleIndices->push_back(7);
+                triangleIndices->push_back(2); triangleIndices->push_back(7); triangleIndices->push_back(6);
                 
-                // 左面：v0,v2,v6,v4
-                osg::ref_ptr<osg::DrawElementsUInt> leftFace = 
-                    new osg::DrawElementsUInt(osg::PrimitiveSet::QUADS);
-                leftFace->push_back(0); leftFace->push_back(2); 
-                leftFace->push_back(6); leftFace->push_back(4);
-                geometry->addPrimitiveSet(leftFace);
+                // 左面：v0,v2,v6,v4 -> 三角形(v0,v2,v6) + 三角形(v0,v6,v4)
+                triangleIndices->push_back(0); triangleIndices->push_back(2); triangleIndices->push_back(6);
+                triangleIndices->push_back(0); triangleIndices->push_back(6); triangleIndices->push_back(4);
                 
-                // 右面：v1,v5,v7,v3
-                osg::ref_ptr<osg::DrawElementsUInt> rightFace = 
-                    new osg::DrawElementsUInt(osg::PrimitiveSet::QUADS);
-                rightFace->push_back(1); rightFace->push_back(5); 
-                rightFace->push_back(7); rightFace->push_back(3);
-                geometry->addPrimitiveSet(rightFace);
+                // 右面：v1,v5,v7,v3 -> 三角形(v1,v5,v7) + 三角形(v1,v7,v3)
+                triangleIndices->push_back(1); triangleIndices->push_back(5); triangleIndices->push_back(7);
+                triangleIndices->push_back(1); triangleIndices->push_back(7); triangleIndices->push_back(3);
+                
+                geometry->addPrimitiveSet(triangleIndices);
             }
         }
     }

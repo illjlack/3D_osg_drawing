@@ -349,23 +349,31 @@ void Prism3D_Geo::buildFaceGeometries()
         // 顶面多边形（三角形扇形）
         geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLE_FAN, numPolygonVertices + 2, numPolygonVertices + 2));
         
-        // 侧面：使用四边形条带
+        // 侧面：使用三角形条带（将四边形分解为三角形）
+        osg::ref_ptr<osg::DrawElementsUInt> triangleIndices = 
+            new osg::DrawElementsUInt(osg::PrimitiveSet::TRIANGLES);
+            
         for (size_t i = 0; i < numPolygonVertices; i++) 
         {
             size_t next = (i + 1) % numPolygonVertices;
             
-            // 为每个侧面四边形创建单独的primitive
-            osg::ref_ptr<osg::DrawElementsUInt> quadIndices = 
-                new osg::DrawElementsUInt(osg::PrimitiveSet::QUADS);
+            int bottomCurr = 1 + i;                                 // 底面当前点
+            int bottomNext = 1 + next;                              // 底面下一点
+            int topNext = numPolygonVertices + 3 + next;            // 顶面下一点
+            int topCurr = numPolygonVertices + 3 + i;               // 顶面当前点
             
-            // 四边形：底面当前点 -> 底面下一点 -> 顶面下一点 -> 顶面当前点
-            quadIndices->push_back(1 + i);                                          // 底面当前点
-            quadIndices->push_back(1 + next);                                       // 底面下一点
-            quadIndices->push_back(numPolygonVertices + 3 + next);                  // 顶面下一点
-            quadIndices->push_back(numPolygonVertices + 3 + i);                     // 顶面当前点
+            // 第一个三角形：底面当前点 -> 底面下一点 -> 顶面下一点
+            triangleIndices->push_back(bottomCurr);
+            triangleIndices->push_back(bottomNext);
+            triangleIndices->push_back(topNext);
             
-            geometry->addPrimitiveSet(quadIndices);
+            // 第二个三角形：底面当前点 -> 顶面下一点 -> 顶面当前点
+            triangleIndices->push_back(bottomCurr);
+            triangleIndices->push_back(topNext);
+            triangleIndices->push_back(topCurr);
         }
+        
+        geometry->addPrimitiveSet(triangleIndices);
     }
     
     // 设置顶点数组

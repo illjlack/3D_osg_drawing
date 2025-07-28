@@ -464,21 +464,33 @@ void DomeHouse3D_Geo::buildFaceGeometries()
                     vertices->size() - 3, 3));
             }
             
-            // 添加穹顶面片（四边形和三角形）
+            // 添加穹顶面片（三角形）
             for (int ring = 0; ring < numRings - 1; ++ring) {
                 for (int i = 0; i < numBasePoints; ++i) {
                     int next_i = (i + 1) % numBasePoints;
                     
-                    // 构建四边形面片
-                    vertices->push_back(vertices->at(ringIndices[ring][i]));
-                    vertices->push_back(vertices->at(ringIndices[ring][next_i]));
-                    vertices->push_back(vertices->at(ringIndices[ring + 1][next_i]));
-                    vertices->push_back(vertices->at(ringIndices[ring + 1][i]));
+                    // 构建三角形面片（将四边形分解为两个三角形）
+                    osg::Vec3 v1 = vertices->at(ringIndices[ring][i]);
+                    osg::Vec3 v2 = vertices->at(ringIndices[ring][next_i]);
+                    osg::Vec3 v3 = vertices->at(ringIndices[ring + 1][next_i]);
+                    osg::Vec3 v4 = vertices->at(ringIndices[ring + 1][i]);
                     
-                    geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::QUADS, 
-                        vertices->size() - 4, 4));
+                    // 第一个三角形：v1 -> v2 -> v3
+                    vertices->push_back(v1);
+                    vertices->push_back(v2);
+                    vertices->push_back(v3);
+                    
+                    // 第二个三角形：v1 -> v3 -> v4
+                    vertices->push_back(v1);
+                    vertices->push_back(v3);
+                    vertices->push_back(v4);
                 }
             }
+            
+            // 添加所有四边形转换的三角形面片
+            int quadTriangleCount = (numRings - 1) * numBasePoints * 2 * 3; // 每个四边形=2个三角形，每个三角形=3个顶点
+            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 
+                vertices->size() - quadTriangleCount, quadTriangleCount));
             
             // 最顶层的三角形面片
             int topRing = numRings - 1;

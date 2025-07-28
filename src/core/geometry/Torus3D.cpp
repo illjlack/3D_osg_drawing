@@ -389,7 +389,10 @@ void Torus3D_Geo::buildFaceGeometries()
     geometry->setNormalArray(normals);
     geometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
     
-    // 生成四边形面片
+    // 生成三角形面片（将四边形分解为三角形）
+    osg::ref_ptr<osg::DrawElementsUInt> triangleIndices = 
+        new osg::DrawElementsUInt(osg::PrimitiveSet::TRIANGLES);
+        
     for (int i = 0; i < majorSegs; i++) {
         for (int j = 0; j < minorSegs; j++) {
             int curr = i * minorSegs + j;
@@ -397,18 +400,19 @@ void Torus3D_Geo::buildFaceGeometries()
             int nextI = ((i + 1) % majorSegs) * minorSegs + j;
             int nextBoth = ((i + 1) % majorSegs) * minorSegs + (j + 1) % minorSegs;
             
-            // 创建四边形面片
-            osg::ref_ptr<osg::DrawElementsUInt> quadIndices = 
-                new osg::DrawElementsUInt(osg::PrimitiveSet::QUADS);
+            // 第一个三角形：curr -> nextJ -> nextBoth
+            triangleIndices->push_back(curr);
+            triangleIndices->push_back(nextJ);
+            triangleIndices->push_back(nextBoth);
             
-            quadIndices->push_back(curr);
-            quadIndices->push_back(nextJ);
-            quadIndices->push_back(nextBoth);
-            quadIndices->push_back(nextI);
-            
-            geometry->addPrimitiveSet(quadIndices);
+            // 第二个三角形：curr -> nextBoth -> nextI
+            triangleIndices->push_back(curr);
+            triangleIndices->push_back(nextBoth);
+            triangleIndices->push_back(nextI);
         }
     }
+    
+    geometry->addPrimitiveSet(triangleIndices);
 }
 
 

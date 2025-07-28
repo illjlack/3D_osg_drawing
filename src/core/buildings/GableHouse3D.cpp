@@ -252,14 +252,24 @@ void GableHouse3D_Geo::buildFaceGeometries()
         const auto& stage1 = allStagePoints[0];
         
         if (stage1.size() >= 4) {
-            // 添加底面四边形顶点（按逆时针顺序）
-            for (size_t i = 0; i < 4; ++i) {
-                Point3D point = stage1[i];
-                vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
-            }
+            // 添加底面四边形顶点（分解为两个三角形）
+            Point3D A = stage1[0];
+            Point3D B = stage1[1]; 
+            Point3D C = stage1[2];
+            Point3D D = stage1[3];
             
-            // 添加底面
-            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::QUADS, 0, 4));
+            // 第一个三角形：A, B, C
+            vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
+            vertices->push_back(osg::Vec3(B.x(), B.y(), B.z()));
+            vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));
+            
+            // 第二个三角形：A, C, D
+            vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
+            vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));
+            vertices->push_back(osg::Vec3(D.x(), D.y(), D.z()));
+            
+            // 添加底面三角形
+            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, 6));
         }
     }
     else if (allStagePoints.size() == 2) {
@@ -274,9 +284,13 @@ void GableHouse3D_Geo::buildFaceGeometries()
             Point3D D = stage1[3];  // 后左
             Point3D E = stage2[0];  // 屋脊1（所有底面点都连接到这里）
             
-            // 面1: 底面 (A, B, C, D)
+            // 面1: 底面 (A, B, C, D) - 分解为两个三角形
+            // 第一个三角形：A, B, C
             vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
             vertices->push_back(osg::Vec3(B.x(), B.y(), B.z()));
+            vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));
+            // 第二个三角形：A, C, D
+            vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
             vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));
             vertices->push_back(osg::Vec3(D.x(), D.y(), D.z()));
             
@@ -302,9 +316,9 @@ void GableHouse3D_Geo::buildFaceGeometries()
             vertices->push_back(osg::Vec3(E.x(), E.y(), E.z()));
             
             // 添加5个面
-            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::QUADS, 0, 4)); // 底面
+            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, 6)); // 底面（2个三角形）
             for (int i = 0; i < 4; i++) {
-                geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 4 + i * 3, 3)); // 4个三角形侧面
+                geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 6 + i * 3, 3)); // 4个三角形侧面
             }
         }
     }
@@ -322,9 +336,13 @@ void GableHouse3D_Geo::buildFaceGeometries()
             Point3D E = stage2[0];  // 屋脊1（A,B连接）
             Point3D F = stage3[0];  // 屋脊2（C,D连接）
             
-            // 面1: 底面 (A, B, C, D)
+            // 面1: 底面 (A, B, C, D) - 分解为两个三角形
+            // 第一个三角形：A, B, C
             vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
             vertices->push_back(osg::Vec3(B.x(), B.y(), B.z()));
+            vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));
+            // 第二个三角形：A, C, D
+            vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
             vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));
             vertices->push_back(osg::Vec3(D.x(), D.y(), D.z()));
             
@@ -338,24 +356,32 @@ void GableHouse3D_Geo::buildFaceGeometries()
             vertices->push_back(osg::Vec3(D.x(), D.y(), D.z()));
             vertices->push_back(osg::Vec3(F.x(), F.y(), F.z()));
             
-            // 面4: 左斜屋顶面 (A, E, F, D) - A连屋脊1，D连屋脊2
+            // 面4: 左斜屋顶面 (A, E, F, D) - 分解为两个三角形
+            // 第一个三角形：A, E, F
             vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
             vertices->push_back(osg::Vec3(E.x(), E.y(), E.z()));
             vertices->push_back(osg::Vec3(F.x(), F.y(), F.z()));
+            // 第二个三角形：A, F, D
+            vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
+            vertices->push_back(osg::Vec3(F.x(), F.y(), F.z()));
             vertices->push_back(osg::Vec3(D.x(), D.y(), D.z()));
             
-            // 面5: 右斜屋顶面 (B, E, F, C) - B连屋脊1，C连屋脊2
+            // 面5: 右斜屋顶面 (B, E, F, C) - 分解为两个三角形
+            // 第一个三角形：B, E, F
             vertices->push_back(osg::Vec3(B.x(), B.y(), B.z()));
             vertices->push_back(osg::Vec3(E.x(), E.y(), E.z()));
             vertices->push_back(osg::Vec3(F.x(), F.y(), F.z()));
+            // 第二个三角形：B, F, C
+            vertices->push_back(osg::Vec3(B.x(), B.y(), B.z()));
+            vertices->push_back(osg::Vec3(F.x(), F.y(), F.z()));
             vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));
             
-            // 添加5个面的图元
-            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::QUADS, 0, 4));    // 底面
-            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 4, 3)); // 前三角形端面
-            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 7, 3)); // 后三角形端面
-            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::QUADS, 10, 4));   // 左斜屋顶面
-            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::QUADS, 14, 4));   // 右斜屋顶面
+            // 添加所有面的图元
+            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, 6));   // 底面（2个三角形）
+            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 6, 3));   // 前三角形端面
+            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 9, 3));   // 后三角形端面
+            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 12, 6));  // 左斜屋顶面（2个三角形）
+            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 18, 6));  // 右斜屋顶面（2个三角形）
         }
     }
     

@@ -372,8 +372,24 @@ void SpireHouse3D_Geo::buildFaceGeometries()
             vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));
             vertices->push_back(osg::Vec3(D.x(), D.y(), D.z()));
             
-            // 添加底面
-            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::QUADS, 0, 4));
+            // 添加底面（分解为两个三角形）
+            // 第一个三角形：0, 1, 2
+            // 第二个三角形：0, 2, 3
+            // 需要调整顶点顺序以符合三角形
+            osg::ref_ptr<osg::Vec3Array> triangleVertices = new osg::Vec3Array();
+            triangleVertices->push_back((*vertices)[0]); // A
+            triangleVertices->push_back((*vertices)[1]); // B  
+            triangleVertices->push_back((*vertices)[2]); // C
+            triangleVertices->push_back((*vertices)[0]); // A
+            triangleVertices->push_back((*vertices)[2]); // C
+            triangleVertices->push_back((*vertices)[3]); // D
+            
+            vertices->clear();
+            for (int i = 0; i < 6; i++) {
+                vertices->push_back((*triangleVertices)[i]);
+            }
+            
+            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, 6));
         }
     }
     else if (allStagePoints.size() == 3) {
@@ -433,10 +449,30 @@ void SpireHouse3D_Geo::buildFaceGeometries()
             vertices->push_back(osg::Vec3(A2.x(), A2.y(), A2.z()));
             vertices->push_back(osg::Vec3(D2.x(), D2.y(), D2.z()));
             
-            // 添加6个四边形面
+            // 添加所有面（分解为三角形）
+            // 总共6个面，每个面4个顶点，需要转换为每个面6个顶点（2个三角形）
+            osg::ref_ptr<osg::Vec3Array> triangleVertices = new osg::Vec3Array();
+            
             for (int i = 0; i < 6; i++) {
-                geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::QUADS, i * 4, 4));
+                int base = i * 4;
+                // 第一个三角形：base+0, base+1, base+2
+                triangleVertices->push_back((*vertices)[base + 0]);
+                triangleVertices->push_back((*vertices)[base + 1]);
+                triangleVertices->push_back((*vertices)[base + 2]);
+                
+                // 第二个三角形：base+0, base+2, base+3
+                triangleVertices->push_back((*vertices)[base + 0]);
+                triangleVertices->push_back((*vertices)[base + 2]);
+                triangleVertices->push_back((*vertices)[base + 3]);
             }
+            
+            vertices->clear();
+            for (int i = 0; i < triangleVertices->size(); i++) {
+                vertices->push_back((*triangleVertices)[i]);
+            }
+            
+            // 添加所有三角形面片（6个面 × 2个三角形 = 12个三角形）
+            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, 36));
         }
     }
     else if (allStagePoints.size() >= 4) {
@@ -513,16 +549,39 @@ void SpireHouse3D_Geo::buildFaceGeometries()
             vertices->push_back(osg::Vec3(A2.x(), A2.y(), A2.z()));
             vertices->push_back(osg::Vec3(spirePoint.x(), spirePoint.y(), spirePoint.z()));
             
-            // 添加墙体面（1个底面 + 4个墙面）
-            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::QUADS, 0, 4));  // 底面
-            for (int i = 0; i < 4; i++) {
-                geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::QUADS, 4 + i * 4, 4)); // 墙面
+            // 添加墙体面（分解四边形为三角形）
+            // 需要将前面的1个底面+4个墙面四边形转换为三角形
+            osg::ref_ptr<osg::Vec3Array> wallTriangles = new osg::Vec3Array();
+            
+            // 转换5个四边形面为三角形（每个四边形 = 2个三角形）
+            for (int i = 0; i < 5; i++) {
+                int base = i * 4;
+                // 第一个三角形：base+0, base+1, base+2
+                wallTriangles->push_back((*vertices)[base + 0]);
+                wallTriangles->push_back((*vertices)[base + 1]);
+                wallTriangles->push_back((*vertices)[base + 2]);
+                
+                // 第二个三角形：base+0, base+2, base+3
+                wallTriangles->push_back((*vertices)[base + 0]);
+                wallTriangles->push_back((*vertices)[base + 2]);
+                wallTriangles->push_back((*vertices)[base + 3]);
             }
             
-            // 添加尖顶面（4个三角形）
-            for (int i = 0; i < 4; i++) {
-                geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 20 + i * 3, 3)); // 尖顶面
+            // 复制尖顶三角形（保持原有的4个三角形）
+            for (int i = 20; i < 32; i++) { // 4个三角形 × 3个顶点 = 12个顶点
+                wallTriangles->push_back((*vertices)[i]);
             }
+            
+            vertices->clear();
+            for (int i = 0; i < wallTriangles->size(); i++) {
+                vertices->push_back((*wallTriangles)[i]);
+            }
+            
+            // 添加墙体三角形面片（5个面 × 2个三角形 = 10个三角形）
+            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, 30));
+            
+            // 添加尖顶面（4个三角形）
+            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 30, 12));
         }
     }
     

@@ -461,16 +461,28 @@ void Hemisphere3D_Geo::buildFaceGeometries()
                 for (int lng = 0; lng < longitudes; ++lng) {
                     int next_lng = (lng + 1) % longitudes;
                     
-                    // 构建四边形面片
-                    vertices->push_back(vertices->at(ringIndices[lat][lng]));
-                    vertices->push_back(vertices->at(ringIndices[lat][next_lng]));
-                    vertices->push_back(vertices->at(ringIndices[lat + 1][next_lng]));
-                    vertices->push_back(vertices->at(ringIndices[lat + 1][lng]));
+                    // 构建三角形面片（将四边形分解为两个三角形）
+                    osg::Vec3 v1 = vertices->at(ringIndices[lat][lng]);
+                    osg::Vec3 v2 = vertices->at(ringIndices[lat][next_lng]);
+                    osg::Vec3 v3 = vertices->at(ringIndices[lat + 1][next_lng]);
+                    osg::Vec3 v4 = vertices->at(ringIndices[lat + 1][lng]);
                     
-                    geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::QUADS, 
-                        vertices->size() - 4, 4));
+                    // 第一个三角形：v1 -> v2 -> v3
+                    vertices->push_back(v1);
+                    vertices->push_back(v2);
+                    vertices->push_back(v3);
+                    
+                    // 第二个三角形：v1 -> v3 -> v4
+                    vertices->push_back(v1);
+                    vertices->push_back(v3);
+                    vertices->push_back(v4);
                 }
             }
+            
+            // 添加所有四边形转换的三角形面片
+            int quadTriangleCount = (latitudes - 1) * longitudes * 2 * 3; // 每个四边形=2个三角形，每个三角形=3个顶点
+            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 
+                vertices->size() - quadTriangleCount, quadTriangleCount));
             
             // 最顶层的三角形面片
             int topRing = latitudes - 1;

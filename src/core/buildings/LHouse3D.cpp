@@ -514,8 +514,21 @@ void LHouse3D_Geo::buildFaceGeometries()
             vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));
             vertices->push_back(osg::Vec3(D.x(), D.y(), D.z()));
             
-            // 添加底面
-            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::QUADS, 0, 4));
+            // 添加底面（分解为两个三角形）
+            osg::ref_ptr<osg::Vec3Array> triangleVertices = new osg::Vec3Array();
+            triangleVertices->push_back((*vertices)[0]);
+            triangleVertices->push_back((*vertices)[1]);
+            triangleVertices->push_back((*vertices)[2]);
+            triangleVertices->push_back((*vertices)[0]);
+            triangleVertices->push_back((*vertices)[2]);
+            triangleVertices->push_back((*vertices)[3]);
+            
+            vertices->clear();
+            for (int i = 0; i < 6; i++) {
+                vertices->push_back((*triangleVertices)[i]);
+            }
+            
+            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, 6));
         }
     }
     else if (allStagePoints.size() == 3) {
@@ -566,9 +579,33 @@ void LHouse3D_Geo::buildFaceGeometries()
             vertices->push_back(osg::Vec3(G.x(), G.y(), G.z()));
             vertices->push_back(osg::Vec3(H.x(), H.y(), H.z()));
             
+            // 转换四边形为三角形
+            osg::ref_ptr<osg::Vec3Array> triangleVertices = new osg::Vec3Array();
+            
+            // 主体矩形（顶点0-3）-> 2个三角形
+            triangleVertices->push_back((*vertices)[0]); // A
+            triangleVertices->push_back((*vertices)[1]); // B
+            triangleVertices->push_back((*vertices)[2]); // C
+            triangleVertices->push_back((*vertices)[0]); // A
+            triangleVertices->push_back((*vertices)[2]); // C
+            triangleVertices->push_back((*vertices)[3]); // D
+            
+            // 扩展矩形（顶点4-7）-> 2个三角形
+            triangleVertices->push_back((*vertices)[4]); // E
+            triangleVertices->push_back((*vertices)[5]); // F
+            triangleVertices->push_back((*vertices)[6]); // G
+            triangleVertices->push_back((*vertices)[4]); // E
+            triangleVertices->push_back((*vertices)[6]); // G
+            triangleVertices->push_back((*vertices)[7]); // H
+            
+            vertices->clear();
+            for (int i = 0; i < triangleVertices->size(); i++) {
+                vertices->push_back((*triangleVertices)[i]);
+            }
+            
             // 添加两个矩形面
-            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::QUADS, 0, 4)); // 主体
-            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::QUADS, 4, 4)); // 扩展
+            // 转换为三角形（2个四边形 = 4个三角形）
+            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, 12)); // 主体和扩展（4个三角形）
         }
     }
     else if (allStagePoints.size() >= 4) {
@@ -647,11 +684,36 @@ void LHouse3D_Geo::buildFaceGeometries()
             vertices->push_back(osg::Vec3(G2.x(), G2.y(), G2.z()));
             vertices->push_back(osg::Vec3(F2.x(), F2.y(), F2.z()));
             
+            // 转换四边形为三角形
+            osg::ref_ptr<osg::Vec3Array> triangleVertices = new osg::Vec3Array();
+            
+            // 转换4个四边形为8个三角形
+            for (int i = 0; i < 4; i++) {
+                int base = i * 4;
+                // 第一个三角形：base+0, base+1, base+2
+                triangleVertices->push_back((*vertices)[base + 0]);
+                triangleVertices->push_back((*vertices)[base + 1]);
+                triangleVertices->push_back((*vertices)[base + 2]);
+                
+                // 第二个三角形：base+0, base+2, base+3
+                triangleVertices->push_back((*vertices)[base + 0]);
+                triangleVertices->push_back((*vertices)[base + 2]);
+                triangleVertices->push_back((*vertices)[base + 3]);
+            }
+            
+            // 保留剩余的顶点（墙面等）
+            for (int i = 16; i < vertices->size(); i++) {
+                triangleVertices->push_back((*vertices)[i]);
+            }
+            
+            vertices->clear();
+            for (int i = 0; i < triangleVertices->size(); i++) {
+                vertices->push_back((*triangleVertices)[i]);
+            }
+            
             // 添加基本面
-            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::QUADS, 0, 4));   // 主体底面
-            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::QUADS, 4, 4));   // 主体顶面
-            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::QUADS, 8, 4));   // 扩展底面
-            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::QUADS, 12, 4));  // 扩展顶面
+            // 转换为三角形（4个四边形 = 8个三角形）
+            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, 24)); // 所有面
             
             // 添加更多的墙面（这里简化处理，实际上L型房屋的墙面构建比较复杂）
             // 可以根据需要添加更多的墙面

@@ -278,10 +278,6 @@ void Cylinder3D_Geo::buildEdgeGeometries()
             glm::dvec3 v1 = glm::normalize(p1 - center);
             glm::dvec3 v2 = glm::normalize(p2 - center);
             glm::dvec3 normal = glm::normalize(glm::cross(v1, v2));
-            
-            // 误差累积得好大
-            assert(std::abs(glm::length(glm::cross(glm::normalize(heightVector), normal)) - 1) > 0.1 && "再怎么样为啥高会与平面法向量垂直啊");
-            assert(glm::length(glm::cross(glm::normalize(heightVector), normal)) < 0.1 && "约束计算错误");
 
             // 计算圆平面上的两个正交向量
             glm::dvec3 radiusVec = v1;
@@ -435,8 +431,6 @@ void Cylinder3D_Geo::buildFaceGeometries()
             glm::dvec3 v1 = glm::normalize(p1 - center);
             glm::dvec3 v2 = glm::normalize(p2 - center);
             glm::dvec3 normal = glm::normalize(glm::cross(v1, v2));
-            
-            assert(glm::length(glm::cross(glm::normalize(heightVector), normal)) < 0.1 && "不垂直，约束计算错误(误差好像很大)");
 
             // 计算圆平面上的两个正交向量
             glm::dvec3 radiusVec = v1;
@@ -484,22 +478,30 @@ void Cylinder3D_Geo::buildFaceGeometries()
             // 顶面圆形（三角形扇形）
             geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLE_FAN, circleSegments + 2, circleSegments + 2));
             
-            // 侧面：使用四边形条带
+            // 侧面：使用三角形条带（将四边形分解为三角形）
+            osg::ref_ptr<osg::DrawElementsUInt> triangleIndices = 
+                new osg::DrawElementsUInt(osg::PrimitiveSet::TRIANGLES);
+                
             for (int i = 0; i < circleSegments; i++) {
                 int next = (i + 1) % circleSegments;
                 
-                // 为每个侧面四边形创建单独的primitive
-                osg::ref_ptr<osg::DrawElementsUInt> quadIndices = 
-                    new osg::DrawElementsUInt(osg::PrimitiveSet::QUADS);
+                int bottomCurr = 1 + i;                      // 底面当前点
+                int bottomNext = 1 + next;                   // 底面下一点
+                int topNext = circleSegments + 3 + next;     // 顶面下一点
+                int topCurr = circleSegments + 3 + i;        // 顶面当前点
                 
-                // 四边形：底面当前点 -> 底面下一点 -> 顶面下一点 -> 顶面当前点
-                quadIndices->push_back(1 + i);                           // 底面当前点
-                quadIndices->push_back(1 + next);                        // 底面下一点
-                quadIndices->push_back(circleSegments + 3 + next);       // 顶面下一点
-                quadIndices->push_back(circleSegments + 3 + i);          // 顶面当前点
+                // 第一个三角形：底面当前点 -> 底面下一点 -> 顶面下一点
+                triangleIndices->push_back(bottomCurr);
+                triangleIndices->push_back(bottomNext);
+                triangleIndices->push_back(topNext);
                 
-                geometry->addPrimitiveSet(quadIndices);
+                // 第二个三角形：底面当前点 -> 顶面下一点 -> 顶面当前点
+                triangleIndices->push_back(bottomCurr);
+                triangleIndices->push_back(topNext);
+                triangleIndices->push_back(topCurr);
             }
+            
+            geometry->addPrimitiveSet(triangleIndices);
         }
     }
     

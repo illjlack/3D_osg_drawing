@@ -331,7 +331,7 @@ void Ellipsoid3D_Geo::buildFaceGeometries()
                 }
             }
             
-            // 生成四边形面片
+            // 生成三角形面片（将每个四边形分解为两个三角形）
             for (int lat = 0; lat < latitudes; ++lat) {
                 for (int lng = 0; lng < longitudes; ++lng) {
                     int next_lng = (lng + 1) % longitudes;
@@ -342,17 +342,20 @@ void Ellipsoid3D_Geo::buildFaceGeometries()
                     int v3 = (lat + 1) * longitudes + next_lng; // 下一层下一经度
                     int v4 = (lat + 1) * longitudes + lng;     // 下一层当前经度
                     
-                    // 添加四边形顶点
+                    // 第一个三角形 (v1, v2, v3)
                     vertices->push_back(ellipsoidVertices[v1]);
                     vertices->push_back(ellipsoidVertices[v2]);
                     vertices->push_back(ellipsoidVertices[v3]);
-                    vertices->push_back(ellipsoidVertices[v4]);
                     
-                    // 添加四边形面
-                    geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::QUADS, 
-                        vertices->size() - 4, 4));
+                    // 第二个三角形 (v1, v3, v4)
+                    vertices->push_back(ellipsoidVertices[v1]);
+                    vertices->push_back(ellipsoidVertices[v3]);
+                    vertices->push_back(ellipsoidVertices[v4]);
                 }
             }
+            
+            // 添加三角形面片
+            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, vertices->size()));
         }
     }
     

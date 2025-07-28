@@ -92,20 +92,25 @@ osg::ref_ptr<osg::Geometry> OSGUtils::createQuad(const glm::dvec3& v1, const glm
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
     osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array();
     
+    // 第一个三角形：v1, v2, v3
     vertices->push_back(glmToOsg(v1));
     vertices->push_back(glmToOsg(v2));
+    vertices->push_back(glmToOsg(v3));
+    
+    // 第二个三角形：v1, v3, v4
+    vertices->push_back(glmToOsg(v1));
     vertices->push_back(glmToOsg(v3));
     vertices->push_back(glmToOsg(v4));
     
     osg::Vec3 normal = calculateTriangleNormal(glmToOsg(v1), glmToOsg(v2), glmToOsg(v3));
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 6; i++) {
         normals->push_back(normal);
     }
     
     geometry->setVertexArray(vertices);
     geometry->setNormalArray(normals);
     geometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
-    geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::QUADS, 0, 4));
+    geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, 6));
     
     return geometry;
 }
@@ -148,25 +153,34 @@ osg::ref_ptr<osg::Geometry> OSGUtils::createBox(const glm::dvec3& center, const 
         glm::dvec3(-1, 0, 0), glm::dvec3( 1, 0, 0)
     };
     
-    // 为每个面添加顶点和法向量
+    // 为每个面添加顶点和法向量（分解为三角形）
     for (size_t f = 0; f < faces.size(); f++) {
         const auto& face = faces[f];
         const auto& normal = faceNormals[f];
         
-        for (int i = 0; i < 4; i++) {
-            vertices->push_back(glmToOsg(boxVertices[face[i]]));
-            normals->push_back(glmToOsg(normal));
-        }
+        // 第一个三角形：face[0], face[1], face[2]
+        vertices->push_back(glmToOsg(boxVertices[face[0]]));
+        vertices->push_back(glmToOsg(boxVertices[face[1]]));
+        vertices->push_back(glmToOsg(boxVertices[face[2]]));
+        normals->push_back(glmToOsg(normal));
+        normals->push_back(glmToOsg(normal));
+        normals->push_back(glmToOsg(normal));
+        
+        // 第二个三角形：face[0], face[2], face[3]
+        vertices->push_back(glmToOsg(boxVertices[face[0]]));
+        vertices->push_back(glmToOsg(boxVertices[face[2]]));
+        vertices->push_back(glmToOsg(boxVertices[face[3]]));
+        normals->push_back(glmToOsg(normal));
+        normals->push_back(glmToOsg(normal));
+        normals->push_back(glmToOsg(normal));
     }
     
     geometry->setVertexArray(vertices);
     geometry->setNormalArray(normals);
     geometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
     
-    // 为每个面添加四边形图元
-    for (int f = 0; f < 6; f++) {
-        geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::QUADS, f * 4, 4));
-    }
+    // 添加所有三角形图元（6个面 × 2个三角形 = 12个三角形）
+    geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, 36));
     
     return geometry;
 }
@@ -357,19 +371,24 @@ osg::ref_ptr<osg::Geometry> OSGUtils::createPlane(const glm::dvec3& center, cons
     glm::dvec3 p3 = center + halfSize * ( u + v);
     glm::dvec3 p4 = center + halfSize * (-u + v);
     
+    // 第一个三角形：p1, p2, p3
     vertices->push_back(glmToOsg(p1));
     vertices->push_back(glmToOsg(p2));
     vertices->push_back(glmToOsg(p3));
+    
+    // 第二个三角形：p1, p3, p4
+    vertices->push_back(glmToOsg(p1));
+    vertices->push_back(glmToOsg(p3));
     vertices->push_back(glmToOsg(p4));
     
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 6; i++) {
         normals->push_back(glmToOsg(normal));
     }
     
     geometry->setVertexArray(vertices);
     geometry->setNormalArray(normals);
     geometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
-    geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::QUADS, 0, 4));
+    geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, 6));
     
     return geometry;
 }
