@@ -155,6 +155,15 @@ private:
     
     // 拾取系统回调
     void onSimplePickingResult(const PickResult& result);
+    
+    // 鼠标事件处理器
+    void handleCameraControl(QMouseEvent* event);
+    void handleSelectionMode(QMouseEvent* event, const PickResult& pickResult, const glm::dvec3& worldPos);
+    void handleDrawingMode(QMouseEvent* event, const PickResult& pickResult, const glm::dvec3& worldPos);
+    void handleLeftClickDrawing(const glm::dvec3& worldPos);
+    void handleRightClickDrawing();
+    void updateMouseWorldPosition(int x, int y);
+    void resetMouseState();
 
 private:
     // OSG场景图相关成员
@@ -203,6 +212,11 @@ private:
     QPoint m_lastContextMenuPos;
     osg::ref_ptr<Geo3D> m_contextMenuGeo;
     int m_contextMenuPointIndex; // 16ms缓存时间（约60FPS）
+    
+    // 鼠标状态跟踪
+    Qt::MouseButton m_pressedButton;
+    Qt::KeyboardModifiers m_pressedModifiers;
+    bool m_isDragging;
     
     QTimer* m_updateTimer;
 

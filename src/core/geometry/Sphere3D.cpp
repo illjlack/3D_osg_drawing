@@ -80,19 +80,18 @@ bool calculateSphereCenterAndRadius(const glm::dvec3& p1, const glm::dvec3& p2,
     // 球心在局部坐标系中的位置（圆心正上方或正下方）
     glm::dvec3 localSphereCenter = glm::dvec3(0.0, 0.0, localSphereZ);
     
-    // 球半径
-    radius = std::abs(localSphereZ);
+    // 球半径：球心到任意球面点的距离
+    radius = glm::length(localP1 - localSphereCenter);
     
     // 验证四个点在局部坐标系中是否都在球面上
     double sphereRadius = radius;
-    // 误差太大，接近0.1
-    //if (std::abs(glm::length(localP1 - localSphereCenter) - sphereRadius) > tolerance ||
-    //    std::abs(glm::length(localP2 - localSphereCenter) - sphereRadius) > tolerance ||
-    //    std::abs(glm::length(localP3 - localSphereCenter) - sphereRadius) > tolerance ||
-    //    std::abs(glm::length(localP4 - localSphereCenter) - sphereRadius) > tolerance) {
-    //    // 验证失败，无法计算有效球体
-    //    return false;
-    //}
+    if (std::abs(glm::length(localP1 - localSphereCenter) - sphereRadius) > tolerance ||
+        std::abs(glm::length(localP2 - localSphereCenter) - sphereRadius) > tolerance ||
+        std::abs(glm::length(localP3 - localSphereCenter) - sphereRadius) > tolerance ||
+        std::abs(glm::length(localP4 - localSphereCenter) - sphereRadius) > tolerance) {
+        // 验证失败，无法计算有效球体
+        return false;
+    }
     
     // 将球心变换回全局坐标系
     glm::dmat3 localToGlobal = glm::transpose(globalToLocal); // 正交矩阵的逆是其转置
@@ -169,8 +168,8 @@ bool calculateSphereCenterSpecialCase(const glm::dvec3& p1, const glm::dvec3& p2
     // 球心在局部坐标系中的位置（圆心正上方或正下方）
     glm::dvec3 localSphereCenter = glm::dvec3(0.0, 0.0, localSphereZ);
     
-    // 球半径
-    radius = std::abs(localSphereZ);
+    // 球半径：球心到任意球面点的距离
+    radius = glm::length(localP1 - localSphereCenter);
     
     // 验证四个点在局部坐标系中是否都在球面上
     double sphereRadius = radius;
