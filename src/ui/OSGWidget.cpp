@@ -560,6 +560,40 @@ void OSGWidget::setupPickingSystem()
     LOG_SUCCESS("拾取指示器设置完成", "拾取");
 }
 
+bool OSGWidget::isHouseGeometry(osg::ref_ptr<Geo3D> geo)
+{
+    if (!geo) return false;
+    
+    // 检查几何体类型是否为房屋类型
+    GeoType3D geoType = geo->getGeoType();
+    return geoType == Geo_FlatHouse3D ||
+           geoType == Geo_DomeHouse3D ||
+           geoType == Geo_SpireHouse3D ||
+           geoType == Geo_GableHouse3D ||
+           geoType == Geo_LHouse3D;
+}
+
+void OSGWidget::setupHouseRenderingState(osg::Node* node)
+{
+    if (!node) return;
+    
+    osg::StateSet* stateSet = node->getOrCreateStateSet();
+    
+    // 关闭深度测试，让房屋显示在最上方
+    stateSet->setMode(GL_DEPTH_TEST, osg::StateAttribute::OFF);
+    
+    // 设置渲染顺序为最高优先级（后渲染，显示在上方）
+    stateSet->setRenderBinDetails(1000, "RenderBin");
+    
+    // 可选：关闭深度写入，避免遮挡其他透明物体
+    stateSet->setMode(GL_DEPTH_WRITEMASK, osg::StateAttribute::OFF);
+    
+    // 确保混合功能开启，支持透明效果
+    stateSet->setMode(GL_BLEND, osg::StateAttribute::ON);
+    
+    LOG_INFO("房屋几何体渲染状态设置完成：关闭深度测试，设置最高渲染优先级", "渲染");
+}
+
 void OSGWidget::resetCamera()
 {
     if (!m_cameraController) return;
@@ -679,6 +713,12 @@ void OSGWidget::addGeo(osg::ref_ptr<Geo3D> geo)
         osg::ref_ptr<osg::Group> geoOSGNode = geo->mm_node()->getOSGNode();
         if (geoOSGNode.valid()) {
             m_geoNode->addChild(geoOSGNode.get());
+            
+            // 检查是否为房屋几何体，如果是则设置特殊渲染状态
+            if (isHouseGeometry(geo)) {
+                setupHouseRenderingState(geoOSGNode.get());
+                LOG_INFO(QString("为房屋几何体设置关闭深度测试: %1").arg(geo->getGeoType()), "OSGWidget");
+            }
         } else {
         }
         

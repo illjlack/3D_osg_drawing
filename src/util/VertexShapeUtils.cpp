@@ -1,4 +1,4 @@
-#include "VertexShapeUtils.h"
+﻿#include "VertexShapeUtils.h"
 #include "../core/camera/CameraController.h"
 #include <osg/StateSet>
 #include <osg/PolygonMode>

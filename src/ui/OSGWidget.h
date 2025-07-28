@@ -137,6 +137,10 @@ private:
     void setupEventHandlers();
     void setupPickingSystem();
     
+    // 房屋几何体特殊渲染设置
+    bool isHouseGeometry(osg::ref_ptr<Geo3D> geo);
+    void setupHouseRenderingState(osg::Node* node);
+    
     void updateCurrentDrawing(const glm::dvec3& worldPos);
     void completeCurrentDrawing();
     void cancelCurrentDrawing();
