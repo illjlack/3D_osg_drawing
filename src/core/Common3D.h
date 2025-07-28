@@ -10,6 +10,10 @@
 #include <QString>
 #include <QStatusBar>
 #include <QObject>
+#include <QJsonObject>
+#include <QJsonDocument>
+#include <QDir>
+#include <QStandardPaths>
 #include <vector>
 #include <filesystem>
 #include <sstream>
@@ -220,8 +224,8 @@ public:
     GeoParameters3D getAllGlobalDefaults() const;
     
     // 保存/加载全局设置
-    void saveGlobalSettings(const std::string& filename);
-    bool loadGlobalSettings(const std::string& filename);
+    void saveGlobalSettings(const std::string& filename = "");
+    bool loadGlobalSettings(const std::string& filename = "");
     
     // 重置为默认值
     void resetToFactoryDefaults();
@@ -234,10 +238,45 @@ public:
     GeoParameters3D getPreset(const std::string& name) const;
     std::vector<std::string> getPresetNames() const;
     
+    // 配置文件管理
+    QString getDefaultConfigPath() const;
+    QString getConfigDirectory() const;
+    bool ensureConfigDirectoryExists();
+    
+    // 自动保存和加载
+    bool autoLoadSettings();
+    void autoSaveSettings();
+    
+    // 配置验证和修复
+    bool validateConfig(const QJsonObject& config) const;
+    void repairInvalidConfig(QJsonObject& config) const;
+    
+    // 配置信息
+    QString getConfigInfo() const;
+    
 private:
     GlobalParametersManager() = default;
+    ~GlobalParametersManager() = default;
+    
+    // 禁止拷贝和赋值
+    GlobalParametersManager(const GlobalParametersManager&) = delete;
+    GlobalParametersManager& operator=(const GlobalParametersManager&) = delete;
+    
+    // JSON序列化和反序列化
+    QJsonObject parametersToJson(const GeoParameters3D& params) const;
+    GeoParameters3D parametersFromJson(const QJsonObject& jsonObj) const;
+    Color3D colorFromJson(const QJsonObject& colorObj) const;
+    QJsonObject colorToJson(const Color3D& color) const;
+    Material3D materialFromJson(const QJsonObject& materialObj) const;
+    QJsonObject materialToJson(const Material3D& material) const;
+    
+    // 内部数据
     std::map<std::string, GeoParameters3D> m_presets;
     static GlobalParametersManager* s_instance;
+    
+    // 配置文件相关
+    static const QString DEFAULT_CONFIG_FILENAME;
+    static const QString CONFIG_SUBDIRECTORY;
 };
 
 // 变换矩阵
@@ -352,6 +391,35 @@ PointShape3D stringToPointShape3D(const QString& str);
 LineStyle3D stringToLineStyle3D(const QString& str);
 FillType3D stringToFillType3D(const QString& str);
 MaterialType3D stringToMaterialType3D(const QString& str); 
+
+// 配置管理便利函数
+namespace Config3D
+{
+    // 应用程序启动时调用，初始化配置系统
+    bool initializeConfigSystem();
+    
+    // 应用程序关闭时调用，保存当前配置
+    void finalizeConfigSystem();
+    
+    // 快速获取/设置当前全局配置
+    GeoParameters3D getCurrentGlobalConfig();
+    void setCurrentGlobalConfig(const GeoParameters3D& config);
+    
+    // 预设管理
+    bool loadPreset(const std::string& presetName);
+    bool saveCurrentAsPreset(const std::string& presetName);
+    std::vector<std::string> getAvailablePresets();
+    
+    // 配置文件操作
+    bool exportConfig(const QString& filePath);
+    bool importConfig(const QString& filePath);
+    
+    // 配置信息
+    QString getConfigurationInfo();
+    
+    // 重置配置
+    void resetToDefaults();
+} 
 
 
 

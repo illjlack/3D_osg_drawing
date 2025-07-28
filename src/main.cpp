@@ -213,24 +213,11 @@ int main(int argc, char *argv[])
     // 初始化全局3D设置
     initializeGlobal3DSettings();
     
-    // 自动加载配置文件
-    try {
-        GlobalParametersManager& configManager = GlobalParametersManager::getInstance();
-        QString configDir = app.applicationDirPath() + "/config";
-        QDir().mkpath(configDir);
-        QString configFile = configDir + "/global_settings.cfg";
-        
-        if (QFile::exists(configFile)) {
-            if (configManager.loadGlobalSettings(configFile.toStdString())) {
-                LOG_INFO("配置文件加载成功", "系统");
-            } else {
-                LOG_WARNING("配置文件加载失败，使用默认设置", "系统");
-            }
-        } else {
-            LOG_INFO("配置文件不存在，使用默认设置", "系统");
-        }
-    } catch (const std::exception& e) {
-        LOG_ERROR("配置文件加载异常: " + QString::fromStdString(e.what()), "系统");
+    // 初始化配置管理系统
+    if (Config3D::initializeConfigSystem()) {
+        LOG_INFO("配置管理系统初始化成功", "系统");
+    } else {
+        LOG_WARNING("配置管理系统初始化失败，使用默认设置", "系统");
     }
     
     // 创建启动画面
@@ -254,19 +241,10 @@ int main(int argc, char *argv[])
         window.activateWindow();
     });
     
-    // 程序结束时自动保存配置
+    // 程序结束时保存配置并清理配置系统
     QObject::connect(&app, &QApplication::aboutToQuit, [&]() {
-        try {
-            GlobalParametersManager& configManager = GlobalParametersManager::getInstance();
-            QString configDir = app.applicationDirPath() + "/config";
-            QDir().mkpath(configDir);
-            QString configFile = configDir + "/global_settings.cfg";
-            
-            configManager.saveGlobalSettings(configFile.toStdString());
-            LOG_INFO("配置文件保存成功", "系统");
-        } catch (const std::exception& e) {
-            LOG_ERROR("配置文件保存异常: " + QString::fromStdString(e.what()), "系统");
-        }
+        LOG_INFO("应用程序即将退出，保存配置", "系统");
+        Config3D::finalizeConfigSystem();
     });
     
     return app.exec();

@@ -4,6 +4,15 @@
 #include <string>
 #include <sstream> // Required for std::ostringstream and std::istringstream
 #include <vector> // Required for std::vector
+#include <QJsonObject>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QFile>
+#include <QDir>
+#include <QStandardPaths>
+#include <QCoreApplication>
+#include <QDateTime>
+#include <QFileInfo>
 
 // 全局变量定义
 DrawMode3D GlobalDrawMode3D = DrawSelect3D;
@@ -545,6 +554,10 @@ void GeoParameters3D::setPresetStyle(const std::string& styleName)
 // 全局参数管理器实现
 GlobalParametersManager* GlobalParametersManager::s_instance = nullptr;
 
+// 静态常量定义
+const QString GlobalParametersManager::DEFAULT_CONFIG_FILENAME = "3d_drawing_config.json";
+const QString GlobalParametersManager::CONFIG_SUBDIRECTORY = "3DDrawing";
+
 GlobalParametersManager& GlobalParametersManager::getInstance()
 {
     if (!s_instance) {
@@ -572,6 +585,8 @@ void GlobalParametersManager::setAllGlobalDefaults(const GeoParameters3D& params
     
     GlobalMaterialType3D = params.material.type;
     GlobalSubdivisionLevel3D = params.subdivisionLevel;
+    
+    LOG_INFO("全局默认参数已更新", "配置管理");
 }
 
 GeoParameters3D GlobalParametersManager::getAllGlobalDefaults() const
@@ -581,15 +596,373 @@ GeoParameters3D GlobalParametersManager::getAllGlobalDefaults() const
     return params;
 }
 
+QString GlobalParametersManager::getConfigDirectory() const
+{
+    QString configDir = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+    return QDir(configDir).absoluteFilePath(CONFIG_SUBDIRECTORY);
+}
+
+QString GlobalParametersManager::getDefaultConfigPath() const
+{
+    return QDir(getConfigDirectory()).absoluteFilePath(DEFAULT_CONFIG_FILENAME);
+}
+
+bool GlobalParametersManager::ensureConfigDirectoryExists()
+{
+    QDir dir(getConfigDirectory());
+    if (!dir.exists()) {
+        if (!dir.mkpath(".")) {
+            LOG_ERROR("无法创建配置目录: " + dir.absolutePath(), "配置管理");
+            return false;
+        }
+        LOG_INFO("已创建配置目录: " + dir.absolutePath(), "配置管理");
+    }
+    return true;
+}
+
+QJsonObject GlobalParametersManager::colorToJson(const Color3D& color) const
+{
+    QJsonObject colorObj;
+    colorObj["r"] = color.r;
+    colorObj["g"] = color.g;
+    colorObj["b"] = color.b;
+    colorObj["a"] = color.a;
+    return colorObj;
+}
+
+Color3D GlobalParametersManager::colorFromJson(const QJsonObject& colorObj) const
+{
+    Color3D color;
+    color.r = colorObj["r"].toDouble(1.0);
+    color.g = colorObj["g"].toDouble(1.0);
+    color.b = colorObj["b"].toDouble(1.0);
+    color.a = colorObj["a"].toDouble(1.0);
+    return color;
+}
+
+QJsonObject GlobalParametersManager::materialToJson(const Material3D& material) const
+{
+    QJsonObject materialObj;
+    materialObj["ambient"] = colorToJson(material.ambient);
+    materialObj["diffuse"] = colorToJson(material.diffuse);
+    materialObj["specular"] = colorToJson(material.specular);
+    materialObj["emission"] = colorToJson(material.emission);
+    materialObj["shininess"] = material.shininess;
+    materialObj["transparency"] = material.transparency;
+    materialObj["type"] = static_cast<int>(material.type);
+    return materialObj;
+}
+
+Material3D GlobalParametersManager::materialFromJson(const QJsonObject& materialObj) const
+{
+    Material3D material;
+    if (materialObj.contains("ambient")) {
+        material.ambient = colorFromJson(materialObj["ambient"].toObject());
+    }
+    if (materialObj.contains("diffuse")) {
+        material.diffuse = colorFromJson(materialObj["diffuse"].toObject());
+    }
+    if (materialObj.contains("specular")) {
+        material.specular = colorFromJson(materialObj["specular"].toObject());
+    }
+    if (materialObj.contains("emission")) {
+        material.emission = colorFromJson(materialObj["emission"].toObject());
+    }
+    material.shininess = materialObj["shininess"].toDouble(32.0);
+    material.transparency = materialObj["transparency"].toDouble(1.0);
+    material.type = static_cast<MaterialType3D>(materialObj["type"].toInt(Material_Basic3D));
+    return material;
+}
+
+QJsonObject GlobalParametersManager::parametersToJson(const GeoParameters3D& params) const
+{
+    QJsonObject jsonObj;
+    
+    // 点属性
+    QJsonObject pointObj;
+    pointObj["shape"] = static_cast<int>(params.pointShape);
+    pointObj["size"] = params.pointSize;
+    pointObj["color"] = colorToJson(params.pointColor);
+    pointObj["show"] = params.showPoints;
+    jsonObj["point"] = pointObj;
+    
+    // 线属性
+    QJsonObject lineObj;
+    lineObj["style"] = static_cast<int>(params.lineStyle);
+    lineObj["width"] = params.lineWidth;
+    lineObj["color"] = colorToJson(params.lineColor);
+    lineObj["dashPattern"] = params.lineDashPattern;
+    lineObj["show"] = params.showEdges;
+    jsonObj["line"] = lineObj;
+    
+    // 面属性
+    QJsonObject fillObj;
+    fillObj["type"] = static_cast<int>(params.fillType);
+    fillObj["color"] = colorToJson(params.fillColor);
+    fillObj["show"] = params.showFaces;
+    jsonObj["fill"] = fillObj;
+    
+    // 材质属性
+    jsonObj["material"] = materialToJson(params.material);
+    
+    // 体属性
+    jsonObj["subdivisionLevel"] = static_cast<int>(params.subdivisionLevel);
+    
+    return jsonObj;
+}
+
+GeoParameters3D GlobalParametersManager::parametersFromJson(const QJsonObject& jsonObj) const
+{
+    GeoParameters3D params;
+    
+    // 点属性
+    if (jsonObj.contains("point")) {
+        QJsonObject pointObj = jsonObj["point"].toObject();
+        params.pointShape = static_cast<PointShape3D>(pointObj["shape"].toInt(Point_Dot3D));
+        params.pointSize = pointObj["size"].toDouble(2.0);
+        if (pointObj.contains("color")) {
+            params.pointColor = colorFromJson(pointObj["color"].toObject());
+        }
+        params.showPoints = pointObj["show"].toBool(true);
+    }
+    
+    // 线属性
+    if (jsonObj.contains("line")) {
+        QJsonObject lineObj = jsonObj["line"].toObject();
+        params.lineStyle = static_cast<LineStyle3D>(lineObj["style"].toInt(Line_Solid3D));
+        params.lineWidth = lineObj["width"].toDouble(1.0);
+        if (lineObj.contains("color")) {
+            params.lineColor = colorFromJson(lineObj["color"].toObject());
+        }
+        params.lineDashPattern = lineObj["dashPattern"].toDouble(1.0);
+        params.showEdges = lineObj["show"].toBool(true);
+    }
+    
+    // 面属性
+    if (jsonObj.contains("fill")) {
+        QJsonObject fillObj = jsonObj["fill"].toObject();
+        params.fillType = static_cast<FillType3D>(fillObj["type"].toInt(Fill_Solid3D));
+        if (fillObj.contains("color")) {
+            params.fillColor = colorFromJson(fillObj["color"].toObject());
+        }
+        params.showFaces = fillObj["show"].toBool(true);
+    }
+    
+    // 材质属性
+    if (jsonObj.contains("material")) {
+        params.material = materialFromJson(jsonObj["material"].toObject());
+    }
+    
+    // 体属性
+    params.subdivisionLevel = static_cast<SubdivisionLevel3D>(
+        jsonObj["subdivisionLevel"].toInt(Subdivision_Medium3D));
+    
+    return params;
+}
+
+bool GlobalParametersManager::validateConfig(const QJsonObject& config) const
+{
+    // 检查基本结构
+    if (!config.contains("version") || !config.contains("globalParameters")) {
+        return false;
+    }
+    
+    // 检查版本兼容性
+    QString version = config["version"].toString();
+    if (version.isEmpty()) {
+        return false;
+    }
+    
+    // 检查全局参数结构
+    QJsonObject globalParams = config["globalParameters"].toObject();
+    if (!globalParams.contains("point") || !globalParams.contains("line") || 
+        !globalParams.contains("fill")) {
+        return false;
+    }
+    
+    return true;
+}
+
+void GlobalParametersManager::repairInvalidConfig(QJsonObject& config) const
+{
+    // 确保版本信息存在
+    if (!config.contains("version")) {
+        config["version"] = "1.0.0";
+    }
+    
+    // 确保全局参数存在
+    if (!config.contains("globalParameters")) {
+        GeoParameters3D defaultParams;
+        config["globalParameters"] = parametersToJson(defaultParams);
+    }
+    
+    // 确保预设参数存在
+    if (!config.contains("presets")) {
+        config["presets"] = QJsonObject();
+    }
+    
+    LOG_INFO("配置文件已修复", "配置管理");
+}
+
 void GlobalParametersManager::saveGlobalSettings(const std::string& filename)
 {
-    // 实现保存逻辑
+    QString configPath;
+    if (filename.empty()) {
+        if (!ensureConfigDirectoryExists()) {
+            return;
+        }
+        configPath = getDefaultConfigPath();
+    } else {
+        configPath = QString::fromStdString(filename);
+    }
+    
+    try {
+        // 创建配置JSON对象
+        QJsonObject config;
+        config["version"] = "1.0.0";
+        config["timestamp"] = QDateTime::currentDateTime().toString(Qt::ISODate);
+        config["application"] = QCoreApplication::applicationName();
+        
+        // 保存全局参数
+        GeoParameters3D globalParams = getAllGlobalDefaults();
+        config["globalParameters"] = parametersToJson(globalParams);
+        
+        // 保存预设
+        QJsonObject presetsObj;
+        for (const auto& pair : m_presets) {
+            presetsObj[QString::fromStdString(pair.first)] = parametersToJson(pair.second);
+        }
+        config["presets"] = presetsObj;
+        
+        // 写入文件
+        QJsonDocument doc(config);
+        QFile file(configPath);
+        if (!file.open(QIODevice::WriteOnly)) {
+            LOG_ERROR("无法打开配置文件进行写入: " + configPath, "配置管理");
+            return;
+        }
+        
+        file.write(doc.toJson());
+        file.close();
+        
+        LOG_INFO("配置已保存到: " + configPath, "配置管理");
+        
+    } catch (const std::exception& e) {
+        LOG_ERROR("保存配置时发生异常: " + QString::fromStdString(e.what()), "配置管理");
+    }
 }
 
 bool GlobalParametersManager::loadGlobalSettings(const std::string& filename)
 {
-    // 实现加载逻辑
-    return true;
+    QString configPath;
+    if (filename.empty()) {
+        configPath = getDefaultConfigPath();
+    } else {
+        configPath = QString::fromStdString(filename);
+    }
+    
+    QFile file(configPath);
+    if (!file.exists()) {
+        LOG_INFO("配置文件不存在，使用默认设置: " + configPath, "配置管理");
+        resetToFactoryDefaults();
+        return true;  // 不算错误，使用默认值
+    }
+    
+    if (!file.open(QIODevice::ReadOnly)) {
+        LOG_ERROR("无法打开配置文件: " + configPath, "配置管理");
+        resetToFactoryDefaults();
+        return false;
+    }
+    
+    try {
+        QByteArray data = file.readAll();
+        file.close();
+        
+        QJsonParseError parseError;
+        QJsonDocument doc = QJsonDocument::fromJson(data, &parseError);
+        
+        if (parseError.error != QJsonParseError::NoError) {
+            LOG_ERROR("配置文件JSON解析错误: " + parseError.errorString(), "配置管理");
+            resetToFactoryDefaults();
+            return false;
+        }
+        
+        QJsonObject config = doc.object();
+        
+        // 验证和修复配置
+        if (!validateConfig(config)) {
+            LOG_WARNING("配置文件格式无效，正在修复", "配置管理");
+            repairInvalidConfig(config);
+        }
+        
+        // 加载全局参数
+        if (config.contains("globalParameters")) {
+            GeoParameters3D params = parametersFromJson(config["globalParameters"].toObject());
+            setAllGlobalDefaults(params);
+        }
+        
+        // 加载预设
+        if (config.contains("presets")) {
+            QJsonObject presetsObj = config["presets"].toObject();
+            m_presets.clear();
+            
+            for (auto it = presetsObj.begin(); it != presetsObj.end(); ++it) {
+                GeoParameters3D preset = parametersFromJson(it.value().toObject());
+                m_presets[it.key().toStdString()] = preset;
+            }
+        }
+        
+        LOG_INFO("配置已从文件加载: " + configPath, "配置管理");
+        return true;
+        
+    } catch (const std::exception& e) {
+        LOG_ERROR("加载配置时发生异常: " + QString::fromStdString(e.what()), "配置管理");
+        resetToFactoryDefaults();
+        return false;
+    }
+}
+
+bool GlobalParametersManager::autoLoadSettings()
+{
+    bool success = loadGlobalSettings();
+    
+    // 注册默认预设（如果没有的话）
+    if (m_presets.empty()) {
+        registerPreset("default", GeoParameters3D::getDefaultStyle());
+        registerPreset("wireframe", GeoParameters3D::getWireframeStyle());
+        registerPreset("point", GeoParameters3D::getPointStyle());
+        registerPreset("transparent", GeoParameters3D::getTransparentStyle());
+        registerPreset("high_quality", GeoParameters3D::getHighQualityStyle());
+        registerPreset("low_quality", GeoParameters3D::getLowQualityStyle());
+        
+        LOG_INFO("已注册默认预设样式", "配置管理");
+    }
+    
+    return success;
+}
+
+void GlobalParametersManager::autoSaveSettings()
+{
+    saveGlobalSettings();
+}
+
+QString GlobalParametersManager::getConfigInfo() const
+{
+    QString info;
+    info += QString("配置目录: %1\n").arg(getConfigDirectory());
+    info += QString("配置文件: %1\n").arg(getDefaultConfigPath());
+    info += QString("预设数量: %1\n").arg(static_cast<int>(m_presets.size()));
+    
+    QFile configFile(getDefaultConfigPath());
+    if (configFile.exists()) {
+        info += QString("配置文件大小: %1 字节\n").arg(configFile.size());
+        info += QString("最后修改: %1\n").arg(
+            QFileInfo(configFile).lastModified().toString(Qt::ISODate));
+    } else {
+        info += "配置文件不存在\n";
+    }
+    
+    return info;
 }
 
 void GlobalParametersManager::resetToFactoryDefaults()
@@ -613,16 +986,20 @@ void GlobalParametersManager::resetToFactoryDefaults()
     GlobalShowPoints3D = true;
     GlobalShowEdges3D = true;
     GlobalShowFaces3D = true;
+    
+    LOG_INFO("已重置为出厂默认设置", "配置管理");
 }
 
 void GlobalParametersManager::notifyParametersChanged()
 {
-    // 实现通知逻辑
+    LOG_INFO("全局参数已更改，通知相关组件", "配置管理");
+    // 这里可以添加信号发射或回调通知机制
 }
 
 void GlobalParametersManager::registerPreset(const std::string& name, const GeoParameters3D& params)
 {
     m_presets[name] = params;
+    LOG_INFO("已注册预设样式: " + QString::fromStdString(name), "配置管理");
 }
 
 GeoParameters3D GlobalParametersManager::getPreset(const std::string& name) const
@@ -631,6 +1008,7 @@ GeoParameters3D GlobalParametersManager::getPreset(const std::string& name) cons
     if (it != m_presets.end()) {
         return it->second;
     }
+    LOG_WARNING("未找到预设样式: " + QString::fromStdString(name), "配置管理");
     return GeoParameters3D();
 }
 
@@ -641,6 +1019,164 @@ std::vector<std::string> GlobalParametersManager::getPresetNames() const
         names.push_back(pair.first);
     }
     return names;
+}
+
+// Config3D命名空间实现
+namespace Config3D
+{
+    bool initializeConfigSystem()
+    {
+        try {
+            LOG_INFO("初始化配置系统", "配置管理");
+            
+            // 获取配置管理器实例并加载设置
+            auto& manager = GlobalParametersManager::getInstance();
+            bool success = manager.autoLoadSettings();
+            
+            if (success) {
+                LOG_INFO("配置系统初始化成功", "配置管理");
+            } else {
+                LOG_WARNING("配置系统初始化时使用了默认设置", "配置管理");
+            }
+            
+            return success;
+            
+        } catch (const std::exception& e) {
+            LOG_ERROR("配置系统初始化失败: " + QString::fromStdString(e.what()), "配置管理");
+            return false;
+        }
+    }
+    
+    void finalizeConfigSystem()
+    {
+        try {
+            LOG_INFO("保存配置并关闭配置系统", "配置管理");
+            
+            auto& manager = GlobalParametersManager::getInstance();
+            manager.autoSaveSettings();
+            
+            LOG_INFO("配置系统已关闭", "配置管理");
+            
+        } catch (const std::exception& e) {
+            LOG_ERROR("配置系统关闭时发生错误: " + QString::fromStdString(e.what()), "配置管理");
+        }
+    }
+    
+    GeoParameters3D getCurrentGlobalConfig()
+    {
+        auto& manager = GlobalParametersManager::getInstance();
+        return manager.getAllGlobalDefaults();
+    }
+    
+    void setCurrentGlobalConfig(const GeoParameters3D& config)
+    {
+        auto& manager = GlobalParametersManager::getInstance();
+        manager.setAllGlobalDefaults(config);
+        manager.notifyParametersChanged();
+    }
+    
+    bool loadPreset(const std::string& presetName)
+    {
+        try {
+            auto& manager = GlobalParametersManager::getInstance();
+            GeoParameters3D preset = manager.getPreset(presetName);
+            
+            // 检查预设是否有效（通过验证参数）
+            if (preset.validateParameters()) {
+                manager.setAllGlobalDefaults(preset);
+                manager.notifyParametersChanged();
+                LOG_INFO("已加载预设: " + QString::fromStdString(presetName), "配置管理");
+                return true;
+            } else {
+                LOG_WARNING("预设无效: " + QString::fromStdString(presetName), "配置管理");
+                return false;
+            }
+            
+        } catch (const std::exception& e) {
+            LOG_ERROR("加载预设时发生错误: " + QString::fromStdString(e.what()), "配置管理");
+            return false;
+        }
+    }
+    
+    bool saveCurrentAsPreset(const std::string& presetName)
+    {
+        try {
+            auto& manager = GlobalParametersManager::getInstance();
+            GeoParameters3D currentConfig = manager.getAllGlobalDefaults();
+            
+            manager.registerPreset(presetName, currentConfig);
+            manager.autoSaveSettings();  // 立即保存到文件
+            
+            LOG_INFO("当前配置已保存为预设: " + QString::fromStdString(presetName), "配置管理");
+            return true;
+            
+        } catch (const std::exception& e) {
+            LOG_ERROR("保存预设时发生错误: " + QString::fromStdString(e.what()), "配置管理");
+            return false;
+        }
+    }
+    
+    std::vector<std::string> getAvailablePresets()
+    {
+        auto& manager = GlobalParametersManager::getInstance();
+        return manager.getPresetNames();
+    }
+    
+    bool exportConfig(const QString& filePath)
+    {
+        try {
+            auto& manager = GlobalParametersManager::getInstance();
+            manager.saveGlobalSettings(filePath.toStdString());
+            LOG_INFO("配置已导出到: " + filePath, "配置管理");
+            return true;
+            
+        } catch (const std::exception& e) {
+            LOG_ERROR("导出配置时发生错误: " + QString::fromStdString(e.what()), "配置管理");
+            return false;
+        }
+    }
+    
+    bool importConfig(const QString& filePath)
+    {
+        try {
+            auto& manager = GlobalParametersManager::getInstance();
+            bool success = manager.loadGlobalSettings(filePath.toStdString());
+            
+            if (success) {
+                manager.notifyParametersChanged();
+                LOG_INFO("配置已从文件导入: " + filePath, "配置管理");
+            } else {
+                LOG_ERROR("导入配置失败: " + filePath, "配置管理");
+            }
+            
+            return success;
+            
+        } catch (const std::exception& e) {
+            LOG_ERROR("导入配置时发生错误: " + QString::fromStdString(e.what()), "配置管理");
+            return false;
+        }
+    }
+    
+    QString getConfigurationInfo()
+    {
+        auto& manager = GlobalParametersManager::getInstance();
+        return manager.getConfigInfo();
+    }
+    
+    void resetToDefaults()
+    {
+        try {
+            auto& manager = GlobalParametersManager::getInstance();
+            manager.resetToFactoryDefaults();
+            manager.notifyParametersChanged();
+            manager.autoSaveSettings();  // 立即保存默认设置
+            
+            LOG_INFO("配置已重置为默认值", "配置管理");
+            
+        } catch (const std::exception& e) {
+            LOG_ERROR("重置配置时发生错误: " + QString::fromStdString(e.what()), "配置管理");
+        }
+    }
 } 
 
 
