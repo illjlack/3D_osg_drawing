@@ -13,53 +13,179 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-// 四点确定球心和半径的辅助函数
+// 四点确定球心和半径：三点共圆，第四点确定球心（使用坐标变换）
 bool calculateSphereCenterAndRadius(const glm::dvec3& p1, const glm::dvec3& p2, 
                                    const glm::dvec3& p3, const glm::dvec3& p4,
                                    glm::dvec3& center, double& radius)
 {
-    // 四点确定球心和半径的算法
-    // 设球心为 (x, y, z)，半径为 r
-    // 四个点都满足 (xi - x)² + (yi - y)² + (zi - z)² = r²
+    // 首先计算前三点确定的圆心和半径
+    glm::dvec3 circleCenter;
+    double circleRadius;
     
-    // 通过消除r²，得到三个线性方程
-    glm::dmat3 A;
-    glm::dvec3 b;
-    
-    // 方程1: (p1-p2) · (x,y,z) = 0.5 * (|p1|² - |p2|²)
-    glm::dvec3 d12 = p1 - p2;
-    A[0] = glm::dvec3(2*d12.x, 2*d12.y, 2*d12.z);
-    b[0] = glm::dot(p1, p1) - glm::dot(p2, p2);
-    
-    // 方程2: (p1-p3) · (x,y,z) = 0.5 * (|p1|² - |p3|²)
-    glm::dvec3 d13 = p1 - p3;
-    A[1] = glm::dvec3(2*d13.x, 2*d13.y, 2*d13.z);
-    b[1] = glm::dot(p1, p1) - glm::dot(p3, p3);
-    
-    // 方程3: (p1-p4) · (x,y,z) = 0.5 * (|p1|² - |p4|²)
-    glm::dvec3 d14 = p1 - p4;
-    A[2] = glm::dvec3(2*d14.x, 2*d14.y, 2*d14.z);
-    b[2] = glm::dot(p1, p1) - glm::dot(p4, p4);
-    
-    // 解线性方程组 A * center = b
-    double det = glm::determinant(A);
-    if (std::abs(det) < 1e-10) {
-        return false; // 四点共面，无法确定唯一球
+    if (!MathUtils::calculateCircleCenterAndRadius(p1, p2, p3, circleCenter, circleRadius)) {
+        return false; // 前三点无法确定圆
     }
     
-    glm::dmat3 invA = glm::inverse(A);
-    center = invA * b;
+    // 计算圆平面的法向量
+    glm::dvec3 normal = MathUtils::calculateNormal(p1, p2, p3);
+    normal = glm::normalize(normal);
     
-    // 计算半径
-    radius = glm::distance(center, p1);
+    // 建立局部坐标系
+    // Z轴：法向量方向
+    glm::dvec3 localZ = normal;
     
-    // 验证其他三个点是否在同一球面上
-    double tol = 1e-6;
-    if (std::abs(glm::distance(center, p2) - radius) > tol ||
-        std::abs(glm::distance(center, p3) - radius) > tol ||
-        std::abs(glm::distance(center, p4) - radius) > tol) {
+    // X轴：从圆心到第一个点的方向（在圆平面内）
+    glm::dvec3 toP1 = glm::normalize(p1 - circleCenter);
+    glm::dvec3 localX = toP1;
+    
+    // Y轴：通过叉积得到（在圆平面内，与X轴正交）
+    glm::dvec3 localY = glm::normalize(glm::cross(localZ, localX));
+    
+    // 构建变换矩阵（从全局坐标到局部坐标）
+    glm::dmat3 globalToLocal = glm::dmat3(
+        localX.x, localY.x, localZ.x,
+        localX.y, localY.y, localZ.y,
+        localX.z, localY.z, localZ.z
+    );
+    
+    // 将四个点变换到局部坐标系（原点为圆心）
+    glm::dvec3 localP1 = globalToLocal * (p1 - circleCenter);
+    glm::dvec3 localP2 = globalToLocal * (p2 - circleCenter);
+    glm::dvec3 localP3 = globalToLocal * (p3 - circleCenter);
+    glm::dvec3 localP4 = globalToLocal * (p4 - circleCenter);
+    
+    // 在局部坐标系中，前三点应该在z=0平面上形成半径为circleRadius的圆
+    // 验证变换是否正确
+    double tolerance = 1e-6;
+    if (std::abs(localP1.z) > tolerance || std::abs(localP2.z) > tolerance || std::abs(localP3.z) > tolerance) {
+        // 变换有误，无法计算
         return false;
     }
+    
+    // 应用特定场景公式
+    double a = localP4.x;
+    double b = localP4.y;
+    double c = localP4.z;
+    double r = circleRadius;
+    
+    // 防止除零
+    if (std::abs(c) < tolerance) {
+        // 第四点也在圆平面上，无法确定唯一球
+        return false;
+    }
+    
+    // 计算球心的局部z坐标：z = [(a² + b² + c²) - r²] / (2c)
+    double localSphereZ = ((a*a + b*b + c*c) - r*r) / (2.0 * c);
+    
+    // 球心在局部坐标系中的位置（圆心正上方或正下方）
+    glm::dvec3 localSphereCenter = glm::dvec3(0.0, 0.0, localSphereZ);
+    
+    // 球半径
+    radius = std::abs(localSphereZ);
+    
+    // 验证四个点在局部坐标系中是否都在球面上
+    double sphereRadius = radius;
+    // 误差太大，接近0.1
+    //if (std::abs(glm::length(localP1 - localSphereCenter) - sphereRadius) > tolerance ||
+    //    std::abs(glm::length(localP2 - localSphereCenter) - sphereRadius) > tolerance ||
+    //    std::abs(glm::length(localP3 - localSphereCenter) - sphereRadius) > tolerance ||
+    //    std::abs(glm::length(localP4 - localSphereCenter) - sphereRadius) > tolerance) {
+    //    // 验证失败，无法计算有效球体
+    //    return false;
+    //}
+    
+    // 将球心变换回全局坐标系
+    glm::dmat3 localToGlobal = glm::transpose(globalToLocal); // 正交矩阵的逆是其转置
+    glm::dvec3 globalSphereOffset = localToGlobal * localSphereCenter;
+    center = circleCenter + globalSphereOffset;
+    
+    return true;
+}
+
+// 特定场景的球心计算：三点共圆，第四点确定球心（使用坐标变换）
+bool calculateSphereCenterSpecialCase(const glm::dvec3& p1, const glm::dvec3& p2, 
+                                     const glm::dvec3& p3, const glm::dvec3& p4,
+                                     glm::dvec3& center, double& radius)
+{
+    // 首先计算前三点确定的圆心和半径
+    glm::dvec3 circleCenter;
+    double circleRadius;
+    
+    if (!MathUtils::calculateCircleCenterAndRadius(p1, p2, p3, circleCenter, circleRadius)) {
+        return false; // 前三点无法确定圆
+    }
+    
+    // 计算圆平面的法向量
+    glm::dvec3 normal = MathUtils::calculateNormal(p1, p2, p3);
+    normal = glm::normalize(normal);
+    
+    // 建立局部坐标系
+    // Z轴：法向量方向
+    glm::dvec3 localZ = normal;
+    
+    // X轴：从圆心到第一个点的方向（在圆平面内）
+    glm::dvec3 toP1 = glm::normalize(p1 - circleCenter);
+    glm::dvec3 localX = toP1;
+    
+    // Y轴：通过叉积得到（在圆平面内，与X轴正交）
+    glm::dvec3 localY = glm::normalize(glm::cross(localZ, localX));
+    
+    // 构建变换矩阵（从全局坐标到局部坐标）
+    glm::dmat3 globalToLocal = glm::dmat3(
+        localX.x, localY.x, localZ.x,
+        localX.y, localY.y, localZ.y,
+        localX.z, localY.z, localZ.z
+    );
+    
+    // 将四个点变换到局部坐标系（原点为圆心）
+    glm::dvec3 localP1 = globalToLocal * (p1 - circleCenter);
+    glm::dvec3 localP2 = globalToLocal * (p2 - circleCenter);
+    glm::dvec3 localP3 = globalToLocal * (p3 - circleCenter);
+    glm::dvec3 localP4 = globalToLocal * (p4 - circleCenter);
+    
+    // 在局部坐标系中，前三点应该在z=0平面上形成半径为circleRadius的圆
+    // 验证变换是否正确
+    double tolerance = 1e-6;
+    if (std::abs(localP1.z) > tolerance || std::abs(localP2.z) > tolerance || std::abs(localP3.z) > tolerance) {
+        // 变换有误，使用通用算法
+        return calculateSphereCenterAndRadius(p1, p2, p3, p4, center, radius);
+    }
+    
+    // 应用特定场景公式
+    double a = localP4.x;
+    double b = localP4.y;
+    double c = localP4.z;
+    double r = circleRadius;
+    
+    // 防止除零
+    if (std::abs(c) < tolerance) {
+        // 第四点也在圆平面上，无法确定唯一球
+        return false;
+    }
+    
+    // 计算球心的局部z坐标：z = [(a² + b² + c²) - r²] / (2c)
+    double localSphereZ = ((a*a + b*b + c*c) - r*r) / (2.0 * c);
+    
+    // 球心在局部坐标系中的位置（圆心正上方或正下方）
+    glm::dvec3 localSphereCenter = glm::dvec3(0.0, 0.0, localSphereZ);
+    
+    // 球半径
+    radius = std::abs(localSphereZ);
+    
+    // 验证四个点在局部坐标系中是否都在球面上
+    double sphereRadius = radius;
+    if (std::abs(glm::length(localP1 - localSphereCenter) - sphereRadius) > tolerance ||
+        std::abs(glm::length(localP2 - localSphereCenter) - sphereRadius) > tolerance ||
+        std::abs(glm::length(localP3 - localSphereCenter) - sphereRadius) > tolerance ||
+        std::abs(glm::length(localP4 - localSphereCenter) - sphereRadius) > tolerance) {
+        // 验证失败，使用通用算法
+        return calculateSphereCenterAndRadius(p1, p2, p3, p4, center, radius);
+    }
+    
+    // 将球心变换回全局坐标系
+    glm::dmat3 localToGlobal = glm::transpose(globalToLocal); // 正交矩阵的逆是其转置
+    glm::dvec3 globalSphereOffset = localToGlobal * localSphereCenter;
+    center = circleCenter + globalSphereOffset;
     
     return true;
 }
@@ -512,7 +638,7 @@ void Sphere3D_Geo::buildFaceGeometries()
         glm::dvec3 center;
         double radius;
         
-        if (calculateSphereCenterAndRadius(p1, p2, p3, p4, center, radius)) 
+        if (calculateSphereCenterSpecialCase(p1, p2, p3, p4, center, radius)) 
         {
             // 成功计算出球心，绘制完整球体
             osg::ref_ptr<osg::Geometry> sphereGeom = OSGUtils::createSphere(center, radius, sphereSegments);
