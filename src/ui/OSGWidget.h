@@ -119,7 +119,6 @@ protected:
     virtual void keyPressEvent(QKeyEvent* event) override;
     virtual void keyReleaseEvent(QKeyEvent* event) override;
     virtual void mouseDoubleClickEvent(QMouseEvent* event) override;
-    virtual void contextMenuEvent(QContextMenuEvent* event) override;
 
 private slots:
     // 右键菜单槽函数
@@ -136,6 +135,12 @@ private:
     void setupLighting();
     void setupEventHandlers();
     void setupPickingSystem();
+    
+    // 配置相机操作器
+    void configureCameraManipulator();
+    
+    // 右键菜单功能
+    void showContextMenu(const QPoint& pos);
     
     // 房屋几何体特殊渲染设置
     bool isHouseGeometry(osg::ref_ptr<Geo3D> geo);

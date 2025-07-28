@@ -85,17 +85,14 @@ OSGWidget::~OSGWidget()
     VertexShapeUtils::setCameraController(nullptr);
 }
 
-void OSGWidget::contextMenuEvent(QContextMenuEvent* event)
+void OSGWidget::showContextMenu(const QPoint& pos)
 {
-    if (!event) return;
+    if (!pos.isNull()) {
+        m_lastContextMenuPos = pos;
+    }
     
-    if (GlobalDrawMode3D != DrawSelect3D) {
-        LOG_INFO("非选择模式，跳过右键菜单", "右键菜单");
-        return;
-    }   
-
-    m_lastContextMenuPos = event->pos();
-    PickResult pickResult = performSimplePicking(event->x(), height() - event->y());
+    // 使用屏幕坐标进行拾取
+    PickResult pickResult = performSimplePicking(pos.x(), height() - pos.y());
     
     QMenu contextMenu(this);
     
@@ -137,7 +134,9 @@ void OSGWidget::contextMenuEvent(QContextMenuEvent* event)
     connect(fitAllAction, &QAction::triggered, this, &OSGWidget::onFitAll);
     
     if (!contextMenu.actions().isEmpty()) {
-        contextMenu.exec(event->globalPos());
+        // 将局部坐标转换为全局坐标
+        QPoint globalPos = mapToGlobal(pos);
+        contextMenu.exec(globalPos);
     }
     
     LOG_INFO("显示右键菜单", "右键菜单");
@@ -403,6 +402,28 @@ void OSGWidget::initializeScene()
     setupLighting();
     setupEventHandlers();
     setupPickingSystem();
+    
+    // 配置TrackballManipulator的鼠标按键绑定
+    configureCameraManipulator();
+}
+
+void OSGWidget::configureCameraManipulator()
+{
+    if (!m_cameraController) return;
+    
+    osgGA::TrackballManipulator* trackball = m_cameraController->getTrackballManipulator();
+    if (trackball) {
+        // OSG TrackballManipulator默认行为：
+        // 左键：旋转
+        // 中键：平移  
+        // 右键：缩放
+        // 
+        // 我们通过事件转换实现的自定义映射：
+        // 左键：旋转
+        // 右键：平移（转换为中键事件）
+        // 中键：缩放
+        LOG_INFO("TrackballManipulator配置：左键旋转，右键平移，中键缩放", "相机");
+    }
 }
 
 void OSGWidget::setupCamera()
@@ -952,100 +973,149 @@ void OSGWidget::resizeEvent(QResizeEvent* event)
 
 void OSGWidget::mousePressEvent(QMouseEvent* event)
 {
-    if (event->button() == Qt::RightButton && m_isDrawing)
-    {
-        if (m_currentDrawingGeo)
-        {
+    // 中键点击显示菜单（无论什么模式）
+    if (event->button() == Qt::MiddleButton) {
+        showContextMenu(event->pos());
+        event->accept();
+        return;
+    }
+
+    // 绘制模式下的右键处理
+    if (event->button() == Qt::RightButton) {
+        // 如果按住Ctrl，转换为中键传递给OSG进行相机控制
+        if (event->modifiers() & Qt::ControlModifier) {
+            QMouseEvent* newEvent = new QMouseEvent(
+                event->type(),
+                event->pos(),
+                event->globalPos(),
+                Qt::MiddleButton,  // 转换为中键
+                event->buttons() & ~Qt::RightButton | Qt::MiddleButton,  // 更新按键状态
+                event->modifiers()
+            );
+            osgQOpenGLWidget::mousePressEvent(newEvent);
+            delete newEvent;
+            return;
+        }
+        
+        // 否则处理绘制逻辑：进入下一阶段
+        if (m_currentDrawingGeo) {
             auto controlPointManager = m_currentDrawingGeo->mm_controlPoint();
-            if (controlPointManager)
-            {
+            if (controlPointManager) {
                 bool hasNextStage = controlPointManager->nextStage();
-                if (!hasNextStage)
-                {
+                if (!hasNextStage) {
                     completeCurrentDrawing();
-                }
-                else
-                {
+                } else {
                     LOG_INFO("进入下一阶段", "绘制");
                 }
-            }
-            else
-            {
+            } else {
                 completeCurrentDrawing();
             }
-        }
-        else
-        {
+        } else {
             completeCurrentDrawing();
         }
+        event->accept();
         return;
     }
 
-    if (event->button() != Qt::LeftButton)
-        return;
+    // 选择模式下，左键和右键都传递给OSG进行相机控制
+    if (GlobalDrawMode3D == DrawSelect3D) {
+        // 先处理拾取和选择逻辑（仅左键且不按Ctrl）
+        if (event->button() == Qt::LeftButton && !(event->modifiers() & Qt::ControlModifier)) {
+            PickResult pickResult = performSimplePicking(event->x(), height() - event->y());
+            glm::dvec3 worldPos;
+            
+            if (pickResult.hasResult) { 
+                worldPos = pickResult.worldPosition; 
+            } else { 
+                worldPos = screenToWorld(event->x(), event->y(), 0.5);
+            }
 
-    PickResult pickResult = performSimplePicking(event->x(), height() - event->y());
-    glm::dvec3 worldPos;
-    if (pickResult.hasResult) 
-    { 
-        worldPos = pickResult.worldPosition; 
-    }
-    else 
-    { 
-        worldPos = screenToWorld(event->x(), event->y(), 0.5);
-    }
+            emit mousePositionChanged(worldPos);
 
-    emit mousePositionChanged(worldPos);
+            if (pickResult.hasResult && pickResult.geometry) {
+                osg::ref_ptr<Geo3D> pickedGeo = pickResult.geometry;
 
-    if (GlobalDrawMode3D == DrawSelect3D)
-    {
-        if (pickResult.hasResult && pickResult.geometry)
-        {
-            osg::ref_ptr<Geo3D> pickedGeo = pickResult.geometry;
-
-            if (QApplication::keyboardModifiers() & Qt::ControlModifier)
-            {
-                if (isSelected(pickedGeo))
-                {
-                    removeFromSelection(pickedGeo);
-                }
-                else
-                {
+                if (QApplication::keyboardModifiers() & Qt::ControlModifier) {
+                    if (isSelected(pickedGeo)) {
+                        removeFromSelection(pickedGeo);
+                    } else {
+                        addToSelection(pickedGeo);
+                    }
+                } else {
+                    clearSelection();
                     addToSelection(pickedGeo);
                 }
-            }
-            else
-            {
+            } else {
                 clearSelection();
-                addToSelection(pickedGeo);
             }
-        }
-        else
-        {
-            clearSelection();
-        }
 
-        if (pickResult.hasResult && pickResult.geometry && pickResult.osgGeometry)
-        {
-            if (pickResult.featureType == PickFeatureType::VERTEX && pickResult.osgGeometry->getNodeMask() == NODE_MASK_CONTROL_POINTS && pickResult.primitiveIndex >= 0)
-            {
-                auto it = std::find(m_selectedGeos.begin(), m_selectedGeos.end(), pickResult.geometry);
-                if (it != m_selectedGeos.end())
-                {
-                    startDraggingControlPoint(pickResult.geometry, pickResult.primitiveIndex);
-                    event->accept();
-                    return;
+            // 检查控制点拖拽
+            if (pickResult.hasResult && pickResult.geometry && pickResult.osgGeometry) {
+                if (pickResult.featureType == PickFeatureType::VERTEX && 
+                    pickResult.osgGeometry->getNodeMask() == NODE_MASK_CONTROL_POINTS && 
+                    pickResult.primitiveIndex >= 0) {
+                    auto it = std::find(m_selectedGeos.begin(), m_selectedGeos.end(), pickResult.geometry);
+                    if (it != m_selectedGeos.end()) {
+                        startDraggingControlPoint(pickResult.geometry, pickResult.primitiveIndex);
+                        event->accept();
+                        return;
+                    }
                 }
             }
+            
+            // 不按Ctrl的左键选择完成后不传递给OSG
+            event->accept();
+            return;
         }
+        
+        // 按住Ctrl或其他按键时，传递给OSG进行相机控制
+        if (event->modifiers() & Qt::ControlModifier) {
+            // 如果是右键，转换为中键事件来实现右键平移
+            if (event->button() == Qt::RightButton) {
+                QMouseEvent* newEvent = new QMouseEvent(
+                    event->type(),
+                    event->pos(),
+                    event->globalPos(),
+                    Qt::MiddleButton,  // 转换为中键
+                    event->buttons() & ~Qt::RightButton | Qt::MiddleButton,  // 更新按键状态
+                    event->modifiers()
+                );
+                osgQOpenGLWidget::mousePressEvent(newEvent);
+                delete newEvent;
+            } else {
+                osgQOpenGLWidget::mousePressEvent(event);
+            }
+            return;
+        }
+        
+        // 其他情况（如右键不按Ctrl）接受事件但不传递给OSG
+        event->accept();
+        return;
     }
-    else
-    {
-        if (!m_isDrawing)
-        {
+
+    // 绘制模式
+    if (event->button() == Qt::LeftButton) {
+        // 如果按住Ctrl，传递给OSG进行相机控制
+        if (event->modifiers() & Qt::ControlModifier) {
+            osgQOpenGLWidget::mousePressEvent(event);
+            return;
+        }
+        
+        // 否则处理绘制逻辑
+        PickResult pickResult = performSimplePicking(event->x(), height() - event->y());
+        glm::dvec3 worldPos;
+        
+        if (pickResult.hasResult) { 
+            worldPos = pickResult.worldPosition; 
+        } else { 
+            worldPos = screenToWorld(event->x(), event->y(), 0.5);
+        }
+
+        emit mousePositionChanged(worldPos);
+
+        if (!m_isDrawing) {
             osg::ref_ptr<Geo3D> newGeo = GeometryFactory::createGeometry(GlobalDrawMode3D);
-            if (newGeo)
-            {
+            if (newGeo) {
                 m_currentDrawingGeo = newGeo;
                 m_isDrawing = true;
                 addGeo(newGeo);
@@ -1053,58 +1123,82 @@ void OSGWidget::mousePressEvent(QMouseEvent* event)
             }
         }
 
-        if (m_currentDrawingGeo)
-        {
+        if (m_currentDrawingGeo) {
             auto controlPointManager = m_currentDrawingGeo->mm_controlPoint();
-            if (controlPointManager)
-            {
-                if (event->button() == Qt::LeftButton)
-                {
-                    bool success = controlPointManager->addControlPoint(Point3D(worldPos));
-                    if (success)
-                    {
-                        LOG_INFO("添加控制点成功", "绘制");
-                        
-                        if (m_currentDrawingGeo->mm_state()->isStateComplete())
-                        {
-                            completeCurrentDrawing();
-                        }
+            if (controlPointManager) {
+                bool success = controlPointManager->addControlPoint(Point3D(worldPos));
+                if (success) {
+                    LOG_INFO("添加控制点成功", "绘制");
+                    
+                    if (m_currentDrawingGeo->mm_state()->isStateComplete()) {
+                        completeCurrentDrawing();
                     }
-                }
-                else if (event->button() == Qt::RightButton && !m_isDrawing)
-                {
                 }
             }
         }
+        
+        event->accept();
+        return;
     }
     
+    // 其他情况传递给OSG
     osgQOpenGLWidget::mousePressEvent(event);
 }
 
 void OSGWidget::mouseMoveEvent(QMouseEvent* event)
 {
-    if (GlobalDrawMode3D == DrawSelect3D || (QApplication::keyboardModifiers() & Qt::ControlModifier))
-    {
+    // 选择模式下，只有按住Ctrl时才传递给OSG进行相机控制
+    if (GlobalDrawMode3D == DrawSelect3D) {
+        if (event->modifiers() & Qt::ControlModifier) {
+            // 如果是右键拖动，转换为中键拖动来实现平移
+            if (event->buttons() & Qt::RightButton) {
+                QMouseEvent* newEvent = new QMouseEvent(
+                    event->type(),
+                    event->pos(),
+                    event->globalPos(),
+                    Qt::MiddleButton,  // 转换为中键
+                    event->buttons() & ~Qt::RightButton | Qt::MiddleButton,  // 更新按键状态
+                    event->modifiers()
+                );
+                osgQOpenGLWidget::mouseMoveEvent(newEvent);
+                delete newEvent;
+            } else {
+                osgQOpenGLWidget::mouseMoveEvent(event);
+            }
+        }
+    } else {
+        // 绘制模式下，只有按住Ctrl时才传递给OSG进行相机控制
+        if (event->modifiers() & Qt::ControlModifier) {
+            // 如果是右键拖动，转换为中键拖动来实现平移
+            if (event->buttons() & Qt::RightButton) {
+                QMouseEvent* newEvent = new QMouseEvent(
+                    event->type(),
+                    event->pos(),
+                    event->globalPos(),
+                    Qt::MiddleButton,  // 转换为中键
+                    event->buttons() & ~Qt::RightButton | Qt::MiddleButton,  // 更新按键状态
+                    event->modifiers()
+                );
+                osgQOpenGLWidget::mouseMoveEvent(newEvent);
+                delete newEvent;
+            } else {
+                osgQOpenGLWidget::mouseMoveEvent(event);
+            }
+        }
     }
-    
-    osgQOpenGLWidget::mouseMoveEvent(event);
     
     emit screenPositionChanged(event->x(), event->y());
     
     static QDateTime lastMouseUpdate;
     QDateTime currentTime = QDateTime::currentDateTime();
-    if (!lastMouseUpdate.isValid() || lastMouseUpdate.msecsTo(currentTime) >= MOUSE_CACHE_DURATION)
-    {
+    if (!lastMouseUpdate.isValid() || lastMouseUpdate.msecsTo(currentTime) >= MOUSE_CACHE_DURATION) {
         PickResult pickResult = performSimplePicking(event->x(), height() - event->y());
         
-        if (pickResult.hasResult)
-        {
+        if (pickResult.hasResult) {
             m_lastMouseWorldPos = pickResult.worldPosition;
             emit mousePositionChanged(pickResult.worldPosition);
             emit simplePickingResult(pickResult);
-        }
-        else
-        {
+        } else {
             glm::dvec3 worldPos = screenToWorld(event->x(), event->y(), 0.5);
             
             m_lastMouseWorldPos = worldPos;
@@ -1114,26 +1208,20 @@ void OSGWidget::mouseMoveEvent(QMouseEvent* event)
         lastMouseUpdate = currentTime;
     }
     
-    if (m_isDraggingControlPoint && m_draggingGeo && m_draggingControlPointIndex >= 0)
-    {
+    if (m_isDraggingControlPoint && m_draggingGeo && m_draggingControlPointIndex >= 0) {
         Point3D newPoint(m_lastMouseWorldPos.x, m_lastMouseWorldPos.y, m_lastMouseWorldPos.z);
         m_draggingGeo->mm_controlPoint()->setControlPoint(m_draggingControlPointIndex, newPoint);
-        
     }
     
-    if (m_isDrawing && m_currentDrawingGeo)
-    {
+    if (m_isDrawing && m_currentDrawingGeo) {
         PickResult pickResult = performSimplePicking(event->x(), height() - event->y());
         glm::dvec3 drawingWorldPos;
         
-        if (pickResult.hasResult)
-        {
+        if (pickResult.hasResult) {
             drawingWorldPos = pickResult.worldPosition;
             m_lastMouseWorldPos = pickResult.worldPosition;
             emit mousePositionChanged(pickResult.worldPosition);
-        }
-        else
-        {
+        } else {
             drawingWorldPos = m_lastMouseWorldPos;
         }
         
@@ -1150,7 +1238,52 @@ void OSGWidget::mouseReleaseEvent(QMouseEvent* event)
         return;
     }
     
-    osgQOpenGLWidget::mouseReleaseEvent(event);
+    // 选择模式下，只有按住Ctrl时才传递给OSG
+    if (GlobalDrawMode3D == DrawSelect3D) {
+        if (event->modifiers() & Qt::ControlModifier) {
+            // 如果是右键释放，转换为中键释放事件
+            if (event->button() == Qt::RightButton) {
+                QMouseEvent* newEvent = new QMouseEvent(
+                    event->type(),
+                    event->pos(),
+                    event->globalPos(),
+                    Qt::MiddleButton,  // 转换为中键
+                    event->buttons() & ~Qt::RightButton | Qt::MiddleButton,  // 更新按键状态
+                    event->modifiers()
+                );
+                osgQOpenGLWidget::mouseReleaseEvent(newEvent);
+                delete newEvent;
+            } else {
+                osgQOpenGLWidget::mouseReleaseEvent(event);
+            }
+        } else {
+            event->accept();
+        }
+        return;
+    }
+    
+    // 绘制模式下，只有按住Ctrl时才传递给OSG
+    if (event->modifiers() & Qt::ControlModifier) {
+        // 如果是右键释放，转换为中键释放事件
+        if (event->button() == Qt::RightButton) {
+            QMouseEvent* newEvent = new QMouseEvent(
+                event->type(),
+                event->pos(),
+                event->globalPos(),
+                Qt::MiddleButton,  // 转换为中键
+                event->buttons() & ~Qt::RightButton | Qt::MiddleButton,  // 更新按键状态
+                event->modifiers()
+            );
+            osgQOpenGLWidget::mouseReleaseEvent(newEvent);
+            delete newEvent;
+        } else {
+            osgQOpenGLWidget::mouseReleaseEvent(event);
+        }
+        return;
+    }
+    
+    // 其他情况接受事件但不传递给OSG
+    event->accept();
 }
 
 void OSGWidget::mouseDoubleClickEvent(QMouseEvent* event)

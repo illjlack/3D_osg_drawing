@@ -75,7 +75,7 @@ void CameraController::initializeManipulators()
     m_currentManipulator = static_cast<osgGA::CameraManipulator*>(m_trackballManipulator.get());
     m_keySwitchManipulator->selectMatrixManipulator(0);
     
-    // 相机操控器初始化完成（移除调试日志）
+    LOG_INFO("相机操控器初始化完成", "相机");
 }
 
 void CameraController::setViewer(osgViewer::Viewer* viewer)
