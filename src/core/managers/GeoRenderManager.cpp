@@ -5,6 +5,7 @@
 #include <osg/PolygonMode>
 #include <osg/Depth>
 #include <osg/BlendFunc>
+#include <osg/AlphaFunc>
 
 GeoRenderManager::GeoRenderManager(osg::ref_ptr<Geo3D> parent)
     : m_parent(parent),
@@ -126,11 +127,11 @@ void GeoRenderManager::setupPointParameters(const GeoParameters3D& params, osg::
         stateSet->setAttributeAndModes(m_pointSize, osg::StateAttribute::ON);
     }
     
-    // 处理透明度
+    // 改进的透明度处理
     if (params.pointColor.a < 1.0) {
-        stateSet->setAttributeAndModes(m_blendFunc, osg::StateAttribute::ON);
-        stateSet->setMode(GL_BLEND, osg::StateAttribute::ON);
-        stateSet->setRenderingHint(osg::StateSet::TRANSPARENT_BIN);
+        setupTransparencyRendering(stateSet, params.pointColor.a);
+    } else {
+        setupTransparencyRendering(stateSet, 1.0f);
     }
 }
 
@@ -141,11 +142,11 @@ void GeoRenderManager::setupTriangleMeshParameters(const GeoParameters3D& params
     m_pointMaterial->setDiffuse(osg::Material::FRONT_AND_BACK, meshColor);
     m_pointMaterial->setAmbient(osg::Material::FRONT_AND_BACK, meshColor * 0.3f);
     
-    // 处理透明度
+    // 改进的透明度处理
     if (params.fillColor.a < 1.0) {
-        stateSet->setAttributeAndModes(m_blendFunc, osg::StateAttribute::ON);
-        stateSet->setMode(GL_BLEND, osg::StateAttribute::ON);
-        stateSet->setRenderingHint(osg::StateSet::TRANSPARENT_BIN);
+        setupTransparencyRendering(stateSet, params.fillColor.a);
+    } else {
+        setupTransparencyRendering(stateSet, 1.0f);
     }
 }
 
@@ -167,17 +168,17 @@ void GeoRenderManager::updateLineRendering(const GeoParameters3D& params)
     // 设置线宽
     m_lineWidth->setWidth(static_cast<float>(params.lineWidth));
     
-    // 确保LINE_SMOOTH被禁用以保证线宽生效
+    // 确保LINE_SMOOTH被禁用以保证线宽设置生效
     stateSet->setMode(GL_LINE_SMOOTH, osg::StateAttribute::OFF);
     
     // 设置线型
     applyLineStyle(params.lineStyle, params.lineDashPattern);
     
-    // 处理透明度
+    // 改进的透明度处理
     if (params.lineColor.a < 1.0) {
-        stateSet->setAttributeAndModes(m_blendFunc, osg::StateAttribute::ON);
-        stateSet->setMode(GL_BLEND, osg::StateAttribute::ON);
-        stateSet->setRenderingHint(osg::StateSet::TRANSPARENT_BIN);
+        setupTransparencyRendering(stateSet, params.lineColor.a);
+    } else {
+        setupTransparencyRendering(stateSet, 1.0f);
     }
 }
 
@@ -196,11 +197,15 @@ void GeoRenderManager::updateSurfaceRendering(const GeoParameters3D& params)
     m_surfaceMaterial->setDiffuse(osg::Material::FRONT_AND_BACK, fillColor);
     m_surfaceMaterial->setAmbient(osg::Material::FRONT_AND_BACK, fillColor * 0.3f);
     
-    // 处理透明度
+    // 改进的透明度处理
     if (params.fillColor.a < 1.0) {
-        stateSet->setAttributeAndModes(m_blendFunc, osg::StateAttribute::ON);
-        stateSet->setMode(GL_BLEND, osg::StateAttribute::ON);
-        stateSet->setRenderingHint(osg::StateSet::TRANSPARENT_BIN);
+        setupTransparencyRendering(stateSet, params.fillColor.a);
+        // 对于透明面，启用双面渲染
+        stateSet->setMode(GL_CULL_FACE, osg::StateAttribute::OFF);
+    } else {
+        setupTransparencyRendering(stateSet, 1.0f);
+        // 非透明面可以使用面剔除优化
+        stateSet->setMode(GL_CULL_FACE, osg::StateAttribute::ON);
     }
 }
 
@@ -307,6 +312,42 @@ osg::Vec4 GeoRenderManager::colorToOsgVec4(const Color3D& color) const
         static_cast<float>(color.b),
         static_cast<float>(color.a)
     );
+}
+
+void GeoRenderManager::setupTransparencyRendering(osg::StateSet* stateSet, float alpha)
+{
+    // 首先清除可能的之前设置
+    stateSet->removeAttribute(osg::StateAttribute::ALPHAFUNC);
+    
+    if (alpha >= 1.0f) {
+        // 完全不透明
+        stateSet->setMode(GL_BLEND, osg::StateAttribute::OFF);
+        stateSet->setRenderingHint(osg::StateSet::OPAQUE_BIN);
+        stateSet->setAttributeAndModes(new osg::Depth(osg::Depth::LESS, 0.0, 1.0, true), osg::StateAttribute::ON);
+    } else {
+        // 透明对象
+        stateSet->setAttributeAndModes(m_blendFunc, osg::StateAttribute::ON);
+        stateSet->setMode(GL_BLEND, osg::StateAttribute::ON);
+        stateSet->setRenderingHint(osg::StateSet::TRANSPARENT_BIN);
+        
+        if (alpha > 0.99f) {
+            // 接近不透明：启用深度写入
+            stateSet->setAttributeAndModes(new osg::Depth(osg::Depth::LESS, 0.0, 1.0, true), osg::StateAttribute::ON);
+        } else if (alpha > 0.1f) {
+            // 半透明：禁用深度写入，但保持深度测试
+            stateSet->setAttributeAndModes(new osg::Depth(osg::Depth::LESS, 0.0, 1.0, false), osg::StateAttribute::ON);
+            
+            // 基于alpha值设置渲染顺序，越透明越晚渲染
+            int order = static_cast<int>((1.0f - alpha) * 100.0f);
+            stateSet->setRenderBinDetails(order, "RenderBin");
+        } else {
+            // 高透明度：禁用深度写入和测试
+            stateSet->setAttributeAndModes(new osg::Depth(osg::Depth::ALWAYS, 0.0, 1.0, false), osg::StateAttribute::ON);
+            
+            // 最后渲染
+            stateSet->setRenderBinDetails(200, "RenderBin");
+        }
+    }
 }
 
 

@@ -193,30 +193,50 @@ void Polygon3D_Geo::buildFaceGeometries()
     }
     else
     {
-        // 多边形：使用三角剖分（简化实现：扇形三角剖分）
-        glm::dvec3 center = MathUtils::calculateCentroid(allPoints);
+        // 多边形：使用改进的三角剖分算法
+        std::vector<unsigned int> triangleIndices = MathUtils::triangulatePolygon(allPoints);
         
-        for (size_t i = 0; i < allPoints.size(); ++i)
-        {
-            // 每个三角形：中心点 -> 当前点 -> 下一个点
-            vertices->push_back(MathUtils::glmToOsg(center));
-            vertices->push_back(MathUtils::glmToOsg(allPoints[i]));
-            vertices->push_back(MathUtils::glmToOsg(allPoints[(i + 1) % allPoints.size()]));
+        if (!triangleIndices.empty()) {
+            // 使用索引三角剖分
+            for (const auto& point : allPoints)
+            {
+                vertices->push_back(MathUtils::glmToOsg(point));
+                normals->push_back(MathUtils::glmToOsg(normal));
+            }
             
-            // 为每个三角形计算法向量
-            glm::dvec3 triNormal = MathUtils::calculateNormal(center, allPoints[i], allPoints[(i + 1) % allPoints.size()]);
-            normals->push_back(MathUtils::glmToOsg(triNormal));
-            normals->push_back(MathUtils::glmToOsg(triNormal));
-            normals->push_back(MathUtils::glmToOsg(triNormal));
+            // 创建索引数组
+            osg::ref_ptr<osg::DrawElementsUInt> indices = 
+                new osg::DrawElementsUInt(osg::PrimitiveSet::TRIANGLES);
+            for (unsigned int index : triangleIndices) {
+                indices->push_back(index);
+            }
+            geometry->addPrimitiveSet(indices);
+        } else {
+            // 回退到质心扇形三角剖分
+            glm::dvec3 center = MathUtils::calculateCentroid(allPoints);
+            
+            for (size_t i = 0; i < allPoints.size(); ++i)
+            {
+                // 每个三角形：中心点 -> 当前点 -> 下一个点
+                vertices->push_back(MathUtils::glmToOsg(center));
+                vertices->push_back(MathUtils::glmToOsg(allPoints[i]));
+                vertices->push_back(MathUtils::glmToOsg(allPoints[(i + 1) % allPoints.size()]));
+                
+                // 为每个三角形计算法向量
+                glm::dvec3 triNormal = MathUtils::calculateNormal(center, allPoints[i], allPoints[(i + 1) % allPoints.size()]);
+                normals->push_back(MathUtils::glmToOsg(triNormal));
+                normals->push_back(MathUtils::glmToOsg(triNormal));
+                normals->push_back(MathUtils::glmToOsg(triNormal));
+            }
+            
+            osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, vertices->size());
+            geometry->addPrimitiveSet(drawArrays);
         }
     }
     
     geometry->setVertexArray(vertices);
     geometry->setNormalArray(normals);
     geometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
-    
-    osg::ref_ptr<osg::DrawArrays> drawArrays = new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, vertices->size());
-    geometry->addPrimitiveSet(drawArrays);
 }
 
 

@@ -8,6 +8,7 @@
 #include <osg/LineWidth>
 #include <osg/Point>
 #include <osg/LineStipple>
+#include <osg/AlphaFunc>
 #include <osg/ref_ptr>
 
 // 前向声明
@@ -42,6 +43,9 @@ private:
     
     void setupPointParameters(const GeoParameters3D& params, osg::StateSet* stateSet);
     void setupTriangleMeshParameters(const GeoParameters3D& params, osg::StateSet* stateSet);
+    
+    // 透明度渲染处理
+    void setupTransparencyRendering(osg::StateSet* stateSet, float alpha);
     
 private:
     osg::ref_ptr<Geo3D> m_parent;

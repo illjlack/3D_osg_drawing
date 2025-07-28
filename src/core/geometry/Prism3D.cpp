@@ -256,31 +256,53 @@ void Prism3D_Geo::buildFaceGeometries()
         
         if (stage1.size() >= 3) 
         {
-            // 计算多边形质心
-            glm::dvec3 center(0.0, 0.0, 0.0);
+            // 将底面多边形的点转换为glm::dvec3格式
+            std::vector<glm::dvec3> bottomPolygon;
             for (size_t i = 0; i < stage1.size(); i++) 
             {
                 Point3D point = stage1[i];
-                center += glm::dvec3(point.x(), point.y(), point.z());
-            }
-            center /= stage1.size();
-            
-            // 添加质心
-            vertices->push_back(osg::Vec3(center.x, center.y, center.z));
-            
-            // 添加多边形顶点
-            for (size_t i = 0; i < stage1.size(); i++) 
-            {
-                Point3D point = stage1[i];
-                vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
+                bottomPolygon.push_back(glm::dvec3(point.x(), point.y(), point.z()));
             }
             
-            // 为了确保TRIANGLE_FAN正确封闭，添加第一个顶点
-            Point3D firstPoint = stage1[0];
-            vertices->push_back(osg::Vec3(firstPoint.x(), firstPoint.y(), firstPoint.z()));
+            // 使用改进的三角剖分算法
+            std::vector<unsigned int> triangleIndices = MathUtils::triangulatePolygon(bottomPolygon);
             
-            // 添加底面多边形（三角形扇形）
-            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLE_FAN, 0, stage1.size() + 2));
+            if (!triangleIndices.empty()) {
+                // 添加多边形顶点
+                for (size_t i = 0; i < stage1.size(); i++) 
+                {
+                    Point3D point = stage1[i];
+                    vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
+                }
+                
+                // 创建索引数组
+                osg::ref_ptr<osg::DrawElementsUInt> indices = 
+                    new osg::DrawElementsUInt(osg::PrimitiveSet::TRIANGLES);
+                for (unsigned int index : triangleIndices) {
+                    indices->push_back(index);
+                }
+                geometry->addPrimitiveSet(indices);
+            } else {
+                // 回退到质心扇形三角剖分
+                glm::dvec3 center = MathUtils::calculateCentroid(bottomPolygon);
+                
+                // 添加质心
+                vertices->push_back(osg::Vec3(center.x, center.y, center.z));
+                
+                // 添加多边形顶点
+                for (size_t i = 0; i < stage1.size(); i++) 
+                {
+                    Point3D point = stage1[i];
+                    vertices->push_back(osg::Vec3(point.x(), point.y(), point.z()));
+                }
+                
+                // 为了确保TRIANGLE_FAN正确封闭，添加第一个顶点
+                Point3D firstPoint = stage1[0];
+                vertices->push_back(osg::Vec3(firstPoint.x(), firstPoint.y(), firstPoint.z()));
+                
+                // 添加底面多边形（三角形扇形）
+                geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLE_FAN, 0, stage1.size() + 2));
+            }
         }
     }
     else if (allStagePoints.size() == 2)
@@ -301,79 +323,153 @@ void Prism3D_Geo::buildFaceGeometries()
         
         size_t numPolygonVertices = stage1.size();
         
-        // 计算底面多边形质心
-        glm::dvec3 bottomCenter(0.0, 0.0, 0.0);
+        // 将底面多边形的点转换为glm::dvec3格式
+        std::vector<glm::dvec3> bottomPolygon;
         for (size_t i = 0; i < numPolygonVertices; i++) 
         {
             Point3D point = stage1[i];
-            bottomCenter += glm::dvec3(point.x(), point.y(), point.z());
-        }
-        bottomCenter /= numPolygonVertices;
-        
-        glm::dvec3 topCenter = bottomCenter + heightVector;
-        
-        // 添加底面质心
-        vertices->push_back(osg::Vec3(bottomCenter.x, bottomCenter.y, bottomCenter.z)); // index 0
-        
-        // 添加底面多边形顶点
-        for (size_t i = 0; i < numPolygonVertices; i++) 
-        {
-            Point3D point = stage1[i];
-            vertices->push_back(osg::Vec3(point.x(), point.y(), point.z())); // index 1+i
+            bottomPolygon.push_back(glm::dvec3(point.x(), point.y(), point.z()));
         }
         
-        // 为了确保TRIANGLE_FAN正确封闭，添加第一个底面顶点
-        Point3D firstBottomPoint = stage1[0];
-        vertices->push_back(osg::Vec3(firstBottomPoint.x(), firstBottomPoint.y(), firstBottomPoint.z())); // index numPolygonVertices+1
+        // 使用改进的三角剖分算法
+        std::vector<unsigned int> triangleIndices = MathUtils::triangulatePolygon(bottomPolygon);
         
-        // 添加顶面质心
-        vertices->push_back(osg::Vec3(topCenter.x, topCenter.y, topCenter.z)); // index numPolygonVertices+2
-        
-        // 添加顶面多边形顶点
-        for (size_t i = 0; i < numPolygonVertices; i++) 
-        {
-            Point3D bottomPoint = stage1[i];
-            glm::dvec3 bp = glm::dvec3(bottomPoint.x(), bottomPoint.y(), bottomPoint.z());
-            glm::dvec3 topPoint = bp + heightVector;
+        if (!triangleIndices.empty()) {
+            // 添加底面多边形顶点
+            for (size_t i = 0; i < numPolygonVertices; i++) 
+            {
+                Point3D point = stage1[i];
+                vertices->push_back(osg::Vec3(point.x(), point.y(), point.z())); // index i
+            }
             
-            vertices->push_back(osg::Vec3(topPoint.x, topPoint.y, topPoint.z)); // index numPolygonVertices+3+i
+            // 添加顶面多边形顶点
+            for (size_t i = 0; i < numPolygonVertices; i++) 
+            {
+                Point3D bottomPoint = stage1[i];
+                glm::dvec3 bp = glm::dvec3(bottomPoint.x(), bottomPoint.y(), bottomPoint.z());
+                glm::dvec3 topPoint = bp + heightVector;
+                
+                vertices->push_back(osg::Vec3(topPoint.x, topPoint.y, topPoint.z)); // index numPolygonVertices + i
+            }
+            
+            // 创建底面三角形索引
+            osg::ref_ptr<osg::DrawElementsUInt> bottomIndices = 
+                new osg::DrawElementsUInt(osg::PrimitiveSet::TRIANGLES);
+            for (unsigned int index : triangleIndices) {
+                bottomIndices->push_back(index);
+            }
+            geometry->addPrimitiveSet(bottomIndices);
+            
+            // 创建顶面三角形索引（需要反向顺序以确保法向量方向正确）
+            osg::ref_ptr<osg::DrawElementsUInt> topIndices = 
+                new osg::DrawElementsUInt(osg::PrimitiveSet::TRIANGLES);
+            for (int i = triangleIndices.size() - 1; i >= 0; i -= 3) {
+                topIndices->push_back(triangleIndices[i - 2] + numPolygonVertices);
+                topIndices->push_back(triangleIndices[i - 1] + numPolygonVertices);
+                topIndices->push_back(triangleIndices[i] + numPolygonVertices);
+            }
+            geometry->addPrimitiveSet(topIndices);
+            
+            // 侧面：使用三角形（将四边形分解为三角形）
+            osg::ref_ptr<osg::DrawElementsUInt> sideIndices = 
+                new osg::DrawElementsUInt(osg::PrimitiveSet::TRIANGLES);
+            
+            for (size_t i = 0; i < numPolygonVertices; i++) 
+            {
+                size_t next = (i + 1) % numPolygonVertices;
+                
+                // 底面点索引
+                unsigned int bottomCurrent = static_cast<unsigned int>(i);
+                unsigned int bottomNext = static_cast<unsigned int>(next);
+                
+                // 顶面点索引
+                unsigned int topCurrent = static_cast<unsigned int>(i + numPolygonVertices);
+                unsigned int topNext = static_cast<unsigned int>(next + numPolygonVertices);
+                
+                // 第一个三角形 (bottom_current, bottom_next, top_current)
+                sideIndices->push_back(bottomCurrent);
+                sideIndices->push_back(bottomNext);
+                sideIndices->push_back(topCurrent);
+                
+                // 第二个三角形 (bottom_next, top_next, top_current)
+                sideIndices->push_back(bottomNext);
+                sideIndices->push_back(topNext);
+                sideIndices->push_back(topCurrent);
+            }
+            
+            geometry->addPrimitiveSet(sideIndices);
+        } else {
+            // 回退到质心扇形三角剖分的原有实现
+            // 计算底面多边形质心
+            glm::dvec3 bottomCenter = MathUtils::calculateCentroid(bottomPolygon);
+            glm::dvec3 topCenter = bottomCenter + heightVector;
+            
+            // 添加底面质心
+            vertices->push_back(osg::Vec3(bottomCenter.x, bottomCenter.y, bottomCenter.z)); // index 0
+            
+            // 添加底面多边形顶点
+            for (size_t i = 0; i < numPolygonVertices; i++) 
+            {
+                Point3D point = stage1[i];
+                vertices->push_back(osg::Vec3(point.x(), point.y(), point.z())); // index 1+i
+            }
+            
+            // 为了确保TRIANGLE_FAN正确封闭，添加第一个底面顶点
+            Point3D firstBottomPoint = stage1[0];
+            vertices->push_back(osg::Vec3(firstBottomPoint.x(), firstBottomPoint.y(), firstBottomPoint.z())); // index numPolygonVertices+1
+            
+            // 添加顶面质心
+            vertices->push_back(osg::Vec3(topCenter.x, topCenter.y, topCenter.z)); // index numPolygonVertices+2
+            
+            // 添加顶面多边形顶点
+            for (size_t i = 0; i < numPolygonVertices; i++) 
+            {
+                Point3D bottomPoint = stage1[i];
+                glm::dvec3 bp = glm::dvec3(bottomPoint.x(), bottomPoint.y(), bottomPoint.z());
+                glm::dvec3 topPoint = bp + heightVector;
+                
+                vertices->push_back(osg::Vec3(topPoint.x, topPoint.y, topPoint.z)); // index numPolygonVertices+3+i
+            }
+            
+            // 为了确保TRIANGLE_FAN正确封闭，添加第一个顶面顶点
+            glm::dvec3 firstTopPoint = fp + heightVector;
+            vertices->push_back(osg::Vec3(firstTopPoint.x, firstTopPoint.y, firstTopPoint.z)); // index 2*numPolygonVertices+3
+            
+            // 底面多边形（三角形扇形）
+            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLE_FAN, 0, numPolygonVertices + 2));
+            
+            // 顶面多边形（三角形扇形）
+            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLE_FAN, numPolygonVertices + 2, numPolygonVertices + 2));
+            
+            // 侧面：使用三角形条带（将四边形分解为三角形）
+            osg::ref_ptr<osg::DrawElementsUInt> triangleIndices = 
+                new osg::DrawElementsUInt(osg::PrimitiveSet::TRIANGLES);
+            
+            for (size_t i = 0; i < numPolygonVertices; i++) 
+            {
+                size_t next = (i + 1) % numPolygonVertices;
+                
+                // 底面点索引（从1开始，0是质心）
+                unsigned int bottomCurrent = static_cast<unsigned int>(1 + i);
+                unsigned int bottomNext = static_cast<unsigned int>(1 + next);
+                
+                // 顶面点索引
+                unsigned int topCurrent = static_cast<unsigned int>(numPolygonVertices + 3 + i);
+                unsigned int topNext = static_cast<unsigned int>(numPolygonVertices + 3 + next);
+                
+                // 第一个三角形 (bottom_current, bottom_next, top_current)
+                triangleIndices->push_back(bottomCurrent);
+                triangleIndices->push_back(bottomNext);
+                triangleIndices->push_back(topCurrent);
+                
+                // 第二个三角形 (bottom_next, top_next, top_current)
+                triangleIndices->push_back(bottomNext);
+                triangleIndices->push_back(topNext);
+                triangleIndices->push_back(topCurrent);
+            }
+            
+            geometry->addPrimitiveSet(triangleIndices);
         }
-        
-        // 为了确保TRIANGLE_FAN正确封闭，添加第一个顶面顶点
-        glm::dvec3 firstTopPoint = fp + heightVector;
-        vertices->push_back(osg::Vec3(firstTopPoint.x, firstTopPoint.y, firstTopPoint.z)); // index 2*numPolygonVertices+3
-        
-        // 底面多边形（三角形扇形）
-        geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLE_FAN, 0, numPolygonVertices + 2));
-        
-        // 顶面多边形（三角形扇形）
-        geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLE_FAN, numPolygonVertices + 2, numPolygonVertices + 2));
-        
-        // 侧面：使用三角形条带（将四边形分解为三角形）
-        osg::ref_ptr<osg::DrawElementsUInt> triangleIndices = 
-            new osg::DrawElementsUInt(osg::PrimitiveSet::TRIANGLES);
-            
-        for (size_t i = 0; i < numPolygonVertices; i++) 
-        {
-            size_t next = (i + 1) % numPolygonVertices;
-            
-            int bottomCurr = 1 + i;                                 // 底面当前点
-            int bottomNext = 1 + next;                              // 底面下一点
-            int topNext = numPolygonVertices + 3 + next;            // 顶面下一点
-            int topCurr = numPolygonVertices + 3 + i;               // 顶面当前点
-            
-            // 第一个三角形：底面当前点 -> 底面下一点 -> 顶面下一点
-            triangleIndices->push_back(bottomCurr);
-            triangleIndices->push_back(bottomNext);
-            triangleIndices->push_back(topNext);
-            
-            // 第二个三角形：底面当前点 -> 顶面下一点 -> 顶面当前点
-            triangleIndices->push_back(bottomCurr);
-            triangleIndices->push_back(topNext);
-            triangleIndices->push_back(topCurr);
-        }
-        
-        geometry->addPrimitiveSet(triangleIndices);
     }
     
     // 设置顶点数组

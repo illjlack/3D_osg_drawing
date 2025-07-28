@@ -256,4 +256,24 @@ public:
     
     // 三角剖分函数声明
     static std::vector<unsigned int> triangulatePolygon(const std::vector<glm::dvec3>& vertices);
+    
+    // 高级多边形处理
+    static std::vector<unsigned int> triangulateSimplePolygon(const std::vector<glm::dvec3>& vertices);
+    static std::vector<unsigned int> triangulateSelfIntersectingPolygon(const std::vector<glm::dvec3>& vertices);
+    static bool isPolygonSelfIntersecting(const std::vector<glm::dvec3>& vertices);
+    static std::vector<glm::dvec3> fixSelfIntersection(const std::vector<glm::dvec3>& vertices);
+    
+    // 多边形辅助函数
+    static bool isPolygonConvex(const std::vector<glm::dvec3>& vertices);
+    static double calculatePolygonSignedArea(const std::vector<glm::dvec3>& vertices);
+    static bool isPolygonClockwise(const std::vector<glm::dvec3>& vertices);
+    static std::vector<glm::dvec3> reversePolygonWinding(const std::vector<glm::dvec3>& vertices);
+    
+    // 耳切算法 (Ear Clipping Algorithm)
+    static std::vector<unsigned int> earClippingTriangulation(const std::vector<glm::dvec3>& vertices);
+    static bool isEar(const std::vector<glm::dvec3>& vertices, int i);
+    static bool isPointInTriangle(const glm::dvec3& p, const glm::dvec3& a, const glm::dvec3& b, const glm::dvec3& c);
+    
+    // 线段相交检测
+    static bool lineSegmentsIntersect(const glm::dvec3& p1, const glm::dvec3& q1, const glm::dvec3& p2, const glm::dvec3& q2);
 }; 
