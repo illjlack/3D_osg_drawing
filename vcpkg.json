@@ -4,7 +4,7 @@
     "description": "An OpenSceneGraph-based 3D drawing application supporting customizable points, lines, surfaces and solids.",
     "dependencies": [
         {
-            "name": "osg",
+          "name": "osg",
           "features": [ "tools", "plugins", "freetype" ]
         },
         "osg-qt",

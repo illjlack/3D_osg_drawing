@@ -1,0 +1,91 @@
+cmake_minimum_required(VERSION 3.15)
+project(3Drawing_Geo3D VERSION 1.0.0)
+
+# 设置 C++ 标准
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# 设置输出目录
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+
+# 收集当前目录的核心文件
+file(GLOB GEO3D_ROOT_SOURCES "*.cpp")
+file(GLOB GEO3D_ROOT_HEADERS "*.h")
+
+# 包含子目录
+add_subdirectory(geometry)
+add_subdirectory(buildings)
+add_subdirectory(managers)
+add_subdirectory(utils)
+add_subdirectory(constraint)
+
+# 创建静态库
+add_library(${PROJECT_NAME} STATIC
+    ${GEO3D_ROOT_SOURCES}
+    ${GEO3D_ROOT_HEADERS}
+    ${GEOMETRY_MODULE_SOURCES}
+    ${GEOMETRY_MODULE_HEADERS}
+    ${BUILDINGS_MODULE_SOURCES}
+    ${BUILDINGS_MODULE_HEADERS}
+    ${MANAGERS_MODULE_SOURCES}
+    ${MANAGERS_MODULE_HEADERS}
+    ${UTILS_MODULE_SOURCES}
+    ${UTILS_MODULE_HEADERS}
+    ${CONSTRAINT_MODULE_SOURCES}
+    ${CONSTRAINT_MODULE_HEADERS}
+)
+
+# 设置包含目录
+target_include_directories(${PROJECT_NAME} PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/geometry
+    ${CMAKE_CURRENT_SOURCE_DIR}/buildings
+    ${CMAKE_CURRENT_SOURCE_DIR}/managers
+    ${CMAKE_CURRENT_SOURCE_DIR}/utils
+    ${CMAKE_CURRENT_SOURCE_DIR}/constraint
+)
+
+# 查找依赖包
+find_package(OpenSceneGraph REQUIRED COMPONENTS osg osgDB osgViewer osgGA osgUtil osgText)
+find_package(glm CONFIG REQUIRED)
+
+# 链接依赖
+target_link_libraries(${PROJECT_NAME} PUBLIC
+    ${OPENSCENEGRAPH_LIBRARIES}
+    glm::glm
+)
+
+# 设置 IDE 中的源文件分组
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} PREFIX "Source Files" FILES 
+    ${GEO3D_ROOT_SOURCES}
+    ${GEOMETRY_MODULE_SOURCES}
+    ${BUILDINGS_MODULE_SOURCES}
+    ${MANAGERS_MODULE_SOURCES}
+    ${UTILS_MODULE_SOURCES}
+    ${CONSTRAINT_MODULE_SOURCES}
+)
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} PREFIX "Header Files" FILES 
+    ${GEO3D_ROOT_HEADERS}
+    ${GEOMETRY_MODULE_HEADERS}
+    ${BUILDINGS_MODULE_HEADERS}
+    ${MANAGERS_MODULE_HEADERS}
+    ${UTILS_MODULE_HEADERS}
+    ${CONSTRAINT_MODULE_HEADERS}
+)
+
+# 导出目标
+install(TARGETS ${PROJECT_NAME}
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
+)
+
+# 安装头文件
+install(FILES ${GEO3D_ROOT_HEADERS} DESTINATION include/geo3D)
+install(FILES ${GEOMETRY_MODULE_HEADERS} DESTINATION include/geo3D/geometry)
+install(FILES ${BUILDINGS_MODULE_HEADERS} DESTINATION include/geo3D/buildings)
+install(FILES ${MANAGERS_MODULE_HEADERS} DESTINATION include/geo3D/managers)
+install(FILES ${UTILS_MODULE_HEADERS} DESTINATION include/geo3D/utils)
+install(FILES ${CONSTRAINT_MODULE_HEADERS} DESTINATION include/geo3D/constraint) 

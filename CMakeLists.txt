@@ -111,187 +111,23 @@ else()
 endif()
 
 # ——— 源文件收集 ———
-# 按目录分组源文件
-set(MAIN_SOURCES
-    src/main.cpp
-)
-set(UI_SOURCES
-    src/ui/OSGWidget.cpp
-    src/ui/MainWindow.cpp
-    src/ui/CoordinateSystemDialog.cpp
-    src/ui/LogOutputWidget.cpp
-    src/ui/StatusBar3D.cpp
-    src/ui/PropertyEditor3D.cpp
-    src/ui/ToolPanel3D.cpp
-    src/ui/ImportInfoDialog.cpp
-)
-set(UI_HEADERS
-    src/ui/OSGWidget.h
-    src/ui/MainWindow.h
-    src/ui/CoordinateSystemDialog.h
-    src/ui/LogOutputWidget.h
-    src/ui/StatusBar3D.h
-    src/ui/PropertyEditor3D.h
-    src/ui/ToolPanel3D.h
-    src/ui/ImportInfoDialog.h
-)
-set(CORE_SOURCES
-    src/core/Common3D.cpp
-    src/core/GeometryBase.cpp
-    src/core/ConstraintSystem.cpp
-    src/core/world/CoordinateSystem3D.cpp
-    src/core/world/CoordinateSystemRenderer.cpp
-    src/core/world/Skybox.cpp
-    src/core/camera/CameraController.cpp
-    src/core/managers/GeoControlPointManager.cpp
-    src/core/managers/GeoNodeManager.cpp
-    src/core/managers/GeoRenderManager.cpp
-    src/core/managers/GeoStateManager.cpp
-)
-set(CORE_HEADERS
-    src/core/Common3D.h
-    src/core/GeometryBase.h
-    src/core/Enums3D.h
-    src/core/ConstraintSystem.h
-    src/core/world/CoordinateSystem3D.h
-    src/core/world/CoordinateSystemRenderer.h
-    src/core/world/Skybox.h
-    src/core/camera/CameraController.h
-    src/core/managers/GeoControlPointManager.h
-    src/core/managers/GeoNodeManager.h
-    src/core/managers/GeoRenderManager.h
-    src/core/managers/GeoStateManager.h
-)
-set(GEOMETRY_SOURCES
-    src/core/geometry/Point3D.cpp
-    src/core/geometry/Line3D.cpp
-    src/core/geometry/Triangle3D.cpp
-    src/core/geometry/Quad3D.cpp
-    src/core/geometry/Polygon3D.cpp
-    src/core/geometry/Box3D.cpp
-    src/core/geometry/Cube3D.cpp
-    src/core/geometry/Sphere3D.cpp
-    src/core/geometry/Cylinder3D.cpp
-    src/core/geometry/Cone3D.cpp
-    src/core/geometry/Torus3D.cpp
-    src/core/geometry/Arc3D.cpp
-    src/core/geometry/BezierCurve3D.cpp
-    src/core/geometry/UndefinedGeo3D.cpp
-    src/core/geometry/Ellipsoid3D.cpp
-    src/core/geometry/Hemisphere3D.cpp
-    src/core/geometry/Prism3D.cpp
-)
-set(GEOMETRY_HEADERS
-    src/core/geometry/Point3D.h
-    src/core/geometry/Line3D.h
-    src/core/geometry/Triangle3D.h
-    src/core/geometry/Quad3D.h
-    src/core/geometry/Polygon3D.h
-    src/core/geometry/Box3D.h
-    src/core/geometry/Cube3D.h
-    src/core/geometry/Sphere3D.h
-    src/core/geometry/Cylinder3D.h
-    src/core/geometry/Cone3D.h
-    src/core/geometry/Torus3D.h
-    src/core/geometry/Arc3D.h
-    src/core/geometry/BezierCurve3D.h
-    src/core/geometry/UndefinedGeo3D.h
-    src/core/geometry/Ellipsoid3D.h
-    src/core/geometry/Hemisphere3D.h
-    src/core/geometry/Prism3D.h
-)
-set(PICKING_SOURCES
-    src/core/picking/GeometryPickingSystem.cpp
-    src/core/picking/PickingIndicator.cpp
-)
-set(PICKING_HEADERS
-    src/core/picking/GeometryPickingSystem.h
-    src/core/picking/PickingIndicator.h
-    src/core/picking/PickingTypes.h
-)
-set(UTIL_SOURCES
-    src/util/OSGUtils.cpp
-    src/util/GeometryFactory.cpp
-    src/util/MathUtils.cpp
-    src/util/LogManager.cpp
-    src/util/GeoOsgbIO.cpp
-)
-set(UTIL_HEADERS
-    src/util/OSGUtils.h
-    src/util/GeometryFactory.h
-    src/util/MathUtils.h
-    src/util/LogManager.h
-    src/util/GeoOsgbIO.h
-)
-
-# 建筑物相关文件
-set(BUILDINGS_SOURCES
-    src/core/buildings/BuildingFactory.cpp
-    src/core/buildings/DomeHouse3D.cpp
-    src/core/buildings/FlatHouse3D.cpp
-    src/core/buildings/GableHouse3D.cpp
-    src/core/buildings/LHouse3D.cpp
-    src/core/buildings/SpireHouse3D.cpp
-)
-set(BUILDINGS_HEADERS
-    src/core/buildings/BuildingFactory.h
-    src/core/buildings/DomeHouse3D.h
-    src/core/buildings/FlatHouse3D.h
-    src/core/buildings/GableHouse3D.h
-    src/core/buildings/LHouse3D.h
-    src/core/buildings/SpireHouse3D.h
-)
-
-# 合并所有源文件和头文件
-set(ALL_SOURCES
-    ${MAIN_SOURCES}
-    ${UI_SOURCES}
-    ${CORE_SOURCES}
-    ${GEOMETRY_SOURCES}
-    ${BUILDINGS_SOURCES}
-    ${PICKING_SOURCES}
-    ${UTIL_SOURCES}
-)
-set(ALL_HEADERS
-    ${UI_HEADERS}
-    ${CORE_HEADERS}
-    ${GEOMETRY_HEADERS}
-    ${BUILDINGS_HEADERS}
-    ${PICKING_HEADERS}
-    ${UTIL_HEADERS}
-)
+# 使用模块化的CMake配置
+add_subdirectory(src)
 
 # ——— 可执行目标 ———
 add_executable(${PROJECT_NAME}
-    ${ALL_SOURCES}
-    ${ALL_HEADERS}
+    src/main.cpp
 )
 
+# 链接模块化的库
 target_link_libraries(${PROJECT_NAME} PRIVATE
-    Qt5::Core
-    Qt5::Widgets
-    Qt5::Gui
-    Qt5::OpenGL
-
-    unofficial::osg::osg
-    unofficial::osg::osgDB
-    unofficial::osg::osgViewer
-    unofficial::osg::osgManipulator
-    unofficial::osg::osgGA
-    unofficial::osg::osgUtil
-    unofficial::osg::osgText
-
+    3Drawing_All
     osgQOpenGL
-
-    glm::glm
 )
 
+# 包含目录现在由模块库自动管理
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}/src
-    ${CMAKE_SOURCE_DIR}/src/core
-    ${CMAKE_SOURCE_DIR}/src/core/world
-    ${CMAKE_SOURCE_DIR}/src/ui
-    ${CMAKE_SOURCE_DIR}/src/util
     ${VCPKG_INSTALLED_DIR}/x64-windows/include
 )
 
@@ -416,19 +252,3 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 # 设置 VS 文件夹结构
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set_target_properties(${PROJECT_NAME} PROPERTIES FOLDER "3Drawing")
-
-# 设置源文件分组
-source_group("Main" FILES ${MAIN_SOURCES})
-source_group("UI" FILES ${UI_SOURCES} ${UI_HEADERS})
-source_group("Core" FILES ${CORE_SOURCES} ${CORE_HEADERS})
-source_group("Core\\World" FILES 
-    src/core/world/CoordinateSystem3D.cpp
-    src/core/world/CoordinateSystem3D.h
-    src/core/world/CoordinateSystemRenderer.cpp
-    src/core/world/CoordinateSystemRenderer.h
-    src/core/world/Skybox.cpp
-    src/core/world/Skybox.h
-)
-source_group("Core\\Geometry" FILES ${GEOMETRY_SOURCES} ${GEOMETRY_HEADERS})
-source_group("Core\\Picking" FILES ${PICKING_SOURCES} ${PICKING_HEADERS})
-source_group("Util" FILES ${UTIL_SOURCES} ${UTIL_HEADERS})
