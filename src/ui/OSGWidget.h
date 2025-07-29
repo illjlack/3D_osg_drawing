@@ -157,12 +157,10 @@ private:
     void onSimplePickingResult(const PickResult& result);
     
     // 鼠标事件处理器
-    void handleCameraControl(QMouseEvent* event);
-    void handleSelectionMode(QMouseEvent* event, const PickResult& pickResult, const glm::dvec3& worldPos);
-    void handleDrawingMode(QMouseEvent* event, const PickResult& pickResult, const glm::dvec3& worldPos);
-    void handleLeftClickDrawing(const glm::dvec3& worldPos);
-    void handleRightClickDrawing();
-    void updateMouseWorldPosition(int x, int y);
+    void updateWorldPosition(int x, int y);
+    void handleCameraEvent(QMouseEvent* event);
+    void handleSelectionEvent(QMouseEvent* event);
+    void handleDrawingEvent(QMouseEvent* event);
     void resetMouseState();
 
 private:
@@ -213,10 +211,7 @@ private:
     osg::ref_ptr<Geo3D> m_contextMenuGeo;
     int m_contextMenuPointIndex; // 16ms缓存时间（约60FPS）
     
-    // 鼠标状态跟踪
-    Qt::MouseButton m_pressedButton;
-    Qt::KeyboardModifiers m_pressedModifiers;
-    bool m_isDragging;
+
     
     QTimer* m_updateTimer;
 
