@@ -7,6 +7,8 @@
 #include <QSplashScreen>
 #include <QPixmap>
 #include <QTimer>
+#include <osgDB/Registry>
+#include <osgViewer/Viewer>
 
 #include "ui/MainWindow.h"
 #include "core/Common3D.h"
@@ -14,6 +16,13 @@
 
 int main(int argc, char *argv[])
 {
+    // 设置 OSG 插件搜索路径（不想设置环境变量）
+    #ifdef OSG_PLUGIN_PATH
+    std::string s = OSG_PLUGIN_PATH;
+    osgDB::Registry::instance()->setLibraryFilePathList({std::string(s)});
+    std::cout<<s;
+    #endif
+
     QApplication app(argc, argv);
     
     // 设置应用程序基本信息

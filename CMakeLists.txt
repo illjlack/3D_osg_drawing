@@ -1,5 +1,6 @@
 # cmake -B build -DCMAKE_PREFIX_PATH=F:/thirdparty/frameworks/Qt5.15.12/5.15.2/msvc2019_64
-# cmake --build build --config Debug
+# cmake -B build -DCMAKE_PREFIX_PATH=/home/liushisheng/Qt5.12.8/5.12.8/gcc_64 -DCMAKE_BUILD_TYPE=Debug
+# cmake --build build 
 
 cmake_minimum_required(VERSION 3.16)
 
@@ -11,6 +12,17 @@ include(${CMAKE_SOURCE_DIR}/cmake/ThirdPartyUtils.cmake)
 # ——— 基本配置 ———
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# 设置调试模式编译标志
+set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0")
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -O0")
+
+# 添加GLM相关的编译选项
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DGLM_FORCE_CTOR_INIT")
+
+# 设置可执行文件输出目录
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 # Qt自动处理
 set(CMAKE_AUTOMOC ON)
@@ -82,8 +94,14 @@ set(ALL_HEADERS
 add_executable(${PROJECT_NAME} ${ALL_SOURCES} ${ALL_HEADERS})
 
 # ——— 设置第三方库根目录 ———
-set(THIRD_PARTY_ROOT "F:/thirdparty")
+set(THIRD_PARTY_ROOT "/home/liushisheng/thirdparty")
 set(THIRD_PARTY_INCLUDE_DIR "${THIRD_PARTY_ROOT}/include")
+
+# 设置插件目录
+set(OSG_PLUGINS_DIR "${THIRD_PARTY_ROOT}/lib/x64/release/osgPlugins-3.6.5")
+
+# 添加插件目录的编译定义（使用字符串字面量）
+add_compile_definitions(OSG_PLUGIN_PATH="${OSG_PLUGINS_DIR}")
 
 # 设置包含目录
 target_include_directories(${PROJECT_NAME} PRIVATE
@@ -97,7 +115,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 # 查找Qt5
 find_package(Qt5 REQUIRED COMPONENTS Core Widgets Gui OpenGL)
 
-# 链接Qt5
+# 链接Qt5和OpenGL
 target_link_libraries(${PROJECT_NAME} PRIVATE
     Qt5::Core
     Qt5::Widgets
@@ -106,11 +124,29 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 )
 
 # 链接OSG和其他第三方库
-link_third_party(${PROJECT_NAME} osg ROOT "${THIRD_PARTY_ROOT}" REQUIRED STATIC)
-link_third_party(${PROJECT_NAME} osgDB ROOT "${THIRD_PARTY_ROOT}" REQUIRED STATIC)
+link_third_party(${PROJECT_NAME} osgQOpenGL ROOT "${THIRD_PARTY_ROOT}" REQUIRED STATIC)
 link_third_party(${PROJECT_NAME} osgViewer ROOT "${THIRD_PARTY_ROOT}" REQUIRED STATIC)
 link_third_party(${PROJECT_NAME} osgGA ROOT "${THIRD_PARTY_ROOT}" REQUIRED STATIC)
-link_third_party(${PROJECT_NAME} osgUtil ROOT "${THIRD_PARTY_ROOT}" REQUIRED STATIC)
 link_third_party(${PROJECT_NAME} osgText ROOT "${THIRD_PARTY_ROOT}" REQUIRED STATIC)
-link_third_party(${PROJECT_NAME} osgQOpenGL ROOT "${THIRD_PARTY_ROOT}" REQUIRED STATIC)
+link_third_party(${PROJECT_NAME} osgDB ROOT "${THIRD_PARTY_ROOT}" REQUIRED STATIC)
+link_third_party(${PROJECT_NAME} osgUtil ROOT "${THIRD_PARTY_ROOT}" REQUIRED STATIC)
+link_third_party(${PROJECT_NAME} osg ROOT "${THIRD_PARTY_ROOT}" REQUIRED STATIC)
+link_third_party(${PROJECT_NAME} OpenThreads ROOT "${THIRD_PARTY_ROOT}" REQUIRED STATIC)
 link_third_party(${PROJECT_NAME} glm ROOT "${THIRD_PARTY_ROOT}" REQUIRED STATIC)
+
+# 添加系统 OpenGL 和其他必要的库
+target_link_libraries(${PROJECT_NAME} PRIVATE 
+    GL
+    dl
+    pthread
+    fontconfig
+    z
+    jpeg
+    png
+    tiff
+    Xrandr
+    Xinerama
+    Xi
+    Xcursor
+    X11
+)

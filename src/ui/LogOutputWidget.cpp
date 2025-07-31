@@ -250,7 +250,7 @@ bool LogOutputWidget::shouldDisplayLog(const LogEntry& entry) const
     // 分类过滤
     if (!m_currentFilterCategory.isEmpty())
     {
-        QStringList keywords = m_currentFilterCategory.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
+        QStringList keywords = m_currentFilterCategory.split(QRegularExpression("\\s+"), QString::SkipEmptyParts);
         if (keywords.isEmpty())
         {
             return true; // 如果没有有效关键词，显示所有
