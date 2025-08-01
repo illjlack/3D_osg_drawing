@@ -23,6 +23,7 @@
 #include "../core/buildings/DomeHouse3D.h"
 #include "../core/buildings/FlatHouse3D.h"
 #include "../core/buildings/LHouse3D.h"
+#include "../core/buildings/CourtHouse3D.h"
 
 osg::ref_ptr<Geo3D> GeometryFactory::createGeometry(DrawMode3D mode)
 {
@@ -71,6 +72,8 @@ osg::ref_ptr<Geo3D> GeometryFactory::createGeometry(DrawMode3D mode)
         return BuildingFactory::createFlatHouse();
     case DrawLHouse3D:
         return BuildingFactory::createLHouse();
+    case DrawCourtHouse3D:
+        return BuildingFactory::createCourtHouse();
     default:
         return createUndefinedGeo();
     }
@@ -191,6 +194,7 @@ DrawMode3D GeometryFactory::geoTypeToDrawMode(GeoType3D type)
     case Geo_SpireHouse3D: return DrawSpireHouse3D;
     case Geo_GableHouse3D: return DrawGableHouse3D;
     case Geo_LHouse3D: return DrawLHouse3D;
+    case Geo_CourtHouse3D: return DrawCourtHouse3D;
     case Geo_UndefinedGeo3D: return DrawSelect3D;
     default: return DrawSelect3D;
     }
@@ -227,6 +231,8 @@ GeoType3D GeometryFactory::drawModeToGeoType(DrawMode3D mode)
         return Geo_FlatHouse3D;
     case DrawLHouse3D:
         return Geo_LHouse3D;
+    case DrawCourtHouse3D:
+        return Geo_CourtHouse3D;
     default: return Geo_UndefinedGeo3D;
     }
 } 

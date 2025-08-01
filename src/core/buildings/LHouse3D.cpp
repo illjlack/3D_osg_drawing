@@ -116,7 +116,7 @@ void LHouse3D_Geo::buildVertexGeometries()
         if (stage6.size() >= 1) vertices->push_back(osg::Vec3(stage6[0].x(), stage6[0].y(), stage6[0].z()));
     }
     else if (allStagePoints.size() >= 7) {
-        // 第七阶段：确定地面高度，形成完整的L型房屋
+        // 第七阶段：确定墙体高度，形成完整的L型房屋
         const auto& stage1 = allStagePoints[0];
         const auto& stage2 = allStagePoints[1];
         const auto& stage3 = allStagePoints[2];
@@ -135,18 +135,18 @@ void LHouse3D_Geo::buildVertexGeometries()
             Point3D D = stage4[0];
             Point3D E = stage5[0];
             Point3D F = stage6[0];
-            Point3D heightPoint = stage7[0];
+            Point3D wallHeightPoint = stage7[0];
             
-            // 计算地面高度
-            double height = heightPoint.z() - A.z();
+            // 计算墙体高度
+            double wallHeight = wallHeightPoint.z() - A.z();
             
-            // 计算顶层的6个顶点
-            Point3D A2 = Point3D(A.x(), A.y(), A.z() + height);
-            Point3D B2 = Point3D(B.x(), B.y(), B.z() + height);
-            Point3D C2 = Point3D(C.x(), C.y(), C.z() + height);
-            Point3D D2 = Point3D(D.x(), D.y(), D.z() + height);
-            Point3D E2 = Point3D(E.x(), E.y(), E.z() + height);
-            Point3D F2 = Point3D(F.x(), F.y(), F.z() + height);
+            // 计算墙体顶层的6个顶点
+            Point3D A2 = Point3D(A.x(), A.y(), A.z() + wallHeight);
+            Point3D B2 = Point3D(B.x(), B.y(), B.z() + wallHeight);
+            Point3D C2 = Point3D(C.x(), C.y(), C.z() + wallHeight);
+            Point3D D2 = Point3D(D.x(), D.y(), D.z() + wallHeight);
+            Point3D E2 = Point3D(E.x(), E.y(), E.z() + wallHeight);
+            Point3D F2 = Point3D(F.x(), F.y(), F.z() + wallHeight);
             
             // 添加底层6个顶点
             vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
@@ -313,7 +313,7 @@ void LHouse3D_Geo::buildEdgeGeometries()
         }
     }
     else if (allStagePoints.size() >= 7) {
-        // 第七阶段：确定地面高度，完整的L型房屋边线
+        // 第七阶段：确定墙体高度，完整的L型房屋边线
         const auto& stage1 = allStagePoints[0];
         const auto& stage2 = allStagePoints[1];
         const auto& stage3 = allStagePoints[2];
@@ -332,18 +332,18 @@ void LHouse3D_Geo::buildEdgeGeometries()
             Point3D D = stage4[0];
             Point3D E = stage5[0];
             Point3D F = stage6[0];
-            Point3D heightPoint = stage7[0];
+            Point3D wallHeightPoint = stage7[0];
             
-            // 计算地面高度
-            double height = heightPoint.z() - A.z();
+            // 计算墙体高度
+            double wallHeight = wallHeightPoint.z() - A.z();
             
-            // 计算顶层的6个顶点
-            Point3D A2 = Point3D(A.x(), A.y(), A.z() + height);
-            Point3D B2 = Point3D(B.x(), B.y(), B.z() + height);
-            Point3D C2 = Point3D(C.x(), C.y(), C.z() + height);
-            Point3D D2 = Point3D(D.x(), D.y(), D.z() + height);
-            Point3D E2 = Point3D(E.x(), E.y(), E.z() + height);
-            Point3D F2 = Point3D(F.x(), F.y(), F.z() + height);
+            // 计算墙体顶层的6个顶点
+            Point3D A2 = Point3D(A.x(), A.y(), A.z() + wallHeight);
+            Point3D B2 = Point3D(B.x(), B.y(), B.z() + wallHeight);
+            Point3D C2 = Point3D(C.x(), C.y(), C.z() + wallHeight);
+            Point3D D2 = Point3D(D.x(), D.y(), D.z() + wallHeight);
+            Point3D E2 = Point3D(E.x(), E.y(), E.z() + wallHeight);
+            Point3D F2 = Point3D(F.x(), F.y(), F.z() + wallHeight);
             
             // 添加底层6个顶点
             vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));  // 0

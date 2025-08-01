@@ -10,6 +10,7 @@ class SpireHouse3D_Geo;
 class DomeHouse3D_Geo;
 class FlatHouse3D_Geo;
 class LHouse3D_Geo;
+class CourtHouse3D_Geo;
 
 // 建筑类型枚举已在Enums3D.h中定义
 
@@ -26,6 +27,7 @@ public:
     static DomeHouse3D_Geo* createDomeHouse();
     static FlatHouse3D_Geo* createFlatHouse();
     static LHouse3D_Geo* createLHouse();
+    static CourtHouse3D_Geo* createCourtHouse();
     
     // 辅助函数
     static std::string getBuildingName(BuildingType3D type);

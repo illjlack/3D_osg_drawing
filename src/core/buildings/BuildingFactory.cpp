@@ -4,6 +4,7 @@
 #include "DomeHouse3D.h"
 #include "FlatHouse3D.h"
 #include "LHouse3D.h"
+#include "CourtHouse3D.h"
 
 osg::ref_ptr<Geo3D> BuildingFactory::createBuilding(BuildingType3D type)
 {
@@ -19,6 +20,8 @@ osg::ref_ptr<Geo3D> BuildingFactory::createBuilding(BuildingType3D type)
         return createFlatHouse();
     case Building_LHouse3D:
         return createLHouse();
+    case Building_CourtyardHouse3D:
+        return createCourtHouse();
     default:
         return nullptr;
     }
@@ -47,6 +50,11 @@ FlatHouse3D_Geo* BuildingFactory::createFlatHouse()
 LHouse3D_Geo* BuildingFactory::createLHouse()
 {
     return new LHouse3D_Geo();
+}
+
+CourtHouse3D_Geo* BuildingFactory::createCourtHouse()
+{
+    return new CourtHouse3D_Geo();
 }
 
 std::string BuildingFactory::getBuildingName(BuildingType3D type)

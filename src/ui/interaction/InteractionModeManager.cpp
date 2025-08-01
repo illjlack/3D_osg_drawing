@@ -1,4 +1,4 @@
-#include "InteractionModeManager.h"
+﻿#include "InteractionModeManager.h"
 #include "../OSGWidget.h"
 #include "../../util/LogManager.h"
 

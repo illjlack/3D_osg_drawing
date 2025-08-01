@@ -11,7 +11,7 @@ GableHouse3D_Geo::GableHouse3D_Geo()
     // 确保基类正确初始化
     initialize();
     
-    // 房屋类特定的可见性设置：只显示点和线
+    // 房屋类特定的可见性设置：显示点、线和面
     GeoParameters3D params = getParameters();
     params.showPoints = true;
     params.showEdges = true;
@@ -102,7 +102,29 @@ void GableHouse3D_Geo::buildVertexGeometries()
             vertices->push_back(osg::Vec3(stage3[0].x(), stage3[0].y(), stage3[0].z()));
         }
         
-        // 第四阶段的地面确定已包含在上述顶点中
+        // 第四阶段新增：添加地面4个顶点
+        if (stage4.size() >= 4) {
+            // 如果stage4有4个点，直接添加
+            for (size_t i = 0; i < 4; ++i) {
+                vertices->push_back(osg::Vec3(stage4[i].x(), stage4[i].y(), stage4[i].z()));
+            }
+        } else if (stage4.size() >= 1) {
+            // 如果stage4只有1个点，基于这个点生成地面4个角点
+            Point3D centerGround = stage4[0];
+            
+            // 基于底面4个点生成地面4个点
+            Point3D A = stage1[0], B = stage1[1], C = stage1[2], D = stage1[3];
+            
+            Point3D G = Point3D(A.x(), A.y(), centerGround.z()); // 地面前左
+            Point3D H = Point3D(B.x(), B.y(), centerGround.z()); // 地面前右  
+            Point3D I = Point3D(C.x(), C.y(), centerGround.z()); // 地面后右
+            Point3D J = Point3D(D.x(), D.y(), centerGround.z()); // 地面后左
+            
+            vertices->push_back(osg::Vec3(G.x(), G.y(), G.z())); 
+            vertices->push_back(osg::Vec3(H.x(), H.y(), H.z())); 
+            vertices->push_back(osg::Vec3(I.x(), I.y(), I.z())); 
+            vertices->push_back(osg::Vec3(J.x(), J.y(), J.z()));
+        }
     }
     
     // 使用顶点形状工具创建几何体
@@ -252,7 +274,7 @@ void GableHouse3D_Geo::buildEdgeGeometries()
         const auto& stage3 = allStagePoints[2];
         const auto& stage4 = allStagePoints[3];
         
-        if (stage1.size() >= 4 && stage2.size() >= 1 && stage3.size() >= 1) {
+        if (stage1.size() >= 4 && stage2.size() >= 1 && stage3.size() >= 1 && stage4.size() >= 1) {
             // 添加底面4个顶点：A(0)前左, B(1)前右, C(2)后右, D(3)后左
             for (size_t i = 0; i < 4; ++i) {
                 vertices->push_back(osg::Vec3(stage1[i].x(), stage1[i].y(), stage1[i].z()));
@@ -261,6 +283,28 @@ void GableHouse3D_Geo::buildEdgeGeometries()
             // 添加屋脊2个点：E(4)屋脊1, F(5)屋脊2  
             vertices->push_back(osg::Vec3(stage2[0].x(), stage2[0].y(), stage2[0].z())); // E索引4(A,B连)
             vertices->push_back(osg::Vec3(stage3[0].x(), stage3[0].y(), stage3[0].z())); // F索引5(C,D连)
+            
+            // 添加地面4个顶点：G(6)地面前左, H(7)地面前右, I(8)地面后右, J(9)地面后左
+            if (stage4.size() >= 4) {
+                // 如果stage4有4个点，直接添加
+                for (size_t i = 0; i < 4; ++i) {
+                    vertices->push_back(osg::Vec3(stage4[i].x(), stage4[i].y(), stage4[i].z()));
+                }
+            } else {
+                // 如果stage4只有1个点，基于底面点直接垂直投影到地面高度
+                Point3D centerGround = stage4[0];
+                Point3D A = stage1[0], B = stage1[1], C = stage1[2], D = stage1[3];
+                
+                Point3D G = Point3D(A.x(), A.y(), centerGround.z()); // 地面前左
+                Point3D H = Point3D(B.x(), B.y(), centerGround.z()); // 地面前右  
+                Point3D I = Point3D(C.x(), C.y(), centerGround.z()); // 地面后右
+                Point3D J = Point3D(D.x(), D.y(), centerGround.z()); // 地面后左
+                
+                vertices->push_back(osg::Vec3(G.x(), G.y(), G.z())); // 索引6
+                vertices->push_back(osg::Vec3(H.x(), H.y(), H.z())); // 索引7
+                vertices->push_back(osg::Vec3(I.x(), I.y(), I.z())); // 索引8
+                vertices->push_back(osg::Vec3(J.x(), J.y(), J.z())); // 索引9
+            }
             
             // 人字形屋顶的主要边线：
             // 1-4. 底面4条边
@@ -278,7 +322,18 @@ void GableHouse3D_Geo::buildEdgeGeometries()
             indices->push_back(2); indices->push_back(5); // C-F (C连屋脊2)
             indices->push_back(3); indices->push_back(5); // D-F (D连屋脊2)
             
-            // 第四阶段的地面处理已包含在上述边线绘制中
+            // 第四阶段新增：地面边线和底面到地面的垂直连线
+            // 10-13. 地面4条边 (G-H-I-J围成地面)
+            indices->push_back(6); indices->push_back(7); // GH (地面前边)
+            indices->push_back(7); indices->push_back(8); // HI (地面右边)
+            indices->push_back(8); indices->push_back(9); // IJ (地面后边)
+            indices->push_back(9); indices->push_back(6); // JG (地面左边)
+            
+            // 14-17. 底面4个顶点到地面对应点的垂直连线
+            indices->push_back(0); indices->push_back(6); // A-G (前左柱)
+            indices->push_back(1); indices->push_back(7); // B-H (前右柱)
+            indices->push_back(2); indices->push_back(8); // C-I (后右柱)
+            indices->push_back(3); indices->push_back(9); // D-J (后左柱)
         }
     }
     
@@ -497,14 +552,83 @@ void GableHouse3D_Geo::buildFaceGeometries()
             vertices->push_back(osg::Vec3(F.x(), F.y(), F.z()));
             vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));
             
-            // 添加所有面的图元
+            // 第四阶段新增：地面面（如果有地面数据）
+            if (stage4.size() >= 1) {
+                // 添加地面4个顶点
+                Point3D G, H, I, J; // 地面4个角点
+                
+                if (stage4.size() >= 4) {
+                    // 如果stage4有4个点，直接使用
+                    G = stage4[0]; H = stage4[1]; I = stage4[2]; J = stage4[3];
+                } else {
+                    // 如果stage4只有1个点，基于这个点生成地面4个角点
+                    Point3D centerGround = stage4[0];
+                    
+                    G = Point3D(A.x(), A.y(), centerGround.z()); // 地面前左
+                    H = Point3D(B.x(), B.y(), centerGround.z()); // 地面前右  
+                    I = Point3D(C.x(), C.y(), centerGround.z()); // 地面后右
+                    J = Point3D(D.x(), D.y(), centerGround.z()); // 地面后左
+                }
+                
+                // 面6: 地面 (G, H, I, J) - 分解为两个三角形
+                // 第一个三角形：G, H, I
+                vertices->push_back(osg::Vec3(G.x(), G.y(), G.z()));
+                vertices->push_back(osg::Vec3(H.x(), H.y(), H.z()));
+                vertices->push_back(osg::Vec3(I.x(), I.y(), I.z()));
+                // 第二个三角形：G, I, J
+                vertices->push_back(osg::Vec3(G.x(), G.y(), G.z()));
+                vertices->push_back(osg::Vec3(I.x(), I.y(), I.z()));
+                vertices->push_back(osg::Vec3(J.x(), J.y(), J.z()));
+                
+                // 面7-10: 4个侧面（底面到地面的连接面）
+                // 面7: 前侧面 (A, B, H, G) - 分解为两个三角形
+                vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
+                vertices->push_back(osg::Vec3(B.x(), B.y(), B.z()));
+                vertices->push_back(osg::Vec3(H.x(), H.y(), H.z()));
+                vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
+                vertices->push_back(osg::Vec3(H.x(), H.y(), H.z()));
+                vertices->push_back(osg::Vec3(G.x(), G.y(), G.z()));
+                
+                // 面8: 右侧面 (B, C, I, H) - 分解为两个三角形
+                vertices->push_back(osg::Vec3(B.x(), B.y(), B.z()));
+                vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));
+                vertices->push_back(osg::Vec3(I.x(), I.y(), I.z()));
+                vertices->push_back(osg::Vec3(B.x(), B.y(), B.z()));
+                vertices->push_back(osg::Vec3(I.x(), I.y(), I.z()));
+                vertices->push_back(osg::Vec3(H.x(), H.y(), H.z()));
+                
+                // 面9: 后侧面 (C, D, J, I) - 分解为两个三角形
+                vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));
+                vertices->push_back(osg::Vec3(D.x(), D.y(), D.z()));
+                vertices->push_back(osg::Vec3(J.x(), J.y(), J.z()));
+                vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));
+                vertices->push_back(osg::Vec3(J.x(), J.y(), J.z()));
+                vertices->push_back(osg::Vec3(I.x(), I.y(), I.z()));
+                
+                // 面10: 左侧面 (D, A, G, J) - 分解为两个三角形
+                vertices->push_back(osg::Vec3(D.x(), D.y(), D.z()));
+                vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
+                vertices->push_back(osg::Vec3(G.x(), G.y(), G.z()));
+                vertices->push_back(osg::Vec3(D.x(), D.y(), D.z()));
+                vertices->push_back(osg::Vec3(G.x(), G.y(), G.z()));
+                vertices->push_back(osg::Vec3(J.x(), J.y(), J.z()));
+            }
+            
+            // 添加基础面的图元
             geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, 6));   // 底面（2个三角形）
             geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 6, 3));   // 前三角形端面
             geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 9, 3));   // 后三角形端面
             geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 12, 6));  // 左斜屋顶面（2个三角形）
             geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 18, 6));  // 右斜屋顶面（2个三角形）
             
-            // 第四阶段的地面处理已包含在底面绘制中
+            // 第四阶段新增的面（仅当有地面数据时）
+            if (stage4.size() >= 1) {
+                geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 24, 6));  // 地面（2个三角形）
+                geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 30, 6));  // 前侧面（2个三角形）
+                geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 36, 6));  // 右侧面（2个三角形）
+                geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 42, 6));  // 后侧面（2个三角形）
+                geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 48, 6));  // 左侧面（2个三角形）
+            }
         }
     }
     

@@ -104,7 +104,7 @@ void SpireHouse3D_Geo::buildVertexGeometries()
         if (stage5.size() >= 1) vertices->push_back(osg::Vec3(stage5[0].x(), stage5[0].y(), stage5[0].z()));
     }
     else if (allStagePoints.size() >= 6) {
-        // 第六阶段：确定地面，形成完整的尖顶房屋
+        // 第六阶段：确定墙体高度，形成完整的尖顶房屋
         const auto& stage1 = allStagePoints[0];
         const auto& stage2 = allStagePoints[1];
         const auto& stage3 = allStagePoints[2];
@@ -118,16 +118,16 @@ void SpireHouse3D_Geo::buildVertexGeometries()
             Point3D C = stage3[0];  // 第三个角点
             Point3D D = stage4[0];  // 第四个角点
             Point3D spirePoint = stage5[0];  // 尖顶点
-            Point3D groundPoint = stage6[0];  // 地面高度点
+            Point3D wallHeightPoint = stage6[0];  // 墙体高度点
             
-            // 计算地面高度
-            double groundHeight = groundPoint.z() - A.z();
+            // 计算墙体高度
+            double wallHeight = wallHeightPoint.z() - A.z();
             
             // 计算房屋墙体顶面的四个顶点
-            Point3D A2 = Point3D(A.x(), A.y(), A.z() + groundHeight);
-            Point3D B2 = Point3D(B.x(), B.y(), B.z() + groundHeight);
-            Point3D C2 = Point3D(C.x(), C.y(), C.z() + groundHeight);
-            Point3D D2 = Point3D(D.x(), D.y(), D.z() + groundHeight);
+            Point3D A2 = Point3D(A.x(), A.y(), A.z() + wallHeight);
+            Point3D B2 = Point3D(B.x(), B.y(), B.z() + wallHeight);
+            Point3D C2 = Point3D(C.x(), C.y(), C.z() + wallHeight);
+            Point3D D2 = Point3D(D.x(), D.y(), D.z() + wallHeight);
             
             // 添加底面4个顶点
             vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
@@ -276,7 +276,7 @@ void SpireHouse3D_Geo::buildEdgeGeometries()
         }
     }
     else if (allStagePoints.size() >= 6) {
-        // 第六阶段：确定地面，完整的尖顶房屋边线
+        // 第六阶段：确定墙体高度，完整的尖顶房屋边线
         const auto& stage1 = allStagePoints[0];
         const auto& stage2 = allStagePoints[1];
         const auto& stage3 = allStagePoints[2];
@@ -290,16 +290,16 @@ void SpireHouse3D_Geo::buildEdgeGeometries()
             Point3D C = stage3[0];  // 第三个角点
             Point3D D = stage4[0];  // 第四个角点
             Point3D spirePoint = stage5[0];  // 尖顶点
-            Point3D groundPoint = stage6[0];  // 地面高度点
+            Point3D wallHeightPoint = stage6[0];  // 墙体高度点
             
-            // 计算地面高度
-            double groundHeight = groundPoint.z() - A.z();
+            // 计算墙体高度
+            double wallHeight = wallHeightPoint.z() - A.z();
             
             // 计算房屋墙体顶面的四个顶点
-            Point3D A2 = Point3D(A.x(), A.y(), A.z() + groundHeight);
-            Point3D B2 = Point3D(B.x(), B.y(), B.z() + groundHeight);
-            Point3D C2 = Point3D(C.x(), C.y(), C.z() + groundHeight);
-            Point3D D2 = Point3D(D.x(), D.y(), D.z() + groundHeight);
+            Point3D A2 = Point3D(A.x(), A.y(), A.z() + wallHeight);
+            Point3D B2 = Point3D(B.x(), B.y(), B.z() + wallHeight);
+            Point3D C2 = Point3D(C.x(), C.y(), C.z() + wallHeight);
+            Point3D D2 = Point3D(D.x(), D.y(), D.z() + wallHeight);
             
             // 添加所有顶点
             vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));    // 0

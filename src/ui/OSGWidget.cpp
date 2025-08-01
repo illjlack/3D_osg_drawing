@@ -628,19 +628,25 @@ void OSGWidget::setupHouseRenderingState(osg::Node* node)
     
     osg::StateSet* stateSet = node->getOrCreateStateSet();
     
-    // 关闭深度测试，让房屋显示在最上方
-    stateSet->setMode(GL_DEPTH_TEST, osg::StateAttribute::OFF);
+    // 关闭深度测试，让房屋显示在最上方（使用OVERRIDE防止被其他设置覆盖）
+    stateSet->setMode(GL_DEPTH_TEST, osg::StateAttribute::OFF | osg::StateAttribute::OVERRIDE);
     
     // 设置渲染顺序为最高优先级（后渲染，显示在上方）
     stateSet->setRenderBinDetails(1000, "RenderBin");
     
-    // 可选：关闭深度写入，避免遮挡其他透明物体
-    stateSet->setMode(GL_DEPTH_WRITEMASK, osg::StateAttribute::OFF);
+    // 关闭深度写入，避免遮挡其他透明物体（使用OVERRIDE）
+    stateSet->setMode(GL_DEPTH_WRITEMASK, osg::StateAttribute::OFF | osg::StateAttribute::OVERRIDE);
     
-    // 确保混合功能开启，支持透明效果
-    stateSet->setMode(GL_BLEND, osg::StateAttribute::ON);
+    // 确保混合功能开启，支持透明效果（使用OVERRIDE）
+    stateSet->setMode(GL_BLEND, osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
     
-    LOG_INFO("房屋几何体渲染状态设置完成：关闭深度测试，设置最高渲染优先级", "渲染");
+    // 设置专用的深度属性，完全禁用深度测试（使用OVERRIDE）
+    osg::ref_ptr<osg::Depth> depth = new osg::Depth();
+    depth->setFunction(osg::Depth::ALWAYS);  // 总是通过深度测试
+    depth->setWriteMask(false);              // 禁用深度写入
+    stateSet->setAttributeAndModes(depth.get(), osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
+    
+    LOG_INFO("房屋几何体渲染状态设置完成：强制关闭深度测试，设置最高渲染优先级（防覆盖）", "渲染");
 }
 
 void OSGWidget::resetCamera()

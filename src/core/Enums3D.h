@@ -45,6 +45,7 @@ enum DrawMode3D
     DrawDomeHouse3D,     // 穹顶房屋
     DrawFlatHouse3D,     // 平顶房屋
     DrawLHouse3D,        // L型房屋
+    DrawCourtHouse3D,    // 回型房屋
 
     EndDrawMode3D
 };
@@ -119,6 +120,7 @@ enum GeoType3D
     Geo_SpireHouse3D,
     Geo_GableHouse3D,
     Geo_LHouse3D,
+    Geo_CourtHouse3D,
     
     // 未定义几何体类型
     Geo_UndefinedGeo3D,

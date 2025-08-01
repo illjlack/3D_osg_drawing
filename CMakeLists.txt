@@ -15,8 +15,17 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # 设置调试模式编译标志
 set(CMAKE_BUILD_TYPE Debug)
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0")
-set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -O0")
+
+# 平台特定的编译标志
+if(WIN32)
+    # Windows特定标志：解决并行编译时PDB文件冲突
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /FS")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /FS")
+else()
+    # Linux/Unix特定标志
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0")
+    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -O0")
+endif()
 
 # 添加GLM相关的编译选项
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DGLM_FORCE_CTOR_INIT")
@@ -94,16 +103,31 @@ set(ALL_HEADERS
 add_executable(${PROJECT_NAME} ${ALL_SOURCES} ${ALL_HEADERS})
 
 # ——— 设置第三方库根目录 ———
-set(THIRD_PARTY_ROOT "/home/liushisheng/thirdparty")
+if(WIN32)
+    set(THIRD_PARTY_ROOT "F:/thirdparty")
+else()
+    set(THIRD_PARTY_ROOT "/home/liushisheng/thirdparty")
+endif()
 set(THIRD_PARTY_INCLUDE_DIR "${THIRD_PARTY_ROOT}/include")
 
-# 根据构建类型设置插件目录
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+if(WIN32)
+    # 根据构建类型设置插件目录
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(OSG_PLUGINS_DIR "${THIRD_PARTY_ROOT}/plugins/x64/debug/osgPlugins-3.6.5")
+    message(STATUS "使用Debug版本OSG插件: ${OSG_PLUGINS_DIR}")
+    else()
+    set(OSG_PLUGINS_DIR "${THIRD_PARTY_ROOT}/plugins/x64/release/osgPlugins-3.6.5")
+    message(STATUS "使用Release版本OSG插件: ${OSG_PLUGINS_DIR}")
+    endif()
+else()
+    # 根据构建类型设置插件目录
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(OSG_PLUGINS_DIR "${THIRD_PARTY_ROOT}/lib/x64/debug/osgPlugins-3.6.5")
     message(STATUS "使用Debug版本OSG插件: ${OSG_PLUGINS_DIR}")
-else()
+    else()
     set(OSG_PLUGINS_DIR "${THIRD_PARTY_ROOT}/lib/x64/release/osgPlugins-3.6.5")
     message(STATUS "使用Release版本OSG插件: ${OSG_PLUGINS_DIR}")
+    endif()
 endif()
 
 # 添加插件目录的编译定义（使用字符串字面量）

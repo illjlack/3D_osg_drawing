@@ -34,34 +34,17 @@ function(link_third_party target lib_name)
     endif()
 
     # 动态选择 debug/release 库路径
-    if(WIN32)
-        if(ARG_SHARED)
-            # Windows 动态库在 bin 目录
-            set(LIB_PATH_BASE "${ROOT_PATH}/bin/${ARCH_SUBDIR}")
-        else()
-            # Windows 静态库在 lib 目录
-            set(LIB_PATH_BASE "${ROOT_PATH}/lib/${ARCH_SUBDIR}")
-        endif()
-    else()
-        # 其他系统使用默认路径
-        set(LIB_PATH_BASE "${ROOT_PATH}/lib/${ARCH_SUBDIR}")
-    endif()
+    set(LIB_PATH_BASE "${ROOT_PATH}/lib/${ARCH_SUBDIR}")
     
     set(DEBUG_LIB_PATH "${LIB_PATH_BASE}/debug")
     set(RELEASE_LIB_PATH "${LIB_PATH_BASE}/release")
 
     # 生成查找名
     if(WIN32)
-        if(ARG_STATIC)
-            set(debug_names "${LIB_TO_FIND}d.lib")
-            set(release_names "${LIB_TO_FIND}.lib")
-        elseif(ARG_SHARED)
-            set(debug_names "${LIB_TO_FIND}d.dll")
-            set(release_names "${LIB_TO_FIND}.dll")
-        else()
-            set(debug_names "${LIB_TO_FIND}d.lib")
-            set(release_names "${LIB_TO_FIND}.lib")
-        endif()
+        # Windows下无论静态库还是动态库，find_library都查找.lib文件
+        # 动态库的.lib是导入库，静态库的.lib是静态库本体
+        set(debug_names "${LIB_TO_FIND}d.lib")
+        set(release_names "${LIB_TO_FIND}.lib")
     else()
         if(ARG_STATIC)
             set(debug_names "lib${LIB_TO_FIND}d.a")
@@ -107,7 +90,89 @@ function(link_third_party target lib_name)
             target_link_libraries(${target} PRIVATE ${${lib_name}_RELEASE})
             message(STATUS "✅ 成功链接 ${lib_name}，Release: ${${lib_name}_RELEASE}")
         endif()
-	
+    endif()
+
+    # Windows动态库运行时处理
+    if(WIN32 AND ARG_SHARED)
+        # 查找对应的.dll文件
+        set(DLL_PATH_BASE "${ROOT_PATH}/bin/${ARCH_SUBDIR}")
+        set(DEBUG_DLL_PATH "${DLL_PATH_BASE}/debug")
+        set(RELEASE_DLL_PATH "${DLL_PATH_BASE}/release")
+        
+        # 生成.dll和.pdb文件名
+        set(debug_dll_names "${LIB_TO_FIND}d.dll")
+        set(release_dll_names "${LIB_TO_FIND}.dll")
+        set(debug_pdb_names "${LIB_TO_FIND}d.pdb")
+        set(release_pdb_names "${LIB_TO_FIND}.pdb")
+        
+        # 查找.dll文件
+        find_file(${lib_name}_DEBUG_DLL
+            NAMES ${debug_dll_names}
+            PATHS "${DEBUG_DLL_PATH}"
+            NO_DEFAULT_PATH
+        )
+        
+        find_file(${lib_name}_RELEASE_DLL
+            NAMES ${release_dll_names}
+            PATHS "${RELEASE_DLL_PATH}"
+            NO_DEFAULT_PATH
+        )
+        
+        # 查找.pdb文件
+        find_file(${lib_name}_DEBUG_PDB
+            NAMES ${debug_pdb_names}
+            PATHS "${DEBUG_DLL_PATH}"
+            NO_DEFAULT_PATH
+        )
+        
+        find_file(${lib_name}_RELEASE_PDB
+            NAMES ${release_pdb_names}
+            PATHS "${RELEASE_DLL_PATH}"
+            NO_DEFAULT_PATH
+        )
+        
+        # 添加post-build步骤来复制.dll和.pdb文件到输出目录
+        if(${lib_name}_DEBUG_DLL)
+            add_custom_command(TARGET ${target} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${${lib_name}_DEBUG_DLL}"
+                "$<TARGET_FILE_DIR:${target}>"
+                COMMENT "复制 ${lib_name} Debug DLL到输出目录"
+            )
+            message(STATUS "🔄 将在构建后复制 Debug DLL: ${${lib_name}_DEBUG_DLL}")
+            
+            # 如果找到对应的.pdb文件，也复制过去
+            if(${lib_name}_DEBUG_PDB)
+                add_custom_command(TARGET ${target} POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${${lib_name}_DEBUG_PDB}"
+                    "$<TARGET_FILE_DIR:${target}>"
+                    COMMENT "复制 ${lib_name} Debug PDB到输出目录"
+                )
+                message(STATUS "🔍 将在构建后复制 Debug PDB: ${${lib_name}_DEBUG_PDB}")
+            endif()
+        endif()
+        
+        if(${lib_name}_RELEASE_DLL)
+            add_custom_command(TARGET ${target} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${${lib_name}_RELEASE_DLL}"
+                "$<TARGET_FILE_DIR:${target}>"
+                COMMENT "复制 ${lib_name} Release DLL到输出目录"
+            )
+            message(STATUS "🔄 将在构建后复制 Release DLL: ${${lib_name}_RELEASE_DLL}")
+            
+            # 如果找到对应的.pdb文件，也复制过去
+            if(${lib_name}_RELEASE_PDB)
+                add_custom_command(TARGET ${target} POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${${lib_name}_RELEASE_PDB}"
+                    "$<TARGET_FILE_DIR:${target}>"
+                    COMMENT "复制 ${lib_name} Release PDB到输出目录"
+                )
+                message(STATUS "🔍 将在构建后复制 Release PDB: ${${lib_name}_RELEASE_PDB}")
+            endif()
+        endif()
     endif()
 
 endfunction()

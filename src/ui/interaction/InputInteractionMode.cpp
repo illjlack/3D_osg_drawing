@@ -1,4 +1,4 @@
-#include "InputInteractionMode.h"
+﻿#include "InputInteractionMode.h"
 #include "../OSGWidget.h"
 #include "../../util/LogManager.h"
 #include "../../util/GeometryFactory.h"
