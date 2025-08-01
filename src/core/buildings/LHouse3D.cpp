@@ -38,7 +38,7 @@ void LHouse3D_Geo::buildVertexGeometries()
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     
     if (allStagePoints.size() == 1) {
-        // 第一阶段：主体基座第一角点
+        // 第一阶段：确定第一个顶点
         const auto& stage1 = allStagePoints[0];
         
         for (size_t i = 0; i < stage1.size(); ++i) {
@@ -46,152 +46,123 @@ void LHouse3D_Geo::buildVertexGeometries()
         }
     }
     else if (allStagePoints.size() == 2) {
-        // 第二阶段：主体基座对角点，形成主体矩形
+        // 第二阶段：确定第二个顶点
         const auto& stage1 = allStagePoints[0];
         const auto& stage2 = allStagePoints[1];
         
-        if (stage1.size() >= 1 && stage2.size() >= 1) {
-            Point3D A = stage1[0];  // 主体第一个角点
-            Point3D C = stage2[0];  // 主体对角点
-            
-            // 计算主体矩形的其他两个顶点
-            Point3D B = Point3D(C.x(), A.y(), A.z());  
-            Point3D D = Point3D(A.x(), C.y(), A.z());  
-            
-            // 添加主体矩形4个顶点
-            vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
-            vertices->push_back(osg::Vec3(B.x(), B.y(), B.z()));
-            vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));
-            vertices->push_back(osg::Vec3(D.x(), D.y(), D.z()));
+        for (size_t i = 0; i < stage1.size(); ++i) {
+            vertices->push_back(osg::Vec3(stage1[i].x(), stage1[i].y(), stage1[i].z()));
+        }
+        for (size_t i = 0; i < stage2.size(); ++i) {
+            vertices->push_back(osg::Vec3(stage2[i].x(), stage2[i].y(), stage2[i].z()));
         }
     }
     else if (allStagePoints.size() == 3) {
-        // 第三阶段：确定扩展部分位置，形成L型基座
+        // 第三阶段：确定第三个顶点
         const auto& stage1 = allStagePoints[0];
         const auto& stage2 = allStagePoints[1];
         const auto& stage3 = allStagePoints[2];
         
-        if (stage1.size() >= 1 && stage2.size() >= 1 && stage3.size() >= 1) {
-            Point3D A = stage1[0];
-            Point3D C = stage2[0];
-            Point3D E = stage3[0];  // 扩展部分的角点
-            
-            Point3D B = Point3D(C.x(), A.y(), A.z());
-            Point3D D = Point3D(A.x(), C.y(), A.z());
-            
-            // 根据扩展点的位置确定扩展方向
-            // 简化实现：假设扩展部分是从主体矩形的一边延伸出去的矩形
-            Point3D F, G, H;
-            
-            // 判断扩展方向（基于扩展点相对于主体矩形的位置）
-            if (E.x() > C.x()) {
-                // 向右扩展
-                F = Point3D(E.x(), C.y(), E.z());
-                G = Point3D(E.x(), E.y(), E.z());
-                H = Point3D(C.x(), E.y(), E.z());
-            }
-            else if (E.x() < A.x()) {
-                // 向左扩展
-                F = Point3D(E.x(), A.y(), E.z());
-                G = Point3D(E.x(), E.y(), E.z());
-                H = Point3D(A.x(), E.y(), E.z());
-            }
-            else if (E.y() > C.y()) {
-                // 向上扩展
-                F = Point3D(D.x(), E.y(), E.z());
-                G = Point3D(E.x(), E.y(), E.z());
-                H = Point3D(E.x(), C.y(), E.z());
-            }
-            else {
-                // 向下扩展
-                F = Point3D(A.x(), E.y(), E.z());
-                G = Point3D(E.x(), E.y(), E.z());
-                H = Point3D(E.x(), A.y(), E.z());
-            }
-            
-            // 添加主体矩形4个顶点
-            vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
-            vertices->push_back(osg::Vec3(B.x(), B.y(), B.z()));
-            vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));
-            vertices->push_back(osg::Vec3(D.x(), D.y(), D.z()));
-            
-            // 添加扩展部分顶点
-            vertices->push_back(osg::Vec3(E.x(), E.y(), E.z()));
-            vertices->push_back(osg::Vec3(F.x(), F.y(), F.z()));
-            vertices->push_back(osg::Vec3(G.x(), G.y(), G.z()));
-            vertices->push_back(osg::Vec3(H.x(), H.y(), H.z()));
+        for (size_t i = 0; i < stage1.size(); ++i) {
+            vertices->push_back(osg::Vec3(stage1[i].x(), stage1[i].y(), stage1[i].z()));
+        }
+        for (size_t i = 0; i < stage2.size(); ++i) {
+            vertices->push_back(osg::Vec3(stage2[i].x(), stage2[i].y(), stage2[i].z()));
+        }
+        for (size_t i = 0; i < stage3.size(); ++i) {
+            vertices->push_back(osg::Vec3(stage3[i].x(), stage3[i].y(), stage3[i].z()));
         }
     }
-    else if (allStagePoints.size() >= 4) {
-        // 第四阶段：确定房屋高度，形成完整的L型房屋
+    else if (allStagePoints.size() == 4) {
+        // 第四阶段：确定第四个顶点
         const auto& stage1 = allStagePoints[0];
         const auto& stage2 = allStagePoints[1];
         const auto& stage3 = allStagePoints[2];
         const auto& stage4 = allStagePoints[3];
         
-        if (stage1.size() >= 1 && stage2.size() >= 1 && stage3.size() >= 1 && stage4.size() >= 1) {
+        if (stage1.size() >= 1) vertices->push_back(osg::Vec3(stage1[0].x(), stage1[0].y(), stage1[0].z()));
+        if (stage2.size() >= 1) vertices->push_back(osg::Vec3(stage2[0].x(), stage2[0].y(), stage2[0].z()));
+        if (stage3.size() >= 1) vertices->push_back(osg::Vec3(stage3[0].x(), stage3[0].y(), stage3[0].z()));
+        if (stage4.size() >= 1) vertices->push_back(osg::Vec3(stage4[0].x(), stage4[0].y(), stage4[0].z()));
+    }
+    else if (allStagePoints.size() == 5) {
+        // 第五阶段：确定第五个顶点
+        const auto& stage1 = allStagePoints[0];
+        const auto& stage2 = allStagePoints[1];
+        const auto& stage3 = allStagePoints[2];
+        const auto& stage4 = allStagePoints[3];
+        const auto& stage5 = allStagePoints[4];
+        
+        if (stage1.size() >= 1) vertices->push_back(osg::Vec3(stage1[0].x(), stage1[0].y(), stage1[0].z()));
+        if (stage2.size() >= 1) vertices->push_back(osg::Vec3(stage2[0].x(), stage2[0].y(), stage2[0].z()));
+        if (stage3.size() >= 1) vertices->push_back(osg::Vec3(stage3[0].x(), stage3[0].y(), stage3[0].z()));
+        if (stage4.size() >= 1) vertices->push_back(osg::Vec3(stage4[0].x(), stage4[0].y(), stage4[0].z()));
+        if (stage5.size() >= 1) vertices->push_back(osg::Vec3(stage5[0].x(), stage5[0].y(), stage5[0].z()));
+    }
+    else if (allStagePoints.size() == 6) {
+        // 第六阶段：确定第六个顶点，形成L型基座
+        const auto& stage1 = allStagePoints[0];
+        const auto& stage2 = allStagePoints[1];
+        const auto& stage3 = allStagePoints[2];
+        const auto& stage4 = allStagePoints[3];
+        const auto& stage5 = allStagePoints[4];
+        const auto& stage6 = allStagePoints[5];
+        
+        if (stage1.size() >= 1) vertices->push_back(osg::Vec3(stage1[0].x(), stage1[0].y(), stage1[0].z()));
+        if (stage2.size() >= 1) vertices->push_back(osg::Vec3(stage2[0].x(), stage2[0].y(), stage2[0].z()));
+        if (stage3.size() >= 1) vertices->push_back(osg::Vec3(stage3[0].x(), stage3[0].y(), stage3[0].z()));
+        if (stage4.size() >= 1) vertices->push_back(osg::Vec3(stage4[0].x(), stage4[0].y(), stage4[0].z()));
+        if (stage5.size() >= 1) vertices->push_back(osg::Vec3(stage5[0].x(), stage5[0].y(), stage5[0].z()));
+        if (stage6.size() >= 1) vertices->push_back(osg::Vec3(stage6[0].x(), stage6[0].y(), stage6[0].z()));
+    }
+    else if (allStagePoints.size() >= 7) {
+        // 第七阶段：确定地面高度，形成完整的L型房屋
+        const auto& stage1 = allStagePoints[0];
+        const auto& stage2 = allStagePoints[1];
+        const auto& stage3 = allStagePoints[2];
+        const auto& stage4 = allStagePoints[3];
+        const auto& stage5 = allStagePoints[4];
+        const auto& stage6 = allStagePoints[5];
+        const auto& stage7 = allStagePoints[6];
+        
+        if (stage1.size() >= 1 && stage2.size() >= 1 && stage3.size() >= 1 && stage4.size() >= 1 && 
+            stage5.size() >= 1 && stage6.size() >= 1 && stage7.size() >= 1) {
+            
+            // L型基座的6个顶点
             Point3D A = stage1[0];
-            Point3D C = stage2[0];
-            Point3D E = stage3[0];
-            Point3D heightPoint = stage4[0];
+            Point3D B = stage2[0];
+            Point3D C = stage3[0];
+            Point3D D = stage4[0];
+            Point3D E = stage5[0];
+            Point3D F = stage6[0];
+            Point3D heightPoint = stage7[0];
             
-            Point3D B = Point3D(C.x(), A.y(), A.z());
-            Point3D D = Point3D(A.x(), C.y(), A.z());
-            
-            // 计算扩展部分的顶点
-            Point3D F, G, H;
-            if (E.x() > C.x()) {
-                F = Point3D(E.x(), C.y(), E.z());
-                G = Point3D(E.x(), E.y(), E.z());
-                H = Point3D(C.x(), E.y(), E.z());
-            }
-            else if (E.x() < A.x()) {
-                F = Point3D(E.x(), A.y(), E.z());
-                G = Point3D(E.x(), E.y(), E.z());
-                H = Point3D(A.x(), E.y(), E.z());
-            }
-            else if (E.y() > C.y()) {
-                F = Point3D(D.x(), E.y(), E.z());
-                G = Point3D(E.x(), E.y(), E.z());
-                H = Point3D(E.x(), C.y(), E.z());
-            }
-            else {
-                F = Point3D(A.x(), E.y(), E.z());
-                G = Point3D(E.x(), E.y(), E.z());
-                H = Point3D(E.x(), A.y(), E.z());
-            }
-            
+            // 计算地面高度
             double height = heightPoint.z() - A.z();
             
-            // 计算顶层顶点
+            // 计算顶层的6个顶点
             Point3D A2 = Point3D(A.x(), A.y(), A.z() + height);
             Point3D B2 = Point3D(B.x(), B.y(), B.z() + height);
             Point3D C2 = Point3D(C.x(), C.y(), C.z() + height);
             Point3D D2 = Point3D(D.x(), D.y(), D.z() + height);
             Point3D E2 = Point3D(E.x(), E.y(), E.z() + height);
             Point3D F2 = Point3D(F.x(), F.y(), F.z() + height);
-            Point3D G2 = Point3D(G.x(), G.y(), G.z() + height);
-            Point3D H2 = Point3D(H.x(), H.y(), H.z() + height);
             
-            // 添加底层顶点
+            // 添加底层6个顶点
             vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
             vertices->push_back(osg::Vec3(B.x(), B.y(), B.z()));
             vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));
             vertices->push_back(osg::Vec3(D.x(), D.y(), D.z()));
             vertices->push_back(osg::Vec3(E.x(), E.y(), E.z()));
             vertices->push_back(osg::Vec3(F.x(), F.y(), F.z()));
-            vertices->push_back(osg::Vec3(G.x(), G.y(), G.z()));
-            vertices->push_back(osg::Vec3(H.x(), H.y(), H.z()));
             
-            // 添加顶层顶点
+            // 添加顶层6个顶点
             vertices->push_back(osg::Vec3(A2.x(), A2.y(), A2.z()));
             vertices->push_back(osg::Vec3(B2.x(), B2.y(), B2.z()));
             vertices->push_back(osg::Vec3(C2.x(), C2.y(), C2.z()));
             vertices->push_back(osg::Vec3(D2.x(), D2.y(), D2.z()));
             vertices->push_back(osg::Vec3(E2.x(), E2.y(), E2.z()));
             vertices->push_back(osg::Vec3(F2.x(), F2.y(), F2.z()));
-            vertices->push_back(osg::Vec3(G2.x(), G2.y(), G2.z()));
-            vertices->push_back(osg::Vec3(H2.x(), H2.y(), H2.z()));
         }
     }
     
@@ -250,223 +221,169 @@ void LHouse3D_Geo::buildEdgeGeometries()
         // 不绘制任何边线
     }
     else if (allStagePoints.size() == 2) {
-        // 第二阶段：主体矩形的边
+        // 第二阶段：两个点，绘制一条边
         const auto& stage1 = allStagePoints[0];
         const auto& stage2 = allStagePoints[1];
         
         if (stage1.size() >= 1 && stage2.size() >= 1) {
-            Point3D A = stage1[0];
-            Point3D C = stage2[0];
-            Point3D B = Point3D(C.x(), A.y(), A.z());
-            Point3D D = Point3D(A.x(), C.y(), A.z());
+            vertices->push_back(osg::Vec3(stage1[0].x(), stage1[0].y(), stage1[0].z()));
+            vertices->push_back(osg::Vec3(stage2[0].x(), stage2[0].y(), stage2[0].z()));
             
-            // 添加4个顶点
-            vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
-            vertices->push_back(osg::Vec3(B.x(), B.y(), B.z()));
-            vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));
-            vertices->push_back(osg::Vec3(D.x(), D.y(), D.z()));
-            
-            // 添加4条边的索引
-            indices->push_back(0); indices->push_back(1); // A-B
-            indices->push_back(1); indices->push_back(2); // B-C
-            indices->push_back(2); indices->push_back(3); // C-D
-            indices->push_back(3); indices->push_back(0); // D-A
+            indices->push_back(0); indices->push_back(1);
         }
     }
     else if (allStagePoints.size() == 3) {
-        // 第三阶段：L型基座的边线
+        // 第三阶段：三个点，绘制线段
         const auto& stage1 = allStagePoints[0];
         const auto& stage2 = allStagePoints[1];
         const auto& stage3 = allStagePoints[2];
         
         if (stage1.size() >= 1 && stage2.size() >= 1 && stage3.size() >= 1) {
-            Point3D A = stage1[0];
-            Point3D C = stage2[0];
-            Point3D E = stage3[0];
+            vertices->push_back(osg::Vec3(stage1[0].x(), stage1[0].y(), stage1[0].z()));
+            vertices->push_back(osg::Vec3(stage2[0].x(), stage2[0].y(), stage2[0].z()));
+            vertices->push_back(osg::Vec3(stage3[0].x(), stage3[0].y(), stage3[0].z()));
             
-            Point3D B = Point3D(C.x(), A.y(), A.z());
-            Point3D D = Point3D(A.x(), C.y(), A.z());
-            
-            Point3D F, G, H;
-            if (E.x() > C.x()) {
-                F = Point3D(E.x(), C.y(), E.z());
-                G = Point3D(E.x(), E.y(), E.z());
-                H = Point3D(C.x(), E.y(), E.z());
-            }
-            else if (E.x() < A.x()) {
-                F = Point3D(E.x(), A.y(), E.z());
-                G = Point3D(E.x(), E.y(), E.z());
-                H = Point3D(A.x(), E.y(), E.z());
-            }
-            else if (E.y() > C.y()) {
-                F = Point3D(D.x(), E.y(), E.z());
-                G = Point3D(E.x(), E.y(), E.z());
-                H = Point3D(E.x(), C.y(), E.z());
-            }
-            else {
-                F = Point3D(A.x(), E.y(), E.z());
-                G = Point3D(E.x(), E.y(), E.z());
-                H = Point3D(E.x(), A.y(), E.z());
-            }
-            
-            // 添加所有顶点
-            vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));  // 0
-            vertices->push_back(osg::Vec3(B.x(), B.y(), B.z()));  // 1
-            vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));  // 2
-            vertices->push_back(osg::Vec3(D.x(), D.y(), D.z()));  // 3
-            vertices->push_back(osg::Vec3(E.x(), E.y(), E.z()));  // 4
-            vertices->push_back(osg::Vec3(F.x(), F.y(), F.z()));  // 5
-            vertices->push_back(osg::Vec3(G.x(), G.y(), G.z()));  // 6
-            vertices->push_back(osg::Vec3(H.x(), H.y(), H.z()));  // 7
-            
-            // 主体矩形的边
-            indices->push_back(0); indices->push_back(1); // A-B
-            indices->push_back(1); indices->push_back(2); // B-C
-            indices->push_back(2); indices->push_back(3); // C-D
-            indices->push_back(3); indices->push_back(0); // D-A
-            
-            // 扩展部分的边
-            indices->push_back(4); indices->push_back(5); // E-F
-            indices->push_back(5); indices->push_back(6); // F-G
-            indices->push_back(6); indices->push_back(7); // G-H
-            indices->push_back(7); indices->push_back(4); // H-E
-            
-            // 连接主体和扩展部分的边（根据扩展方向添加）
-            if (E.x() > C.x()) {
-                indices->push_back(2); indices->push_back(5); // C-F
-                indices->push_back(2); indices->push_back(7); // C-H
-            }
-            else if (E.x() < A.x()) {
-                indices->push_back(0); indices->push_back(5); // A-F
-                indices->push_back(3); indices->push_back(7); // D-H
-            }
-            else if (E.y() > C.y()) {
-                indices->push_back(3); indices->push_back(5); // D-F
-                indices->push_back(2); indices->push_back(7); // C-H
-            }
-            else {
-                indices->push_back(0); indices->push_back(5); // A-F
-                indices->push_back(1); indices->push_back(7); // B-H
-            }
+            indices->push_back(0); indices->push_back(1);
+            indices->push_back(1); indices->push_back(2);
         }
     }
-    else if (allStagePoints.size() >= 4) {
-        // 第四阶段：完整L型房屋的边线
+    else if (allStagePoints.size() == 4) {
+        // 第四阶段：四个点，继续连线
         const auto& stage1 = allStagePoints[0];
         const auto& stage2 = allStagePoints[1];
         const auto& stage3 = allStagePoints[2];
         const auto& stage4 = allStagePoints[3];
         
         if (stage1.size() >= 1 && stage2.size() >= 1 && stage3.size() >= 1 && stage4.size() >= 1) {
+            vertices->push_back(osg::Vec3(stage1[0].x(), stage1[0].y(), stage1[0].z()));
+            vertices->push_back(osg::Vec3(stage2[0].x(), stage2[0].y(), stage2[0].z()));
+            vertices->push_back(osg::Vec3(stage3[0].x(), stage3[0].y(), stage3[0].z()));
+            vertices->push_back(osg::Vec3(stage4[0].x(), stage4[0].y(), stage4[0].z()));
+            
+            indices->push_back(0); indices->push_back(1);
+            indices->push_back(1); indices->push_back(2);
+            indices->push_back(2); indices->push_back(3);
+        }
+    }
+    else if (allStagePoints.size() == 5) {
+        // 第五阶段：五个点，继续连线
+        const auto& stage1 = allStagePoints[0];
+        const auto& stage2 = allStagePoints[1];
+        const auto& stage3 = allStagePoints[2];
+        const auto& stage4 = allStagePoints[3];
+        const auto& stage5 = allStagePoints[4];
+        
+        if (stage1.size() >= 1 && stage2.size() >= 1 && stage3.size() >= 1 && stage4.size() >= 1 && stage5.size() >= 1) {
+            vertices->push_back(osg::Vec3(stage1[0].x(), stage1[0].y(), stage1[0].z()));
+            vertices->push_back(osg::Vec3(stage2[0].x(), stage2[0].y(), stage2[0].z()));
+            vertices->push_back(osg::Vec3(stage3[0].x(), stage3[0].y(), stage3[0].z()));
+            vertices->push_back(osg::Vec3(stage4[0].x(), stage4[0].y(), stage4[0].z()));
+            vertices->push_back(osg::Vec3(stage5[0].x(), stage5[0].y(), stage5[0].z()));
+            
+            indices->push_back(0); indices->push_back(1);
+            indices->push_back(1); indices->push_back(2);
+            indices->push_back(2); indices->push_back(3);
+            indices->push_back(3); indices->push_back(4);
+        }
+    }
+    else if (allStagePoints.size() == 6) {
+        // 第六阶段：六个点，形成L型基座边线
+        const auto& stage1 = allStagePoints[0];
+        const auto& stage2 = allStagePoints[1];
+        const auto& stage3 = allStagePoints[2];
+        const auto& stage4 = allStagePoints[3];
+        const auto& stage5 = allStagePoints[4];
+        const auto& stage6 = allStagePoints[5];
+        
+        if (stage1.size() >= 1 && stage2.size() >= 1 && stage3.size() >= 1 && stage4.size() >= 1 && stage5.size() >= 1 && stage6.size() >= 1) {
+            vertices->push_back(osg::Vec3(stage1[0].x(), stage1[0].y(), stage1[0].z()));
+            vertices->push_back(osg::Vec3(stage2[0].x(), stage2[0].y(), stage2[0].z()));
+            vertices->push_back(osg::Vec3(stage3[0].x(), stage3[0].y(), stage3[0].z()));
+            vertices->push_back(osg::Vec3(stage4[0].x(), stage4[0].y(), stage4[0].z()));
+            vertices->push_back(osg::Vec3(stage5[0].x(), stage5[0].y(), stage5[0].z()));
+            vertices->push_back(osg::Vec3(stage6[0].x(), stage6[0].y(), stage6[0].z()));
+            
+            // 连接6个点形成L型闭合图形
+            indices->push_back(0); indices->push_back(1);
+            indices->push_back(1); indices->push_back(2);
+            indices->push_back(2); indices->push_back(3);
+            indices->push_back(3); indices->push_back(4);
+            indices->push_back(4); indices->push_back(5);
+            indices->push_back(5); indices->push_back(0); // 闭合
+        }
+    }
+    else if (allStagePoints.size() >= 7) {
+        // 第七阶段：确定地面高度，完整的L型房屋边线
+        const auto& stage1 = allStagePoints[0];
+        const auto& stage2 = allStagePoints[1];
+        const auto& stage3 = allStagePoints[2];
+        const auto& stage4 = allStagePoints[3];
+        const auto& stage5 = allStagePoints[4];
+        const auto& stage6 = allStagePoints[5];
+        const auto& stage7 = allStagePoints[6];
+        
+        if (stage1.size() >= 1 && stage2.size() >= 1 && stage3.size() >= 1 && stage4.size() >= 1 && 
+            stage5.size() >= 1 && stage6.size() >= 1 && stage7.size() >= 1) {
+            
+            // L型基座的6个顶点
             Point3D A = stage1[0];
-            Point3D C = stage2[0];
-            Point3D E = stage3[0];
-            Point3D heightPoint = stage4[0];
+            Point3D B = stage2[0];
+            Point3D C = stage3[0];
+            Point3D D = stage4[0];
+            Point3D E = stage5[0];
+            Point3D F = stage6[0];
+            Point3D heightPoint = stage7[0];
             
-            Point3D B = Point3D(C.x(), A.y(), A.z());
-            Point3D D = Point3D(A.x(), C.y(), A.z());
-            
-            Point3D F, G, H;
-            if (E.x() > C.x()) {
-                F = Point3D(E.x(), C.y(), E.z());
-                G = Point3D(E.x(), E.y(), E.z());
-                H = Point3D(C.x(), E.y(), E.z());
-            }
-            else if (E.x() < A.x()) {
-                F = Point3D(E.x(), A.y(), E.z());
-                G = Point3D(E.x(), E.y(), E.z());
-                H = Point3D(A.x(), E.y(), E.z());
-            }
-            else if (E.y() > C.y()) {
-                F = Point3D(D.x(), E.y(), E.z());
-                G = Point3D(E.x(), E.y(), E.z());
-                H = Point3D(E.x(), C.y(), E.z());
-            }
-            else {
-                F = Point3D(A.x(), E.y(), E.z());
-                G = Point3D(E.x(), E.y(), E.z());
-                H = Point3D(E.x(), A.y(), E.z());
-            }
-            
+            // 计算地面高度
             double height = heightPoint.z() - A.z();
             
+            // 计算顶层的6个顶点
             Point3D A2 = Point3D(A.x(), A.y(), A.z() + height);
             Point3D B2 = Point3D(B.x(), B.y(), B.z() + height);
             Point3D C2 = Point3D(C.x(), C.y(), C.z() + height);
             Point3D D2 = Point3D(D.x(), D.y(), D.z() + height);
             Point3D E2 = Point3D(E.x(), E.y(), E.z() + height);
             Point3D F2 = Point3D(F.x(), F.y(), F.z() + height);
-            Point3D G2 = Point3D(G.x(), G.y(), G.z() + height);
-            Point3D H2 = Point3D(H.x(), H.y(), H.z() + height);
             
-            // 添加16个顶点（底层8个 + 顶层8个）
-            vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));   // 0
-            vertices->push_back(osg::Vec3(B.x(), B.y(), B.z()));   // 1
-            vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));   // 2
-            vertices->push_back(osg::Vec3(D.x(), D.y(), D.z()));   // 3
-            vertices->push_back(osg::Vec3(E.x(), E.y(), E.z()));   // 4
-            vertices->push_back(osg::Vec3(F.x(), F.y(), F.z()));   // 5
-            vertices->push_back(osg::Vec3(G.x(), G.y(), G.z()));   // 6
-            vertices->push_back(osg::Vec3(H.x(), H.y(), H.z()));   // 7
-            vertices->push_back(osg::Vec3(A2.x(), A2.y(), A2.z())); // 8
-            vertices->push_back(osg::Vec3(B2.x(), B2.y(), B2.z())); // 9
-            vertices->push_back(osg::Vec3(C2.x(), C2.y(), C2.z())); // 10
-            vertices->push_back(osg::Vec3(D2.x(), D2.y(), D2.z())); // 11
-            vertices->push_back(osg::Vec3(E2.x(), E2.y(), E2.z())); // 12
-            vertices->push_back(osg::Vec3(F2.x(), F2.y(), F2.z())); // 13
-            vertices->push_back(osg::Vec3(G2.x(), G2.y(), G2.z())); // 14
-            vertices->push_back(osg::Vec3(H2.x(), H2.y(), H2.z())); // 15
+            // 添加底层6个顶点
+            vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));  // 0
+            vertices->push_back(osg::Vec3(B.x(), B.y(), B.z()));  // 1
+            vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));  // 2
+            vertices->push_back(osg::Vec3(D.x(), D.y(), D.z()));  // 3
+            vertices->push_back(osg::Vec3(E.x(), E.y(), E.z()));  // 4
+            vertices->push_back(osg::Vec3(F.x(), F.y(), F.z()));  // 5
             
-            // 底层边线
+            // 添加顶层6个顶点
+            vertices->push_back(osg::Vec3(A2.x(), A2.y(), A2.z()));  // 6
+            vertices->push_back(osg::Vec3(B2.x(), B2.y(), B2.z()));  // 7
+            vertices->push_back(osg::Vec3(C2.x(), C2.y(), C2.z()));  // 8
+            vertices->push_back(osg::Vec3(D2.x(), D2.y(), D2.z()));  // 9
+            vertices->push_back(osg::Vec3(E2.x(), E2.y(), E2.z()));  // 10
+            vertices->push_back(osg::Vec3(F2.x(), F2.y(), F2.z()));  // 11
+            
+            // 底层L型闭合边线
             indices->push_back(0); indices->push_back(1);
             indices->push_back(1); indices->push_back(2);
             indices->push_back(2); indices->push_back(3);
-            indices->push_back(3); indices->push_back(0);
+            indices->push_back(3); indices->push_back(4);
             indices->push_back(4); indices->push_back(5);
-            indices->push_back(5); indices->push_back(6);
-            indices->push_back(6); indices->push_back(7);
-            indices->push_back(7); indices->push_back(4);
+            indices->push_back(5); indices->push_back(0);
             
-            // 顶层边线
+            // 顶层L型闭合边线
+            indices->push_back(6); indices->push_back(7);
+            indices->push_back(7); indices->push_back(8);
             indices->push_back(8); indices->push_back(9);
             indices->push_back(9); indices->push_back(10);
             indices->push_back(10); indices->push_back(11);
-            indices->push_back(11); indices->push_back(8);
-            indices->push_back(12); indices->push_back(13);
-            indices->push_back(13); indices->push_back(14);
-            indices->push_back(14); indices->push_back(15);
-            indices->push_back(15); indices->push_back(12);
+            indices->push_back(11); indices->push_back(6);
             
-            // 垂直边线
-            for (int i = 0; i < 8; ++i) {
-                indices->push_back(i); indices->push_back(i + 8);
-            }
-            
-            // 连接边线
-            if (E.x() > C.x()) {
-                indices->push_back(2); indices->push_back(5);
-                indices->push_back(2); indices->push_back(7);
-                indices->push_back(10); indices->push_back(13);
-                indices->push_back(10); indices->push_back(15);
-            }
-            else if (E.x() < A.x()) {
-                indices->push_back(0); indices->push_back(5);
-                indices->push_back(3); indices->push_back(7);
-                indices->push_back(8); indices->push_back(13);
-                indices->push_back(11); indices->push_back(15);
-            }
-            else if (E.y() > C.y()) {
-                indices->push_back(3); indices->push_back(5);
-                indices->push_back(2); indices->push_back(7);
-                indices->push_back(11); indices->push_back(13);
-                indices->push_back(10); indices->push_back(15);
-            }
-            else {
-                indices->push_back(0); indices->push_back(5);
-                indices->push_back(1); indices->push_back(7);
-                indices->push_back(8); indices->push_back(13);
-                indices->push_back(9); indices->push_back(15);
-            }
+            // 6条垂直边线
+            indices->push_back(0); indices->push_back(6);
+            indices->push_back(1); indices->push_back(7);
+            indices->push_back(2); indices->push_back(8);
+            indices->push_back(3); indices->push_back(9);
+            indices->push_back(4); indices->push_back(10);
+            indices->push_back(5); indices->push_back(11);
         }
     }
     

@@ -38,7 +38,7 @@ void SpireHouse3D_Geo::buildVertexGeometries()
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     
     if (allStagePoints.size() == 1) {
-        // 第一阶段：基座第一角点
+        // 第一阶段：确定第一个角点
         const auto& stage1 = allStagePoints[0];
         
         for (size_t i = 0; i < stage1.size(); ++i) {
@@ -46,82 +46,88 @@ void SpireHouse3D_Geo::buildVertexGeometries()
         }
     }
     else if (allStagePoints.size() == 2) {
-        // 第二阶段：基座对角点，形成矩形基座
+        // 第二阶段：确定第二个角点
         const auto& stage1 = allStagePoints[0];
         const auto& stage2 = allStagePoints[1];
         
-        if (stage1.size() >= 1 && stage2.size() >= 1) {
-            Point3D A = stage1[0];  // 第一个角点
-            Point3D C = stage2[0];  // 对角点
-            
-            // 计算矩形的其他两个顶点
-            Point3D B = Point3D(C.x(), A.y(), A.z());  
-            Point3D D = Point3D(A.x(), C.y(), A.z());  
-            
-            // 添加底面4个顶点
-            vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
-            vertices->push_back(osg::Vec3(B.x(), B.y(), B.z()));
-            vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));
-            vertices->push_back(osg::Vec3(D.x(), D.y(), D.z()));
+        for (size_t i = 0; i < stage1.size(); ++i) {
+            vertices->push_back(osg::Vec3(stage1[i].x(), stage1[i].y(), stage1[i].z()));
+        }
+        for (size_t i = 0; i < stage2.size(); ++i) {
+            vertices->push_back(osg::Vec3(stage2[i].x(), stage2[i].y(), stage2[i].z()));
         }
     }
     else if (allStagePoints.size() == 3) {
-        // 第三阶段：确定房屋墙体高度
+        // 第三阶段：确定第三个角点
         const auto& stage1 = allStagePoints[0];
         const auto& stage2 = allStagePoints[1];
         const auto& stage3 = allStagePoints[2];
         
-        if (stage1.size() >= 1 && stage2.size() >= 1 && stage3.size() >= 1) {
-            Point3D A = stage1[0];
-            Point3D C = stage2[0];
-            Point3D heightPoint = stage3[0];
-            
-            Point3D B = Point3D(C.x(), A.y(), A.z());
-            Point3D D = Point3D(A.x(), C.y(), A.z());
-            
-            // 计算墙体高度
-            double wallHeight = heightPoint.z() - A.z();
-            
-            Point3D A2 = Point3D(A.x(), A.y(), A.z() + wallHeight);
-            Point3D B2 = Point3D(B.x(), B.y(), B.z() + wallHeight);
-            Point3D C2 = Point3D(C.x(), C.y(), C.z() + wallHeight);
-            Point3D D2 = Point3D(D.x(), D.y(), D.z() + wallHeight);
-            
-            // 添加底面4个顶点
-            vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
-            vertices->push_back(osg::Vec3(B.x(), B.y(), B.z()));
-            vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));
-            vertices->push_back(osg::Vec3(D.x(), D.y(), D.z()));
-            
-            // 添加墙体顶面4个顶点
-            vertices->push_back(osg::Vec3(A2.x(), A2.y(), A2.z()));
-            vertices->push_back(osg::Vec3(B2.x(), B2.y(), B2.z()));
-            vertices->push_back(osg::Vec3(C2.x(), C2.y(), C2.z()));
-            vertices->push_back(osg::Vec3(D2.x(), D2.y(), D2.z()));
+        for (size_t i = 0; i < stage1.size(); ++i) {
+            vertices->push_back(osg::Vec3(stage1[i].x(), stage1[i].y(), stage1[i].z()));
+        }
+        for (size_t i = 0; i < stage2.size(); ++i) {
+            vertices->push_back(osg::Vec3(stage2[i].x(), stage2[i].y(), stage2[i].z()));
+        }
+        for (size_t i = 0; i < stage3.size(); ++i) {
+            vertices->push_back(osg::Vec3(stage3[i].x(), stage3[i].y(), stage3[i].z()));
         }
     }
-    else if (allStagePoints.size() >= 4) {
-        // 第四阶段：确定尖顶高度，形成完整的尖塔房屋
+    else if (allStagePoints.size() == 4) {
+        // 第四阶段：确定第四个角点，形成四边形基座
         const auto& stage1 = allStagePoints[0];
         const auto& stage2 = allStagePoints[1];
         const auto& stage3 = allStagePoints[2];
         const auto& stage4 = allStagePoints[3];
         
-        if (stage1.size() >= 1 && stage2.size() >= 1 && stage3.size() >= 1 && stage4.size() >= 1) {
-            Point3D A = stage1[0];
-            Point3D C = stage2[0];
-            Point3D heightPoint = stage3[0];
-            Point3D spirePoint = stage4[0];
+        // 添加四个角点
+        if (stage1.size() >= 1) vertices->push_back(osg::Vec3(stage1[0].x(), stage1[0].y(), stage1[0].z()));
+        if (stage2.size() >= 1) vertices->push_back(osg::Vec3(stage2[0].x(), stage2[0].y(), stage2[0].z()));
+        if (stage3.size() >= 1) vertices->push_back(osg::Vec3(stage3[0].x(), stage3[0].y(), stage3[0].z()));
+        if (stage4.size() >= 1) vertices->push_back(osg::Vec3(stage4[0].x(), stage4[0].y(), stage4[0].z()));
+    }
+    else if (allStagePoints.size() == 5) {
+        // 第五阶段：确定尖顶位置
+        const auto& stage1 = allStagePoints[0];
+        const auto& stage2 = allStagePoints[1];
+        const auto& stage3 = allStagePoints[2];
+        const auto& stage4 = allStagePoints[3];
+        const auto& stage5 = allStagePoints[4];
+        
+        // 添加四个角点
+        if (stage1.size() >= 1) vertices->push_back(osg::Vec3(stage1[0].x(), stage1[0].y(), stage1[0].z()));
+        if (stage2.size() >= 1) vertices->push_back(osg::Vec3(stage2[0].x(), stage2[0].y(), stage2[0].z()));
+        if (stage3.size() >= 1) vertices->push_back(osg::Vec3(stage3[0].x(), stage3[0].y(), stage3[0].z()));
+        if (stage4.size() >= 1) vertices->push_back(osg::Vec3(stage4[0].x(), stage4[0].y(), stage4[0].z()));
+        
+        // 添加尖顶点
+        if (stage5.size() >= 1) vertices->push_back(osg::Vec3(stage5[0].x(), stage5[0].y(), stage5[0].z()));
+    }
+    else if (allStagePoints.size() >= 6) {
+        // 第六阶段：确定地面，形成完整的尖顶房屋
+        const auto& stage1 = allStagePoints[0];
+        const auto& stage2 = allStagePoints[1];
+        const auto& stage3 = allStagePoints[2];
+        const auto& stage4 = allStagePoints[3];
+        const auto& stage5 = allStagePoints[4];
+        const auto& stage6 = allStagePoints[5];
+        
+        if (stage1.size() >= 1 && stage2.size() >= 1 && stage3.size() >= 1 && stage4.size() >= 1 && stage5.size() >= 1 && stage6.size() >= 1) {
+            Point3D A = stage1[0];  // 第一个角点
+            Point3D B = stage2[0];  // 第二个角点
+            Point3D C = stage3[0];  // 第三个角点
+            Point3D D = stage4[0];  // 第四个角点
+            Point3D spirePoint = stage5[0];  // 尖顶点
+            Point3D groundPoint = stage6[0];  // 地面高度点
             
-            Point3D B = Point3D(C.x(), A.y(), A.z());
-            Point3D D = Point3D(A.x(), C.y(), A.z());
+            // 计算地面高度
+            double groundHeight = groundPoint.z() - A.z();
             
-            double wallHeight = heightPoint.z() - A.z();
-            
-            Point3D A2 = Point3D(A.x(), A.y(), A.z() + wallHeight);
-            Point3D B2 = Point3D(B.x(), B.y(), B.z() + wallHeight);
-            Point3D C2 = Point3D(C.x(), C.y(), C.z() + wallHeight);
-            Point3D D2 = Point3D(D.x(), D.y(), D.z() + wallHeight);
+            // 计算房屋墙体顶面的四个顶点
+            Point3D A2 = Point3D(A.x(), A.y(), A.z() + groundHeight);
+            Point3D B2 = Point3D(B.x(), B.y(), B.z() + groundHeight);
+            Point3D C2 = Point3D(C.x(), C.y(), C.z() + groundHeight);
+            Point3D D2 = Point3D(D.x(), D.y(), D.z() + groundHeight);
             
             // 添加底面4个顶点
             vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
@@ -195,31 +201,144 @@ void SpireHouse3D_Geo::buildEdgeGeometries()
         // 不绘制任何边线
     }
     else if (allStagePoints.size() == 2) {
-        // 第二阶段：基座矩形的边
+        // 第二阶段：两个点，绘制一条边
         const auto& stage1 = allStagePoints[0];
         const auto& stage2 = allStagePoints[1];
         
         if (stage1.size() >= 1 && stage2.size() >= 1) {
-            Point3D A = stage1[0];
-            Point3D C = stage2[0];
-            Point3D B = Point3D(C.x(), A.y(), A.z());
-            Point3D D = Point3D(A.x(), C.y(), A.z());
+            vertices->push_back(osg::Vec3(stage1[0].x(), stage1[0].y(), stage1[0].z()));
+            vertices->push_back(osg::Vec3(stage2[0].x(), stage2[0].y(), stage2[0].z()));
             
-            // 添加4个顶点
-            vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
-            vertices->push_back(osg::Vec3(B.x(), B.y(), B.z()));
-            vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));
-            vertices->push_back(osg::Vec3(D.x(), D.y(), D.z()));
-            
-            // 添加4条边的索引
-            indices->push_back(0); indices->push_back(1); // A-B
-            indices->push_back(1); indices->push_back(2); // B-C
-            indices->push_back(2); indices->push_back(3); // C-D
-            indices->push_back(3); indices->push_back(0); // D-A
+            indices->push_back(0); indices->push_back(1);
         }
     }
     else if (allStagePoints.size() == 3) {
-        // 第三阶段：墙体边线
+        // 第三阶段：三个点，绘制两条边
+        const auto& stage1 = allStagePoints[0];
+        const auto& stage2 = allStagePoints[1];
+        const auto& stage3 = allStagePoints[2];
+        
+        if (stage1.size() >= 1 && stage2.size() >= 1 && stage3.size() >= 1) {
+            vertices->push_back(osg::Vec3(stage1[0].x(), stage1[0].y(), stage1[0].z()));
+            vertices->push_back(osg::Vec3(stage2[0].x(), stage2[0].y(), stage2[0].z()));
+            vertices->push_back(osg::Vec3(stage3[0].x(), stage3[0].y(), stage3[0].z()));
+            
+            indices->push_back(0); indices->push_back(1);
+            indices->push_back(1); indices->push_back(2);
+        }
+    }
+    else if (allStagePoints.size() == 4) {
+        // 第四阶段：四个点，形成四边形基座
+        const auto& stage1 = allStagePoints[0];
+        const auto& stage2 = allStagePoints[1];
+        const auto& stage3 = allStagePoints[2];
+        const auto& stage4 = allStagePoints[3];
+        
+        if (stage1.size() >= 1 && stage2.size() >= 1 && stage3.size() >= 1 && stage4.size() >= 1) {
+            vertices->push_back(osg::Vec3(stage1[0].x(), stage1[0].y(), stage1[0].z()));
+            vertices->push_back(osg::Vec3(stage2[0].x(), stage2[0].y(), stage2[0].z()));
+            vertices->push_back(osg::Vec3(stage3[0].x(), stage3[0].y(), stage3[0].z()));
+            vertices->push_back(osg::Vec3(stage4[0].x(), stage4[0].y(), stage4[0].z()));
+            
+            // 连接四个点形成四边形
+            indices->push_back(0); indices->push_back(1);
+            indices->push_back(1); indices->push_back(2);
+            indices->push_back(2); indices->push_back(3);
+            indices->push_back(3); indices->push_back(0);
+        }
+    }
+    else if (allStagePoints.size() == 5) {
+        // 第五阶段：添加尖顶点并连接到基座各点
+        const auto& stage1 = allStagePoints[0];
+        const auto& stage2 = allStagePoints[1];
+        const auto& stage3 = allStagePoints[2];
+        const auto& stage4 = allStagePoints[3];
+        const auto& stage5 = allStagePoints[4];
+        
+        if (stage1.size() >= 1 && stage2.size() >= 1 && stage3.size() >= 1 && stage4.size() >= 1 && stage5.size() >= 1) {
+            vertices->push_back(osg::Vec3(stage1[0].x(), stage1[0].y(), stage1[0].z()));
+            vertices->push_back(osg::Vec3(stage2[0].x(), stage2[0].y(), stage2[0].z()));
+            vertices->push_back(osg::Vec3(stage3[0].x(), stage3[0].y(), stage3[0].z()));
+            vertices->push_back(osg::Vec3(stage4[0].x(), stage4[0].y(), stage4[0].z()));
+            vertices->push_back(osg::Vec3(stage5[0].x(), stage5[0].y(), stage5[0].z())); // 尖顶点
+            
+            // 底面四边形
+            indices->push_back(0); indices->push_back(1);
+            indices->push_back(1); indices->push_back(2);
+            indices->push_back(2); indices->push_back(3);
+            indices->push_back(3); indices->push_back(0);
+            
+            // 尖顶到基座各点的连线
+            indices->push_back(4); indices->push_back(0);
+            indices->push_back(4); indices->push_back(1);
+            indices->push_back(4); indices->push_back(2);
+            indices->push_back(4); indices->push_back(3);
+        }
+    }
+    else if (allStagePoints.size() >= 6) {
+        // 第六阶段：确定地面，完整的尖顶房屋边线
+        const auto& stage1 = allStagePoints[0];
+        const auto& stage2 = allStagePoints[1];
+        const auto& stage3 = allStagePoints[2];
+        const auto& stage4 = allStagePoints[3];
+        const auto& stage5 = allStagePoints[4];
+        const auto& stage6 = allStagePoints[5];
+        
+        if (stage1.size() >= 1 && stage2.size() >= 1 && stage3.size() >= 1 && stage4.size() >= 1 && stage5.size() >= 1 && stage6.size() >= 1) {
+            Point3D A = stage1[0];  // 第一个角点
+            Point3D B = stage2[0];  // 第二个角点
+            Point3D C = stage3[0];  // 第三个角点
+            Point3D D = stage4[0];  // 第四个角点
+            Point3D spirePoint = stage5[0];  // 尖顶点
+            Point3D groundPoint = stage6[0];  // 地面高度点
+            
+            // 计算地面高度
+            double groundHeight = groundPoint.z() - A.z();
+            
+            // 计算房屋墙体顶面的四个顶点
+            Point3D A2 = Point3D(A.x(), A.y(), A.z() + groundHeight);
+            Point3D B2 = Point3D(B.x(), B.y(), B.z() + groundHeight);
+            Point3D C2 = Point3D(C.x(), C.y(), C.z() + groundHeight);
+            Point3D D2 = Point3D(D.x(), D.y(), D.z() + groundHeight);
+            
+            // 添加所有顶点
+            vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));    // 0
+            vertices->push_back(osg::Vec3(B.x(), B.y(), B.z()));    // 1
+            vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));    // 2
+            vertices->push_back(osg::Vec3(D.x(), D.y(), D.z()));    // 3
+            vertices->push_back(osg::Vec3(A2.x(), A2.y(), A2.z())); // 4
+            vertices->push_back(osg::Vec3(B2.x(), B2.y(), B2.z())); // 5
+            vertices->push_back(osg::Vec3(C2.x(), C2.y(), C2.z())); // 6
+            vertices->push_back(osg::Vec3(D2.x(), D2.y(), D2.z())); // 7
+            vertices->push_back(osg::Vec3(spirePoint.x(), spirePoint.y(), spirePoint.z())); // 8
+            
+            // 底面四边形
+            indices->push_back(0); indices->push_back(1);
+            indices->push_back(1); indices->push_back(2);
+            indices->push_back(2); indices->push_back(3);
+            indices->push_back(3); indices->push_back(0);
+            
+            // 顶面四边形
+            indices->push_back(4); indices->push_back(5);
+            indices->push_back(5); indices->push_back(6);
+            indices->push_back(6); indices->push_back(7);
+            indices->push_back(7); indices->push_back(4);
+            
+            // 4条垂直边
+            indices->push_back(0); indices->push_back(4);
+            indices->push_back(1); indices->push_back(5);
+            indices->push_back(2); indices->push_back(6);
+            indices->push_back(3); indices->push_back(7);
+            
+            // 尖顶到顶面各点的连线
+            indices->push_back(8); indices->push_back(4);
+            indices->push_back(8); indices->push_back(5);
+            indices->push_back(8); indices->push_back(6);
+            indices->push_back(8); indices->push_back(7);
+        }
+    }
+    else if (allStagePoints.size() == 3) {
+        // 第三阶段：墙体边线（废弃的旧逻辑）
         const auto& stage1 = allStagePoints[0];
         const auto& stage2 = allStagePoints[1];
         const auto& stage3 = allStagePoints[2];
@@ -351,14 +470,90 @@ void SpireHouse3D_Geo::buildFaceGeometries()
     // 创建顶点数组
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     
-    if (allStagePoints.size() == 1) {
-        // 第一阶段：无面
+    if (allStagePoints.size() <= 3) {
+        // 第一至三阶段：无面
         // 不绘制任何面
     }
-    else if (allStagePoints.size() == 2) {
-        // 第二阶段：只显示底面
+    else if (allStagePoints.size() == 4) {
+        // 第四阶段：显示底面
         const auto& stage1 = allStagePoints[0];
         const auto& stage2 = allStagePoints[1];
+        const auto& stage3 = allStagePoints[2];
+        const auto& stage4 = allStagePoints[3];
+        
+        if (stage1.size() >= 1 && stage2.size() >= 1 && stage3.size() >= 1 && stage4.size() >= 1) {
+            Point3D A = stage1[0];
+            Point3D B = stage2[0];
+            Point3D C = stage3[0];
+            Point3D D = stage4[0];
+            
+            // 添加底面四边形顶点（分解为两个三角形）
+            // 第一个三角形：A, B, C
+            vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
+            vertices->push_back(osg::Vec3(B.x(), B.y(), B.z()));
+            vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));
+            
+            // 第二个三角形：A, C, D
+            vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
+            vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));
+            vertices->push_back(osg::Vec3(D.x(), D.y(), D.z()));
+            
+            // 添加底面三角形
+            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, 6));
+        }
+    }
+    else if (allStagePoints.size() == 5) {
+        // 第五阶段：显示底面和尖顶锥形
+        const auto& stage1 = allStagePoints[0];
+        const auto& stage2 = allStagePoints[1];
+        const auto& stage3 = allStagePoints[2];
+        const auto& stage4 = allStagePoints[3];
+        const auto& stage5 = allStagePoints[4];
+        
+        if (stage1.size() >= 1 && stage2.size() >= 1 && stage3.size() >= 1 && stage4.size() >= 1 && stage5.size() >= 1) {
+            Point3D A = stage1[0];
+            Point3D B = stage2[0];
+            Point3D C = stage3[0];
+            Point3D D = stage4[0];
+            Point3D spirePoint = stage5[0];
+            
+            // 底面四边形（分解为两个三角形）
+            vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
+            vertices->push_back(osg::Vec3(B.x(), B.y(), B.z()));
+            vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));
+            vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
+            vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));
+            vertices->push_back(osg::Vec3(D.x(), D.y(), D.z()));
+            
+            // 尖顶锥形四个侧面（4个三角形）
+            vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
+            vertices->push_back(osg::Vec3(B.x(), B.y(), B.z()));
+            vertices->push_back(osg::Vec3(spirePoint.x(), spirePoint.y(), spirePoint.z()));
+            
+            vertices->push_back(osg::Vec3(B.x(), B.y(), B.z()));
+            vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));
+            vertices->push_back(osg::Vec3(spirePoint.x(), spirePoint.y(), spirePoint.z()));
+            
+            vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));
+            vertices->push_back(osg::Vec3(D.x(), D.y(), D.z()));
+            vertices->push_back(osg::Vec3(spirePoint.x(), spirePoint.y(), spirePoint.z()));
+            
+            vertices->push_back(osg::Vec3(D.x(), D.y(), D.z()));
+            vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
+            vertices->push_back(osg::Vec3(spirePoint.x(), spirePoint.y(), spirePoint.z()));
+            
+            // 添加所有三角形（底面2个 + 侧面4个 = 6个三角形）
+            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, 18));
+        }
+    }
+    else if (allStagePoints.size() >= 6) {
+        // 第六阶段：完整的尖顶房屋，添加墙体
+        const auto& stage1 = allStagePoints[0];
+        const auto& stage2 = allStagePoints[1];
+        const auto& stage3 = allStagePoints[2];
+        const auto& stage4 = allStagePoints[3];
+        const auto& stage5 = allStagePoints[4];
+        const auto& stage6 = allStagePoints[5];
         
         if (stage1.size() >= 1 && stage2.size() >= 1) {
             Point3D A = stage1[0];

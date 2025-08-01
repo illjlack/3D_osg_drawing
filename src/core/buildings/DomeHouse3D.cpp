@@ -77,8 +77,8 @@ void DomeHouse3D_Geo::buildVertexGeometries()
             }
         }
     }
-    else if (allStagePoints.size() >= 2) {
-        // 第二阶段：确定穹顶高度，形成完整的圆顶房屋
+    else if (allStagePoints.size() == 2) {
+        // 第二阶段：确定穹顶高度
         const auto& stage1 = allStagePoints[0];
         const auto& stage2 = allStagePoints[1];
         
@@ -105,6 +105,75 @@ void DomeHouse3D_Geo::buildVertexGeometries()
             
             // 添加圆形基座的点
             int numBasePoints = 16;
+            for (int i = 0; i < numBasePoints; ++i) {
+                double angle = 2.0 * M_PI * i / numBasePoints;
+                double x = center.x() + radius * std::cos(angle);
+                double y = center.y() + radius * std::sin(angle);
+                double z = center.z();
+                vertices->push_back(osg::Vec3(x, y, z));
+            }
+            
+            // 添加穹顶的点（半球）
+            int numRings = 8; // 穹顶分为8层
+            for (int ring = 1; ring <= numRings; ++ring) {
+                double ringHeight = domeHeight * ring / numRings;
+                double ringRadius = radius * std::sqrt(1.0 - std::pow((double)ring / numRings, 2));
+                
+                if (ring == numRings) {
+                    // 最顶层只有一个点
+                    vertices->push_back(osg::Vec3(center.x(), center.y(), center.z() + domeHeight));
+                } else {
+                    for (int i = 0; i < numBasePoints; ++i) {
+                        double angle = 2.0 * M_PI * i / numBasePoints;
+                        double x = center.x() + ringRadius * std::cos(angle);
+                        double y = center.y() + ringRadius * std::sin(angle);
+                        double z = center.z() + ringHeight;
+                        vertices->push_back(osg::Vec3(x, y, z));
+                    }
+                }
+            }
+        }
+    }
+    else if (allStagePoints.size() >= 3) {
+        // 第三阶段：确定地面，形成完整的圆顶房屋
+        const auto& stage1 = allStagePoints[0];
+        const auto& stage2 = allStagePoints[1];
+        const auto& stage3 = allStagePoints[2];
+        
+        if (stage1.size() >= 3 && stage2.size() >= 1 && stage3.size() >= 1) {
+            Point3D p1 = stage1[0];
+            Point3D p2 = stage1[1];
+            Point3D p3 = stage1[2];
+            Point3D heightPoint = stage2[0];
+            Point3D groundPoint = stage3[0];
+            
+            // 计算圆心和半径
+            Point3D center = Point3D(
+                (p1.x() + p2.x() + p3.x()) / 3.0,
+                (p1.y() + p2.y() + p3.y()) / 3.0,
+                (p1.z() + p2.z() + p3.z()) / 3.0
+            );
+            
+            double radius = std::sqrt(
+                std::pow(p1.x() - center.x(), 2) +
+                std::pow(p1.y() - center.y(), 2) +
+                std::pow(p1.z() - center.z(), 2)
+            );
+            
+            double domeHeight = heightPoint.z() - center.z();
+            double groundHeight = groundPoint.z() - center.z();
+            
+            // 添加地面圆形的点
+            int numBasePoints = 16;
+            for (int i = 0; i < numBasePoints; ++i) {
+                double angle = 2.0 * M_PI * i / numBasePoints;
+                double x = center.x() + radius * std::cos(angle);
+                double y = center.y() + radius * std::sin(angle);
+                double z = center.z() + groundHeight;
+                vertices->push_back(osg::Vec3(x, y, z));
+            }
+            
+            // 添加原基座圆形的点（墙体底部）
             for (int i = 0; i < numBasePoints; ++i) {
                 double angle = 2.0 * M_PI * i / numBasePoints;
                 double x = center.x() + radius * std::cos(angle);
@@ -234,8 +303,8 @@ void DomeHouse3D_Geo::buildEdgeGeometries()
             }
         }
     }
-    else if (allStagePoints.size() >= 2) {
-        // 第二阶段：完整圆顶房屋的边线
+    else if (allStagePoints.size() == 2) {
+        // 第二阶段：添加穹顶边线
         const auto& stage1 = allStagePoints[0];
         const auto& stage2 = allStagePoints[1];
         
@@ -271,7 +340,6 @@ void DomeHouse3D_Geo::buildEdgeGeometries()
             
             // 添加穹顶的顶点
             int numRings = 8;
-            int currentIndex = numBasePoints;
             
             for (int ring = 1; ring <= numRings; ++ring) {
                 double ringHeight = domeHeight * ring / numRings;
@@ -319,6 +387,123 @@ void DomeHouse3D_Geo::buildEdgeGeometries()
             // 添加穹顶的纬线（每一层的圆形边线）
             for (int ring = 1; ring < numRings; ++ring) {
                 int ringStartIndex = numBasePoints + (ring - 1) * numBasePoints;
+                for (int i = 0; i < numBasePoints; ++i) {
+                    indices->push_back(ringStartIndex + i);
+                    indices->push_back(ringStartIndex + (i + 1) % numBasePoints);
+                }
+            }
+        }
+    }
+    else if (allStagePoints.size() >= 3) {
+        // 第三阶段：确定地面，完整圆顶房屋的边线
+        const auto& stage1 = allStagePoints[0];
+        const auto& stage2 = allStagePoints[1];
+        const auto& stage3 = allStagePoints[2];
+        
+        if (stage1.size() >= 3 && stage2.size() >= 1 && stage3.size() >= 1) {
+            Point3D p1 = stage1[0];
+            Point3D p2 = stage1[1];
+            Point3D p3 = stage1[2];
+            Point3D heightPoint = stage2[0];
+            Point3D groundPoint = stage3[0];
+            
+            Point3D center = Point3D(
+                (p1.x() + p2.x() + p3.x()) / 3.0,
+                (p1.y() + p2.y() + p3.y()) / 3.0,
+                (p1.z() + p2.z() + p3.z()) / 3.0
+            );
+            
+            double radius = std::sqrt(
+                std::pow(p1.x() - center.x(), 2) +
+                std::pow(p1.y() - center.y(), 2) +
+                std::pow(p1.z() - center.z(), 2)
+            );
+            
+            double domeHeight = heightPoint.z() - center.z();
+            double groundHeight = groundPoint.z() - center.z();
+            
+            // 添加地面圆形的顶点
+            int numBasePoints = 16;
+            for (int i = 0; i < numBasePoints; ++i) {
+                double angle = 2.0 * M_PI * i / numBasePoints;
+                double x = center.x() + radius * std::cos(angle);
+                double y = center.y() + radius * std::sin(angle);
+                double z = center.z() + groundHeight;
+                vertices->push_back(osg::Vec3(x, y, z));
+            }
+            
+            // 添加墙体基座圆形的顶点
+            for (int i = 0; i < numBasePoints; ++i) {
+                double angle = 2.0 * M_PI * i / numBasePoints;
+                double x = center.x() + radius * std::cos(angle);
+                double y = center.y() + radius * std::sin(angle);
+                double z = center.z();
+                vertices->push_back(osg::Vec3(x, y, z));
+            }
+            
+            // 添加穹顶的顶点
+            int numRings = 8;
+            
+            for (int ring = 1; ring <= numRings; ++ring) {
+                double ringHeight = domeHeight * ring / numRings;
+                double ringRadius = radius * std::sqrt(1.0 - std::pow((double)ring / numRings, 2));
+                
+                if (ring == numRings) {
+                    // 最顶层点
+                    vertices->push_back(osg::Vec3(center.x(), center.y(), center.z() + domeHeight));
+                } else {
+                    for (int i = 0; i < numBasePoints; ++i) {
+                        double angle = 2.0 * M_PI * i / numBasePoints;
+                        double x = center.x() + ringRadius * std::cos(angle);
+                        double y = center.y() + ringRadius * std::sin(angle);
+                        double z = center.z() + ringHeight;
+                        vertices->push_back(osg::Vec3(x, y, z));
+                    }
+                }
+            }
+            
+            // 地面圆形边线
+            for (int i = 0; i < numBasePoints; ++i) {
+                indices->push_back(i);
+                indices->push_back((i + 1) % numBasePoints);
+            }
+            
+            // 墙体基座圆形边线
+            for (int i = 0; i < numBasePoints; ++i) {
+                indices->push_back(numBasePoints + i);
+                indices->push_back(numBasePoints + (i + 1) % numBasePoints);
+            }
+            
+            // 垂直边线（地面到基座）
+            for (int i = 0; i < numBasePoints; ++i) {
+                indices->push_back(i);
+                indices->push_back(numBasePoints + i);
+            }
+            
+            // 添加穹顶的经线（从基座到顶点的线）
+            int topIndex = vertices->size() - 1; // 最顶层点的索引
+            int baseStartIndex = numBasePoints; // 墙体基座起始索引
+            
+            for (int i = 0; i < numBasePoints; ++i) {
+                // 从墙体基座点到顶点的经线
+                int baseIndex = baseStartIndex + i;
+                int prevRingIndex = baseIndex;
+                
+                for (int ring = 1; ring < numRings; ++ring) {
+                    int currentRingIndex = 2 * numBasePoints + (ring - 1) * numBasePoints + i;
+                    indices->push_back(prevRingIndex);
+                    indices->push_back(currentRingIndex);
+                    prevRingIndex = currentRingIndex;
+                }
+                
+                // 连接到顶点
+                indices->push_back(prevRingIndex);
+                indices->push_back(topIndex);
+            }
+            
+            // 添加穹顶的纬线（每一层的圆形边线）
+            for (int ring = 1; ring < numRings; ++ring) {
+                int ringStartIndex = 2 * numBasePoints + (ring - 1) * numBasePoints;
                 for (int i = 0; i < numBasePoints; ++i) {
                     indices->push_back(ringStartIndex + i);
                     indices->push_back(ringStartIndex + (i + 1) % numBasePoints);
@@ -388,8 +573,8 @@ void DomeHouse3D_Geo::buildFaceGeometries()
             geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLE_FAN, 0, numPoints + 1));
         }
     }
-    else if (allStagePoints.size() >= 2) {
-        // 第二阶段：完整的圆顶房屋（底面 + 穹顶）
+    else if (allStagePoints.size() == 2) {
+        // 第二阶段：圆顶房屋（底面 + 穹顶，无地面）
         const auto& stage1 = allStagePoints[0];
         const auto& stage2 = allStagePoints[1];
         
@@ -429,6 +614,127 @@ void DomeHouse3D_Geo::buildFaceGeometries()
                 ringIndices[0].push_back(vertices->size() - 1);
             }
             
+            // 基座中心点（用于底面三角形扇形）
+            vertices->push_back(osg::Vec3(center.x(), center.y(), center.z()));
+            int centerIndex = vertices->size() - 1;
+            
+            // 穹顶各层点
+            for (int ring = 1; ring <= numRings; ++ring) {
+                double ringHeight = domeHeight * ring / numRings;
+                double ringRadius = radius * std::sqrt(1.0 - std::pow((double)ring / numRings, 2));
+                
+                if (ring == numRings) {
+                    // 最顶层只有一个点
+                    vertices->push_back(osg::Vec3(center.x(), center.y(), center.z() + domeHeight));
+                    ringIndices[ring].push_back(vertices->size() - 1);
+                } else {
+                    for (int i = 0; i < numBasePoints; ++i) {
+                        double angle = 2.0 * M_PI * i / numBasePoints;
+                        double x = center.x() + ringRadius * std::cos(angle);
+                        double y = center.y() + ringRadius * std::sin(angle);
+                        double z = center.z() + ringHeight;
+                        vertices->push_back(osg::Vec3(x, y, z));
+                        ringIndices[ring].push_back(vertices->size() - 1);
+                    }
+                }
+            }
+            
+            // 添加底面（三角形扇形）
+            for (int i = 0; i < numBasePoints; ++i) {
+                vertices->push_back(vertices->at(ringIndices[0][i]));      // 基座点
+                vertices->push_back(vertices->at(ringIndices[0][(i + 1) % numBasePoints])); // 下一个基座点
+                vertices->push_back(vertices->at(centerIndex));           // 中心点
+            }
+            
+            // 添加穹顶面片
+            for (int ring = 0; ring < numRings - 1; ++ring) {
+                for (int i = 0; i < numBasePoints; ++i) {
+                    int currentRing = ring;
+                    int nextRing = ring + 1;
+                    int currentPoint = i;
+                    int nextPoint = (i + 1) % numBasePoints;
+                    
+                    // 四边形分解为两个三角形
+                    // 三角形1
+                    vertices->push_back(vertices->at(ringIndices[currentRing][currentPoint]));
+                    vertices->push_back(vertices->at(ringIndices[currentRing][nextPoint]));
+                    vertices->push_back(vertices->at(ringIndices[nextRing][currentPoint]));
+                    
+                    // 三角形2
+                    vertices->push_back(vertices->at(ringIndices[currentRing][nextPoint]));
+                    vertices->push_back(vertices->at(ringIndices[nextRing][nextPoint]));
+                    vertices->push_back(vertices->at(ringIndices[nextRing][currentPoint]));
+                }
+            }
+            
+            // 最后一层（连接到顶点的三角形）
+            int lastRing = numRings - 1;
+            int topIndex = ringIndices[numRings][0];
+            for (int i = 0; i < numBasePoints; ++i) {
+                vertices->push_back(vertices->at(ringIndices[lastRing][i]));
+                vertices->push_back(vertices->at(ringIndices[lastRing][(i + 1) % numBasePoints]));
+                vertices->push_back(vertices->at(topIndex));
+            }
+            
+            // 添加图元集合
+            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, vertices->size()));
+        }
+    }
+    else if (allStagePoints.size() >= 3) {
+        // 第三阶段：完整的圆顶房屋（底面 + 穹顶 + 地面）
+        const auto& stage1 = allStagePoints[0];
+        const auto& stage2 = allStagePoints[1];
+        const auto& stage3 = allStagePoints[2];
+        
+        if (stage1.size() >= 3 && stage2.size() >= 1 && stage3.size() >= 1) {
+            Point3D p1 = stage1[0];
+            Point3D p2 = stage1[1];
+            Point3D p3 = stage1[2];
+            Point3D heightPoint = stage2[0];
+            Point3D groundPoint = stage3[0];
+            
+            Point3D center = Point3D(
+                (p1.x() + p2.x() + p3.x()) / 3.0,
+                (p1.y() + p2.y() + p3.y()) / 3.0,
+                (p1.z() + p2.z() + p3.z()) / 3.0
+            );
+            
+            double radius = std::sqrt(
+                std::pow(p1.x() - center.x(), 2) +
+                std::pow(p1.y() - center.y(), 2) +
+                std::pow(p1.z() - center.z(), 2)
+            );
+            
+            double domeHeight = heightPoint.z() - center.z();
+            double groundHeight = groundPoint.z() - center.z();
+            
+            int numBasePoints = 16;
+            int numRings = 8;
+            
+            // 构建穹顶的所有顶点
+            std::vector<std::vector<int>> ringIndices(numRings + 1);
+            
+            // 地面圆周点
+            std::vector<int> groundIndices;
+            for (int i = 0; i < numBasePoints; ++i) {
+                double angle = 2.0 * M_PI * i / numBasePoints;
+                double x = center.x() + radius * std::cos(angle);
+                double y = center.y() + radius * std::sin(angle);
+                double z = center.z() + groundHeight;
+                vertices->push_back(osg::Vec3(x, y, z));
+                groundIndices.push_back(vertices->size() - 1);
+            }
+            
+            // 墙体基座圆周点
+            for (int i = 0; i < numBasePoints; ++i) {
+                double angle = 2.0 * M_PI * i / numBasePoints;
+                double x = center.x() + radius * std::cos(angle);
+                double y = center.y() + radius * std::sin(angle);
+                double z = center.z();
+                vertices->push_back(osg::Vec3(x, y, z));
+                ringIndices[0].push_back(vertices->size() - 1);
+            }
+            
             // 穹顶各层点
             for (int ring = 1; ring <= numRings; ++ring) {
                 double ringHeight = domeHeight * ring / numRings;
@@ -450,61 +756,71 @@ void DomeHouse3D_Geo::buildFaceGeometries()
                 }
             }
             
-            // 添加圆形底面（三角形扇形）
-            vertices->push_back(osg::Vec3(center.x(), center.y(), center.z())); // 圆心
-            int centerIndex = vertices->size() - 1;
+            // 添加地面圆形面片（三角形扇形）
+            vertices->push_back(osg::Vec3(center.x(), center.y(), center.z() + groundHeight));
+            int groundCenterIndex = vertices->size() - 1;
             
-            // 底面三角形扇形
             for (int i = 0; i < numBasePoints; ++i) {
-                vertices->push_back(osg::Vec3(center.x(), center.y(), center.z())); // 圆心
-                vertices->push_back(vertices->at(ringIndices[0][i])); // 当前基座点
-                vertices->push_back(vertices->at(ringIndices[0][(i + 1) % numBasePoints])); // 下一个基座点
-                
-                geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 
-                    vertices->size() - 3, 3));
+                vertices->push_back(vertices->at(groundCenterIndex));
+                vertices->push_back(vertices->at(groundIndices[i]));
+                vertices->push_back(vertices->at(groundIndices[(i + 1) % numBasePoints]));
             }
             
-            // 添加穹顶面片（三角形）
+            // 添加墙体底面圆形面片（三角形扇形）
+            vertices->push_back(osg::Vec3(center.x(), center.y(), center.z()));
+            int baseCenterIndex = vertices->size() - 1;
+            
+            for (int i = 0; i < numBasePoints; ++i) {
+                vertices->push_back(vertices->at(baseCenterIndex));
+                vertices->push_back(vertices->at(ringIndices[0][(i + 1) % numBasePoints]));
+                vertices->push_back(vertices->at(ringIndices[0][i]));
+            }
+            
+            // 添加墙体侧面面片（连接地面和基座）
+            for (int i = 0; i < numBasePoints; ++i) {
+                int next_i = (i + 1) % numBasePoints;
+                
+                // 四边形分解为两个三角形
+                // 三角形1: 地面[i] -> 地面[next_i] -> 基座[i]
+                vertices->push_back(vertices->at(groundIndices[i]));
+                vertices->push_back(vertices->at(groundIndices[next_i]));
+                vertices->push_back(vertices->at(ringIndices[0][i]));
+                
+                // 三角形2: 地面[next_i] -> 基座[next_i] -> 基座[i]
+                vertices->push_back(vertices->at(groundIndices[next_i]));
+                vertices->push_back(vertices->at(ringIndices[0][next_i]));
+                vertices->push_back(vertices->at(ringIndices[0][i]));
+            }
+            
+            // 添加穹顶面片
             for (int ring = 0; ring < numRings - 1; ++ring) {
                 for (int i = 0; i < numBasePoints; ++i) {
                     int next_i = (i + 1) % numBasePoints;
                     
-                    // 构建三角形面片（将四边形分解为两个三角形）
-                    osg::Vec3 v1 = vertices->at(ringIndices[ring][i]);
-                    osg::Vec3 v2 = vertices->at(ringIndices[ring][next_i]);
-                    osg::Vec3 v3 = vertices->at(ringIndices[ring + 1][next_i]);
-                    osg::Vec3 v4 = vertices->at(ringIndices[ring + 1][i]);
+                    // 四边形分解为两个三角形
+                    // 三角形1
+                    vertices->push_back(vertices->at(ringIndices[ring][i]));
+                    vertices->push_back(vertices->at(ringIndices[ring][next_i]));
+                    vertices->push_back(vertices->at(ringIndices[ring + 1][i]));
                     
-                    // 第一个三角形：v1 -> v2 -> v3
-                    vertices->push_back(v1);
-                    vertices->push_back(v2);
-                    vertices->push_back(v3);
-                    
-                    // 第二个三角形：v1 -> v3 -> v4
-                    vertices->push_back(v1);
-                    vertices->push_back(v3);
-                    vertices->push_back(v4);
+                    // 三角形2
+                    vertices->push_back(vertices->at(ringIndices[ring][next_i]));
+                    vertices->push_back(vertices->at(ringIndices[ring + 1][next_i]));
+                    vertices->push_back(vertices->at(ringIndices[ring + 1][i]));
                 }
             }
             
-            // 添加所有四边形转换的三角形面片
-            int quadTriangleCount = (numRings - 1) * numBasePoints * 2 * 3; // 每个四边形=2个三角形，每个三角形=3个顶点
-            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 
-                vertices->size() - quadTriangleCount, quadTriangleCount));
-            
             // 最顶层的三角形面片
             int topRing = numRings - 1;
-            int topIndex = ringIndices[numRings][0]; // 顶点索引
+            int topIndex = ringIndices[numRings][0];
             for (int i = 0; i < numBasePoints; ++i) {
-                int next_i = (i + 1) % numBasePoints;
-                
                 vertices->push_back(vertices->at(ringIndices[topRing][i]));
-                vertices->push_back(vertices->at(ringIndices[topRing][next_i]));
+                vertices->push_back(vertices->at(ringIndices[topRing][(i + 1) % numBasePoints]));
                 vertices->push_back(vertices->at(topIndex));
-                
-                geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 
-                    vertices->size() - 3, 3));
             }
+            
+            // 添加所有三角形
+            geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, vertices->size()));
         }
     }
     

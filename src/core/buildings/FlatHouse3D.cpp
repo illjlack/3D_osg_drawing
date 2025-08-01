@@ -38,7 +38,7 @@ void FlatHouse3D_Geo::buildVertexGeometries()
     osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
     
     if (allStagePoints.size() == 1) {
-        // 第一阶段：基座第一角点
+        // 第一阶段：确定第一个角点
         const auto& stage1 = allStagePoints[0];
         
         for (size_t i = 0; i < stage1.size(); ++i) {
@@ -46,41 +46,62 @@ void FlatHouse3D_Geo::buildVertexGeometries()
         }
     }
     else if (allStagePoints.size() == 2) {
-        // 第二阶段：基座对角点，形成矩形基座
+        // 第二阶段：确定第二个角点
         const auto& stage1 = allStagePoints[0];
         const auto& stage2 = allStagePoints[1];
         
-        if (stage1.size() >= 1 && stage2.size() >= 1) {
-            Point3D A = stage1[0];  // 第一个角点
-            Point3D C = stage2[0];  // 对角点
-            
-            // 计算矩形的其他两个顶点
-            Point3D B = Point3D(C.x(), A.y(), A.z());  // 保持y坐标与A相同
-            Point3D D = Point3D(A.x(), C.y(), A.z());  // 保持x坐标与A相同
-            
-            // 添加底面4个顶点
-            vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
-            vertices->push_back(osg::Vec3(B.x(), B.y(), B.z()));
-            vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));
-            vertices->push_back(osg::Vec3(D.x(), D.y(), D.z()));
+        for (size_t i = 0; i < stage1.size(); ++i) {
+            vertices->push_back(osg::Vec3(stage1[i].x(), stage1[i].y(), stage1[i].z()));
+        }
+        for (size_t i = 0; i < stage2.size(); ++i) {
+            vertices->push_back(osg::Vec3(stage2[i].x(), stage2[i].y(), stage2[i].z()));
         }
     }
-    else if (allStagePoints.size() >= 3) {
-        // 第三阶段：确定房屋高度，形成完整的平房
+    else if (allStagePoints.size() == 3) {
+        // 第三阶段：确定第三个角点
         const auto& stage1 = allStagePoints[0];
         const auto& stage2 = allStagePoints[1];
         const auto& stage3 = allStagePoints[2];
         
-        if (stage1.size() >= 1 && stage2.size() >= 1 && stage3.size() >= 1) {
-            Point3D A = stage1[0];
-            Point3D C = stage2[0];
-            Point3D heightPoint = stage3[0];
+        for (size_t i = 0; i < stage1.size(); ++i) {
+            vertices->push_back(osg::Vec3(stage1[i].x(), stage1[i].y(), stage1[i].z()));
+        }
+        for (size_t i = 0; i < stage2.size(); ++i) {
+            vertices->push_back(osg::Vec3(stage2[i].x(), stage2[i].y(), stage2[i].z()));
+        }
+        for (size_t i = 0; i < stage3.size(); ++i) {
+            vertices->push_back(osg::Vec3(stage3[i].x(), stage3[i].y(), stage3[i].z()));
+        }
+    }
+    else if (allStagePoints.size() == 4) {
+        // 第四阶段：确定第四个角点，形成四边形基座
+        const auto& stage1 = allStagePoints[0];
+        const auto& stage2 = allStagePoints[1];
+        const auto& stage3 = allStagePoints[2];
+        const auto& stage4 = allStagePoints[3];
+        
+        // 添加四个角点
+        if (stage1.size() >= 1) vertices->push_back(osg::Vec3(stage1[0].x(), stage1[0].y(), stage1[0].z()));
+        if (stage2.size() >= 1) vertices->push_back(osg::Vec3(stage2[0].x(), stage2[0].y(), stage2[0].z()));
+        if (stage3.size() >= 1) vertices->push_back(osg::Vec3(stage3[0].x(), stage3[0].y(), stage3[0].z()));
+        if (stage4.size() >= 1) vertices->push_back(osg::Vec3(stage4[0].x(), stage4[0].y(), stage4[0].z()));
+    }
+    else if (allStagePoints.size() >= 5) {
+        // 第五阶段：确定地面高度，形成完整的平顶房屋
+        const auto& stage1 = allStagePoints[0];
+        const auto& stage2 = allStagePoints[1];
+        const auto& stage3 = allStagePoints[2];
+        const auto& stage4 = allStagePoints[3];
+        const auto& stage5 = allStagePoints[4];
+        
+        if (stage1.size() >= 1 && stage2.size() >= 1 && stage3.size() >= 1 && stage4.size() >= 1 && stage5.size() >= 1) {
+            Point3D A = stage1[0];  // 第一个角点
+            Point3D B = stage2[0];  // 第二个角点
+            Point3D C = stage3[0];  // 第三个角点
+            Point3D D = stage4[0];  // 第四个角点
+            Point3D heightPoint = stage5[0];  // 地面高度点
             
-            // 计算矩形底面的四个顶点
-            Point3D B = Point3D(C.x(), A.y(), A.z());
-            Point3D D = Point3D(A.x(), C.y(), A.z());
-            
-            // 计算高度向量
+            // 计算高度
             double height = heightPoint.z() - A.z();
             
             // 计算顶面的四个顶点
@@ -158,42 +179,66 @@ void FlatHouse3D_Geo::buildEdgeGeometries()
         // 不绘制任何边线
     }
     else if (allStagePoints.size() == 2) {
-        // 第二阶段：基座矩形的边
+        // 第二阶段：两个点，绘制一条边
         const auto& stage1 = allStagePoints[0];
         const auto& stage2 = allStagePoints[1];
         
         if (stage1.size() >= 1 && stage2.size() >= 1) {
-            Point3D A = stage1[0];
-            Point3D C = stage2[0];
-            Point3D B = Point3D(C.x(), A.y(), A.z());
-            Point3D D = Point3D(A.x(), C.y(), A.z());
+            vertices->push_back(osg::Vec3(stage1[0].x(), stage1[0].y(), stage1[0].z()));
+            vertices->push_back(osg::Vec3(stage2[0].x(), stage2[0].y(), stage2[0].z()));
             
-            // 添加4个顶点
-            vertices->push_back(osg::Vec3(A.x(), A.y(), A.z()));
-            vertices->push_back(osg::Vec3(B.x(), B.y(), B.z()));
-            vertices->push_back(osg::Vec3(C.x(), C.y(), C.z()));
-            vertices->push_back(osg::Vec3(D.x(), D.y(), D.z()));
-            
-            // 添加4条边的索引
-            indices->push_back(0); indices->push_back(1); // A-B
-            indices->push_back(1); indices->push_back(2); // B-C
-            indices->push_back(2); indices->push_back(3); // C-D
-            indices->push_back(3); indices->push_back(0); // D-A
+            indices->push_back(0); indices->push_back(1);
         }
     }
-    else if (allStagePoints.size() >= 3) {
-        // 第三阶段：完整平房的边线
+    else if (allStagePoints.size() == 3) {
+        // 第三阶段：三个点，绘制两条边
         const auto& stage1 = allStagePoints[0];
         const auto& stage2 = allStagePoints[1];
         const auto& stage3 = allStagePoints[2];
         
         if (stage1.size() >= 1 && stage2.size() >= 1 && stage3.size() >= 1) {
-            Point3D A = stage1[0];
-            Point3D C = stage2[0];
-            Point3D heightPoint = stage3[0];
+            vertices->push_back(osg::Vec3(stage1[0].x(), stage1[0].y(), stage1[0].z()));
+            vertices->push_back(osg::Vec3(stage2[0].x(), stage2[0].y(), stage2[0].z()));
+            vertices->push_back(osg::Vec3(stage3[0].x(), stage3[0].y(), stage3[0].z()));
             
-            Point3D B = Point3D(C.x(), A.y(), A.z());
-            Point3D D = Point3D(A.x(), C.y(), A.z());
+            indices->push_back(0); indices->push_back(1);
+            indices->push_back(1); indices->push_back(2);
+        }
+    }
+    else if (allStagePoints.size() == 4) {
+        // 第四阶段：四个点，形成四边形基座
+        const auto& stage1 = allStagePoints[0];
+        const auto& stage2 = allStagePoints[1];
+        const auto& stage3 = allStagePoints[2];
+        const auto& stage4 = allStagePoints[3];
+        
+        if (stage1.size() >= 1 && stage2.size() >= 1 && stage3.size() >= 1 && stage4.size() >= 1) {
+            vertices->push_back(osg::Vec3(stage1[0].x(), stage1[0].y(), stage1[0].z()));
+            vertices->push_back(osg::Vec3(stage2[0].x(), stage2[0].y(), stage2[0].z()));
+            vertices->push_back(osg::Vec3(stage3[0].x(), stage3[0].y(), stage3[0].z()));
+            vertices->push_back(osg::Vec3(stage4[0].x(), stage4[0].y(), stage4[0].z()));
+            
+            // 连接四个点形成四边形
+            indices->push_back(0); indices->push_back(1);
+            indices->push_back(1); indices->push_back(2);
+            indices->push_back(2); indices->push_back(3);
+            indices->push_back(3); indices->push_back(0);
+        }
+    }
+    else if (allStagePoints.size() >= 5) {
+        // 第五阶段：完整平顶房屋的边线
+        const auto& stage1 = allStagePoints[0];
+        const auto& stage2 = allStagePoints[1];
+        const auto& stage3 = allStagePoints[2];
+        const auto& stage4 = allStagePoints[3];
+        const auto& stage5 = allStagePoints[4];
+        
+        if (stage1.size() >= 1 && stage2.size() >= 1 && stage3.size() >= 1 && stage4.size() >= 1 && stage5.size() >= 1) {
+            Point3D A = stage1[0];
+            Point3D B = stage2[0];
+            Point3D C = stage3[0];
+            Point3D D = stage4[0];
+            Point3D heightPoint = stage5[0];
             
             double height = heightPoint.z() - A.z();
             
@@ -260,15 +305,25 @@ void FlatHouse3D_Geo::buildFaceGeometries()
         // 不绘制任何面
     }
     else if (allStagePoints.size() == 2) {
-        // 第二阶段：只显示底面
+        // 第二阶段：无面
+        // 不绘制任何面
+    }
+    else if (allStagePoints.size() == 3) {
+        // 第三阶段：无面
+        // 不绘制任何面
+    }
+    else if (allStagePoints.size() == 4) {
+        // 第四阶段：显示底面
         const auto& stage1 = allStagePoints[0];
         const auto& stage2 = allStagePoints[1];
+        const auto& stage3 = allStagePoints[2];
+        const auto& stage4 = allStagePoints[3];
         
-        if (stage1.size() >= 1 && stage2.size() >= 1) {
+        if (stage1.size() >= 1 && stage2.size() >= 1 && stage3.size() >= 1 && stage4.size() >= 1) {
             Point3D A = stage1[0];
-            Point3D C = stage2[0];
-            Point3D B = Point3D(C.x(), A.y(), A.z());
-            Point3D D = Point3D(A.x(), C.y(), A.z());
+            Point3D B = stage2[0];
+            Point3D C = stage3[0];
+            Point3D D = stage4[0];
             
             // 添加底面四边形顶点（分解为两个三角形）
             // 第一个三角形：A, B, C
@@ -285,19 +340,20 @@ void FlatHouse3D_Geo::buildFaceGeometries()
             geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, 6));
         }
     }
-    else if (allStagePoints.size() >= 3) {
-        // 第三阶段：完整的平房（6个面）
+    else if (allStagePoints.size() >= 5) {
+        // 第五阶段：完整的平顶房屋（6个面）
         const auto& stage1 = allStagePoints[0];
         const auto& stage2 = allStagePoints[1];
         const auto& stage3 = allStagePoints[2];
+        const auto& stage4 = allStagePoints[3];
+        const auto& stage5 = allStagePoints[4];
         
-        if (stage1.size() >= 1 && stage2.size() >= 1 && stage3.size() >= 1) {
+        if (stage1.size() >= 1 && stage2.size() >= 1 && stage3.size() >= 1 && stage4.size() >= 1 && stage5.size() >= 1) {
             Point3D A = stage1[0];
-            Point3D C = stage2[0];
-            Point3D heightPoint = stage3[0];
-            
-            Point3D B = Point3D(C.x(), A.y(), A.z());
-            Point3D D = Point3D(A.x(), C.y(), A.z());
+            Point3D B = stage2[0];
+            Point3D C = stage3[0];
+            Point3D D = stage4[0];
+            Point3D heightPoint = stage5[0];
             
             double height = heightPoint.z() - A.z();
             
