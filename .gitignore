@@ -42,6 +42,7 @@ CMakeFiles/
 cmake_install.cmake
 Makefile
 *.cmake
+!cmake/ThirdPartyUtils.cmake
 !CMakeLists.txt
 build/
 
