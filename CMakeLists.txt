@@ -97,8 +97,14 @@ add_executable(${PROJECT_NAME} ${ALL_SOURCES} ${ALL_HEADERS})
 set(THIRD_PARTY_ROOT "/home/liushisheng/thirdparty")
 set(THIRD_PARTY_INCLUDE_DIR "${THIRD_PARTY_ROOT}/include")
 
-# 设置插件目录
-set(OSG_PLUGINS_DIR "${THIRD_PARTY_ROOT}/lib/x64/release/osgPlugins-3.6.5")
+# 根据构建类型设置插件目录
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(OSG_PLUGINS_DIR "${THIRD_PARTY_ROOT}/lib/x64/debug/osgPlugins-3.6.5")
+    message(STATUS "使用Debug版本OSG插件: ${OSG_PLUGINS_DIR}")
+else()
+    set(OSG_PLUGINS_DIR "${THIRD_PARTY_ROOT}/lib/x64/release/osgPlugins-3.6.5")
+    message(STATUS "使用Release版本OSG插件: ${OSG_PLUGINS_DIR}")
+endif()
 
 # 添加插件目录的编译定义（使用字符串字面量）
 add_compile_definitions(OSG_PLUGIN_PATH="${OSG_PLUGINS_DIR}")
@@ -123,30 +129,63 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     Qt5::OpenGL
 )
 
-# 链接OSG和其他第三方库
-link_third_party(${PROJECT_NAME} osgQOpenGL ROOT "${THIRD_PARTY_ROOT}" REQUIRED STATIC)
-link_third_party(${PROJECT_NAME} osgViewer ROOT "${THIRD_PARTY_ROOT}" REQUIRED STATIC)
-link_third_party(${PROJECT_NAME} osgGA ROOT "${THIRD_PARTY_ROOT}" REQUIRED STATIC)
-link_third_party(${PROJECT_NAME} osgText ROOT "${THIRD_PARTY_ROOT}" REQUIRED STATIC)
-link_third_party(${PROJECT_NAME} osgDB ROOT "${THIRD_PARTY_ROOT}" REQUIRED STATIC)
-link_third_party(${PROJECT_NAME} osgUtil ROOT "${THIRD_PARTY_ROOT}" REQUIRED STATIC)
-link_third_party(${PROJECT_NAME} osg ROOT "${THIRD_PARTY_ROOT}" REQUIRED STATIC)
-link_third_party(${PROJECT_NAME} OpenThreads ROOT "${THIRD_PARTY_ROOT}" REQUIRED STATIC)
+# 链接OSG和其他第三方库 - 使用动态库
+link_third_party(${PROJECT_NAME} osgQOpenGL ROOT "${THIRD_PARTY_ROOT}" REQUIRED STATIC)# 没编osgqt的动态库
+link_third_party(${PROJECT_NAME} osgViewer ROOT "${THIRD_PARTY_ROOT}" REQUIRED SHARED)
+link_third_party(${PROJECT_NAME} osgGA ROOT "${THIRD_PARTY_ROOT}" REQUIRED SHARED)
+link_third_party(${PROJECT_NAME} osgText ROOT "${THIRD_PARTY_ROOT}" REQUIRED SHARED)
+link_third_party(${PROJECT_NAME} osgDB ROOT "${THIRD_PARTY_ROOT}" REQUIRED SHARED)
+link_third_party(${PROJECT_NAME} osgUtil ROOT "${THIRD_PARTY_ROOT}" REQUIRED SHARED)
+link_third_party(${PROJECT_NAME} osg ROOT "${THIRD_PARTY_ROOT}" REQUIRED SHARED)
+link_third_party(${PROJECT_NAME} OpenThreads ROOT "${THIRD_PARTY_ROOT}" REQUIRED SHARED)
 link_third_party(${PROJECT_NAME} glm ROOT "${THIRD_PARTY_ROOT}" REQUIRED STATIC)
 
-# 添加系统 OpenGL 和其他必要的库
-target_link_libraries(${PROJECT_NAME} PRIVATE 
-    GL
-    dl
-    pthread
-    fontconfig
-    z
-    jpeg
-    png
-    tiff
-    Xrandr
-    Xinerama
-    Xi
-    Xcursor
-    X11
+# 根据操作系统添加不同的系统库
+if(WIN32)
+    target_link_libraries(${PROJECT_NAME} PRIVATE 
+        OpenGL32
+    )
+else()
+    target_link_libraries(${PROJECT_NAME} PRIVATE 
+        GL
+        dl
+        pthread
+        fontconfig
+        freetype
+        expat
+        z
+        jpeg
+        png
+        tiff
+        Xrandr
+        Xinerama
+        Xi
+        Xcursor
+        X11
+    )
+endif()
+
+# 设置运行时库路径，确保程序能找到OSG动态库
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    BUILD_RPATH_USE_ORIGIN TRUE
+    INSTALL_RPATH_USE_LINK_PATH TRUE
+)
+
+# 根据构建类型设置不同的运行时库路径
+target_link_directories(${PROJECT_NAME} PRIVATE
+    $<$<CONFIG:Debug>:${THIRD_PARTY_ROOT}/lib/x64/debug>
+    $<$<CONFIG:Release>:${THIRD_PARTY_ROOT}/lib/x64/release>
+)
+
+# 设置不同配置的RPATH
+set_property(TARGET ${PROJECT_NAME} PROPERTY
+    BUILD_RPATH 
+    $<$<CONFIG:Debug>:${THIRD_PARTY_ROOT}/lib/x64/debug>
+    $<$<CONFIG:Release>:${THIRD_PARTY_ROOT}/lib/x64/release>
+)
+
+set_property(TARGET ${PROJECT_NAME} PROPERTY
+    INSTALL_RPATH
+    $<$<CONFIG:Debug>:${THIRD_PARTY_ROOT}/lib/x64/debug>
+    $<$<CONFIG:Release>:${THIRD_PARTY_ROOT}/lib/x64/release>
 )

@@ -39,14 +39,28 @@ void GeoRenderManager::initializeRenderStates()
         auto stateSet = lineGeom->getOrCreateStateSet();
         stateSet->setAttributeAndModes(m_lineMaterial, osg::StateAttribute::ON);
         stateSet->setAttributeAndModes(m_lineWidth, osg::StateAttribute::ON);
+        
+// #ifdef __linux__
+//         // Linux平台简化线条渲染设置，避免兼容性问题
+//         // 强制禁用线条平滑，减少驱动兼容性问题
+//         stateSet->setMode(GL_LINE_SMOOTH, osg::StateAttribute::OFF | osg::StateAttribute::PROTECTED);
+//         LOG_INFO("Linux平台：使用简化线条渲染设置", "渲染管理");
+// #else
         // 禁用LINE_SMOOTH以确保线宽设置生效
         stateSet->setMode(GL_LINE_SMOOTH, osg::StateAttribute::OFF);
+// #endif
     }
     
     // 为面几何设置状态
     if (auto faceGeom = nodeManager->getFaceGeometry()) {
         auto stateSet = faceGeom->getOrCreateStateSet();
         stateSet->setAttributeAndModes(m_surfaceMaterial, osg::StateAttribute::ON);
+        
+// #ifdef __linux__
+//         // Linux平台简化面剔除设置
+//         stateSet->setMode(GL_CULL_FACE, osg::StateAttribute::OFF);
+//         LOG_INFO("Linux平台：禁用面剔除以提升兼容性", "渲染管理");
+// #endif
     }
 }
 
@@ -197,7 +211,14 @@ void GeoRenderManager::updateSurfaceRendering(const GeoParameters3D& params)
     m_surfaceMaterial->setDiffuse(osg::Material::FRONT_AND_BACK, fillColor);
     m_surfaceMaterial->setAmbient(osg::Material::FRONT_AND_BACK, fillColor * 0.3f);
     
-    // 改进的透明度处理
+// #ifdef __linux__
+//     // Linux平台简化透明度处理，避免频繁的面剔除状态切换
+//     setupTransparencyRendering(stateSet, params.fillColor.a);
+//     // 始终禁用面剔除，减少状态切换和兼容性问题
+//     stateSet->setMode(GL_CULL_FACE, osg::StateAttribute::OFF | osg::StateAttribute::PROTECTED);
+//     LOG_INFO("Linux平台：简化面几何体渲染状态", "渲染管理");
+// #else
+    // Windows平台保持原有的透明度处理
     if (params.fillColor.a < 1.0) {
         setupTransparencyRendering(stateSet, params.fillColor.a);
         // 对于透明面，启用双面渲染
@@ -207,12 +228,12 @@ void GeoRenderManager::updateSurfaceRendering(const GeoParameters3D& params)
         // 非透明面可以使用面剔除优化
         stateSet->setMode(GL_CULL_FACE, osg::StateAttribute::ON);
     }
+// #endif
 }
 
 void GeoRenderManager::updateVisibilityStates(const GeoParameters3D& params)
 {
     if (!m_parent || !m_parent->mm_node()) return;
-    
     auto nodeManager = m_parent->mm_node();
     
     // 强制执行可见性约束：至少有一个组件可见
@@ -319,6 +340,23 @@ void GeoRenderManager::setupTransparencyRendering(osg::StateSet* stateSet, float
     // 首先清除可能的之前设置
     stateSet->removeAttribute(osg::StateAttribute::ALPHAFUNC);
     
+// #ifdef __linux__
+//     // Linux平台简化透明度处理，减少复杂的状态切换
+//     if (alpha >= 0.99f) {
+//         // 接近不透明或完全不透明 - 简化处理
+//         stateSet->setMode(GL_BLEND, osg::StateAttribute::OFF);
+//         stateSet->setRenderingHint(osg::StateSet::OPAQUE_BIN);
+//         stateSet->setAttributeAndModes(new osg::Depth(osg::Depth::LESS, 0.0, 1.0, true), osg::StateAttribute::ON);
+//     } else {
+//         // 透明对象 - 使用简化的透明度处理
+//         stateSet->setAttributeAndModes(m_blendFunc, osg::StateAttribute::ON);
+//         stateSet->setMode(GL_BLEND, osg::StateAttribute::ON);
+//         stateSet->setRenderingHint(osg::StateSet::TRANSPARENT_BIN);
+//         // Linux下简化深度处理，避免复杂的分级处理
+//         stateSet->setAttributeAndModes(new osg::Depth(osg::Depth::LESS, 0.0, 1.0, false), osg::StateAttribute::ON);
+//     }
+// #else
+    // Windows平台保持原有复杂处理
     if (alpha >= 1.0f) {
         // 完全不透明
         stateSet->setMode(GL_BLEND, osg::StateAttribute::OFF);
@@ -348,6 +386,7 @@ void GeoRenderManager::setupTransparencyRendering(osg::StateSet* stateSet, float
             stateSet->setRenderBinDetails(200, "RenderBin");
         }
     }
+// #endif
 }
 
 

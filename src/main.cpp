@@ -9,6 +9,7 @@
 #include <QTimer>
 #include <osgDB/Registry>
 #include <osgViewer/Viewer>
+#include <osg/Notify>
 
 #include "ui/MainWindow.h"
 #include "core/Common3D.h"
@@ -16,6 +17,11 @@
 
 int main(int argc, char *argv[])
 {
+    // 设置OSG通知级别，让OSG_WARN等消息可以输出
+    osg::setNotifyLevel(osg::WARN);
+    // 如果需要更详细的调试信息，可以设置为：
+    // osg::setNotifyLevel(osg::DEBUG_INFO);
+    
     // 设置 OSG 插件搜索路径（不想设置环境变量）
     #ifdef OSG_PLUGIN_PATH
     std::string s = OSG_PLUGIN_PATH;

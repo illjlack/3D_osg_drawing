@@ -312,21 +312,33 @@ void Geo3D::restoreFromFileNode(osg::ref_ptr<osg::Node> node)
     mm_node()->setOSGNode(node);
     LOG_INFO("步骤1: OSG节点设置完成", "文件加载");
     
-    // 2. 重新初始化渲染状态（解决材质悬空问题）
-    assert(this->mm_node());
-    if (mm_render()) {
-        mm_render()->reinitializeRenderStates();
-        LOG_INFO("步骤2: 渲染状态重新初始化完成", "文件加载");
-    }
+    // 检查是否为外部文件（UndefinedGeo3D类型）
+    bool isExternalFile = (getGeoType() == Geo_UndefinedGeo3D);
     
-    // 3. 更新渲染参数
-    if (mm_render()) {
-        mm_render()->updateRenderingParameters(m_parameters);
-        LOG_INFO("步骤3: 渲染参数应用完成", "文件加载");
+    if (isExternalFile) {
+        // 对于外部文件，保留原始的纹理和材质，不重新初始化渲染状态
+        LOG_INFO("检测到外部文件，跳过渲染状态重新初始化以保留原始纹理", "文件加载");
+    } else {
+        // 2. 重新初始化渲染状态（解决材质悬空问题）
+        assert(this->mm_node());
+        if (mm_render()) {
+            mm_render()->reinitializeRenderStates();
+            LOG_INFO("步骤2: 渲染状态重新初始化完成", "文件加载");
+        }
+        
+        // 3. 更新渲染参数
+        if (mm_render()) {
+            mm_render()->updateRenderingParameters(m_parameters);
+            LOG_INFO("步骤3: 渲染参数应用完成", "文件加载");
+        }
     }
     
     // 直接构建完成
     mm_state()->setStateComplete();
-    LOG_INFO("文件节点恢复完成，对象状态已完全恢复", "文件加载");
+    if (isExternalFile) {
+        LOG_INFO("外部文件节点恢复完成，保留了原始纹理和材质", "文件加载");
+    } else {
+        LOG_INFO("文件节点恢复完成，对象状态已完全恢复", "文件加载");
+    }
 }
 

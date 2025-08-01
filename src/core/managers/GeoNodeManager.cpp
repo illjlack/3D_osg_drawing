@@ -327,9 +327,43 @@ void GeoNodeManager::findAndAssignNodeComponents(osg::Node* node)
 
 void GeoNodeManager::updateSpatialIndex()
 {
+#ifdef __linux__
+    // Linux平台优化：仅在几何体发生实质变化时才重建空间索引
+    // 减少KdTree重建频率，提升性能
+    if (!m_parent->mm_state()->isStateComplete()) {
+        LOG_INFO("几何体未完成，跳过空间索引构建", "空间索引");
+        return;
+    }
+    
+    // 检查几何体是否有顶点数据，避免无效的索引构建
+    bool needRebuild = false;
+    
+    if (m_edgeGeometry.valid() && m_edgeGeometry->getVertexArray() && 
+        m_edgeGeometry->getVertexArray()->getNumElements() > 0) {
+        if (!m_edgeGeometry->getShape()) {
+            needRebuild = true;
+        }
+    }
+    
+    if (m_faceGeometry.valid() && m_faceGeometry->getVertexArray() && 
+        m_faceGeometry->getVertexArray()->getNumElements() > 0) {
+        if (!m_faceGeometry->getShape()) {
+            needRebuild = true;
+        }
+    }
+    
+    if (needRebuild) {
+        LOG_INFO("Linux平台：开始构建必要的空间索引", "空间索引");
+        // 为边和面几何体构建KdTree以加速射线拾取
+        buildKdTreeForGeometry(m_edgeGeometry.get());
+        buildKdTreeForGeometry(m_faceGeometry.get());
+    }
+#else
+    // 其他平台保持原有行为
     // 为边和面几何体构建KdTree以加速射线拾取
     buildKdTreeForGeometry(m_edgeGeometry.get());
     buildKdTreeForGeometry(m_faceGeometry.get());
+#endif
 }
 
 void GeoNodeManager::clearSpatialIndex()
@@ -437,6 +471,22 @@ void GeoNodeManager::setupControlPointsRendering()
 
     osg::ref_ptr<osg::StateSet> stateSet = m_controlPointsGeometry->getOrCreateStateSet();
     
+#ifdef __linux__
+    // Linux平台简化控制点渲染
+    // 设置点的大小，使用较小的尺寸减少填充率压力
+    osg::ref_ptr<osg::Point> pointSize = new osg::Point(3.0f);
+    stateSet->setAttributeAndModes(pointSize.get(), osg::StateAttribute::ON);
+    
+    // 简化材质设置，只设置基本颜色
+    osg::ref_ptr<osg::Material> material = new osg::Material();
+    material->setDiffuse(osg::Material::FRONT_AND_BACK, osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f));  // 黄色
+    stateSet->setAttributeAndModes(material.get(), osg::StateAttribute::ON);
+    
+    // 关闭光照，减少计算开销
+    stateSet->setMode(GL_LIGHTING, osg::StateAttribute::OFF | osg::StateAttribute::PROTECTED);
+    
+    LOG_INFO("Linux平台：使用简化的控制点渲染", "几何体管理");
+#else
     // 设置点的大小和颜色
     osg::ref_ptr<osg::Point> pointSize = new osg::Point(4.0f);
     stateSet->setAttributeAndModes(pointSize.get(), osg::StateAttribute::ON);
@@ -449,6 +499,7 @@ void GeoNodeManager::setupControlPointsRendering()
     
     // 关闭光照
     stateSet->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+#endif
 }
 
 void GeoNodeManager::setupBoundingBoxRendering()
@@ -457,6 +508,22 @@ void GeoNodeManager::setupBoundingBoxRendering()
 
     osg::ref_ptr<osg::StateSet> stateSet = m_boundingBoxGeometry->getOrCreateStateSet();
     
+#ifdef __linux__
+    // Linux平台简化包围盒渲染
+    // 使用较小的线宽，减少填充率压力
+    osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth(1.5f);
+    stateSet->setAttributeAndModes(lineWidth.get(), osg::StateAttribute::ON);
+    
+    // 简化材质设置，只设置基本颜色
+    osg::ref_ptr<osg::Material> material = new osg::Material();
+    material->setDiffuse(osg::Material::FRONT_AND_BACK, osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f));  // 黄色
+    stateSet->setAttributeAndModes(material.get(), osg::StateAttribute::ON);
+    
+    // 关闭光照，减少计算开销
+    stateSet->setMode(GL_LIGHTING, osg::StateAttribute::OFF | osg::StateAttribute::PROTECTED);
+    
+    LOG_INFO("Linux平台：使用简化的包围盒渲染", "几何体管理");
+#else
     // 设置线宽
     osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth(2.0f);
     stateSet->setAttributeAndModes(lineWidth.get(), osg::StateAttribute::ON);
@@ -469,4 +536,5 @@ void GeoNodeManager::setupBoundingBoxRendering()
     
     // 关闭光照
     stateSet->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+#endif
 }

@@ -215,7 +215,7 @@ bool LogOutputWidget::isShowCategoryEnabled() const
 
 void LogOutputWidget::addLogEntry(const LogEntry& entry)
 {
-    qDebug() << "LogOutputWidget::addLogEntry - 接收到日志:" << entry.message;
+    // qDebug() << "LogOutputWidget::addLogEntry - 接收到日志:" << entry.message;
     
     // 添加日志到本地存储
     m_allLogs.append(entry);
@@ -326,7 +326,7 @@ void LogOutputWidget::addLogsToTextEdit(const QList<LogEntry>& logs)
 {
     if (!m_textEdit || logs.isEmpty()) return;
     
-    qDebug() << "LogOutputWidget::addLogsToTextEdit - 开始添加日志到UI，数量:" << logs.size();
+    // qDebug() << "LogOutputWidget::addLogsToTextEdit - 开始添加日志到UI，数量:" << logs.size();
     
     // 准备批量文本插入 - 优化版本
     QStringList textLines;
@@ -357,7 +357,7 @@ void LogOutputWidget::addLogsToTextEdit(const QList<LogEntry>& logs)
         }
     }
     
-    qDebug() << "LogOutputWidget::addLogsToTextEdit - 完成添加日志到UI";
+    // qDebug() << "LogOutputWidget::addLogsToTextEdit - 完成添加日志到UI";
 }
 
 void LogOutputWidget::addLogToTextEdit(const LogEntry& entry)

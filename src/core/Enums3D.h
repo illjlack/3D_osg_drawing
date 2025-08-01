@@ -219,6 +219,19 @@ enum CoordinateAxis3D
     EndCoordinateAxis3D
 };
 
+// Linux平台渲染质量配置
+enum LinuxRenderQuality3D
+{
+    BeginLinuxRenderQuality3D = EndCoordinateAxis3D,
+    
+    Linux_Performance3D,    // 性能优先：最简化的渲染设置
+    Linux_Balanced3D,       // 平衡模式：中等渲染质量
+    Linux_Quality3D,        // 质量优先：接近Windows平台的渲染效果
+    Linux_Auto3D,           // 自动检测：根据GPU性能自动选择
+    
+    EndLinuxRenderQuality3D
+};
+
 // 网格平面
 enum GridPlane3D
 {
